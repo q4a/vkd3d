@@ -144,6 +144,12 @@ static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
                     vkd3d_string_buffer_printf(buffer, "%#xu", reg->u.immconst_u32[0]);
                     break;
 
+                case VSIR_DIMENSION_VEC4:
+                    vkd3d_string_buffer_printf(buffer, "uvec4(%#xu, %#xu, %#xu, %#xu)",
+                            reg->u.immconst_u32[0], reg->u.immconst_u32[1],
+                            reg->u.immconst_u32[2], reg->u.immconst_u32[3]);
+                    break;
+
                 default:
                     vkd3d_string_buffer_printf(buffer, "<unhandled_dimension %#x>", reg->dimension);
                     vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
