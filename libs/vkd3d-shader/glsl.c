@@ -694,6 +694,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             shader_glsl_relop(gen, ins, "!=", "notEqual");
             break;
         case VKD3DSIH_ITOF:
+        case VKD3DSIH_UTOF:
             shader_glsl_cast(gen, ins, "float", "vec");
             break;
         case VKD3DSIH_MOV:
