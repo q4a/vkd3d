@@ -137,6 +137,21 @@ static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
             vkd3d_string_buffer_printf(buffer, "%s_out[%u]", gen->prefix, reg->idx[0].offset);
             break;
 
+        case VKD3DSPR_IMMCONST:
+            switch (reg->dimension)
+            {
+                case VSIR_DIMENSION_SCALAR:
+                    vkd3d_string_buffer_printf(buffer, "%#xu", reg->u.immconst_u32[0]);
+                    break;
+
+                default:
+                    vkd3d_string_buffer_printf(buffer, "<unhandled_dimension %#x>", reg->dimension);
+                    vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                            "Internal compiler error: Unhandled dimension %#x.", reg->dimension);
+                    break;
+            }
+            break;
+
         case VKD3DSPR_CONSTBUFFER:
             if (reg->idx_count != 3)
             {
@@ -195,12 +210,41 @@ static void glsl_src_cleanup(struct glsl_src *src, struct vkd3d_string_buffer_ca
     vkd3d_string_buffer_release(cache, src->str);
 }
 
+static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vkd3d_glsl_generator *gen,
+        const char *src, enum vkd3d_data_type dst_data_type, enum vkd3d_data_type src_data_type)
+{
+    if (dst_data_type == VKD3D_DATA_UNORM || dst_data_type == VKD3D_DATA_SNORM)
+        dst_data_type = VKD3D_DATA_FLOAT;
+    if (src_data_type == VKD3D_DATA_UNORM || src_data_type == VKD3D_DATA_SNORM)
+        src_data_type = VKD3D_DATA_FLOAT;
+
+    if (dst_data_type == src_data_type)
+    {
+        vkd3d_string_buffer_printf(dst, "%s", src);
+        return;
+    }
+
+    if (src_data_type == VKD3D_DATA_UINT && dst_data_type == VKD3D_DATA_FLOAT)
+    {
+        vkd3d_string_buffer_printf(dst, "uintBitsToFloat(%s)", src);
+        return;
+    }
+
+    vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+            "Internal compiler error: Unhandled bitcast from %#x to %#x.",
+            src_data_type, dst_data_type);
+    vkd3d_string_buffer_printf(dst, "%s", src);
+}
+
 static void glsl_src_init(struct glsl_src *glsl_src, struct vkd3d_glsl_generator *gen,
         const struct vkd3d_shader_src_param *vsir_src, uint32_t mask)
 {
     const struct vkd3d_shader_register *reg = &vsir_src->reg;
+    struct vkd3d_string_buffer *register_name;
+    enum vkd3d_data_type src_data_type;
 
     glsl_src->str = vkd3d_string_buffer_get(&gen->string_buffers);
+    register_name = vkd3d_string_buffer_get(&gen->string_buffers);
 
     if (reg->non_uniform)
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -209,9 +253,17 @@ static void glsl_src_init(struct glsl_src *glsl_src, struct vkd3d_glsl_generator
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                 "Internal compiler error: Unhandled source modifier(s) %#x.", vsir_src->modifiers);
 
-    shader_glsl_print_register_name(glsl_src->str, gen, reg);
+    if (reg->type == VKD3DSPR_IMMCONST)
+        src_data_type = VKD3D_DATA_UINT;
+    else
+        src_data_type = VKD3D_DATA_FLOAT;
+
+    shader_glsl_print_register_name(register_name, gen, reg);
+    shader_glsl_print_bitcast(glsl_src->str, gen, register_name->buffer, reg->data_type, src_data_type);
     if (reg->dimension == VSIR_DIMENSION_VEC4)
         shader_glsl_print_swizzle(glsl_src->str, vsir_src->swizzle, mask);
+
+    vkd3d_string_buffer_release(&gen->string_buffers, register_name);
 }
 
 static void glsl_dst_cleanup(struct glsl_dst *dst, struct vkd3d_string_buffer_cache *cache)
