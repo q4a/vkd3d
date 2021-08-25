@@ -224,6 +224,12 @@ static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vk
         return;
     }
 
+    if (src_data_type == VKD3D_DATA_FLOAT && dst_data_type == VKD3D_DATA_UINT)
+    {
+        vkd3d_string_buffer_printf(dst, "floatBitsToUint(%s)", src);
+        return;
+    }
+
     if (src_data_type == VKD3D_DATA_UINT && dst_data_type == VKD3D_DATA_FLOAT)
     {
         vkd3d_string_buffer_printf(dst, "uintBitsToFloat(%s)", src);
@@ -317,6 +323,9 @@ static uint32_t glsl_dst_init(struct glsl_dst *glsl_dst, struct vkd3d_glsl_gener
 static void VKD3D_PRINTF_FUNC(3, 4) shader_glsl_print_assignment(
         struct vkd3d_glsl_generator *gen, struct glsl_dst *dst, const char *format, ...)
 {
+    const struct vkd3d_shader_register *dst_reg = &dst->vsir->reg;
+    struct vkd3d_string_buffer *buffer = gen->buffer;
+    bool close = true;
     va_list args;
 
     if (dst->vsir->shift)
@@ -326,14 +335,28 @@ static void VKD3D_PRINTF_FUNC(3, 4) shader_glsl_print_assignment(
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                 "Internal compiler error: Unhandled destination modifier(s) %#x.", dst->vsir->modifiers);
 
-    shader_glsl_print_indent(gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(gen->buffer, "%s%s = ", dst->register_name->buffer, dst->mask->buffer);
+    shader_glsl_print_indent(buffer, gen->indent);
+    vkd3d_string_buffer_printf(buffer, "%s%s = ", dst->register_name->buffer, dst->mask->buffer);
+
+    switch (dst_reg->data_type)
+    {
+        default:
+            vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                    "Internal compiler error: Unhandled destination register data type %#x.", dst_reg->data_type);
+            /* fall through */
+        case VKD3D_DATA_FLOAT:
+            close = false;
+            break;
+        case VKD3D_DATA_UINT:
+            vkd3d_string_buffer_printf(buffer, "uintBitsToFloat(");
+            break;
+    }
 
     va_start(args, format);
-    vkd3d_string_buffer_vprintf(gen->buffer, format, args);
+    vkd3d_string_buffer_vprintf(buffer, format, args);
     va_end(args);
 
-    vkd3d_string_buffer_printf(gen->buffer, ";\n");
+    vkd3d_string_buffer_printf(buffer, "%s;\n", close ? ")" : "");
 }
 
 static void shader_glsl_unhandled(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
@@ -523,6 +546,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
     {
         case VKD3DSIH_ADD:
             shader_glsl_binop(gen, ins, "+");
+            break;
+        case VKD3DSIH_AND:
+            shader_glsl_binop(gen, ins, "&");
             break;
         case VKD3DSIH_DCL_INPUT:
         case VKD3DSIH_DCL_OUTPUT:
