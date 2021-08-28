@@ -272,6 +272,24 @@ static void shader_glsl_unhandled(struct vkd3d_glsl_generator *gen, const struct
             "Internal compiler error: Unhandled instruction %#x.", ins->opcode);
 }
 
+static void shader_glsl_binop(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_instruction *ins, const char *op)
+{
+    struct glsl_src src[2];
+    struct glsl_dst dst;
+    uint32_t mask;
+
+    mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&src[0], gen, &ins->src[0], mask);
+    glsl_src_init(&src[1], gen, &ins->src[1], mask);
+
+    shader_glsl_print_assignment(gen, &dst, "%s %s %s", src[0].str->buffer, op, src[1].str->buffer);
+
+    glsl_src_cleanup(&src[1], &gen->string_buffers);
+    glsl_src_cleanup(&src[0], &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_mov(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct glsl_src src;
@@ -431,6 +449,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
 
     switch (ins->opcode)
     {
+        case VKD3DSIH_ADD:
+            shader_glsl_binop(gen, ins, "+");
+            break;
         case VKD3DSIH_DCL_INPUT:
         case VKD3DSIH_DCL_OUTPUT:
         case VKD3DSIH_DCL_OUTPUT_SIV:
