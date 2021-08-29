@@ -472,6 +472,31 @@ static void shader_glsl_mov(struct vkd3d_glsl_generator *gen, const struct vkd3d
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_movc(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    unsigned int component_count;
+    struct glsl_src src[3];
+    struct glsl_dst dst;
+    uint32_t mask;
+
+    mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&src[0], gen, &ins->src[0], mask);
+    glsl_src_init(&src[1], gen, &ins->src[1], mask);
+    glsl_src_init(&src[2], gen, &ins->src[2], mask);
+
+    if ((component_count = vsir_write_mask_component_count(mask)) > 1)
+        shader_glsl_print_assignment(gen, &dst, "mix(%s, %s, bvec%u(%s))",
+                src[2].str->buffer, src[1].str->buffer, component_count, src[0].str->buffer);
+    else
+        shader_glsl_print_assignment(gen, &dst, "mix(%s, %s, bool(%s))",
+                src[2].str->buffer, src[1].str->buffer, src[0].str->buffer);
+
+    glsl_src_cleanup(&src[2], &gen->string_buffers);
+    glsl_src_cleanup(&src[1], &gen->string_buffers);
+    glsl_src_cleanup(&src[0], &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
         enum vkd3d_shader_sysval_semantic sysval, unsigned int idx)
 {
@@ -642,6 +667,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_MOV:
             shader_glsl_mov(gen, ins);
+            break;
+        case VKD3DSIH_MOVC:
+            shader_glsl_movc(gen, ins);
             break;
         case VKD3DSIH_MUL:
             shader_glsl_binop(gen, ins, "*");
