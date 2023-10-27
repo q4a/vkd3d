@@ -49,6 +49,7 @@ enum shader_type
     SHADER_TYPE_DS,
     SHADER_TYPE_GS,
     SHADER_TYPE_FX,
+    SHADER_TYPE_COUNT,
 };
 
 const char *shader_type_string(enum shader_type type);
@@ -179,13 +180,7 @@ struct shader_runner
 
     bool is_todo;
 
-    char *vs_source;
-    char *ps_source;
-    char *cs_source;
-    char *fx_source;
-    char *hs_source;
-    char *ds_source;
-    char *gs_source;
+    char *shader_source[SHADER_TYPE_COUNT];
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
     bool require_shader_caps[SHADER_CAP_COUNT];

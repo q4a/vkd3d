@@ -533,8 +533,9 @@ static void gl_runner_destroy_resource(struct shader_runner *r, struct resource 
     free(resource);
 }
 
-static ID3DBlob *compile_hlsl(const struct shader_runner *runner, const char *source, const char *type)
+static ID3DBlob *compile_hlsl(const struct shader_runner *runner, enum shader_type type)
 {
+    const char *source = runner->shader_source[type];
     ID3DBlob *blob = NULL, *errors = NULL;
     char profile[7];
 
@@ -546,7 +547,7 @@ static ID3DBlob *compile_hlsl(const struct shader_runner *runner, const char *so
         [SHADER_MODEL_5_1] = "5_1",
     };
 
-    sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
+    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
     D3DCompile(source, strlen(source), NULL, NULL, NULL, "main",
             profile, runner->compile_options, 0, &blob, &errors);
     if (errors)
@@ -742,7 +743,7 @@ static GLuint compile_compute_shader_program(struct gl_runner *runner)
     bool ret;
 
     reset_combined_samplers(runner);
-    if (!(cs_blob = compile_hlsl(&runner->r, runner->r.cs_source, "cs")))
+    if (!(cs_blob = compile_hlsl(&runner->r, SHADER_TYPE_CS)))
         return false;
     ret = compile_shader(runner, cs_blob, &cs_code);
     ID3D10Blob_Release(cs_blob);
@@ -916,23 +917,23 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
 
     reset_combined_samplers(runner);
 
-    *vs_blob = compile_hlsl(&runner->r, runner->r.vs_source, "vs");
-    fs_blob = compile_hlsl(&runner->r, runner->r.ps_source, "ps");
+    *vs_blob = compile_hlsl(&runner->r, SHADER_TYPE_VS);
+    fs_blob = compile_hlsl(&runner->r, SHADER_TYPE_PS);
     succeeded = *vs_blob && fs_blob;
 
-    if (runner->r.hs_source)
+    if (runner->r.shader_source[SHADER_TYPE_HS])
     {
-        hs_blob = compile_hlsl(&runner->r, runner->r.hs_source, "hs");
+        hs_blob = compile_hlsl(&runner->r, SHADER_TYPE_HS);
         succeeded = succeeded && hs_blob;
     }
-    if (runner->r.ds_source)
+    if (runner->r.shader_source[SHADER_TYPE_DS])
     {
-        ds_blob = compile_hlsl(&runner->r, runner->r.ds_source, "ds");
+        ds_blob = compile_hlsl(&runner->r, SHADER_TYPE_DS);
         succeeded = succeeded && ds_blob;
     }
-    if (runner->r.gs_source)
+    if (runner->r.shader_source[SHADER_TYPE_GS])
     {
-        gs_blob = compile_hlsl(&runner->r, runner->r.gs_source, "gs");
+        gs_blob = compile_hlsl(&runner->r, SHADER_TYPE_GS);
         succeeded = succeeded && gs_blob;
     }
 

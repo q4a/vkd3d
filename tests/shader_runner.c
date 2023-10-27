@@ -958,7 +958,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             "    return pos;\n"
             "}";
 
-        if (!runner->hs_source != !runner->ds_source)
+        if (!runner->shader_source[SHADER_TYPE_HS] != !runner->shader_source[SHADER_TYPE_DS])
             fatal_error("Have a domain or hull shader but not both.\n");
 
         set_default_target(runner);
@@ -987,8 +987,8 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         set_resource(runner, &params);
         free(params.data);
 
-        if (!runner->vs_source)
-            runner->vs_source = strdup(vs_source);
+        if (!runner->shader_source[SHADER_TYPE_VS])
+            runner->shader_source[SHADER_TYPE_VS] = strdup(vs_source);
 
         runner->sample_count = 1;
         for (i = 0; i < runner->resource_count; ++i)
@@ -1005,7 +1005,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         unsigned int vertex_count, instance_count;
         D3D_PRIMITIVE_TOPOLOGY topology;
 
-        if (!runner->hs_source != !runner->ds_source)
+        if (!runner->shader_source[SHADER_TYPE_HS] != !runner->shader_source[SHADER_TYPE_DS])
             fatal_error("Have a domain or hull shader but not both.\n");
 
         set_default_target(runner);
@@ -1823,8 +1823,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_CS,
                                 expect_hr);
                     }
-                    free(runner->cs_source);
-                    runner->cs_source = shader_source;
+                    free(runner->shader_source[SHADER_TYPE_CS]);
+                    runner->shader_source[SHADER_TYPE_CS] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -1838,8 +1838,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_PS,
                                 expect_hr);
                     }
-                    free(runner->ps_source);
-                    runner->ps_source = shader_source;
+                    free(runner->shader_source[SHADER_TYPE_PS]);
+                    runner->shader_source[SHADER_TYPE_PS] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -1853,8 +1853,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_VS,
                                 expect_hr);
                     }
-                    free(runner->vs_source);
-                    runner->vs_source = shader_source;
+                    free(runner->shader_source[SHADER_TYPE_VS]);
+                    runner->shader_source[SHADER_TYPE_VS] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -1868,8 +1868,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_FX,
                                 expect_hr);
                     }
-                    free(runner->fx_source);
-                    runner->fx_source = shader_source;
+                    free(runner->shader_source[SHADER_TYPE_FX]);
+                    runner->shader_source[SHADER_TYPE_FX] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -1883,8 +1883,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_HS,
                                 expect_hr);
                     }
-                    free(runner->hs_source);
-                    runner->hs_source = shader_source;
+                    free(runner->shader_source[SHADER_TYPE_HS]);
+                    runner->shader_source[SHADER_TYPE_HS] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -1898,8 +1898,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_DS,
                                 expect_hr);
                     }
-                    free(runner->ds_source);
-                    runner->ds_source = shader_source;
+                    free(runner->shader_source[SHADER_TYPE_DS]);
+                    runner->shader_source[SHADER_TYPE_DS] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -1913,8 +1913,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_GS,
                                 expect_hr);
                     }
-                    free(runner->gs_source);
-                    runner->gs_source = shader_source;
+                    free(runner->shader_source[SHADER_TYPE_GS]);
+                    runner->shader_source[SHADER_TYPE_GS] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -2212,13 +2212,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     for (i = 0; i < runner->input_element_count; ++i)
         free(runner->input_elements[i].name);
     free(runner->input_elements);
-    free(runner->vs_source);
-    free(runner->ps_source);
-    free(runner->cs_source);
-    free(runner->hs_source);
-    free(runner->ds_source);
-    free(runner->gs_source);
-    free(runner->fx_source);
+    for (i = 0; i < SHADER_TYPE_COUNT; ++i)
+        free(runner->shader_source[i]);
     free(runner->uniforms);
     for (i = 0; i < runner->resource_count; ++i)
     {

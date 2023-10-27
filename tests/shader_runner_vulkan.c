@@ -503,14 +503,15 @@ static bool compile_shader(struct vulkan_shader_runner *runner,
     return true;
 }
 
-static bool create_shader_stage(struct vulkan_shader_runner *runner, VkPipelineShaderStageCreateInfo *stage_info,
-        const char *type, enum VkShaderStageFlagBits stage, const char *source)
+static bool create_shader_stage(struct vulkan_shader_runner *runner,
+        VkPipelineShaderStageCreateInfo *stage_info, enum shader_type type, enum VkShaderStageFlagBits stage)
 {
     VkShaderModuleCreateInfo module_info = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     const struct vulkan_test_context *context = &runner->context;
+    const char *source = runner->r.shader_source[type];
     struct vkd3d_shader_code spirv;
 
-    if (!compile_shader(runner, source, type, &spirv))
+    if (!compile_shader(runner, source, shader_type_string(type), &spirv))
         return false;
 
     memset(stage_info, 0, sizeof(*stage_info));
@@ -621,22 +622,19 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     int ret;
 
     memset(stage_desc, 0, sizeof(stage_desc));
-    ret = create_shader_stage(runner, &stage_desc[stage_count++],
-            "vs", VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source);
-    ret &= create_shader_stage(runner, &stage_desc[stage_count++],
-            "ps", VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source);
+    ret = create_shader_stage(runner, &stage_desc[stage_count++], SHADER_TYPE_VS, VK_SHADER_STAGE_VERTEX_BIT);
+    ret &= create_shader_stage(runner, &stage_desc[stage_count++], SHADER_TYPE_PS, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    if (runner->r.hs_source)
+    if (runner->r.shader_source[SHADER_TYPE_HS])
     {
-        ret &= create_shader_stage(runner, &stage_desc[stage_count++], "hs",
-                VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, runner->r.hs_source);
-        ret &= create_shader_stage(runner, &stage_desc[stage_count++], "ds",
-                VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, runner->r.ds_source);
+        ret &= create_shader_stage(runner, &stage_desc[stage_count++],
+                SHADER_TYPE_HS, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+        ret &= create_shader_stage(runner, &stage_desc[stage_count++],
+                SHADER_TYPE_DS, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
     }
 
-    if (runner->r.gs_source)
-        ret &= create_shader_stage(runner, &stage_desc[stage_count++],
-                "gs", VK_SHADER_STAGE_GEOMETRY_BIT, runner->r.gs_source);
+    if (runner->r.shader_source[SHADER_TYPE_GS])
+        ret &= create_shader_stage(runner, &stage_desc[stage_count++], SHADER_TYPE_GS, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     if (!ret)
     {
@@ -756,7 +754,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     pipeline_desc.renderPass = render_pass;
     pipeline_desc.subpass = 0;
 
-    if (runner->r.hs_source)
+    if (runner->r.shader_source[SHADER_TYPE_HS])
     {
         tessellation_info.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
         tessellation_info.pNext = NULL;
@@ -783,7 +781,7 @@ static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, V
     VkPipeline pipeline;
     bool ret;
 
-    ret = create_shader_stage(runner, &pipeline_desc.stage, "cs", VK_SHADER_STAGE_COMPUTE_BIT, runner->r.cs_source);
+    ret = create_shader_stage(runner, &pipeline_desc.stage, SHADER_TYPE_CS, VK_SHADER_STAGE_COMPUTE_BIT);
     todo_if (runner->r.is_todo) ok(ret, "Failed to compile shader.\n");
     if (!ret)
         return VK_NULL_HANDLE;
