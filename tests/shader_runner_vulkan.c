@@ -294,6 +294,7 @@ static bool compile_hlsl_and_scan(struct vulkan_shader_runner *runner, enum shad
 static bool compile_d3d_code(struct vulkan_shader_runner *runner,
         enum shader_type type, struct vkd3d_shader_code *spirv)
 {
+    struct vkd3d_shader_varying_map_info varying_map_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_VARYING_MAP_INFO};
     struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};
     struct vkd3d_shader_interface_info interface_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO};
     struct vkd3d_shader_parameter_info parameter_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_PARAMETER_INFO};
@@ -301,6 +302,7 @@ static bool compile_d3d_code(struct vulkan_shader_runner *runner,
     struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
     struct vkd3d_shader_push_constant_buffer push_constants;
     enum vkd3d_shader_spirv_extension spirv_extensions[2];
+    struct vkd3d_shader_varying_map varying_map[12];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_compile_option options[2];
     struct vkd3d_shader_parameter1 parameters[17];
@@ -324,6 +326,18 @@ static bool compile_d3d_code(struct vulkan_shader_runner *runner,
     info.log_level = VKD3D_SHADER_LOG_WARNING;
     info.option_count = ARRAY_SIZE(options);
     info.options = options;
+
+    if (type == SHADER_TYPE_VS && info.source_type == VKD3D_SHADER_SOURCE_D3D_BYTECODE)
+    {
+        info.next = &varying_map_info;
+
+        varying_map_info.next = &spirv_info;
+        varying_map_info.varying_map = varying_map;
+        vkd3d_shader_build_varying_map(&runner->signatures[SHADER_TYPE_VS].output,
+                &runner->signatures[SHADER_TYPE_PS].input, &varying_map_info.varying_count, varying_map);
+        ok(varying_map_info.varying_count <= ARRAY_SIZE(varying_map),
+                "Got unexpected count %u.\n", varying_map_info.varying_count);
+    }
 
     spirv_info.next = &interface_info;
     spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
