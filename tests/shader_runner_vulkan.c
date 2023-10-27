@@ -465,9 +465,6 @@ static bool create_shader_stage(struct vulkan_shader_runner *runner,
     const struct vulkan_test_context *context = &runner->context;
     struct vkd3d_shader_code spirv;
 
-    if (!compile_hlsl_and_scan(runner, type))
-        return false;
-
     if (!compile_d3d_code(runner, type, &spirv))
         return false;
 
@@ -578,6 +575,24 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkResult vr;
     int ret;
 
+    ret = compile_hlsl_and_scan(runner, SHADER_TYPE_VS);
+    ret &= compile_hlsl_and_scan(runner, SHADER_TYPE_PS);
+    if (runner->r.shader_source[SHADER_TYPE_HS])
+    {
+        ret &= compile_hlsl_and_scan(runner, SHADER_TYPE_HS);
+        ret &= compile_hlsl_and_scan(runner, SHADER_TYPE_DS);
+    }
+    if (runner->r.shader_source[SHADER_TYPE_GS])
+        ret &= compile_hlsl_and_scan(runner, SHADER_TYPE_GS);
+
+    if (!ret)
+    {
+        /* We ok() only when failing here, so that we don't result in a "todo
+         * succeeded" when the todo applies to pipeline linking. */
+        todo_if (runner->r.is_todo) ok(false, "Failed to compile shaders.\n");
+        return VK_NULL_HANDLE;
+    }
+
     memset(stage_desc, 0, sizeof(stage_desc));
     ret = create_shader_stage(runner, &stage_desc[stage_count++], SHADER_TYPE_VS, VK_SHADER_STAGE_VERTEX_BIT);
     ret &= create_shader_stage(runner, &stage_desc[stage_count++], SHADER_TYPE_PS, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -593,11 +608,9 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     if (runner->r.shader_source[SHADER_TYPE_GS])
         ret &= create_shader_stage(runner, &stage_desc[stage_count++], SHADER_TYPE_GS, VK_SHADER_STAGE_GEOMETRY_BIT);
 
+    todo_if (runner->r.is_todo) ok(ret, "Failed to compile shaders.\n");
     if (!ret)
     {
-        /* We ok() only when failing here, so that we don't result in a "todo
-         * succeeded" when the todo applies to pipeline linking. */
-        todo_if (runner->r.is_todo) ok(false, "Failed to compile shaders.\n");
         for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
             VK_CALL(vkDestroyShaderModule(device, stage_desc[i].module, NULL));
         return VK_NULL_HANDLE;
@@ -747,10 +760,13 @@ static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, V
     VkPipeline pipeline;
     bool ret;
 
-    ret = create_shader_stage(runner, &pipeline_desc.stage, SHADER_TYPE_CS, VK_SHADER_STAGE_COMPUTE_BIT);
+    ret = compile_hlsl_and_scan(runner, SHADER_TYPE_CS);
     todo_if (runner->r.is_todo) ok(ret, "Failed to compile shader.\n");
     if (!ret)
         return VK_NULL_HANDLE;
+
+    ret = create_shader_stage(runner, &pipeline_desc.stage, SHADER_TYPE_CS, VK_SHADER_STAGE_COMPUTE_BIT);
+    ok(ret, "Failed to compile shader.\n");
 
     pipeline_desc.layout = pipeline_layout;
 
