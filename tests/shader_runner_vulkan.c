@@ -264,8 +264,8 @@ static void vulkan_runner_destroy_resource(struct shader_runner *r, struct resou
     free(resource);
 }
 
-static bool compile_shader(struct vulkan_shader_runner *runner, const char *source, const char *type,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_code *spirv)
+static bool compile_shader(struct vulkan_shader_runner *runner,
+        const char *source, const char *type, struct vkd3d_shader_code *spirv)
 {
     struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};
     struct vkd3d_shader_interface_info interface_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO};
@@ -280,6 +280,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     struct vkd3d_shader_parameter1 parameters[17];
     struct vkd3d_shader_compile_option *option;
     unsigned int i, compile_options;
+    struct vkd3d_shader_code dxbc;
     char profile[7];
     char *messages;
     int ret;
@@ -341,7 +342,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     sprintf(profile, "%s_%s", type, shader_models[runner->r.minimum_shader_model]);
     hlsl_info.profile = profile;
 
-    ret = vkd3d_shader_compile(&info, dxbc, &messages);
+    ret = vkd3d_shader_compile(&info, &dxbc, &messages);
     if (messages && vkd3d_test_state.debug_level)
         trace("%s\n", messages);
     vkd3d_shader_free_messages(messages);
@@ -349,7 +350,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
         return false;
 
     info.next = &spirv_info;
-    info.source = *dxbc;
+    info.source = dxbc;
     if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
         info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
     else
@@ -495,28 +496,22 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     if (messages && vkd3d_test_state.debug_level)
         trace("%s\n", messages);
     vkd3d_shader_free_messages(messages);
+    vkd3d_shader_free_shader_code(&dxbc);
     if (ret)
         return false;
 
     return true;
 }
 
-static bool create_shader_stage(struct vulkan_shader_runner *runner,
-        VkPipelineShaderStageCreateInfo *stage_info, const char *type, enum VkShaderStageFlagBits stage,
-        const char *source, struct vkd3d_shader_code *dxbc_ptr)
+static bool create_shader_stage(struct vulkan_shader_runner *runner, VkPipelineShaderStageCreateInfo *stage_info,
+        const char *type, enum VkShaderStageFlagBits stage, const char *source)
 {
     VkShaderModuleCreateInfo module_info = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     const struct vulkan_test_context *context = &runner->context;
-    struct vkd3d_shader_code spirv, dxbc;
+    struct vkd3d_shader_code spirv;
 
-    if (!dxbc_ptr)
-        dxbc_ptr = &dxbc;
-
-    if (!compile_shader(runner, source, type, dxbc_ptr, &spirv))
+    if (!compile_shader(runner, source, type, &spirv))
         return false;
-
-    if (dxbc_ptr == &dxbc)
-        vkd3d_shader_free_shader_code(&dxbc);
 
     memset(stage_info, 0, sizeof(*stage_info));
     stage_info->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -619,7 +614,6 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkVertexInputBindingDescription input_bindings[32];
     VkPipelineShaderStageCreateInfo stage_desc[5];
     VkDevice device = context->device;
-    struct vkd3d_shader_code vs_dxbc;
     unsigned int stage_count = 0;
     VkPipeline pipeline;
     unsigned int i, j;
@@ -627,22 +621,22 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     int ret;
 
     memset(stage_desc, 0, sizeof(stage_desc));
-    ret = create_shader_stage(runner, &stage_desc[stage_count++], "vs",
-            VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source, &vs_dxbc);
-    ret &= create_shader_stage(runner, &stage_desc[stage_count++], "ps",
-            VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source, NULL);
+    ret = create_shader_stage(runner, &stage_desc[stage_count++],
+            "vs", VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source);
+    ret &= create_shader_stage(runner, &stage_desc[stage_count++],
+            "ps", VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source);
 
     if (runner->r.hs_source)
     {
         ret &= create_shader_stage(runner, &stage_desc[stage_count++], "hs",
-                VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, runner->r.hs_source, NULL);
+                VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, runner->r.hs_source);
         ret &= create_shader_stage(runner, &stage_desc[stage_count++], "ds",
-                VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, runner->r.ds_source, NULL);
+                VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, runner->r.ds_source);
     }
 
     if (runner->r.gs_source)
-        ret &= create_shader_stage(runner, &stage_desc[stage_count++], "gs",
-                VK_SHADER_STAGE_GEOMETRY_BIT, runner->r.gs_source, NULL);
+        ret &= create_shader_stage(runner, &stage_desc[stage_count++],
+                "gs", VK_SHADER_STAGE_GEOMETRY_BIT, runner->r.gs_source);
 
     if (!ret)
     {
@@ -778,7 +772,6 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
         VK_CALL(vkDestroyShaderModule(device, stage_desc[i].module, NULL));
     vkd3d_shader_free_scan_signature_info(&runner->vs_signatures);
-    vkd3d_shader_free_shader_code(&vs_dxbc);
 
     return pipeline;
 }
@@ -790,8 +783,7 @@ static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, V
     VkPipeline pipeline;
     bool ret;
 
-    ret = create_shader_stage(runner, &pipeline_desc.stage, "cs",
-            VK_SHADER_STAGE_COMPUTE_BIT, runner->r.cs_source, NULL);
+    ret = create_shader_stage(runner, &pipeline_desc.stage, "cs", VK_SHADER_STAGE_COMPUTE_BIT, runner->r.cs_source);
     todo_if (runner->r.is_todo) ok(ret, "Failed to compile shader.\n");
     if (!ret)
         return VK_NULL_HANDLE;
