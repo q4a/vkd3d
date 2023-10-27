@@ -20,6 +20,7 @@
 
 #ifndef _WIN32
 
+#define COBJMACROS
 #define VK_NO_PROTOTYPES
 #define VKD3D_TEST_NO_DEFS
 #include "config.h"
@@ -56,7 +57,8 @@ struct vulkan_shader_runner
 
     struct vulkan_test_context context;
 
-    struct vkd3d_shader_scan_signature_info vs_signatures;
+    ID3D10Blob *d3d_blobs[SHADER_TYPE_COUNT];
+    struct vkd3d_shader_scan_signature_info signatures[SHADER_TYPE_COUNT];
 
     struct vulkan_sampler
     {
@@ -264,102 +266,64 @@ static void vulkan_runner_destroy_resource(struct shader_runner *r, struct resou
     free(resource);
 }
 
-static bool compile_shader(struct vulkan_shader_runner *runner,
-        const char *source, const char *type, struct vkd3d_shader_code *spirv)
+static bool compile_hlsl_and_scan(struct vulkan_shader_runner *runner, enum shader_type type)
 {
-    struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};
-    struct vkd3d_shader_interface_info interface_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO};
-    struct vkd3d_shader_parameter_info parameter_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_PARAMETER_INFO};
-    struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
     struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
-    struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
-    struct vkd3d_shader_push_constant_buffer push_constants;
-    enum vkd3d_shader_spirv_extension spirv_extensions[2];
-    struct vkd3d_shader_resource_binding *binding;
-    struct vkd3d_shader_compile_option options[3];
-    struct vkd3d_shader_parameter1 parameters[17];
-    struct vkd3d_shader_compile_option *option;
-    unsigned int i, compile_options;
-    struct vkd3d_shader_code dxbc;
-    char profile[7];
-    char *messages;
-    int ret;
+    enum vkd3d_result ret;
 
-    static const char *const shader_models[] =
-    {
-        [SHADER_MODEL_2_0] = "2_0",
-        [SHADER_MODEL_3_0] = "3_0",
-        [SHADER_MODEL_4_0] = "4_0",
-        [SHADER_MODEL_4_1] = "4_1",
-        [SHADER_MODEL_5_0] = "5_0",
-        [SHADER_MODEL_5_1] = "5_1",
-    };
-
-    info.next = &hlsl_info;
-    info.source.code = source;
-    info.source.size = strlen(source);
-    info.source_type = VKD3D_SHADER_SOURCE_HLSL;
-    if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
-        info.target_type = VKD3D_SHADER_TARGET_D3D_BYTECODE;
-    else
-        info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
-
-    info.log_level = VKD3D_SHADER_LOG_WARNING;
-
-    info.options = options;
-    info.option_count = 0;
-
-    option = &options[info.option_count++];
-    option->name = VKD3D_SHADER_COMPILE_OPTION_API_VERSION;
-    option->value = VKD3D_SHADER_API_VERSION_1_13;
-
-    compile_options = runner->r.compile_options;
-    if (compile_options)
-    {
-
-        if (compile_options & (D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR))
-        {
-            option = &options[info.option_count++];
-            option->name = VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER;
-            option->value = 0;
-            if (compile_options & D3DCOMPILE_PACK_MATRIX_ROW_MAJOR)
-                option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR;
-            if (compile_options & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
-                option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR;
-
-            compile_options &= ~(D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR);
-        }
-
-        /* FIXME: ignore compatibility flag for now */
-        if (compile_options & D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY)
-            compile_options &= ~D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
-
-        if (compile_options)
-            fatal_error("Unsupported compiler options %#x.\n", compile_options);
-    }
-
-    hlsl_info.entry_point = "main";
-    sprintf(profile, "%s_%s", type, shader_models[runner->r.minimum_shader_model]);
-    hlsl_info.profile = profile;
-
-    ret = vkd3d_shader_compile(&info, &dxbc, &messages);
-    if (messages && vkd3d_test_state.debug_level)
-        trace("%s\n", messages);
-    vkd3d_shader_free_messages(messages);
-    if (ret)
+    if (!(runner->d3d_blobs[type] = compile_hlsl(&runner->r, type)))
         return false;
 
-    info.next = &spirv_info;
-    info.source = dxbc;
+    info.next = &runner->signatures[type];
+    info.source.code = ID3D10Blob_GetBufferPointer(runner->d3d_blobs[type]);
+    info.source.size = ID3D10Blob_GetBufferSize(runner->d3d_blobs[type]);
     if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
         info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
     else
         info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
 
-    option = &options[info.option_count++];
-    option->name = VKD3D_SHADER_COMPILE_OPTION_FEATURE;
-    option->value = shader_runner_caps_get_feature_flags(&runner->caps);
+    runner->signatures[type].type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
+    runner->signatures[type].next = NULL;
+    ret = vkd3d_shader_scan(&info, NULL);
+    ok(!ret, "Failed to scan, error %d.\n", ret);
+
+    return true;
+}
+
+static bool compile_d3d_code(struct vulkan_shader_runner *runner,
+        enum shader_type type, struct vkd3d_shader_code *spirv)
+{
+    struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};
+    struct vkd3d_shader_interface_info interface_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO};
+    struct vkd3d_shader_parameter_info parameter_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_PARAMETER_INFO};
+    struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
+    struct vkd3d_shader_push_constant_buffer push_constants;
+    enum vkd3d_shader_spirv_extension spirv_extensions[2];
+    struct vkd3d_shader_resource_binding *binding;
+    struct vkd3d_shader_compile_option options[2];
+    struct vkd3d_shader_parameter1 parameters[17];
+    unsigned int i;
+    char *messages;
+    int ret;
+
+    options[0].name = VKD3D_SHADER_COMPILE_OPTION_API_VERSION;
+    options[0].value = VKD3D_SHADER_API_VERSION_1_13;
+    options[1].name = VKD3D_SHADER_COMPILE_OPTION_FEATURE;
+    options[1].value = shader_runner_caps_get_feature_flags(&runner->caps);
+
+    info.next = &spirv_info;
+    info.source.code = ID3D10Blob_GetBufferPointer(runner->d3d_blobs[type]);
+    info.source.size = ID3D10Blob_GetBufferSize(runner->d3d_blobs[type]);
+    if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
+        info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+    else
+        info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+    info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
+    info.log_level = VKD3D_SHADER_LOG_WARNING;
+    info.option_count = ARRAY_SIZE(options);
+    info.options = options;
 
     spirv_info.next = &interface_info;
     spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
@@ -484,19 +448,10 @@ static bool compile_shader(struct vulkan_shader_runner *runner,
     parameter_info.parameter_count = ARRAY_SIZE(parameters);
     parameter_info.parameters = parameters;
 
-    if (!strcmp(type, "vs"))
-    {
-        parameter_info.next = &runner->vs_signatures;
-
-        runner->vs_signatures.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
-        runner->vs_signatures.next = NULL;
-    }
-
     ret = vkd3d_shader_compile(&info, spirv, &messages);
     if (messages && vkd3d_test_state.debug_level)
         trace("%s\n", messages);
     vkd3d_shader_free_messages(messages);
-    vkd3d_shader_free_shader_code(&dxbc);
     if (ret)
         return false;
 
@@ -508,10 +463,12 @@ static bool create_shader_stage(struct vulkan_shader_runner *runner,
 {
     VkShaderModuleCreateInfo module_info = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     const struct vulkan_test_context *context = &runner->context;
-    const char *source = runner->r.shader_source[type];
     struct vkd3d_shader_code spirv;
 
-    if (!compile_shader(runner, source, shader_type_string(type), &spirv))
+    if (!compile_hlsl_and_scan(runner, type))
+        return false;
+
+    if (!compile_d3d_code(runner, type, &spirv))
         return false;
 
     memset(stage_info, 0, sizeof(*stage_info));
@@ -655,7 +612,8 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
         const struct input_element *element = &runner->r.input_elements[i];
         const struct vkd3d_shader_signature_element *signature_element;
 
-        signature_element = vkd3d_shader_find_signature_element(&runner->vs_signatures.input, element->name, element->index, 0);
+        signature_element = vkd3d_shader_find_signature_element(
+                &runner->signatures[SHADER_TYPE_VS].input, element->name, element->index, 0);
         ok(signature_element, "Cannot find signature element %s%u.\n", element->name, element->index);
 
         attribute->location = signature_element->register_index;
@@ -769,7 +727,15 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
 
     for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
         VK_CALL(vkDestroyShaderModule(device, stage_desc[i].module, NULL));
-    vkd3d_shader_free_scan_signature_info(&runner->vs_signatures);
+    for (i = 0; i < SHADER_TYPE_COUNT; ++i)
+    {
+        if (!runner->d3d_blobs[i])
+            continue;
+
+        vkd3d_shader_free_scan_signature_info(&runner->signatures[i]);
+        ID3D10Blob_Release(runner->d3d_blobs[i]);
+        runner->d3d_blobs[i] = NULL;
+    }
 
     return pipeline;
 }
@@ -791,6 +757,10 @@ static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, V
     VK_CALL(vkCreateComputePipelines(context->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
 
     VK_CALL(vkDestroyShaderModule(context->device, pipeline_desc.stage.module, NULL));
+
+    vkd3d_shader_free_scan_signature_info(&runner->signatures[SHADER_TYPE_CS]);
+    ID3D10Blob_Release(runner->d3d_blobs[SHADER_TYPE_CS]);
+    runner->d3d_blobs[SHADER_TYPE_CS] = NULL;
 
     return pipeline;
 }
