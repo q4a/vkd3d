@@ -1635,7 +1635,8 @@ int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
         case VKD3D_SHADER_TARGET_GLSL:
             if ((ret = vsir_program_scan(program, &scan_info, message_context, &scan_descriptor_info)) < 0)
                 return ret;
-            ret = glsl_compile(program, config_flags, compile_info, out, message_context);
+            ret = glsl_compile(program, config_flags, &scan_descriptor_info,
+                    compile_info, out, message_context);
             vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;
 

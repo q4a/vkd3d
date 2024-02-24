@@ -168,6 +168,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_WARNING_HLSL_IGNORED_DEFAULT_VALUE     = 5306,
 
     VKD3D_SHADER_ERROR_GLSL_INTERNAL                    = 6000,
+    VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND           = 6001,
 
     VKD3D_SHADER_ERROR_D3DBC_UNEXPECTED_EOF             = 7000,
     VKD3D_SHADER_ERROR_D3DBC_INVALID_VERSION_TOKEN      = 7001,
@@ -1593,8 +1594,9 @@ int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, struct shader_signature *signature);
 
 int glsl_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
-        struct vkd3d_shader_message_context *message_context);
+        const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info,
+        const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
 #define SPIRV_MAX_SRC_COUNT 6
 

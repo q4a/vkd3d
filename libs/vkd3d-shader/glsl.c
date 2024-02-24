@@ -48,6 +48,10 @@ struct vkd3d_glsl_generator
     } limits;
     bool interstage_input;
     bool interstage_output;
+
+    const struct vkd3d_shader_interface_info *interface_info;
+    const struct vkd3d_shader_descriptor_offset_info *offset_info;
+    const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info;
 };
 
 static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
@@ -131,6 +135,25 @@ static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
                 break;
             }
             vkd3d_string_buffer_printf(buffer, "%s_out[%u]", gen->prefix, reg->idx[0].offset);
+            break;
+
+        case VKD3DSPR_CONSTBUFFER:
+            if (reg->idx_count != 3)
+            {
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled constant buffer register index count %u.", reg->idx_count);
+                vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
+                break;
+            }
+            if (reg->idx[0].rel_addr || reg->idx[2].rel_addr)
+            {
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled constant buffer register indirect addressing.");
+                vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
+                break;
+            }
+            vkd3d_string_buffer_printf(buffer, "%s_cb_%u[%u]",
+                    gen->prefix, reg->idx[0].offset, reg->idx[2].offset);
             break;
 
         default:
@@ -425,6 +448,151 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
     }
 }
 
+static bool shader_glsl_check_shader_visibility(const struct vkd3d_glsl_generator *gen,
+        enum vkd3d_shader_visibility visibility)
+{
+    enum vkd3d_shader_type t = gen->program->shader_version.type;
+
+    switch (visibility)
+    {
+        case VKD3D_SHADER_VISIBILITY_ALL:
+            return true;
+        case VKD3D_SHADER_VISIBILITY_VERTEX:
+            return t == VKD3D_SHADER_TYPE_VERTEX;
+        case VKD3D_SHADER_VISIBILITY_HULL:
+            return t == VKD3D_SHADER_TYPE_HULL;
+        case VKD3D_SHADER_VISIBILITY_DOMAIN:
+            return t == VKD3D_SHADER_TYPE_DOMAIN;
+        case VKD3D_SHADER_VISIBILITY_GEOMETRY:
+            return t == VKD3D_SHADER_TYPE_GEOMETRY;
+        case VKD3D_SHADER_VISIBILITY_PIXEL:
+            return t == VKD3D_SHADER_TYPE_PIXEL;
+        case VKD3D_SHADER_VISIBILITY_COMPUTE:
+            return t == VKD3D_SHADER_TYPE_COMPUTE;
+        default:
+            WARN("Invalid shader visibility %#x.\n", visibility);
+            return false;
+    }
+}
+
+static bool shader_glsl_get_cbv_binding(const struct vkd3d_glsl_generator *gen,
+        unsigned int register_space, unsigned int register_idx, unsigned int *binding_idx)
+{
+    const struct vkd3d_shader_interface_info *interface_info = gen->interface_info;
+    const struct vkd3d_shader_resource_binding *binding;
+    unsigned int i;
+
+    if (!interface_info)
+        return false;
+
+    for (i = 0; i < interface_info->binding_count; ++i)
+    {
+        binding = &interface_info->bindings[i];
+
+        if (binding->type != VKD3D_SHADER_DESCRIPTOR_TYPE_CBV)
+            continue;
+        if (binding->register_space != register_space)
+            continue;
+        if (binding->register_index != register_idx)
+            continue;
+        if (!shader_glsl_check_shader_visibility(gen, binding->shader_visibility))
+            continue;
+        if (!(binding->flags & VKD3D_SHADER_BINDING_FLAG_BUFFER))
+            continue;
+        *binding_idx = i;
+        return true;
+    }
+
+    return false;
+}
+
+static void shader_glsl_generate_cbv_declaration(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_descriptor_info1 *cbv)
+{
+    const struct vkd3d_shader_descriptor_binding *binding;
+    const struct vkd3d_shader_descriptor_offset *offset;
+    struct vkd3d_string_buffer *buffer = gen->buffer;
+    const char *prefix = gen->prefix;
+    unsigned int binding_idx;
+    size_t size;
+
+    if (cbv->count != 1)
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+                "Constant buffer %u has unsupported descriptor array size %u.", cbv->register_id, cbv->count);
+        return;
+    }
+
+    if (!shader_glsl_get_cbv_binding(gen, cbv->register_space, cbv->register_index, &binding_idx))
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+                "No descriptor binding specified for constant buffer %u.", cbv->register_id);
+        return;
+    }
+
+    binding = &gen->interface_info->bindings[binding_idx].binding;
+
+    if (binding->set != 0)
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+                "Unsupported binding set %u specified for constant buffer %u.", binding->set, cbv->register_id);
+        return;
+    }
+
+    if (binding->count != 1)
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+                "Unsupported binding count %u specified for constant buffer %u.", binding->count, cbv->register_id);
+        return;
+    }
+
+    if (gen->offset_info && gen->offset_info->binding_offsets)
+    {
+        offset = &gen->offset_info->binding_offsets[binding_idx];
+        if (offset->static_offset || offset->dynamic_offset_index != ~0u)
+        {
+            vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                    "Internal compiler error: Unhandled descriptor offset specified for constant buffer %u.",
+                    cbv->register_id);
+            return;
+        }
+    }
+
+    size = align(cbv->buffer_size, VKD3D_VEC4_SIZE * sizeof(uint32_t));
+    size /= VKD3D_VEC4_SIZE * sizeof(uint32_t);
+
+    vkd3d_string_buffer_printf(buffer,
+            "layout(std140, binding = %u) uniform block_%s_cb_%u { vec4 %s_cb_%u[%zu]; };\n",
+            binding->binding, prefix, cbv->register_id, prefix, cbv->register_id, size);
+}
+
+static void shader_glsl_generate_descriptor_declarations(struct vkd3d_glsl_generator *gen)
+{
+    const struct vkd3d_shader_scan_descriptor_info1 *info = gen->descriptor_info;
+    const struct vkd3d_shader_descriptor_info1 *descriptor;
+    unsigned int i;
+
+    for (i = 0; i < info->descriptor_count; ++i)
+    {
+        descriptor = &info->descriptors[i];
+
+        switch (descriptor->type)
+        {
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
+                shader_glsl_generate_cbv_declaration(gen, descriptor);
+                break;
+
+            default:
+                vkd3d_string_buffer_printf(gen->buffer, "/* <unhandled descriptor type %#x> */\n", descriptor->type);
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled descriptor type %#x.", descriptor->type);
+                break;
+        }
+    }
+    if (info->descriptor_count)
+        vkd3d_string_buffer_printf(gen->buffer, "\n");
+}
+
 static void shader_glsl_generate_interface_block(struct vkd3d_string_buffer *buffer,
         const char *type, unsigned int count)
 {
@@ -553,6 +721,7 @@ static void shader_glsl_generate_declarations(struct vkd3d_glsl_generator *gen)
     const struct vsir_program *program = gen->program;
     struct vkd3d_string_buffer *buffer = gen->buffer;
 
+    shader_glsl_generate_descriptor_declarations(gen);
     shader_glsl_generate_input_declarations(gen);
     shader_glsl_generate_output_declarations(gen);
 
@@ -642,7 +811,9 @@ static void shader_glsl_init_limits(struct vkd3d_glsl_generator *gen, const stru
 }
 
 static void vkd3d_glsl_generator_init(struct vkd3d_glsl_generator *gen,
-        struct vsir_program *program, struct vkd3d_shader_message_context *message_context)
+        struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
+        const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info,
+        struct vkd3d_shader_message_context *message_context)
 {
     enum vkd3d_shader_type type = program->shader_version.type;
 
@@ -650,6 +821,7 @@ static void vkd3d_glsl_generator_init(struct vkd3d_glsl_generator *gen,
     gen->program = program;
     vkd3d_string_buffer_cache_init(&gen->string_buffers);
     gen->buffer = vkd3d_string_buffer_get(&gen->string_buffers);
+    gen->location.source_name = compile_info->source_name;
     gen->message_context = message_context;
     if (!(gen->prefix = shader_glsl_get_prefix(type)))
     {
@@ -660,11 +832,16 @@ static void vkd3d_glsl_generator_init(struct vkd3d_glsl_generator *gen,
     shader_glsl_init_limits(gen, &program->shader_version);
     gen->interstage_input = type != VKD3D_SHADER_TYPE_VERTEX;
     gen->interstage_output = type != VKD3D_SHADER_TYPE_PIXEL;
+
+    gen->interface_info = vkd3d_find_struct(compile_info->next, INTERFACE_INFO);
+    gen->offset_info = vkd3d_find_struct(compile_info->next, DESCRIPTOR_OFFSET_INFO);
+    gen->descriptor_info = descriptor_info;
 }
 
 int glsl_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
-        struct vkd3d_shader_message_context *message_context)
+        const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info,
+        const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_glsl_generator generator;
     int ret;
@@ -672,7 +849,7 @@ int glsl_compile(struct vsir_program *program, uint64_t config_flags,
     if ((ret = vsir_program_transform(program, config_flags, compile_info, message_context)) < 0)
         return ret;
 
-    vkd3d_glsl_generator_init(&generator, program, message_context);
+    vkd3d_glsl_generator_init(&generator, program, compile_info, descriptor_info, message_context);
     ret = vkd3d_glsl_generator_generate(&generator, out);
     vkd3d_glsl_generator_cleanup(&generator);
 
