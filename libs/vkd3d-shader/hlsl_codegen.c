@@ -1981,6 +1981,76 @@ bool hlsl_copy_propagation_execute(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     return progress;
 }
 
+enum validation_result
+{
+    DEREF_VALIDATION_OK,
+    DEREF_VALIDATION_OUT_OF_BOUNDS,
+    DEREF_VALIDATION_NOT_CONSTANT,
+};
+
+static enum validation_result validate_component_index_range_from_deref(struct hlsl_ctx *ctx,
+        const struct hlsl_deref *deref)
+{
+    struct hlsl_type *type = deref->var->data_type;
+    unsigned int i;
+
+    for (i = 0; i < deref->path_len; ++i)
+    {
+        struct hlsl_ir_node *path_node = deref->path[i].node;
+        unsigned int idx = 0;
+
+        assert(path_node);
+        if (path_node->type != HLSL_IR_CONSTANT)
+            return DEREF_VALIDATION_NOT_CONSTANT;
+
+        /* We should always have generated a cast to UINT. */
+        assert(path_node->data_type->class == HLSL_CLASS_SCALAR
+                && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
+
+        idx = hlsl_ir_constant(path_node)->value.u[0].u;
+
+        switch (type->class)
+        {
+            case HLSL_CLASS_VECTOR:
+                if (idx >= type->dimx)
+                {
+                    hlsl_error(ctx, &path_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
+                            "Vector index is out of bounds. %u/%u", idx, type->dimx);
+                    return DEREF_VALIDATION_OUT_OF_BOUNDS;
+                }
+                break;
+
+            case HLSL_CLASS_MATRIX:
+                if (idx >= hlsl_type_major_size(type))
+                {
+                    hlsl_error(ctx, &path_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
+                            "Matrix index is out of bounds. %u/%u", idx, hlsl_type_major_size(type));
+                    return DEREF_VALIDATION_OUT_OF_BOUNDS;
+                }
+                break;
+
+            case HLSL_CLASS_ARRAY:
+                if (idx >= type->e.array.elements_count)
+                {
+                    hlsl_error(ctx, &path_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
+                            "Array index is out of bounds. %u/%u", idx, type->e.array.elements_count);
+                    return DEREF_VALIDATION_OUT_OF_BOUNDS;
+                }
+                break;
+
+            case HLSL_CLASS_STRUCT:
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+
+        type = hlsl_get_element_type_from_path_index(ctx, type, path_node);
+    }
+
+    return DEREF_VALIDATION_OK;
+}
+
 static void note_non_static_deref_expressions(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         const char *usage)
 {
@@ -1998,11 +2068,9 @@ static void note_non_static_deref_expressions(struct hlsl_ctx *ctx, const struct
     }
 }
 
-static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
+static bool validate_dereferences(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         void *context)
 {
-    unsigned int start, count;
-
     switch (instr->type)
     {
         case HLSL_IR_RESOURCE_LOAD:
@@ -2014,7 +2082,7 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                         "Loaded resource must have a single uniform source.");
             }
-            else if (!hlsl_component_index_range_from_deref(ctx, &load->resource, &start, &count))
+            else if (validate_component_index_range_from_deref(ctx, &load->resource) == DEREF_VALIDATION_NOT_CONSTANT)
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                         "Loaded resource from \"%s\" must be determinable at compile time.",
@@ -2029,7 +2097,7 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
                     hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                             "Resource load sampler must have a single uniform source.");
                 }
-                else if (!hlsl_component_index_range_from_deref(ctx, &load->sampler, &start, &count))
+                else if (validate_component_index_range_from_deref(ctx, &load->sampler) == DEREF_VALIDATION_NOT_CONSTANT)
                 {
                     hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                             "Resource load sampler from \"%s\" must be determinable at compile time.",
@@ -2048,13 +2116,25 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                         "Accessed resource must have a single uniform source.");
             }
-            else if (!hlsl_component_index_range_from_deref(ctx, &store->resource, &start, &count))
+            else if (validate_component_index_range_from_deref(ctx, &store->resource) == DEREF_VALIDATION_NOT_CONSTANT)
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                         "Accessed resource from \"%s\" must be determinable at compile time.",
                         store->resource.var->name);
                 note_non_static_deref_expressions(ctx, &store->resource, "accessed resource");
             }
+            break;
+        }
+        case HLSL_IR_LOAD:
+        {
+            struct hlsl_ir_load *load = hlsl_ir_load(instr);
+            validate_component_index_range_from_deref(ctx, &load->src);
+            break;
+        }
+        case HLSL_IR_STORE:
+        {
+            struct hlsl_ir_store *store = hlsl_ir_store(instr);
+            validate_component_index_range_from_deref(ctx, &store->lhs);
             break;
         }
         default:
@@ -5210,21 +5290,13 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
         {
             case HLSL_CLASS_VECTOR:
                 if (idx >= type->dimx)
-                {
-                    hlsl_error(ctx, &path_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
-                            "Vector index is out of bounds. %u/%u", idx, type->dimx);
                     return false;
-                }
                 *start += idx;
                 break;
 
             case HLSL_CLASS_MATRIX:
                 if (idx >= hlsl_type_major_size(type))
-                {
-                    hlsl_error(ctx, &path_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
-                            "Matrix index is out of bounds. %u/%u", idx, hlsl_type_major_size(type));
                     return false;
-                }
                 if (hlsl_type_is_row_major(type))
                     *start += idx * type->dimx;
                 else
@@ -5233,11 +5305,7 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
 
             case HLSL_CLASS_ARRAY:
                 if (idx >= type->e.array.elements_count)
-                {
-                    hlsl_error(ctx, &path_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
-                            "Array index is out of bounds. %u/%u", idx, type->e.array.elements_count);
                     return false;
-                }
                 *start += idx * hlsl_type_component_count(type->e.array.type);
                 break;
 
@@ -5737,7 +5805,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
 
-    hlsl_transform_ir(ctx, validate_static_object_references, body, NULL);
+    hlsl_transform_ir(ctx, validate_dereferences, body, NULL);
     hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
     if (profile->major_version >= 4)
         hlsl_transform_ir(ctx, lower_combined_samples, body, NULL);
