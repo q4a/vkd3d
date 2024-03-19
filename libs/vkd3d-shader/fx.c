@@ -1290,6 +1290,9 @@ static bool state_block_contains_state(const char *name, unsigned int start, str
 
     for (i = start; i < block->count; ++i)
     {
+        if (block->entries[i]->is_function_call)
+            continue;
+
         if (!ascii_strcasecmp(block->entries[i]->name, name))
             return true;
     }

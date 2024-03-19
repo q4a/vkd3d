@@ -7382,6 +7382,32 @@ state_block:
             $$ = $1;
             state_block_add_entry($$, entry);
         }
+    | state_block any_identifier '(' func_arguments ')' ';'
+        {
+            struct hlsl_state_block_entry *entry;
+            unsigned int i;
+
+            if (!(entry = hlsl_alloc(ctx, sizeof(*entry))))
+                YYABORT;
+
+            entry->is_function_call = true;
+
+            entry->name = $2;
+            entry->lhs_has_index = false;
+            entry->lhs_index = 0;
+
+            entry->instrs = $4.instrs;
+
+            entry->args_count = $4.args_count;
+            if (!(entry->args = hlsl_alloc(ctx, sizeof(*entry->args) * entry->args_count)))
+                YYABORT;
+            for (i = 0; i < entry->args_count; ++i)
+                hlsl_src_from_node(&entry->args[i], $4.args[i]);
+            vkd3d_free($4.args);
+
+            $$ = $1;
+            state_block_add_entry($$, entry);
+        }
 
 state_block_list:
       '{' state_block '}'

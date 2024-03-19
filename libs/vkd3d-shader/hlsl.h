@@ -507,22 +507,31 @@ struct hlsl_ir_var
  *     name[lhs_index] = args[0]
  *       - or -
  *     name[lhs_index] = {args[0], args[1], ...};
+ *
+ * This struct also represents function call syntax:
+ *     name(args[0], args[1], ...)
  */
 struct hlsl_state_block_entry
 {
-    /* For assignments, the name in the lhs. */
+    /* Whether this entry is a function call. */
+    bool is_function_call;
+
+    /* For assignments, the name in the lhs.
+     * For functions, the name of the function. */
     char *name;
     /* Resolved format-specific property identifier. */
     unsigned int name_id;
 
-    /* Whether the lhs in the assignment is indexed and, in that case, its index. */
+    /* For assignments, whether the lhs of an assignment is indexed and, in
+     * that case, its index. */
     bool lhs_has_index;
     unsigned int lhs_index;
 
-    /* Instructions present in the rhs. */
+    /* Instructions present in the rhs or the function arguments. */
     struct hlsl_block *instrs;
 
-    /* For assignments, arguments of the rhs initializer. */
+    /* For assignments, arguments of the rhs initializer.
+     * For function calls, the arguments themselves. */
     struct hlsl_src *args;
     unsigned int args_count;
 };
