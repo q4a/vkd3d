@@ -655,8 +655,9 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
         const struct parse_attribute_list *attributes, struct hlsl_block *init, struct hlsl_block *cond,
         struct hlsl_block *iter, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
 {
+    enum hlsl_ir_loop_unroll_type unroll_type = HLSL_IR_LOOP_UNROLL;
+    unsigned int i, unroll_limit = 0;
     struct hlsl_ir_node *loop;
-    unsigned int i;
 
     if (attribute_list_has_duplicates(attributes))
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Found duplicate attribute.");
@@ -669,18 +670,29 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
         const struct hlsl_attribute *attr = attributes->attrs[i];
         if (!strcmp(attr->name, "unroll"))
         {
-            if (attr->args_count)
+            if (attr->args_count > 1)
             {
-                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Unroll attribute with iteration count.");
+                hlsl_warning(ctx, &attr->loc, VKD3D_SHADER_WARNING_HLSL_IGNORED_ATTRIBUTE,
+                        "Ignoring 'unroll' attribute with more than 1 argument.");
+                continue;
             }
-            else
+
+            if (attr->args_count == 1)
             {
-                hlsl_warning(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Loop unrolling is not implemented.");
+                struct hlsl_block expr;
+                hlsl_block_init(&expr);
+                if (!hlsl_clone_block(ctx, &expr, &attr->instrs))
+                    return NULL;
+
+                unroll_limit = evaluate_static_expression_as_uint(ctx, &expr, loc);
+                hlsl_block_cleanup(&expr);
             }
+
+            unroll_type = HLSL_IR_LOOP_FORCE_UNROLL;
         }
         else if (!strcmp(attr->name, "loop"))
         {
-            /* TODO: this attribute will be used to disable unrolling, once it's implememented. */
+            unroll_type = HLSL_IR_LOOP_FORCE_LOOP;
         }
         else if (!strcmp(attr->name, "fastopt")
                 || !strcmp(attr->name, "allow_uav_condition"))
@@ -709,7 +721,7 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
     else
         list_move_head(&body->instrs, &cond->instrs);
 
-    if (!(loop = hlsl_new_loop(ctx, body, loc)))
+    if (!(loop = hlsl_new_loop(ctx, body, unroll_type, unroll_limit, loc)))
         goto oom;
     hlsl_block_add_instr(init, loop);
 

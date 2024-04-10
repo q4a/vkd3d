@@ -1810,7 +1810,8 @@ struct hlsl_ir_node *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type 
 }
 
 struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx,
-        struct hlsl_block *block, const struct vkd3d_shader_location *loc)
+        struct hlsl_block *block, enum hlsl_ir_loop_unroll_type unroll_type,
+        unsigned int unroll_limit, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_loop *loop;
 
@@ -1819,6 +1820,9 @@ struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx,
     init_node(&loop->node, HLSL_IR_LOOP, NULL, loc);
     hlsl_block_init(&loop->body);
     hlsl_block_add_block(&loop->body, block);
+
+    loop->unroll_type = unroll_type;
+    loop->unroll_limit = unroll_limit;
     return &loop->node;
 }
 
@@ -1980,7 +1984,7 @@ static struct hlsl_ir_node *clone_loop(struct hlsl_ctx *ctx, struct clone_instr_
     if (!clone_block(ctx, &body, &src->body, map))
         return NULL;
 
-    if (!(dst = hlsl_new_loop(ctx, &body, &src->node.loc)))
+    if (!(dst = hlsl_new_loop(ctx, &body, src->unroll_type, src->unroll_limit, &src->node.loc)))
     {
         hlsl_block_cleanup(&body);
         return NULL;

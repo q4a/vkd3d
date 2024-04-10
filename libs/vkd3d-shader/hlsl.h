@@ -602,12 +602,21 @@ struct hlsl_ir_if
     struct hlsl_block else_block;
 };
 
+enum hlsl_ir_loop_unroll_type
+{
+    HLSL_IR_LOOP_UNROLL,
+    HLSL_IR_LOOP_FORCE_UNROLL,
+    HLSL_IR_LOOP_FORCE_LOOP
+};
+
 struct hlsl_ir_loop
 {
     struct hlsl_ir_node node;
     /* loop condition is stored in the body (as "if (!condition) break;") */
     struct hlsl_block body;
     unsigned int next_index; /* liveness index of the end of the loop */
+    unsigned int unroll_limit;
+    enum hlsl_ir_loop_unroll_type unroll_type;
 };
 
 struct hlsl_ir_switch_case
@@ -1390,7 +1399,7 @@ bool hlsl_index_chain_has_resource_access(struct hlsl_ir_index *index);
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx,
-        struct hlsl_block *block, const struct vkd3d_shader_location *loc);
+        struct hlsl_block *block, enum hlsl_ir_loop_unroll_type unroll_type, unsigned int unroll_limit, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,
