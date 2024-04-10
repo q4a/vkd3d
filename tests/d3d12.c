@@ -33787,7 +33787,7 @@ static void test_shader_get_render_target_sample_count(void)
         return;
     command_list = context.list;
     queue = context.queue;
-    bug_if(is_mvk_device(context.device))
+    bug_if(is_mvk_device(context.device) || is_llvmpipe_device(context.device))
     ok(context.render_target_desc.SampleDesc.Count == 8, "Failed to create render target with MSAA 8, got %u.\n",
             context.render_target_desc.SampleDesc.Count);
 
