@@ -14180,6 +14180,7 @@ static void test_sample_instructions(void)
         float ps_constants[4];
         const unsigned int *expected_data;
         bool bug_on_mvk;
+        bool bug_on_llvmpipe;
     }
     tests[] =
     {
@@ -14209,7 +14210,7 @@ static void test_sample_instructions(void)
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {-1.0f},                  rgba_level_0},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.0f},                   rgba_level_0},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.4f},                   rgba_level_0},
-        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.5f},                   level_1_colors, true},
+        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.5f},                   level_1_colors, true, true},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.6f},                   level_1_colors},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {1.0f},                   level_1_colors},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {1.4f},                   level_1_colors},
@@ -14359,6 +14360,7 @@ static void test_sample_instructions(void)
                 break;
         }
         bug_if(tests[i].bug_on_mvk && is_mvk_device(device))
+        bug_if(tests[i].bug_on_llvmpipe && is_llvmpipe_device(device))
         ok(!fail, "Got color 0x%08x, expected 0x%08x at (%u, %u).\n",
                 color, tests[i].expected_data[tests[i].texture->width * y + x], x, y);
         release_resource_readback(&rb);
