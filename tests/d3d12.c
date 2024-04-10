@@ -35518,7 +35518,8 @@ static void test_conditional_rendering(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    /* Direct3D latches the value of the predicate upon beginning predicated rendering. */
+    /* Direct3D latches the value of the predicate upon beginning predicated rendering. However
+     * Vulkan doesn't mandate any behavior, so some drivers behave differently. */
     buffer = create_default_buffer(context.device, sizeof(predicate_args),
             D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST);
     transition_resource_state(command_list, conditions,
@@ -35544,6 +35545,7 @@ static void test_conditional_rendering(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    todo_if(is_llvmpipe_device(context.device))
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
 
     ID3D12Resource_Release(buffer);
