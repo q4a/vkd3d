@@ -1,6 +1,6 @@
 % TODO: dxcompiler emits no loops for any of these test shaders.
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 float a;
 
 float4 main() : sv_target
@@ -18,11 +18,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 5.0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (50.0, 50.0, 50.0, 50.0)
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 float a;
 
 float4 main() : sv_target
@@ -41,10 +41,10 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (20.0, 20.0, 20.0, 20.0)
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 float a;
 
 float4 main() : sv_target
@@ -70,10 +70,10 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (409.1, 409.1, 409.1, 409.1)
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 float a;
 
 float4 main() : sv_target
@@ -100,7 +100,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (410.1, 410.1, 410.1, 410.1)
 
 % loop attribute by itself

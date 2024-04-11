@@ -5710,6 +5710,222 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     sm1_generate_vsir_signature(ctx, program);
 }
 
+static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,
+        struct hlsl_block **found_block)
+{
+    struct hlsl_ir_node *node;
+
+    LIST_FOR_EACH_ENTRY(node, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (node == stop_point)
+            return NULL;
+
+        if (node->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(node);
+            struct hlsl_ir_jump *jump = NULL;
+
+            if ((jump = loop_unrolling_find_jump(&iff->then_block, stop_point, found_block)))
+                return jump;
+            if ((jump = loop_unrolling_find_jump(&iff->else_block, stop_point, found_block)))
+                return jump;
+        }
+        else if (node->type == HLSL_IR_JUMP)
+        {
+            struct hlsl_ir_jump *jump = hlsl_ir_jump(node);
+
+            if (jump->type == HLSL_IR_JUMP_BREAK || jump->type == HLSL_IR_JUMP_CONTINUE)
+            {
+                *found_block = block;
+                return jump;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static unsigned int loop_unrolling_get_max_iterations(struct hlsl_ctx *ctx, struct hlsl_ir_loop *loop)
+{
+    /* Always use the explicit limit if it has been passed. */
+    if (loop->unroll_limit)
+        return loop->unroll_limit;
+
+    /* All SMs will default to 1024 if [unroll] has been specified without an explicit limit. */
+    if (loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
+        return 1024;
+
+    /* SM4 limits implicit unrolling to 254 iterations. */
+    if (hlsl_version_ge(ctx, 4, 0))
+        return 254;
+
+    /* SM<3 implicitly unrolls up to 1024 iterations. */
+    return 1024;
+}
+
+static bool loop_unrolling_unroll_loop(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_block *loop_parent, struct hlsl_ir_loop *loop)
+{
+    unsigned int max_iterations, i;
+
+    max_iterations = loop_unrolling_get_max_iterations(ctx, loop);
+
+    for (i = 0; i < max_iterations; ++i)
+    {
+        struct hlsl_block tmp_dst, *jump_block;
+        struct hlsl_ir_jump *jump = NULL;
+
+        if (!hlsl_clone_block(ctx, &tmp_dst, &loop->body))
+            return false;
+        list_move_before(&loop->node.entry, &tmp_dst.instrs);
+        hlsl_block_cleanup(&tmp_dst);
+
+        hlsl_run_const_passes(ctx, block);
+
+        if ((jump = loop_unrolling_find_jump(loop_parent, &loop->node, &jump_block)))
+        {
+            enum hlsl_ir_jump_type type = jump->type;
+
+            if (jump_block != loop_parent)
+            {
+                if (loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
+                    hlsl_error(ctx, &jump->node.loc, VKD3D_SHADER_ERROR_HLSL_FAILED_FORCED_UNROLL,
+                        "Unable to unroll loop, unrolling loops with conditional jumps is currently not supported.");
+                return false;
+            }
+
+            list_move_slice_tail(&tmp_dst.instrs, &jump->node.entry, list_prev(&loop_parent->instrs, &loop->node.entry));
+            hlsl_block_cleanup(&tmp_dst);
+
+            if (type == HLSL_IR_JUMP_BREAK)
+                break;
+        }
+    }
+
+    /* Native will not emit an error if max_iterations has been reached with an
+     * explicit limit. It also will not insert a loop if there are iterations left
+     * i.e [unroll(4)] for (i = 0; i < 8; ++i)) */
+    if (!loop->unroll_limit && i == max_iterations)
+    {
+        if (loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
+            hlsl_error(ctx, &loop->node.loc, VKD3D_SHADER_ERROR_HLSL_FAILED_FORCED_UNROLL,
+                "Unable to unroll loop, maximum iterations reached (%u).", max_iterations);
+        return false;
+    }
+
+    list_remove(&loop->node.entry);
+    hlsl_free_instr(&loop->node);
+
+    return true;
+}
+
+/*
+ * loop_unrolling_find_unrollable_loop() is not the normal way to do things;
+ * normal passes simply iterate over the whole block and apply a transformation
+ * to every relevant instruction. However, loop unrolling can fail, and we want
+ * to leave the loop in its previous state in that case. That isn't a problem by
+ * itself, except that loop unrolling needs copy-prop in order to work properly,
+ * and copy-prop state at the time of the loop depends on the rest of the program
+ * up to that point. This means we need to clone the whole program, and at that
+ * point we have to search it again anyway to find the clone of the loop we were
+ * going to unroll.
+ *
+ * FIXME: Ideally we wouldn't clone the whole program; instead we would run copyprop
+ * up until the loop instruction, clone just that loop, then use copyprop again
+ * with the saved state after unrolling. However, copyprop currently isn't built
+ * for that yet [notably, it still relies on indices]. Note also this still doesn't
+ * really let us use transform_ir() anyway [since we don't have a good way to say
+ * "copyprop from the beginning of the program up to the instruction we're
+ * currently processing" from the callback]; we'd have to use a dedicated
+ * recursive function instead. */
+static struct hlsl_ir_loop *loop_unrolling_find_unrollable_loop(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_block **containing_block)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        switch (instr->type)
+        {
+            case HLSL_IR_LOOP:
+            {
+                struct hlsl_ir_loop *nested_loop;
+                struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
+
+                if ((nested_loop = loop_unrolling_find_unrollable_loop(ctx, &loop->body, containing_block)))
+                    return nested_loop;
+
+                if (loop->unroll_type == HLSL_IR_LOOP_UNROLL || loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
+                {
+                    *containing_block = block;
+                    return loop;
+                }
+
+                break;
+            }
+            case HLSL_IR_IF:
+            {
+                struct hlsl_ir_loop *loop;
+                struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+                if ((loop = loop_unrolling_find_unrollable_loop(ctx, &iff->then_block, containing_block)))
+                    return loop;
+                if ((loop = loop_unrolling_find_unrollable_loop(ctx, &iff->else_block, containing_block)))
+                    return loop;
+
+                break;
+            }
+            case HLSL_IR_SWITCH:
+            {
+                struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+                struct hlsl_ir_switch_case *c;
+                struct hlsl_ir_loop *loop;
+
+                LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                {
+                    if ((loop = loop_unrolling_find_unrollable_loop(ctx, &c->body, containing_block)))
+                        return loop;
+                }
+
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    return NULL;
+}
+
+static void transform_unroll_loops(struct hlsl_ctx *ctx, struct hlsl_block *block)
+{
+    while (true)
+    {
+        struct hlsl_block clone, *containing_block;
+        struct hlsl_ir_loop *loop, *cloned_loop;
+
+        if (!(loop = loop_unrolling_find_unrollable_loop(ctx, block, &containing_block)))
+            return;
+
+        if (!hlsl_clone_block(ctx, &clone, block))
+            return;
+
+        cloned_loop = loop_unrolling_find_unrollable_loop(ctx, &clone, &containing_block);
+        assert(cloned_loop);
+
+        if (!loop_unrolling_unroll_loop(ctx, &clone, containing_block, cloned_loop))
+        {
+            hlsl_block_cleanup(&clone);
+            loop->unroll_type = HLSL_IR_LOOP_FORCE_LOOP;
+            continue;
+        }
+
+        hlsl_block_cleanup(block);
+        hlsl_block_init(block);
+        hlsl_block_add_block(block, &clone);
+    }
+}
+
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
@@ -5796,6 +6012,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         hlsl_transform_ir(ctx, lower_discard_neg, body, NULL);
     }
 
+    transform_unroll_loops(ctx, body);
     hlsl_run_const_passes(ctx, body);
 
     remove_unreachable_code(ctx, body);
