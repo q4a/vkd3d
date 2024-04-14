@@ -267,11 +267,12 @@ static void shader_glsl_mov(struct vkd3d_glsl_generator *gen, const struct vkd3d
 static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
         enum vkd3d_shader_sysval_semantic sysval, unsigned int idx)
 {
+    const struct vkd3d_shader_version *version = &gen->program->shader_version;
+
     switch (sysval)
     {
         case VKD3D_SHADER_SV_POSITION:
-            if (gen->program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL
-                    || gen->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
+            if (version->type == VKD3D_SHADER_TYPE_PIXEL || version->type == VKD3D_SHADER_TYPE_COMPUTE)
             {
                 vkd3d_string_buffer_printf(buffer, "<unhandled sysval %#x>", sysval);
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -284,6 +285,13 @@ static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, st
                     vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                             "Internal compiler error: Unhandled SV_POSITION index %u.", idx);
             }
+            break;
+
+        case VKD3D_SHADER_SV_TARGET:
+            if (version->type != VKD3D_SHADER_TYPE_PIXEL)
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled SV_TARGET in shader type #%x.", version->type);
+            vkd3d_string_buffer_printf(buffer, "shader_out_%u", idx);
             break;
 
         default:
