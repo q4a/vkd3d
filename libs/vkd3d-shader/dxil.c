@@ -431,6 +431,7 @@ enum dx_intrinsic_opcode
     DX_DERIV_FINEX                  =  85,
     DX_DERIV_FINEY                  =  86,
     DX_EVAL_SAMPLE_INDEX            =  88,
+    DX_EVAL_CENTROID                =  89,
     DX_SAMPLE_INDEX                 =  90,
     DX_COVERAGE                     =  91,
     DX_THREAD_ID                    =  93,
@@ -5129,9 +5130,10 @@ static void sm6_parser_emit_dx_eval_attrib(struct sm6_parser *sm6, enum dx_intri
         return;
     }
 
-    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_EVAL_SAMPLE_INDEX);
+    vsir_instruction_init(ins, &sm6->p.location, (op == DX_EVAL_CENTROID)
+            ? VKD3DSIH_EVAL_CENTROID : VKD3DSIH_EVAL_SAMPLE_INDEX);
 
-    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+    if (!(src_params = instruction_src_params_alloc(ins, 1 + (op == DX_EVAL_SAMPLE_INDEX), sm6)))
         return;
 
     src_params[0].reg = sm6->input_params[row_index].reg;
@@ -5139,7 +5141,8 @@ static void sm6_parser_emit_dx_eval_attrib(struct sm6_parser *sm6, enum dx_intri
     if (e->register_count > 1)
         register_index_address_init(&src_params[0].reg.idx[0], operands[1], sm6);
 
-    src_param_init_from_value(&src_params[1], operands[3]);
+    if (op == DX_EVAL_SAMPLE_INDEX)
+        src_param_init_from_value(&src_params[1], operands[3]);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -6334,6 +6337,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_DOT4                          ] = {"g", "RRRRRRRR", sm6_parser_emit_dx_dot},
     [DX_EMIT_STREAM                   ] = {"v", "c",    sm6_parser_emit_dx_stream},
     [DX_EMIT_THEN_CUT_STREAM          ] = {"v", "c",    sm6_parser_emit_dx_stream},
+    [DX_EVAL_CENTROID                 ] = {"o", "cic",  sm6_parser_emit_dx_eval_attrib},
     [DX_EVAL_SAMPLE_INDEX             ] = {"o", "cici", sm6_parser_emit_dx_eval_attrib},
     [DX_EXP                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_FABS                          ] = {"g", "R",    sm6_parser_emit_dx_fabs},
