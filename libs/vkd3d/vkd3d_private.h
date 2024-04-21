@@ -70,6 +70,8 @@
 
 #define VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT (VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER + 1)
 
+#define VKD3D_VALIDATE_FORCE_ALLOW_DS  0x1u
+
 extern uint64_t object_global_serial_id;
 
 struct d3d12_command_list;
@@ -534,7 +536,7 @@ struct vkd3d_resource_allocation_info
 };
 
 bool d3d12_resource_is_cpu_accessible(const struct d3d12_resource *resource);
-HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC1 *desc, struct d3d12_device *device);
+HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC1 *desc, struct d3d12_device *device, uint32_t flags);
 void d3d12_resource_get_tiling(struct d3d12_device *device, const struct d3d12_resource *resource,
         UINT *total_tile_count, D3D12_PACKED_MIP_INFO *packed_mip_info, D3D12_TILE_SHAPE *standard_tile_shape,
         UINT *sub_resource_tiling_count, UINT first_sub_resource_tiling,
