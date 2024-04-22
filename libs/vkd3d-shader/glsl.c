@@ -385,6 +385,30 @@ static void shader_glsl_binop(struct vkd3d_glsl_generator *gen,
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_relop(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_instruction *ins, const char *scalar_op, const char *vector_op)
+{
+    unsigned int mask_size;
+    struct glsl_src src[2];
+    struct glsl_dst dst;
+    uint32_t mask;
+
+    mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&src[0], gen, &ins->src[0], mask);
+    glsl_src_init(&src[1], gen, &ins->src[1], mask);
+
+    if ((mask_size = vsir_write_mask_component_count(mask)) > 1)
+        shader_glsl_print_assignment(gen, &dst, "uvec%u(%s(%s, %s)) * 0xffffffffu",
+                mask_size, vector_op, src[0].str->buffer, src[1].str->buffer);
+    else
+        shader_glsl_print_assignment(gen, &dst, "%s %s %s ? 0xffffffffu : 0u",
+                src[0].str->buffer, scalar_op, src[1].str->buffer);
+
+    glsl_src_cleanup(&src[1], &gen->string_buffers);
+    glsl_src_cleanup(&src[0], &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_mov(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct glsl_src src;
@@ -554,6 +578,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DCL_OUTPUT:
         case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
+            break;
+        case VKD3DSIH_NEU:
+            shader_glsl_relop(gen, ins, "!=", "notEqual");
             break;
         case VKD3DSIH_MOV:
             shader_glsl_mov(gen, ins);
