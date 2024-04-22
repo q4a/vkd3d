@@ -5189,6 +5189,44 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             }
             break;
 
+        case HLSL_OP1_RCP:
+            switch (dst_type->e.numeric.type)
+            {
+                case HLSL_TYPE_FLOAT:
+                    /* SM5 comes with a RCP opcode */
+                    if (tpf->ctx->profile->major_version >= 5)
+                    {
+                        write_sm4_unary_op(tpf, VKD3D_SM5_OP_RCP, &expr->node, arg1, 0);
+                    }
+                    else
+                    {
+                        /* For SM4, implement as DIV dst, 1.0, src */
+                        struct sm4_instruction instr;
+                        struct hlsl_constant_value one;
+
+                        assert(type_is_float(dst_type));
+
+                        memset(&instr, 0, sizeof(instr));
+                        instr.opcode = VKD3D_SM4_OP_DIV;
+
+                        sm4_dst_from_node(&instr.dsts[0], &expr->node);
+                        instr.dst_count = 1;
+
+                        for (unsigned int i = 0; i < 4; i++)
+                            one.u[i].f = 1.0f;
+                        sm4_src_from_constant_value(&instr.srcs[0], &one, dst_type->dimx, instr.dsts[0].write_mask);
+                        sm4_src_from_node(tpf, &instr.srcs[1], arg1, instr.dsts[0].write_mask);
+                        instr.src_count = 2;
+
+                        write_sm4_instruction(tpf, &instr);
+                    }
+                    break;
+
+                default:
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s rcp expression.", dst_type_string->buffer);
+            }
+            break;
+
         case HLSL_OP1_REINTERPRET:
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
             break;
