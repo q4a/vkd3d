@@ -1166,6 +1166,17 @@ static bool replace_state_block_constant(struct hlsl_ctx *ctx, struct hlsl_ir_no
     return true;
 }
 
+static void fold_state_value(struct hlsl_ctx *ctx, struct hlsl_state_block_entry *entry)
+{
+    bool progress;
+
+    do
+    {
+        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, entry->instrs, NULL);
+        progress |= hlsl_copy_propagation_execute(ctx, entry->instrs);
+    } while (progress);
+}
+
 static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl_state_block_entry *entry,
         struct fx_write_context *fx)
 {
@@ -1219,6 +1230,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     {
         const char *name;
         enum hlsl_type_class container;
+        enum hlsl_type_class class;
         enum hlsl_base_type type;
         unsigned int dimx;
         uint32_t id;
@@ -1226,26 +1238,25 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
     states[] =
     {
-        { "Filter",         HLSL_CLASS_SAMPLER, HLSL_TYPE_UINT,    1, 45, filter_values },
-        { "AddressU",       HLSL_CLASS_SAMPLER, HLSL_TYPE_UINT,    1, 46, address_values },
-        { "AddressV",       HLSL_CLASS_SAMPLER, HLSL_TYPE_UINT,    1, 47, address_values },
-        { "AddressW",       HLSL_CLASS_SAMPLER, HLSL_TYPE_UINT,    1, 48, address_values },
-        { "MipLODBias",     HLSL_CLASS_SAMPLER, HLSL_TYPE_FLOAT,   1, 49 },
-        { "MaxAnisotropy",  HLSL_CLASS_SAMPLER, HLSL_TYPE_UINT,    1, 50 },
-        { "ComparisonFunc", HLSL_CLASS_SAMPLER, HLSL_TYPE_UINT,    1, 51, compare_func_values },
-        { "BorderColor",    HLSL_CLASS_SAMPLER, HLSL_TYPE_FLOAT,   4, 52 },
-        { "MinLOD",         HLSL_CLASS_SAMPLER, HLSL_TYPE_FLOAT,   1, 53 },
-        { "MaxLOD",         HLSL_CLASS_SAMPLER, HLSL_TYPE_FLOAT,   1, 54 },
+        { "Filter",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 45, filter_values },
+        { "AddressU",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 46, address_values },
+        { "AddressV",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 47, address_values },
+        { "AddressW",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 48, address_values },
+        { "MipLODBias",     HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_FLOAT,  1, 49 },
+        { "MaxAnisotropy",  HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 50 },
+        { "ComparisonFunc", HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 51, compare_func_values },
+        { "BorderColor",    HLSL_CLASS_SAMPLER, HLSL_CLASS_VECTOR,  HLSL_TYPE_FLOAT,  4, 52 },
+        { "MinLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_FLOAT,  1, 53 },
+        { "MaxLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_FLOAT,  1, 54 },
         /* TODO: "Texture" field */
     };
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
     struct replace_state_context replace_context;
+    struct hlsl_type *state_type = NULL;
     struct hlsl_ir_node *node, *cast;
     const struct state *state = NULL;
     struct hlsl_ctx *ctx = fx->ctx;
-    struct hlsl_type *state_type;
     unsigned int i;
-    bool progress;
 
     for (i = 0; i < ARRAY_SIZE(states); ++i)
     {
@@ -1275,28 +1286,39 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     replace_context.values = state->values;
     replace_context.var = var;
 
-    /* Turned named constants to actual constants. */
+    /* Turn named constants to actual constants. */
     hlsl_transform_ir(ctx, replace_state_block_constant, entry->instrs, &replace_context);
+    fold_state_value(ctx, entry);
 
-    if (state->dimx)
-        state_type = hlsl_get_vector_type(ctx, state->type, state->dimx);
-    else
-        state_type = hlsl_get_scalar_type(ctx, state->type);
+    /* Now cast and run folding again. */
 
-    /* Cast to expected property type. */
-    node = entry->args->node;
-    if (!(cast = hlsl_new_cast(ctx, node, state_type, &var->loc)))
-        return;
-    list_add_after(&node->entry, &cast->entry);
-
-    hlsl_src_remove(entry->args);
-    hlsl_src_from_node(entry->args, cast);
-
-    do
+    switch (state->class)
     {
-        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, entry->instrs, NULL);
-        progress |= hlsl_copy_propagation_execute(ctx, entry->instrs);
-    } while (progress);
+        case HLSL_CLASS_VECTOR:
+            state_type = hlsl_get_vector_type(ctx, state->type, state->dimx);
+            break;
+        case HLSL_CLASS_SCALAR:
+            state_type = hlsl_get_scalar_type(ctx, state->type);
+            break;
+        case HLSL_CLASS_TEXTURE:
+            hlsl_fixme(ctx, &ctx->location, "Object type fields are not supported.");
+            break;
+        default:
+            ;
+    }
+
+    if (state_type)
+    {
+        node = entry->args->node;
+        if (!(cast = hlsl_new_cast(ctx, node, state_type, &var->loc)))
+            return;
+        list_add_after(&node->entry, &cast->entry);
+
+        hlsl_src_remove(entry->args);
+        hlsl_src_from_node(entry->args, cast);
+
+        fold_state_value(ctx, entry);
+    }
 }
 
 static void write_fx_4_state_object_initializer(struct hlsl_ir_var *var, struct fx_write_context *fx)
