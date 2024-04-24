@@ -563,7 +563,7 @@ float4 main() : sv_target { return 0; }
 
 
 % State blocks are valid for RasterizerState
-[pixel shader todo]
+[pixel shader]
 RasterizerState rs
 {
     random_field = 1;

@@ -7097,6 +7097,10 @@ type_no_void:
                         "ConstantBuffer<...> requires user-defined structure type.");
             $$ = hlsl_new_cb_type(ctx, $3);
         }
+    | KW_RASTERIZERSTATE
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "RasterizerState", true, true);
+        }
 
 type:
       type_no_void
