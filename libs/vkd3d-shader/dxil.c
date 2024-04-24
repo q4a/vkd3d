@@ -4098,6 +4098,8 @@ static enum vkd3d_shader_register_type register_type_from_dxil_semantic_kind(
 
     switch (sysval_semantic)
     {
+        case VKD3D_SHADER_SV_PRIMITIVE_ID:
+            return VKD3DSPR_PRIMID;
         /* VSIR does not use an I/O register for SV_SampleIndex, but its
          * signature element has a register index of UINT_MAX and it is
          * convenient to return a valid register type here to handle it. */
