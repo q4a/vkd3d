@@ -305,6 +305,9 @@ static void glsl_src_init(struct glsl_src *glsl_src, struct vkd3d_glsl_generator
     {
         case VKD3DSPSM_NONE:
             break;
+        case VKD3DSPSM_NEG:
+            vkd3d_string_buffer_printf(glsl_src->str, "-%s", str->buffer);
+            break;
         case VKD3DSPSM_ABS:
             vkd3d_string_buffer_printf(glsl_src->str, "abs(%s)", str->buffer);
             break;
