@@ -608,6 +608,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
             break;
+        case VKD3DSIH_DIV:
+            shader_glsl_binop(gen, ins, "/");
+            break;
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:
             shader_glsl_relop(gen, ins, "!=", "notEqual");
