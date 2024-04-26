@@ -591,6 +591,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_MOV:
             shader_glsl_mov(gen, ins);
             break;
+        case VKD3DSIH_MUL:
+            shader_glsl_binop(gen, ins, "*");
+            break;
         case VKD3DSIH_RET:
             shader_glsl_ret(gen, ins);
             break;
