@@ -417,6 +417,22 @@ static void shader_glsl_binop(struct vkd3d_glsl_generator *gen,
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_intrinsic(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_instruction *ins, const char *op)
+{
+    struct glsl_src src;
+    struct glsl_dst dst;
+    uint32_t mask;
+
+    mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&src, gen, &ins->src[0], mask);
+
+    shader_glsl_print_assignment(gen, &dst, "%s(%s)", op, src.str->buffer);
+
+    glsl_src_cleanup(&src, &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_relop(struct vkd3d_glsl_generator *gen,
         const struct vkd3d_shader_instruction *ins, const char *scalar_op, const char *vector_op)
 {
@@ -613,6 +629,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_DIV:
             shader_glsl_binop(gen, ins, "/");
+            break;
+        case VKD3DSIH_FRC:
+            shader_glsl_intrinsic(gen, ins, "fract");
             break;
         case VKD3DSIH_GEO:
             shader_glsl_relop(gen, ins, ">=", "greaterThanEqual");
