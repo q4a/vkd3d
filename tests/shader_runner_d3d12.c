@@ -120,8 +120,9 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             if (params->desc.sample_count > 1 && params->desc.level_count > 1)
                 fatal_error("Multisampled texture has multiple levels.\n");
 
-            resource->resource = create_default_texture_(__FILE__, __LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                    params->desc.width, params->desc.height, 1, params->desc.level_count, params->desc.sample_count,
+            resource->resource = create_default_texture_(__FILE__, __LINE__, device,
+                    D3D12_RESOURCE_DIMENSION_TEXTURE2D, params->desc.width, params->desc.height,
+                    params->desc.depth, params->desc.level_count, params->desc.sample_count,
                     params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, initial_state);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
                     NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.desc.slot));
@@ -132,8 +133,8 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->dsv_heap = create_cpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
 
             resource->resource = create_default_texture2d(device, params->desc.width,
-                    params->desc.height, 1, params->desc.level_count, params->desc.format,
-                    D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, initial_state);
+                    params->desc.height, params->desc.depth, params->desc.level_count,
+                    params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, initial_state);
             ID3D12Device_CreateDepthStencilView(device, resource->resource,
                     NULL, get_cpu_dsv_handle(test_context, runner->dsv_heap, 0));
             break;
@@ -170,8 +171,8 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                     fatal_error("Multisampled texture has multiple levels.\n");
 
                 resource->resource = create_default_texture_(__FILE__, __LINE__, device,
-                        D3D12_RESOURCE_DIMENSION_TEXTURE2D, params->desc.width, params->desc.height, 1,
-                        params->desc.level_count, params->desc.sample_count, params->desc.format,
+                        D3D12_RESOURCE_DIMENSION_TEXTURE2D, params->desc.width, params->desc.height,
+                        params->desc.depth, params->desc.level_count, params->desc.sample_count, params->desc.format,
                         /* Multisampled textures must have ALLOW_RENDER_TARGET set. */
                         (params->desc.sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0, initial_state);
                 if (params->data)
@@ -219,8 +220,8 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             else
             {
                 resource->resource = create_default_texture2d(device, params->desc.width,
-                        params->desc.height, 1, params->desc.level_count, params->desc.format,
-                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, initial_state);
+                        params->desc.height, params->desc.depth, params->desc.level_count,
+                        params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, initial_state);
                 if (params->data)
                 {
                     upload_texture_data_with_states(resource->resource, resource_data, params->desc.level_count,
@@ -930,7 +931,8 @@ static bool d3d12_runner_copy(struct shader_runner *r, struct resource *src, str
     return true;
 }
 
-static struct resource_readback *d3d12_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
+static struct resource_readback *d3d12_runner_get_resource_readback(struct shader_runner *r,
+        struct resource *res, unsigned int sub_resource_idx)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
@@ -939,8 +941,8 @@ static struct resource_readback *d3d12_runner_get_resource_readback(struct shade
     D3D12_RESOURCE_STATES state;
 
     state = resource_get_state(res);
-    get_resource_readback_with_command_list_and_states(resource->resource, 0, rb,
-            test_context->queue, test_context->list, state, state);
+    get_resource_readback_with_command_list_and_states(resource->resource,
+            sub_resource_idx, rb, test_context->queue, test_context->list, state, state);
     reset_command_list(test_context->list, test_context->allocator);
 
     return &rb->rb;
@@ -1033,6 +1035,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;
     runner->caps.shader_caps[SHADER_CAP_INT64] = options1.Int64ShaderOps;
     runner->caps.shader_caps[SHADER_CAP_ROV] = options.ROVsSupported;
+    runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX]
+            = options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizerSupportedWithoutGSEmulation;
     runner->caps.shader_caps[SHADER_CAP_WAVE_OPS] = options1.WaveOps;
 
     runner->caps.tag_count = 0;

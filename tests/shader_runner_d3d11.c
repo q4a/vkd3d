@@ -260,6 +260,7 @@ static bool get_format_support(ID3D11Device *device, enum DXGI_FORMAT format)
 static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
     D3D11_FEATURE_DATA_D3D11_OPTIONS2 options2 = {0};
+    D3D11_FEATURE_DATA_D3D11_OPTIONS3 options3 = {0};
     D3D11_FEATURE_DATA_DOUBLES doubles = {0};
     unsigned int rt_width, rt_height;
     D3D11_RASTERIZER_DESC rs_desc;
@@ -309,7 +310,12 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
             D3D11_FEATURE_D3D11_OPTIONS2, &options2, sizeof(options2));
     ok(hr == S_OK, "Failed to check feature options2 support, hr %#lx.\n", hr);
 
+    hr = ID3D11Device_CheckFeatureSupport(runner->device,
+            D3D11_FEATURE_D3D11_OPTIONS3, &options3, sizeof(options3));
+    ok(hr == S_OK, "Failed to check feature options3 support, hr %#lx.\n", hr);
+
     runner->caps.shader_caps[SHADER_CAP_ROV] = options2.ROVsSupported;
+    runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX] = options3.VPAndRTArrayIndexFromAnyShaderFeedingRasterizer;
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
     {
         runner->caps.format_caps[formats[i]] = get_format_support(runner->device, formats[i]);
@@ -414,7 +420,7 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     desc.Width = params->desc.width;
     desc.Height = params->desc.height;
     desc.MipLevels = params->desc.level_count;
-    desc.ArraySize = 1;
+    desc.ArraySize = params->desc.depth;
     desc.Format = params->desc.format;
     desc.SampleDesc.Count = max(params->desc.sample_count, 1);
     desc.Usage = D3D11_USAGE_DEFAULT;
@@ -926,9 +932,11 @@ struct d3d11_resource_readback
 {
     struct resource_readback rb;
     ID3D11Resource *resource;
+    unsigned int sub_resource_idx;
 };
 
-static struct resource_readback *d3d11_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
+static struct resource_readback *d3d11_runner_get_resource_readback(struct shader_runner *r,
+        struct resource *res, unsigned int sub_resource_idx)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     struct d3d11_resource_readback *rb = malloc(sizeof(*rb));
@@ -990,7 +998,8 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
         ID3D11DeviceContext_CopyStructureCount(runner->immediate_context, (ID3D11Buffer *)rb->resource, 0, resource->uav);
     else
         ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, src_resource);
-    hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &map_desc);
+    hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource,
+            sub_resource_idx, D3D11_MAP_READ, 0, &map_desc);
     ok(hr == S_OK, "Failed to map texture, hr %#lx.\n", hr);
 
     if (resolved_resource)
@@ -1001,6 +1010,8 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
     rb->rb.width = resource->r.desc.width;
     rb->rb.height = resource->r.desc.height;
     rb->rb.depth = 1;
+    rb->sub_resource_idx = sub_resource_idx;
+
     return &rb->rb;
 }
 
@@ -1009,7 +1020,7 @@ static void d3d11_runner_release_readback(struct shader_runner *r, struct resour
     struct d3d11_resource_readback *d3d11_rb = CONTAINING_RECORD(rb, struct d3d11_resource_readback, rb);
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
 
-    ID3D11DeviceContext_Unmap(runner->immediate_context, d3d11_rb->resource, 0);
+    ID3D11DeviceContext_Unmap(runner->immediate_context, d3d11_rb->resource, d3d11_rb->sub_resource_idx);
     ID3D11Resource_Release(d3d11_rb->resource);
     free(d3d11_rb);
 }

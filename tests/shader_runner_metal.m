@@ -200,10 +200,13 @@ static void init_resource_texture(struct metal_runner *runner,
     desc = [[MTLTextureDescriptor alloc] init];
     if (params->desc.sample_count > 1)
         desc.textureType = MTLTextureType2DMultisample;
+    else if (params->desc.depth > 1)
+        desc.textureType = MTLTextureType2DArray;
     desc.pixelFormat = get_metal_pixel_format(params->desc.format);
     ok(desc.pixelFormat != MTLPixelFormatInvalid, "Unhandled pixel format %#x.\n", params->desc.format);
     desc.width = params->desc.width;
     desc.height = params->desc.height;
+    desc.arrayLength = params->desc.depth;
     desc.mipmapLevelCount = params->desc.level_count;
     desc.sampleCount = max(params->desc.sample_count, 1);
     desc.storageMode = MTLStorageModePrivate;
@@ -572,13 +575,15 @@ static bool metal_runner_copy(struct shader_runner *r, struct resource *src, str
     return false;
 }
 
-static struct resource_readback *metal_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
+static struct resource_readback *metal_runner_get_resource_readback(struct shader_runner *r,
+        struct resource *res, unsigned int sub_resource_idx)
 {
     struct metal_resource *resource = metal_resource(res);
     struct metal_runner *runner = metal_runner(r);
     id<MTLCommandBuffer> command_buffer;
     struct metal_resource_readback *rb;
     id<MTLBlitCommandEncoder> blit;
+    unsigned int layer, level;
 
     if (resource->r.desc.dimension != RESOURCE_DIMENSION_2D)
         fatal_error("Unhandled resource dimension %#x.\n", resource->r.desc.dimension);
@@ -593,14 +598,17 @@ static struct resource_readback *metal_runner_get_resource_readback(struct shade
     rb->buffer = [runner->device newBufferWithLength:rb->rb.row_pitch * rb->rb.height
             options:DEFAULT_BUFFER_RESOURCE_OPTIONS];
 
+    level = sub_resource_idx % resource->r.desc.level_count;
+    layer = sub_resource_idx / resource->r.desc.level_count;
+
     @autoreleasepool
     {
         command_buffer = [runner->queue commandBuffer];
 
         blit = [command_buffer blitCommandEncoder];
         [blit copyFromTexture:resource->texture
-                sourceSlice:0
-                sourceLevel:0
+                sourceSlice:layer
+                sourceLevel:level
                 sourceOrigin:MTLOriginMake(0, 0, 0)
                 sourceSize:MTLSizeMake(rb->rb.width, rb->rb.height, rb->rb.depth)
                 toBuffer:rb->buffer

@@ -584,7 +584,8 @@ struct d3d9_resource_readback
     IDirect3DSurface9 *surface;
 };
 
-static struct resource_readback *d3d9_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
+static struct resource_readback *d3d9_runner_get_resource_readback(struct shader_runner *r,
+        struct resource *res, unsigned int sub_resource_idx)
 {
     struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
     struct d3d9_resource_readback *rb = malloc(sizeof(*rb));
@@ -594,6 +595,8 @@ static struct resource_readback *d3d9_runner_get_resource_readback(struct shader
     HRESULT hr;
 
     assert(resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET);
+    if (sub_resource_idx)
+        fatal_error("Unsupported sub-resource index %u.\n", sub_resource_idx);
 
     hr = IDirect3DSurface9_GetDesc(resource->surface, &desc);
     ok(hr == D3D_OK, "Failed to get surface desc, hr %#lx.\n", hr);

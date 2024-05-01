@@ -350,15 +350,16 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
 
 static const char *const shader_cap_strings[] =
 {
-    [SHADER_CAP_CLIP_PLANES]     = "clip-planes",
-    [SHADER_CAP_DEPTH_BOUNDS]    = "depth-bounds",
-    [SHADER_CAP_FLOAT64]         = "float64",
-    [SHADER_CAP_FOG]             = "fog",
-    [SHADER_CAP_GEOMETRY_SHADER] = "geometry-shader",
-    [SHADER_CAP_INT64]           = "int64",
-    [SHADER_CAP_POINT_SIZE]      = "point-size",
-    [SHADER_CAP_ROV]             = "rov",
-    [SHADER_CAP_WAVE_OPS]        = "wave-ops",
+    [SHADER_CAP_CLIP_PLANES]       = "clip-planes",
+    [SHADER_CAP_DEPTH_BOUNDS]      = "depth-bounds",
+    [SHADER_CAP_FLOAT64]           = "float64",
+    [SHADER_CAP_FOG]               = "fog",
+    [SHADER_CAP_GEOMETRY_SHADER]   = "geometry-shader",
+    [SHADER_CAP_INT64]             = "int64",
+    [SHADER_CAP_POINT_SIZE]        = "point-size",
+    [SHADER_CAP_ROV]               = "rov",
+    [SHADER_CAP_RT_VP_ARRAY_INDEX] = "rt-vp-array-index",
+    [SHADER_CAP_WAVE_OPS]          = "wave-ops",
 };
 
 static bool match_shader_cap_string(const char *line, enum shader_cap *cap)
@@ -570,17 +571,20 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         {
             resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
             resource->desc.height = 1;
+            resource->desc.depth = 1;
         }
         else if (sscanf(line, "( raw_buffer , %u ) ", &resource->desc.width) == 1)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
             resource->desc.height = 1;
+            resource->desc.depth = 1;
             resource->is_raw = true;
         }
         else if (sscanf(line, "( counter_buffer , %u ) ", &resource->desc.width) == 1)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
             resource->desc.height = 1;
+            resource->desc.depth = 1;
             resource->is_uav_counter = true;
             resource->stride = sizeof(uint32_t);
             resource->desc.texel_size = resource->stride;
@@ -591,9 +595,16 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         else if (sscanf(line, "( 2d , %u , %u ) ", &resource->desc.width, &resource->desc.height) == 2)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_2D;
+            resource->desc.depth = 1;
         }
         else if (sscanf(line, "( 2dms , %u , %u , %u ) ",
                 &resource->desc.sample_count, &resource->desc.width, &resource->desc.height) == 3)
+        {
+            resource->desc.dimension = RESOURCE_DIMENSION_2D;
+            resource->desc.depth = 1;
+        }
+        else if (sscanf(line, "( 2darray , %u , %u , %u ) ", &resource->desc.width, &resource->desc.height,
+                &resource->desc.depth) == 3)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_2D;
         }
@@ -641,6 +652,9 @@ static void parse_resource_directive(struct resource_params *resource, const cha
 
             if (rest == line)
                 break;
+
+            if (resource->desc.depth > 1)
+                fatal_error("Upload not implemented for 2d arrays.\n");
 
             vkd3d_array_reserve((void **)&resource->data, &resource->data_capacity, resource->data_size + sizeof(u), 1);
             memcpy(resource->data + resource->data_size, &u, sizeof(u));
@@ -754,6 +768,7 @@ static void set_default_target(struct shader_runner *runner)
     params.desc.texel_size = 16;
     params.desc.width = RENDER_TARGET_WIDTH;
     params.desc.height = RENDER_TARGET_HEIGHT;
+    params.desc.depth = 1;
     params.desc.level_count = 1;
 
     set_resource(runner, &params);
@@ -1124,7 +1139,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     }
     else if (match_string(line, "probe", &line))
     {
-        unsigned int left, top, right, bottom, ulps, slot;
+        unsigned int left, top, right, bottom, ulps, slot, array_layer = 0;
         struct resource_readback *rb;
         struct resource *resource;
         bool is_signed = false;
@@ -1163,11 +1178,14 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             resource = shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0);
         }
 
-        rb = runner->ops->get_resource_readback(runner, resource);
-
         if (sscanf(line, " ( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
         {
             set_rect(&rect, left, top, right, bottom);
+            line += len;
+        }
+        else if (sscanf(line, " ( %u , %u , %u )%n", &left, &top, &array_layer, &len) == 3)
+        {
+            set_rect(&rect, left, top, left + 1, top + 1);
             line += len;
         }
         else if (sscanf(line, " ( %u , %u )%n", &left, &top, &len) == 2)
@@ -1184,6 +1202,8 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         {
             fatal_error("Malformed probe arguments '%s'.\n", line);
         }
+
+        rb = runner->ops->get_resource_readback(runner, resource, array_layer * resource->desc.level_count);
 
         if (match_string(line, "rgbaui", &line))
         {

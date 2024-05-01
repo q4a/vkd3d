@@ -95,7 +95,7 @@ struct resource_desc
 
     DXGI_FORMAT format;
     unsigned int texel_size;
-    unsigned int width, height;
+    unsigned int width, height, depth;
     unsigned int level_count;
     unsigned int sample_count;
 };
@@ -148,6 +148,7 @@ enum shader_cap
     SHADER_CAP_INT64,
     SHADER_CAP_POINT_SIZE,
     SHADER_CAP_ROV,
+    SHADER_CAP_RT_VP_ARRAY_INDEX,
     SHADER_CAP_WAVE_OPS,
     SHADER_CAP_COUNT,
 };
@@ -251,7 +252,8 @@ struct shader_runner_ops
             unsigned int instance_count);
     bool (*copy)(struct shader_runner *runner, struct resource *src, struct resource *dst);
     bool (*dispatch)(struct shader_runner *runner, unsigned int x, unsigned int y, unsigned int z);
-    struct resource_readback *(*get_resource_readback)(struct shader_runner *runner, struct resource *resource);
+    struct resource_readback *(*get_resource_readback)(struct shader_runner *runner,
+            struct resource *resource, unsigned int sub_resource_idx);
     void (*release_readback)(struct shader_runner *runner, struct resource_readback *rb);
 };
 

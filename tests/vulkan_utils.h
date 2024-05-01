@@ -73,7 +73,8 @@ static inline void end_command_buffer(const struct vulkan_test_context *context)
 }
 
 static inline void transition_image_layout(const struct vulkan_test_context *context,
-        VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout src_layout, VkImageLayout dst_layout)
+        VkImage image, VkImageAspectFlags aspect_mask, uint32_t base_layer, uint32_t layer_count,
+        VkImageLayout src_layout, VkImageLayout dst_layout)
 {
     VkImageMemoryBarrier barrier = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
 
@@ -87,8 +88,8 @@ static inline void transition_image_layout(const struct vulkan_test_context *con
     barrier.subresourceRange.aspectMask = aspect_mask;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.baseArrayLayer = base_layer;
+    barrier.subresourceRange.layerCount = layer_count;
 
     VK_CALL(vkCmdPipelineBarrier(context->cmd_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &barrier));
@@ -166,8 +167,9 @@ static inline VkBufferView create_vulkan_buffer_view(const struct vulkan_test_co
     return view;
 }
 
-static inline VkImage create_vulkan_2d_image(const struct vulkan_test_context *context, uint32_t width, uint32_t height,
-        uint32_t level_count, uint32_t sample_count, VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
+static inline VkImage create_vulkan_2d_image(const struct vulkan_test_context *context, unsigned int width,
+        unsigned int height, unsigned int level_count, unsigned int layer_count, unsigned int sample_count,
+        VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
 {
     VkImageCreateInfo image_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     VkMemoryRequirements memory_reqs;
@@ -179,7 +181,7 @@ static inline VkImage create_vulkan_2d_image(const struct vulkan_test_context *c
     image_info.extent.height = height;
     image_info.extent.depth = 1;
     image_info.mipLevels = level_count;
-    image_info.arrayLayers = 1;
+    image_info.arrayLayers = layer_count;
     image_info.samples = max(sample_count, 1);
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.usage = usage;
@@ -196,13 +198,13 @@ static inline VkImage create_vulkan_2d_image(const struct vulkan_test_context *c
 }
 
 static inline VkImageView create_vulkan_2d_image_view(const struct vulkan_test_context *context,
-        VkImage image, VkFormat format, VkImageAspectFlags aspect_mask)
+        VkImage image, VkFormat format, VkImageAspectFlags aspect_mask, unsigned int layer_count)
 {
     VkImageViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     VkImageView view;
 
     view_info.image = image;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.viewType = (layer_count > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
     view_info.format = format;
     view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -212,7 +214,7 @@ static inline VkImageView create_vulkan_2d_image_view(const struct vulkan_test_c
     view_info.subresourceRange.baseMipLevel = 0;
     view_info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
+    view_info.subresourceRange.layerCount = layer_count;
 
     VK_CALL(vkCreateImageView(context->device, &view_info, NULL, &view));
     return view;

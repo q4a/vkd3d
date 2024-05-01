@@ -58,6 +58,7 @@ struct gl_resource
 
     const struct format_info *format;
     GLuint id, tbo_id;
+    GLenum target;
 };
 
 static struct gl_resource *gl_resource(struct resource *r)
@@ -97,20 +98,30 @@ static void debug_output(GLenum source, GLenum type, GLuint id, GLenum severity,
     trace("%.*s\n", length, message);
 }
 
-static bool check_gl_extension(const char *extension, GLint extension_count)
+static bool check_extension(GLenum name, const char *extension, GLint extension_count)
 {
     for (GLint i = 0; i < extension_count; ++i)
     {
-        if (!strcmp(extension, (const char *)glGetStringi(GL_EXTENSIONS, i)))
+        if (!strcmp(extension, (const char *)glGetStringi(name, i)))
             return true;
     }
 
     return false;
 }
 
+static bool check_gl_extension(const char *extension, GLint extension_count)
+{
+    return check_extension(GL_EXTENSIONS, extension, extension_count);
+}
+
+static bool check_spirv_extension(const char *extension, GLint extension_count)
+{
+    return check_extension(GL_SPIR_V_EXTENSIONS, extension, extension_count);
+}
+
 static bool check_gl_extensions(struct gl_runner *runner)
 {
-    GLint count;
+    GLint count, spirv_count = 0;
 
     static const char *required_extensions[] =
     {
@@ -126,8 +137,14 @@ static bool check_gl_extensions(struct gl_runner *runner)
 
     glGetIntegerv(GL_NUM_EXTENSIONS, &count);
 
-    if (runner->language == SPIR_V && !check_gl_extension("GL_ARB_gl_spirv", count))
-        return false;
+    if (runner->language == SPIR_V)
+    {
+        if (!check_gl_extension("GL_ARB_gl_spirv", count))
+            return false;
+
+        if (check_gl_extension("GL_ARB_spirv_extensions", count))
+            glGetIntegerv(GL_NUM_SPIR_V_EXTENSIONS, &spirv_count);
+    }
 
     for (unsigned int i = 0; i < ARRAY_SIZE(required_extensions); ++i)
     {
@@ -139,6 +156,9 @@ static bool check_gl_extensions(struct gl_runner *runner)
         runner->caps.shader_caps[SHADER_CAP_FLOAT64] = true;
     if (check_gl_extension("GL_ARB_gpu_shader_int64", count))
         runner->caps.shader_caps[SHADER_CAP_INT64] = true;
+    if (check_gl_extension("GL_ARB_shader_viewport_layer_array", count) && (runner->language == GLSL
+            || check_spirv_extension("SPV_EXT_shader_viewport_index_layer", spirv_count)))
+        runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX] = true;
     if (check_gl_extension("GL_EXT_depth_bounds_test", count))
         runner->caps.shader_caps[SHADER_CAP_DEPTH_BOUNDS] = true;
 
@@ -421,8 +441,16 @@ static void gl_runner_cleanup(struct gl_runner *runner)
 
 static bool init_resource_2d(struct gl_resource *resource, const struct resource_params *params)
 {
-    GLenum target = params->desc.sample_count > 1 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
     unsigned int offset, w, h, i;
+    GLenum target;
+
+    if (params->desc.sample_count > 1)
+        target = GL_TEXTURE_2D_MULTISAMPLE;
+    else if (params->desc.depth > 1)
+        target = GL_TEXTURE_2D_ARRAY;
+    else
+        target = GL_TEXTURE_2D;
+    resource->target = target;
 
     resource->format = get_format_info(params->desc.format, params->is_shadow);
 
@@ -447,8 +475,12 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
     }
     else
     {
-        glTexStorage2D(target, params->desc.level_count,
-                resource->format->internal_format, params->desc.width, params->desc.height);
+        if (params->desc.depth > 1)
+            glTexStorage3D(target, params->desc.level_count, resource->format->internal_format,
+                    params->desc.width, params->desc.height, params->desc.depth);
+        else
+            glTexStorage2D(target, params->desc.level_count, resource->format->internal_format,
+                    params->desc.width, params->desc.height);
         glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
     }
@@ -469,15 +501,18 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
 
 static void init_resource_buffer(struct gl_resource *resource, const struct resource_params *params)
 {
+    GLenum target = GL_TEXTURE_BUFFER;
+
     resource->format = get_format_info(params->desc.format, false);
+    resource->target = target;
 
     glGenBuffers(1, &resource->id);
-    glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
-    glBufferData(GL_TEXTURE_BUFFER, params->data_size, params->data, GL_STATIC_DRAW);
+    glBindBuffer(target, resource->id);
+    glBufferData(target, params->data_size, params->data, GL_STATIC_DRAW);
 
     glGenTextures(1, &resource->tbo_id);
-    glBindTexture(GL_TEXTURE_BUFFER, resource->tbo_id);
-    glTexBuffer(GL_TEXTURE_BUFFER, resource->format->internal_format, resource->id);
+    glBindTexture(target, resource->tbo_id);
+    glTexBuffer(target, resource->format->internal_format, resource->id);
 }
 
 static struct resource *gl_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
@@ -549,6 +584,7 @@ static bool compile_shader(struct gl_runner *runner, enum shader_type shader_typ
     struct vkd3d_shader_scan_hull_shader_tessellation_info tessellation_info;
     struct vkd3d_shader_spirv_domain_shader_target_info domain_info;
     struct vkd3d_shader_combined_resource_sampler *sampler;
+    enum vkd3d_shader_spirv_extension spirv_extensions[1];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_parameter parameters[1];
     unsigned int count, i;
@@ -620,6 +656,10 @@ static bool compile_shader(struct gl_runner *runner, enum shader_type shader_typ
         info.next = &spirv_info;
         spirv_info.next = &interface_info;
         spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5;
+        spirv_info.extensions = spirv_extensions;
+        spirv_info.extension_count = 0;
+        if (runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX])
+            spirv_extensions[spirv_info.extension_count++] = VKD3D_SHADER_SPIRV_EXTENSION_EXT_VIEWPORT_INDEX_LAYER;
     }
     else
     {
@@ -1159,11 +1199,9 @@ static bool gl_runner_draw(struct shader_runner *r,
 
         glActiveTexture(GL_TEXTURE0 + s->binding.binding);
         if (resource->desc.dimension == RESOURCE_DIMENSION_BUFFER)
-            glBindTexture(GL_TEXTURE_BUFFER, gl_resource(resource)->tbo_id);
-        else if (resource->desc.sample_count > 1)
-            glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, gl_resource(resource)->id);
+            glBindTexture(gl_resource(resource)->target, gl_resource(resource)->tbo_id);
         else
-            glBindTexture(GL_TEXTURE_2D, gl_resource(resource)->id);
+            glBindTexture(gl_resource(resource)->target, gl_resource(resource)->id);
 
         if (s->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX)
             continue;
@@ -1306,19 +1344,16 @@ static bool gl_runner_copy(struct shader_runner *r, struct resource *src, struct
 {
     struct gl_resource *s = gl_resource(src);
     struct gl_resource *d = gl_resource(dst);
-    GLenum target = GL_TEXTURE_2D;
     unsigned int l, w, h;
 
-    if (src->desc.dimension == RESOURCE_DIMENSION_BUFFER)
+    if (src->desc.dimension == RESOURCE_DIMENSION_BUFFER || src->desc.depth > 1)
         return false;
 
-    if (src->desc.sample_count > 1)
-        target = GL_TEXTURE_2D_MULTISAMPLE;
     for (l = 0; l < src->desc.level_count; ++l)
     {
         w = get_level_dimension(src->desc.width, l);
         h = get_level_dimension(src->desc.height, l);
-        glCopyImageSubData(s->id, target, l, 0, 0, 0, d->id, target, l, 0, 0, 0, w, h, 1);
+        glCopyImageSubData(s->id, s->target, l, 0, 0, 0, d->id, d->target, l, 0, 0, 0, w, h, 1);
     }
 
     return true;
@@ -1329,11 +1364,14 @@ struct gl_resource_readback
     struct resource_readback rb;
 };
 
-static struct resource_readback *gl_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
+static struct resource_readback *gl_runner_get_resource_readback(struct shader_runner *r,
+        struct resource *res, unsigned int sub_resource_idx)
 {
     struct gl_resource *resource = gl_resource(res);
     struct gl_runner *runner = gl_runner(r);
     struct resource_readback *rb;
+    unsigned int layer, level;
+    size_t slice_pitch;
 
     if (resource->r.desc.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.desc.type != RESOURCE_TYPE_DEPTH_STENCIL
             && resource->r.desc.type != RESOURCE_TYPE_UAV)
@@ -1346,12 +1384,16 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
     rb->depth = 1;
 
     rb->row_pitch = rb->width * resource->r.desc.texel_size;
-    rb->data = malloc(rb->row_pitch * rb->height);
+    slice_pitch = rb->row_pitch * rb->height;
+    rb->data = calloc(slice_pitch, resource->r.desc.depth);
+
+    level = sub_resource_idx % resource->r.desc.level_count;
+    layer = sub_resource_idx / resource->r.desc.level_count;
 
     if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
     {
-        glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
-        glGetBufferSubData(GL_TEXTURE_BUFFER, 0, rb->row_pitch * rb->height, rb->data);
+        glBindBuffer(resource->target, resource->id);
+        glGetBufferSubData(resource->target, 0, slice_pitch, rb->data);
     }
     else if (resource->r.desc.sample_count > 1)
     {
@@ -1385,8 +1427,10 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
     }
     else
     {
-        glBindTexture(GL_TEXTURE_2D, resource->id);
-        glGetTexImage(GL_TEXTURE_2D, 0, resource->format->format, resource->format->type, rb->data);
+        glBindTexture(resource->target, resource->id);
+        glGetTexImage(resource->target, level, resource->format->format, resource->format->type, rb->data);
+        if (layer)
+            memcpy(rb->data, (const uint8_t *)rb->data + layer * slice_pitch, slice_pitch);
     }
 
     return rb;
