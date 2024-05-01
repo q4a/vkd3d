@@ -379,6 +379,9 @@ static void VKD3D_PRINTF_FUNC(3, 4) shader_glsl_print_assignment(
         case VKD3D_DATA_FLOAT:
             close = false;
             break;
+        case VKD3D_DATA_INT:
+            vkd3d_string_buffer_printf(buffer, "intBitsToFloat(");
+            break;
         case VKD3D_DATA_UINT:
             vkd3d_string_buffer_printf(buffer, "uintBitsToFloat(");
             break;
@@ -679,6 +682,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_FRC:
             shader_glsl_intrinsic(gen, ins, "fract");
+            break;
+        case VKD3DSIH_FTOI:
+            shader_glsl_cast(gen, ins, "int", "ivec");
             break;
         case VKD3DSIH_GEO:
             shader_glsl_relop(gen, ins, ">=", "greaterThanEqual");
