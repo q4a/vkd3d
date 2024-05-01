@@ -428,6 +428,30 @@ static void shader_glsl_binop(struct vkd3d_glsl_generator *gen,
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_dot(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_instruction *ins, uint32_t src_mask)
+{
+    unsigned int component_count;
+    struct glsl_src src[2];
+    struct glsl_dst dst;
+    uint32_t dst_mask;
+
+    dst_mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&src[0], gen, &ins->src[0], src_mask);
+    glsl_src_init(&src[1], gen, &ins->src[1], src_mask);
+
+    if ((component_count = vsir_write_mask_component_count(dst_mask)) > 1)
+        shader_glsl_print_assignment(gen, &dst, "vec%d(dot(%s, %s))",
+                component_count, src[0].str->buffer, src[1].str->buffer);
+    else
+        shader_glsl_print_assignment(gen, &dst, "dot(%s, %s)",
+                src[0].str->buffer, src[1].str->buffer);
+
+    glsl_src_cleanup(&src[1], &gen->string_buffers);
+    glsl_src_cleanup(&src[0], &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_intrinsic(struct vkd3d_glsl_generator *gen,
         const struct vkd3d_shader_instruction *ins, const char *op)
 {
@@ -687,6 +711,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_DIV:
             shader_glsl_binop(gen, ins, "/");
+            break;
+        case VKD3DSIH_DP3:
+            shader_glsl_dot(gen, ins, vkd3d_write_mask_from_component_count(3));
             break;
         case VKD3DSIH_FRC:
             shader_glsl_intrinsic(gen, ins, "fract");
