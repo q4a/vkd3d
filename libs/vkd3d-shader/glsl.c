@@ -712,6 +712,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DIV:
             shader_glsl_binop(gen, ins, "/");
             break;
+        case VKD3DSIH_DP2:
+            shader_glsl_dot(gen, ins, vkd3d_write_mask_from_component_count(2));
+            break;
         case VKD3DSIH_DP3:
             shader_glsl_dot(gen, ins, vkd3d_write_mask_from_component_count(3));
             break;
