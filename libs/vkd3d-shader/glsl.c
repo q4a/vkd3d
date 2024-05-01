@@ -715,6 +715,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DP3:
             shader_glsl_dot(gen, ins, vkd3d_write_mask_from_component_count(3));
             break;
+        case VKD3DSIH_DP4:
+            shader_glsl_dot(gen, ins, VKD3DSP_WRITEMASK_ALL);
+            break;
         case VKD3DSIH_FRC:
             shader_glsl_intrinsic(gen, ins, "fract");
             break;
