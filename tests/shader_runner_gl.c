@@ -1355,7 +1355,18 @@ static bool gl_runner_draw(struct shader_runner *r,
 
     glEnable(GL_SAMPLE_MASK);
     glSampleMaski(0, runner->r.sample_mask);
-    glViewport(0, 0, fb_width, fb_height);
+
+    if (r->viewport_count)
+    {
+        for (i = 0; i < r->viewport_count; ++i)
+        {
+            glViewportIndexedf(i, r->viewports[i].x, r->viewports[i].y, r->viewports[i].width, r->viewports[i].height);
+        }
+    }
+    else
+    {
+        glViewport(0, 0, fb_width, fb_height);
+    }
     glScissor(0, 0, fb_width, fb_height);
     glDrawBuffers(rt_count, draw_buffers);
 

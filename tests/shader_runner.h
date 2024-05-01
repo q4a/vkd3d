@@ -130,6 +130,14 @@ struct input_element
     unsigned int index;
 };
 
+struct viewport
+{
+    float x;
+    float y;
+    float width;
+    float height;
+};
+
 #define MAX_RESOURCES 32
 #define MAX_SAMPLERS 32
 #define DXGI_FORMAT_COUNT (DXGI_FORMAT_B4G4R4A4_UNORM + 1)
@@ -254,6 +262,9 @@ struct shader_runner
     enum fog_mode fog_mode;
     float fog_start, fog_end, fog_density;
     bool ortho_fog;
+
+    struct viewport viewports[4];
+    unsigned int viewport_count;
 };
 
 struct shader_runner_ops

@@ -684,18 +684,18 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkPipelineMultisampleStateCreateInfo ms_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
     VkPipelineViewportStateCreateInfo vp_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
     VkGraphicsPipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-    VkViewport viewport = {.y = runner->rt_size.height, .width = runner->rt_size.width,
-            .height = -(float)runner->rt_size.height, .maxDepth = 1};
+    VkViewport viewports[ARRAY_SIZE(runner->r.viewports)] = {{.y = runner->rt_size.height,
+            .width = runner->rt_size.width, .height = -(float)runner->rt_size.height, .maxDepth = 1}};
+    VkRect2D scissor_rects[ARRAY_SIZE(runner->r.viewports)] = {{.extent = runner->rt_size}};
     VkPipelineColorBlendAttachmentState attachment_desc[MAX_RESOURCES] = {0};
     const struct vulkan_test_context *context = &runner->context;
     VkPipelineTessellationStateCreateInfo tessellation_info;
     VkVertexInputAttributeDescription input_attributes[32];
-    const VkRect2D rt_rect = {.extent = runner->rt_size};
     VkPipelineDepthStencilStateCreateInfo ds_desc = {0};
     VkVertexInputBindingDescription input_bindings[32];
     VkPipelineShaderStageCreateInfo stage_desc[5];
+    unsigned int stage_count = 0, viewport_count;
     VkDevice device = context->device;
-    unsigned int stage_count = 0;
     VkPipeline pipeline;
     unsigned int i, j;
     VkResult vr;
@@ -819,16 +819,31 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
 
     ia_desc.topology = vulkan_primitive_topology_from_d3d(primitive_topology);
 
+    viewport_count = max(runner->r.viewport_count, 1);
+    for (i = 0; i < runner->r.viewport_count; ++i)
+    {
+        viewports[i].x = runner->r.viewports[i].x;
+        viewports[i].y = runner->r.viewports[i].y + runner->r.viewports[i].height;
+        viewports[i].width = runner->r.viewports[i].width;
+        viewports[i].height = -runner->r.viewports[i].height;
+        viewports[i].maxDepth = 1.0f;
+        scissor_rects[i].offset.x = 0;
+        scissor_rects[i].offset.y = 0;
+        scissor_rects[i].extent = runner->rt_size;
+    }
     if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
     {
-        viewport.x += 0.5f;
-        viewport.y += 0.5f;
+        for (i = 0; i < viewport_count; ++i)
+        {
+            viewports[i].x += 0.5f;
+            viewports[i].y += 0.5f;
+        }
     }
 
-    vp_desc.viewportCount = 1;
-    vp_desc.pViewports = &viewport;
-    vp_desc.scissorCount = 1;
-    vp_desc.pScissors = &rt_rect;
+    vp_desc.viewportCount = viewport_count;
+    vp_desc.pViewports = viewports;
+    vp_desc.scissorCount = viewport_count;
+    vp_desc.pScissors = scissor_rects;
 
     rs_desc.cullMode = VK_CULL_MODE_NONE;
     rs_desc.frontFace = VK_FRONT_FACE_CLOCKWISE;
@@ -1790,18 +1805,23 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     /* FIXME: Probably make these optional. */
 
 #define ENABLE_FEATURE(x) \
-    if (!ret_features->x) \
+    do \
     { \
-        skip("The selected Vulkan device does not support " #x ".\n"); \
-        goto out_destroy_context; \
-    } \
-    features.x = VK_TRUE
+        if (!ret_features->x) \
+        { \
+            skip("The selected Vulkan device does not support " #x ".\n"); \
+            goto out_destroy_context; \
+        } \
+        features.x = VK_TRUE; \
+    } while (false)
 
     ENABLE_FEATURE(fragmentStoresAndAtomics);
     ENABLE_FEATURE(sampleRateShading);
     ENABLE_FEATURE(shaderClipDistance);
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
+    if (runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX])
+        ENABLE_FEATURE(multiViewport);
 
     if (ret_features->tessellationShader)
     {
