@@ -718,6 +718,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_ROUND_PI:
             shader_glsl_intrinsic(gen, ins, "ceil");
             break;
+        case VKD3DSIH_ROUND_Z:
+            shader_glsl_intrinsic(gen, ins, "trunc");
+            break;
         default:
             shader_glsl_unhandled(gen, ins);
             break;
