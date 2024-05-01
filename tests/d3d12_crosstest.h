@@ -749,26 +749,35 @@ static void enable_d3d12_debug_layer(void)
 {
     ID3D12Debug1 *debug1;
     ID3D12Debug *debug;
+    HRESULT hr;
 
     if (test_options.enable_gpu_based_validation)
     {
-        if (SUCCEEDED(D3D12GetDebugInterface(&IID_ID3D12Debug1, (void **)&debug1)))
+        if (SUCCEEDED(hr = D3D12GetDebugInterface(&IID_ID3D12Debug1, (void **)&debug1)))
         {
             ID3D12Debug1_SetEnableGPUBasedValidation(debug1, true);
             ID3D12Debug1_Release(debug1);
             test_options.enable_debug_layer = true;
+            trace("GPU-based validation was enabled.\n");
         }
         else
         {
-            trace("Failed to enable GPU-based validation.\n");
+            trace("Failed to enable GPU-based validation, hr %#x.\n", hr);
         }
     }
 
-    if (test_options.enable_debug_layer
-            && SUCCEEDED(D3D12GetDebugInterface(&IID_ID3D12Debug, (void **)&debug)))
+    if (test_options.enable_debug_layer)
     {
-        ID3D12Debug_EnableDebugLayer(debug);
-        ID3D12Debug_Release(debug);
+        if (SUCCEEDED(hr = D3D12GetDebugInterface(&IID_ID3D12Debug, (void **)&debug)))
+        {
+            ID3D12Debug_EnableDebugLayer(debug);
+            ID3D12Debug_Release(debug);
+            trace("The debug layer was enabled.\n");
+        }
+        else
+        {
+            trace("Failed to enable the debug layer, hr %#x.\n", hr);
+        }
     }
 }
 
