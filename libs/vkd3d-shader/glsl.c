@@ -686,6 +686,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_FTOI:
             shader_glsl_cast(gen, ins, "int", "ivec");
             break;
+        case VKD3DSIH_FTOU:
+            shader_glsl_cast(gen, ins, "uint", "uvec");
+            break;
         case VKD3DSIH_GEO:
             shader_glsl_relop(gen, ins, ">=", "greaterThanEqual");
             break;
