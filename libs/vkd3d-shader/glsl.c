@@ -137,6 +137,14 @@ static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
             vkd3d_string_buffer_printf(buffer, "%s_out[%u]", gen->prefix, reg->idx[0].offset);
             break;
 
+        case VKD3DSPR_DEPTHOUT:
+            if (gen->program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled depth output in shader type #%x.",
+                        gen->program->shader_version.type);
+            vkd3d_string_buffer_printf(buffer, "gl_FragDepth");
+            break;
+
         case VKD3DSPR_IMMCONST:
             switch (reg->dimension)
             {
