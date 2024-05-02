@@ -293,6 +293,51 @@ static IUnknown *create_adapter(void)
     return adapter;
 }
 
+static const char *d3d12_message_category_to_string(D3D12_MESSAGE_CATEGORY category)
+{
+    switch (category)
+    {
+#define X(x) case D3D12_MESSAGE_CATEGORY_ ## x: return #x
+        X(APPLICATION_DEFINED);
+        X(MISCELLANEOUS);
+        X(INITIALIZATION);
+        X(CLEANUP);
+        X(COMPILATION);
+        X(STATE_CREATION);
+        X(STATE_SETTING);
+        X(STATE_GETTING);
+        X(RESOURCE_MANIPULATION);
+        X(EXECUTION);
+        X(SHADER);
+#undef X
+        default: return "??";
+    }
+}
+
+static const char *d3d12_message_severity_to_string(D3D12_MESSAGE_SEVERITY severity)
+{
+    switch (severity)
+    {
+#define X(x) case D3D12_MESSAGE_SEVERITY_ ## x: return #x
+        X(CORRUPTION);
+        X(ERROR);
+        X(WARNING);
+        X(INFO);
+        X(MESSAGE);
+#undef X
+        default: return "??";
+    }
+}
+
+static void STDMETHODCALLTYPE info_callback(D3D12_MESSAGE_CATEGORY category,
+        D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID id, const char *description, void *context)
+{
+    if (severity >= D3D12_MESSAGE_SEVERITY_INFO)
+        return;
+    fprintf(stderr, "d3d12 validation %s %s #%#x: %s.\n", d3d12_message_severity_to_string(severity),
+            d3d12_message_category_to_string(category), id, description);
+}
+
 static ID3D12Device *create_device(void)
 {
     IUnknown *adapter = NULL;
@@ -309,6 +354,27 @@ static ID3D12Device *create_device(void)
     hr = D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, (void **)&device);
     if (adapter)
         IUnknown_Release(adapter);
+
+    if (SUCCEEDED(hr) && test_options.enable_debug_layer)
+    {
+        ID3D12InfoQueue1 *info_queue;
+        DWORD cookie;
+
+        hr = ID3D12Device_QueryInterface(device, &IID_ID3D12InfoQueue1, (void **)&info_queue);
+
+        if (FAILED(hr))
+        {
+            trace("Failed to query for ID3D12InfoQueue1, you might want to update your d3d12 runtime "
+                    "or check that d3d12sdklayers.dll is available, hr %#x.\n", hr);
+        }
+        else
+        {
+            hr = ID3D12InfoQueue1_RegisterMessageCallback(info_queue, info_callback,
+                    D3D12_MESSAGE_CALLBACK_IGNORE_FILTERS, NULL, &cookie);
+            ok(SUCCEEDED(hr), "Failed to register info queue callback, hr %#x.\n", hr);
+            ID3D12InfoQueue1_Release(info_queue);
+        }
+    }
 
     return SUCCEEDED(hr) ? device : NULL;
 }
