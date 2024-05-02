@@ -705,6 +705,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             shader_glsl_binop(gen, ins, "&");
             break;
         case VKD3DSIH_DCL_INPUT:
+        case VKD3DSIH_DCL_INPUT_PS:
         case VKD3DSIH_DCL_OUTPUT:
         case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
