@@ -21,6 +21,8 @@
 #include "vkd3d_common.h"
 #include "vkd3d_d3d12shader.h"
 
+VKD3D_AGILITY_SDK_EXPORTS
+
 #ifndef D3DERR_INVALIDCALL
 #define D3DERR_INVALIDCALL 0x8876086c
 #endif

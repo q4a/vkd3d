@@ -18,6 +18,8 @@
 
 #include "d3d12_crosstest.h"
 
+VKD3D_AGILITY_SDK_EXPORTS
+
 struct test_options test_options = {0};
 
 #define recreate_command_list(a, b, c) recreate_command_list_(__LINE__, a, b, c)

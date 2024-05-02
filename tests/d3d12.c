@@ -23,6 +23,8 @@
 
 #include "d3d12_crosstest.h"
 
+VKD3D_AGILITY_SDK_EXPORTS
+
 struct test_options test_options = {0};
 
 static PFN_D3D12_CREATE_VERSIONED_ROOT_SIGNATURE_DESERIALIZER pfn_D3D12CreateVersionedRootSignatureDeserializer;

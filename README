@@ -111,3 +111,46 @@ to submit their patches using the merge request tool.
 
 Each merge request is automatically tested with the GitLab CI
 system. See gitlab/README in the Git tree for more details.
+
+============================
+Testing with the Agility SDK
+============================
+
+Traditionally Microsoft have released the Direct3D 12 development files,
+including the debug layer runtime, as part of the larger Windows SDK.
+In 2021 the DirectX 12 Agility SDK was introduced, which may be updated
+independently of the Windows SDK. If you plan to run the vkd3d
+crosstests with Microsoft's debug layer you might want to get it from
+the Agility SDK, both because it's probably going to be more up-to-date
+and because the Agility SDK is a couple dozens of megabytes versus the
+gigabytes of the Windows SDK.
+
+In order to build the vkd3d crosstests with Agility SDK support, follow
+these steps:
+
+ * The Agility SDK is distributed at [1]: select your preferred
+   version (likely the most recent one) and note the number in column
+   D3D12SDKVersion, which you're going to need later.
+
+ [1] https://devblogs.microsoft.com/directx/directx12agility/
+
+ * Configure vkd3d with something like:
+   'CROSSCC64="x86_64-w64-mingw32-gcc -DVKD3D_AGILITY_SDK_VERSION=<version>"',
+   as well as the equivalent CROSSCC32 variable for the 32-bit
+   crosstests. You'll have to replace '<version>' with the
+   D3D12SDKVersion number you noted above. Then build the crosstests
+   with 'make crosstest' as usual.
+
+ * Download the Agility SDK NuGet package, which is essentially a ZIP
+   file with a .nupkg extension. Extract d3d12core.dll and
+   d3d12sdklayers.dll for your architecture, and put them in the
+   directory containing the crosstest executables.
+
+ * Now you can run the crosstests, possibly with arguments
+   '--validate' and '--gbv' to enable the debug layers. They will use
+   the runtime from the Agility SDK.
+
+ * It's also possible to use '-DVKD3D_AGILITY_SDK_PATH=/path/to/sdk/' to
+   specify the directory to load the Agility SDK DLLs from at runtime.
+   If relative, the path is intended to be relative to the executable
+   path. If unspecified the path defaults to '.'.

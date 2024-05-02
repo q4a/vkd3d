@@ -28,6 +28,8 @@
 #include "shader_runner.h"
 #include "dxcompiler.h"
 
+VKD3D_AGILITY_SDK_EXPORTS
+
 struct d3d12_resource
 {
     struct resource r;
