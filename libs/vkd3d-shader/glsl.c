@@ -795,6 +795,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_MAX:
             shader_glsl_intrinsic(gen, ins, "max");
             break;
+        case VKD3DSIH_MIN:
+            shader_glsl_intrinsic(gen, ins, "min");
+            break;
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:
             shader_glsl_relop(gen, ins, "!=", "notEqual");
