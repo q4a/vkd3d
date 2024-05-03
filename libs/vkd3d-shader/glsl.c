@@ -365,18 +365,21 @@ static void VKD3D_PRINTF_FUNC(3, 4) shader_glsl_print_assignment(
 {
     const struct vkd3d_shader_register *dst_reg = &dst->vsir->reg;
     struct vkd3d_string_buffer *buffer = gen->buffer;
+    uint32_t modifiers = dst->vsir->modifiers;
     bool close = true;
     va_list args;
 
     if (dst->vsir->shift)
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                 "Internal compiler error: Unhandled destination shift %#x.", dst->vsir->shift);
-    if (dst->vsir->modifiers)
+    if (modifiers & ~VKD3DSPDM_SATURATE)
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                "Internal compiler error: Unhandled destination modifier(s) %#x.", dst->vsir->modifiers);
+                "Internal compiler error: Unhandled destination modifier(s) %#x.", modifiers);
 
     shader_glsl_print_indent(buffer, gen->indent);
     vkd3d_string_buffer_printf(buffer, "%s%s = ", dst->register_name->buffer, dst->mask->buffer);
+    if (modifiers & VKD3DSPDM_SATURATE)
+        vkd3d_string_buffer_printf(buffer, "clamp(");
 
     switch (dst_reg->data_type)
     {
@@ -399,7 +402,11 @@ static void VKD3D_PRINTF_FUNC(3, 4) shader_glsl_print_assignment(
     vkd3d_string_buffer_vprintf(buffer, format, args);
     va_end(args);
 
-    vkd3d_string_buffer_printf(buffer, "%s;\n", close ? ")" : "");
+    if (close)
+        vkd3d_string_buffer_printf(buffer, ")");
+    if (modifiers & VKD3DSPDM_SATURATE)
+        vkd3d_string_buffer_printf(buffer, ", 0.0, 1.0)");
+    vkd3d_string_buffer_printf(buffer, ";\n");
 }
 
 static void shader_glsl_unhandled(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
