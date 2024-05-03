@@ -547,6 +547,22 @@ static void shader_glsl_endif(struct vkd3d_glsl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "}\n");
 }
 
+static void shader_glsl_unary_op(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_instruction *ins, const char *op)
+{
+    struct glsl_src src;
+    struct glsl_dst dst;
+    uint32_t mask;
+
+    mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&src, gen, &ins->src[0], mask);
+
+    shader_glsl_print_assignment(gen, &dst, "%s%s", op, src.str->buffer);
+
+    glsl_src_cleanup(&src, &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_mov(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct glsl_src src;
@@ -817,6 +833,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_MUL:
             shader_glsl_binop(gen, ins, "*");
+            break;
+        case VKD3DSIH_NOT:
+            shader_glsl_unary_op(gen, ins, "~");
             break;
         case VKD3DSIH_OR:
             shader_glsl_binop(gen, ins, "|");
