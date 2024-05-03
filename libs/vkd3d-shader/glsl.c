@@ -836,6 +836,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_ROUND_Z:
             shader_glsl_intrinsic(gen, ins, "trunc");
             break;
+        case VKD3DSIH_RSQ:
+            shader_glsl_intrinsic(gen, ins, "inversesqrt");
+            break;
         case VKD3DSIH_SQRT:
             shader_glsl_intrinsic(gen, ins, "sqrt");
             break;
