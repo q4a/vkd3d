@@ -797,6 +797,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_RET:
             shader_glsl_ret(gen, ins);
             break;
+        case VKD3DSIH_ROUND_NE:
+            shader_glsl_intrinsic(gen, ins, "roundEven");
+            break;
         case VKD3DSIH_ROUND_NI:
             shader_glsl_intrinsic(gen, ins, "floor");
             break;
