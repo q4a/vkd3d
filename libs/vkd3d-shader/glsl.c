@@ -514,6 +514,31 @@ static void shader_glsl_cast(struct vkd3d_glsl_generator *gen, const struct vkd3
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_if(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    const char *condition;
+    struct glsl_src src;
+
+    glsl_src_init(&src, gen, &ins->src[0], VKD3DSP_WRITEMASK_0);
+
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    condition = ins->flags == VKD3D_SHADER_CONDITIONAL_OP_NZ ? "bool" : "!bool";
+    vkd3d_string_buffer_printf(gen->buffer, "if (%s(%s))\n", condition, src.str->buffer);
+
+    glsl_src_cleanup(&src, &gen->string_buffers);
+
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "{\n");
+    ++gen->indent;
+}
+
+static void shader_glsl_endif(struct vkd3d_glsl_generator *gen)
+{
+    --gen->indent;
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "}\n");
+}
+
 static void shader_glsl_mov(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct glsl_src src;
@@ -722,6 +747,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DP4:
             shader_glsl_dot(gen, ins, VKD3DSP_WRITEMASK_ALL);
             break;
+        case VKD3DSIH_ENDIF:
+            shader_glsl_endif(gen);
+            break;
         case VKD3DSIH_IEQ:
             shader_glsl_relop(gen, ins, "==", "equal");
             break;
@@ -739,6 +767,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_GEO:
             shader_glsl_relop(gen, ins, ">=", "greaterThanEqual");
+            break;
+        case VKD3DSIH_IF:
+            shader_glsl_if(gen, ins);
             break;
         case VKD3DSIH_LTO:
             shader_glsl_relop(gen, ins, "<", "lessThan");
