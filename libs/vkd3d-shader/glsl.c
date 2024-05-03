@@ -455,16 +455,24 @@ static void shader_glsl_dot(struct vkd3d_glsl_generator *gen,
 static void shader_glsl_intrinsic(struct vkd3d_glsl_generator *gen,
         const struct vkd3d_shader_instruction *ins, const char *op)
 {
+    struct vkd3d_string_buffer *args;
     struct glsl_src src;
     struct glsl_dst dst;
+    unsigned int i;
     uint32_t mask;
 
     mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
-    glsl_src_init(&src, gen, &ins->src[0], mask);
+    args = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    shader_glsl_print_assignment(gen, &dst, "%s(%s)", op, src.str->buffer);
+    for (i = 0; i < ins->src_count; ++i)
+    {
+        glsl_src_init(&src, gen, &ins->src[i], mask);
+        vkd3d_string_buffer_printf(args, "%s%s", i ? ", " : "", src.str->buffer);
+        glsl_src_cleanup(&src, &gen->string_buffers);
+    }
+    shader_glsl_print_assignment(gen, &dst, "%s(%s)", op, args->buffer);
 
-    glsl_src_cleanup(&src, &gen->string_buffers);
+    vkd3d_string_buffer_release(&gen->string_buffers, args);
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
@@ -783,6 +791,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_LTO:
             shader_glsl_relop(gen, ins, "<", "lessThan");
+            break;
+        case VKD3DSIH_MAX:
+            shader_glsl_intrinsic(gen, ins, "max");
             break;
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:
