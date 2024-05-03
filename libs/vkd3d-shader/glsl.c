@@ -540,6 +540,13 @@ static void shader_glsl_if(struct vkd3d_glsl_generator *gen, const struct vkd3d_
     ++gen->indent;
 }
 
+static void shader_glsl_else(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    unsigned int i = 4 * (gen->indent - 1);
+
+    vkd3d_string_buffer_printf(gen->buffer, "%*s}\n%*selse\n%*s{\n", i, "", i, "", i, "");
+}
+
 static void shader_glsl_endif(struct vkd3d_glsl_generator *gen)
 {
     --gen->indent;
@@ -780,6 +787,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_DP4:
             shader_glsl_dot(gen, ins, VKD3DSP_WRITEMASK_ALL);
+            break;
+        case VKD3DSIH_ELSE:
+            shader_glsl_else(gen, ins);
             break;
         case VKD3DSIH_ENDIF:
             shader_glsl_endif(gen);
