@@ -469,6 +469,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                     return ret;
                 break;
 
+            case VKD3DSIH_DCL:
             case VKD3DSIH_DCL_CONSTANT_BUFFER:
             case VKD3DSIH_DCL_TEMPS:
                 vkd3d_shader_instruction_make_nop(ins);
