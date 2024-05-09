@@ -1882,6 +1882,32 @@ struct sm1_instruction
     unsigned int has_dst;
 };
 
+static bool is_inconsequential_instr(const struct sm1_instruction *instr)
+{
+    const struct sm1_src_register *src = &instr->srcs[0];
+    const struct sm1_dst_register *dst = &instr->dst;
+    unsigned int i;
+
+    if (instr->opcode != D3DSIO_MOV)
+        return false;
+    if (dst->mod != D3DSPDM_NONE)
+        return false;
+    if (src->mod != D3DSPSM_NONE)
+        return false;
+    if (src->type != dst->type)
+        return false;
+    if (src->reg != dst->reg)
+        return false;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if ((dst->writemask & (1 << i)) && (vsir_swizzle_get_component(src->swizzle, i) != i))
+            return false;
+    }
+
+    return true;
+}
+
 static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const struct sm1_dst_register *reg)
 {
     assert(reg->writemask);
@@ -1900,6 +1926,9 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct s
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
     uint32_t token = instr->opcode;
     unsigned int i;
+
+    if (is_inconsequential_instr(instr))
+        return;
 
     token |= VKD3D_SM1_INSTRUCTION_FLAGS_MASK & (instr->flags << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT);
 
