@@ -341,7 +341,7 @@ static unsigned int vkd3d_check_extensions(const VkExtensionProperties *extensio
         ++extension_count;
     }
 
-    assert(!optional_user_extension_count || user_extension_supported);
+    VKD3D_ASSERT(!optional_user_extension_count || user_extension_supported);
     for (i = 0; i < optional_user_extension_count; ++i)
     {
         if (has_extension(extensions, count, optional_user_extensions[i]))
@@ -403,7 +403,7 @@ static unsigned int vkd3d_enable_extensions(const char *extensions[],
     {
         extension_count = vkd3d_append_extension(extensions, extension_count, user_extensions[i]);
     }
-    assert(!optional_user_extension_count || user_extension_supported);
+    VKD3D_ASSERT(!optional_user_extension_count || user_extension_supported);
     for (i = 0; i < optional_user_extension_count; ++i)
     {
         if (!user_extension_supported[i])
@@ -1507,7 +1507,7 @@ static bool d3d12_device_supports_typed_uav_load_additional_formats(const struct
     for (i = 0; i < ARRAY_SIZE(additional_formats); ++i)
     {
         format = vkd3d_get_format(device, additional_formats[i], false);
-        assert(format);
+        VKD3D_ASSERT(format);
 
         VK_CALL(vkGetPhysicalDeviceFormatProperties(device->vk_physical_device, format->vk_format, &properties));
         if (!((properties.linearTilingFeatures | properties.optimalTilingFeatures) & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT))
@@ -2547,7 +2547,7 @@ static void device_init_descriptor_pool_sizes(struct d3d12_device *device)
         return;
     }
 
-    assert(ARRAY_SIZE(device->vk_pool_sizes) >= 6);
+    VKD3D_ASSERT(ARRAY_SIZE(device->vk_pool_sizes) >= 6);
     pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     pool_sizes[0].descriptorCount = min(limits->uniform_buffer_max_descriptors,
             VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
@@ -5254,7 +5254,7 @@ struct d3d12_device *unsafe_impl_from_ID3D12Device9(ID3D12Device9 *iface)
 {
     if (!iface)
         return NULL;
-    assert(iface->lpVtbl == &d3d12_device_vtbl);
+    VKD3D_ASSERT(iface->lpVtbl == &d3d12_device_vtbl);
     return impl_from_ID3D12Device9(iface);
 }
 

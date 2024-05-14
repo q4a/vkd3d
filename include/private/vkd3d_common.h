@@ -46,6 +46,12 @@
 
 #define STATIC_ASSERT(e) extern void __VKD3D_STATIC_ASSERT__(int [(e) ? 1 : -1])
 
+#define VKD3D_ASSERT(cond) \
+        do { \
+            if (!(cond)) \
+                ERR("Failed assertion: %s\n", #cond); \
+        } while (0)
+
 #define MEMBER_SIZE(t, m) sizeof(((t *)0)->m)
 
 #define VKD3D_MAKE_TAG(ch0, ch1, ch2, ch3) \

@@ -153,7 +153,7 @@ static const D3D12_ROOT_SIGNATURE_DESC * STDMETHODCALLTYPE d3d12_root_signature_
 
     TRACE("iface %p.\n", iface);
 
-    assert(deserializer->desc.d3d12.Version == D3D_ROOT_SIGNATURE_VERSION_1_0);
+    VKD3D_ASSERT(deserializer->desc.d3d12.Version == D3D_ROOT_SIGNATURE_VERSION_1_0);
     return &deserializer->desc.d3d12.u.Desc_1_0;
 }
 
@@ -354,7 +354,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_versioned_root_signature_deserializer_Get
         }
     }
 
-    assert(deserializer->other_desc.d3d12.Version == version);
+    VKD3D_ASSERT(deserializer->other_desc.d3d12.Version == version);
     *desc = &deserializer->other_desc.d3d12;
     return S_OK;
 }
