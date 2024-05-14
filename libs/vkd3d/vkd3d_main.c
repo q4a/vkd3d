@@ -38,12 +38,12 @@ HRESULT vkd3d_create_device(const struct vkd3d_device_create_info *create_info,
     }
     if (!create_info->instance && !create_info->instance_create_info)
     {
-        ERR("Instance or instance create info is required.\n");
+        WARN("Instance or instance create info is required.\n");
         return E_INVALIDARG;
     }
     if (create_info->instance && create_info->instance_create_info)
     {
-        ERR("Instance and instance create info are mutually exclusive parameters.\n");
+        WARN("Instance and instance create info are mutually exclusive parameters.\n");
         return E_INVALIDARG;
     }
 

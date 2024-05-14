@@ -2165,7 +2165,7 @@ static HRESULT vkd3d_bind_heap_memory(struct d3d12_device *device,
 
     if (heap_offset > heap->desc.SizeInBytes || requirements.size > heap->desc.SizeInBytes - heap_offset)
     {
-        ERR("Heap too small for the resource (offset %"PRIu64", resource size %"PRIu64", heap size %"PRIu64".\n",
+        WARN("Heap too small for the resource (offset %"PRIu64", resource size %"PRIu64", heap size %"PRIu64".\n",
                 heap_offset, requirements.size, heap->desc.SizeInBytes);
         return E_INVALIDARG;
     }

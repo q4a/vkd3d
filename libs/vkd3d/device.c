@@ -308,7 +308,7 @@ static unsigned int vkd3d_check_extensions(const VkExtensionProperties *extensio
     for (i = 0; i < required_extension_count; ++i)
     {
         if (!has_extension(extensions, count, required_extensions[i]))
-            ERR("Required %s extension %s is not supported.\n",
+            WARN("Required %s extension %s is not supported.\n",
                     extension_type, debugstr_a(required_extensions[i]));
         ++extension_count;
     }
@@ -336,7 +336,7 @@ static unsigned int vkd3d_check_extensions(const VkExtensionProperties *extensio
     for (i = 0; i < user_extension_count; ++i)
     {
         if (!has_extension(extensions, count, user_extensions[i]))
-            ERR("Required user %s extension %s is not supported.\n",
+            WARN("Required user %s extension %s is not supported.\n",
                     extension_type, debugstr_a(user_extensions[i]));
         ++extension_count;
     }
@@ -584,7 +584,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
 
     if (!create_info->pfn_signal_event)
     {
-        ERR("Invalid signal event function pointer.\n");
+        WARN("Invalid signal event function pointer.\n");
         return E_INVALIDARG;
     }
     if (!create_info->pfn_create_thread != !create_info->pfn_join_thread)
@@ -594,7 +594,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
     }
     if (create_info->wchar_size != 2 && create_info->wchar_size != 4)
     {
-        ERR("Unexpected WCHAR size %zu.\n", create_info->wchar_size);
+        WARN("Unexpected WCHAR size %zu.\n", create_info->wchar_size);
         return E_INVALIDARG;
     }
 
@@ -2155,7 +2155,7 @@ static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
     vkd3d_free(extensions);
     if (vr < 0)
     {
-        ERR("Failed to create Vulkan device, vr %d.\n", vr);
+        WARN("Failed to create Vulkan device, vr %d.\n", vr);
         return hresult_from_vk_result(vr);
     }
 
