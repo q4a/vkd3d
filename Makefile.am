@@ -241,6 +241,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/unsigned.shader_test \
 	tests/hlsl/uniform-parameters.shader_test \
 	tests/hlsl/uniform-semantics.shader_test \
+	tests/hlsl/unroll.shader_test \
 	tests/hlsl/vector-indexing-uniform.shader_test \
 	tests/hlsl/vector-indexing.shader_test \
 	tests/hlsl/vertex-shader-ops.shader_test \
