@@ -2003,55 +2003,62 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
 {
     unsigned int start, count;
 
-    if (instr->type == HLSL_IR_RESOURCE_LOAD)
+    switch (instr->type)
     {
-        struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
+        case HLSL_IR_RESOURCE_LOAD:
+        {
+            struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
 
-        if (!load->resource.var->is_uniform)
-        {
-            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                    "Loaded resource must have a single uniform source.");
-        }
-        else if (!hlsl_component_index_range_from_deref(ctx, &load->resource, &start, &count))
-        {
-            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                    "Loaded resource from \"%s\" must be determinable at compile time.",
-                    load->resource.var->name);
-            note_non_static_deref_expressions(ctx, &load->resource, "loaded resource");
-        }
-
-        if (load->sampler.var)
-        {
-            if (!load->sampler.var->is_uniform)
+            if (!load->resource.var->is_uniform)
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                        "Resource load sampler must have a single uniform source.");
+                        "Loaded resource must have a single uniform source.");
             }
-            else if (!hlsl_component_index_range_from_deref(ctx, &load->sampler, &start, &count))
+            else if (!hlsl_component_index_range_from_deref(ctx, &load->resource, &start, &count))
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                        "Resource load sampler from \"%s\" must be determinable at compile time.",
-                        load->sampler.var->name);
-                note_non_static_deref_expressions(ctx, &load->sampler, "resource load sampler");
+                        "Loaded resource from \"%s\" must be determinable at compile time.",
+                        load->resource.var->name);
+                note_non_static_deref_expressions(ctx, &load->resource, "loaded resource");
             }
-        }
-    }
-    else if (instr->type == HLSL_IR_RESOURCE_STORE)
-    {
-        struct hlsl_ir_resource_store *store = hlsl_ir_resource_store(instr);
 
-        if (!store->resource.var->is_uniform)
-        {
-            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                    "Accessed resource must have a single uniform source.");
+            if (load->sampler.var)
+            {
+                if (!load->sampler.var->is_uniform)
+                {
+                    hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
+                            "Resource load sampler must have a single uniform source.");
+                }
+                else if (!hlsl_component_index_range_from_deref(ctx, &load->sampler, &start, &count))
+                {
+                    hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
+                            "Resource load sampler from \"%s\" must be determinable at compile time.",
+                            load->sampler.var->name);
+                    note_non_static_deref_expressions(ctx, &load->sampler, "resource load sampler");
+                }
+            }
+            break;
         }
-        else if (!hlsl_component_index_range_from_deref(ctx, &store->resource, &start, &count))
+        case HLSL_IR_RESOURCE_STORE:
         {
-            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                    "Accessed resource from \"%s\" must be determinable at compile time.",
-                    store->resource.var->name);
-            note_non_static_deref_expressions(ctx, &store->resource, "accessed resource");
+            struct hlsl_ir_resource_store *store = hlsl_ir_resource_store(instr);
+
+            if (!store->resource.var->is_uniform)
+            {
+                hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
+                        "Accessed resource must have a single uniform source.");
+            }
+            else if (!hlsl_component_index_range_from_deref(ctx, &store->resource, &start, &count))
+            {
+                hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
+                        "Accessed resource from \"%s\" must be determinable at compile time.",
+                        store->resource.var->name);
+                note_non_static_deref_expressions(ctx, &store->resource, "accessed resource");
+            }
+            break;
         }
+        default:
+            break;
     }
 
     return false;
