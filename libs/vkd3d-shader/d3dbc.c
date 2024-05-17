@@ -2779,7 +2779,14 @@ static void write_sm1_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
     }
 }
 
-int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
+/* OBJECTIVE: Stop relying on ctx and entry_func on this function, receiving
+ * data from the other parameters instead, so it can be removed as an argument
+ * and be declared in vkd3d_shader_private.h and used without relying on HLSL
+ * IR structs. */
+int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
+        struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct vkd3d_bytecode_buffer buffer = {0};
 
