@@ -726,7 +726,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkPipelineVertexInputStateCreateInfo input_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
     VkPipelineColorBlendStateCreateInfo blend_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
     VkPipelineMultisampleStateCreateInfo ms_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-    static const VkViewport viewport = {.y = RENDER_TARGET_HEIGHT,
+    VkViewport viewport = {.y = RENDER_TARGET_HEIGHT,
             .width = RENDER_TARGET_WIDTH, .height = -RENDER_TARGET_HEIGHT, .maxDepth = 1};
     VkPipelineViewportStateCreateInfo vp_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
     static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
@@ -848,6 +848,12 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     }
 
     ia_desc.topology = vulkan_primitive_topology_from_d3d(primitive_topology);
+
+    if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
+    {
+        viewport.x += 0.5f;
+        viewport.y += 0.5f;
+    }
 
     vp_desc.viewportCount = 1;
     vp_desc.pViewports = &viewport;
