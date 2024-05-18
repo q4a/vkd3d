@@ -443,6 +443,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
 {
     struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};
     struct vkd3d_shader_interface_info interface_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO};
+    struct vkd3d_shader_parameter_info parameter_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_PARAMETER_INFO};
     struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
     struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
     struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
@@ -450,7 +451,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     enum vkd3d_shader_spirv_extension spirv_extensions[2];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_compile_option options[3];
-    struct vkd3d_shader_parameter parameters[1];
+    struct vkd3d_shader_parameter1 parameters[3];
     struct vkd3d_shader_compile_option *option;
     unsigned int i, compile_options;
     char profile[7];
@@ -594,6 +595,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
         binding->binding.count = 1;
     }
 
+    interface_info.next = &parameter_info;
     interface_info.bindings = bindings;
 
     interface_info.push_constant_buffer_count = 1;
@@ -604,12 +606,22 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     parameters[0].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
     parameters[0].u.immediate_constant.u.u32 = runner->r.sample_count;
 
-    spirv_info.parameter_count = ARRAY_SIZE(parameters);
-    spirv_info.parameters = parameters;
+    parameters[1].name = VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_FUNC;
+    parameters[1].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[1].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
+    parameters[1].u.immediate_constant.u.u32 = runner->r.alpha_test_func;
+
+    parameters[2].name = VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF;
+    parameters[2].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[2].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32;
+    parameters[2].u.immediate_constant.u.f32 = runner->r.alpha_test_ref;
+
+    parameter_info.parameter_count = ARRAY_SIZE(parameters);
+    parameter_info.parameters = parameters;
 
     if (!strcmp(type, "vs"))
     {
-        interface_info.next = &runner->vs_signatures;
+        parameter_info.next = &runner->vs_signatures;
 
         runner->vs_signatures.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
         runner->vs_signatures.next = NULL;

@@ -326,7 +326,15 @@ static bool d3d9_runner_dispatch(struct shader_runner *r, unsigned int x, unsign
 
 static void d3d9_runner_clear(struct shader_runner *r, struct resource *resource, const struct vec4 *clear_value)
 {
-    fatal_error("Clears are not implemented.\n");
+    struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
+    unsigned int colour;
+    HRESULT hr;
+
+    colour = vkd3d_make_u32(vkd3d_make_u16(clear_value->z * 255.0, clear_value->y * 255.0),
+            vkd3d_make_u16(clear_value->x * 255.0, clear_value->w * 255.0));
+
+    hr = IDirect3DDevice9_ColorFill(runner->device, d3d9_resource(resource)->surface, NULL, colour);
+    ok(hr == S_OK, "Got hr %#lx.\n", hr);
 }
 
 static bool d3d9_runner_draw(struct shader_runner *r,
@@ -447,6 +455,15 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 (sampler->filter & 0x10) ? D3DTEXF_LINEAR : D3DTEXF_POINT);
         ok(hr == D3D_OK, "Failed to set sampler state, hr %#lx.\n", hr);
     }
+
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_ALPHATESTENABLE, TRUE);
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+    /* The members of enum vkd3d_shader_parameter_alpha_test_func are
+     * compatible with D3DCMPFUNC. */
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_ALPHAFUNC, runner->r.alpha_test_func);
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_ALPHAREF, runner->r.alpha_test_ref * 255.0);
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
 
     hr = IDirect3DDevice9_CreateVertexDeclaration(device, decl_elements, &vertex_declaration);
     ok(hr == D3D_OK, "Failed to create vertex declaration, hr %#lx.\n", hr);

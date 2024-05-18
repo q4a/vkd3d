@@ -394,7 +394,7 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     fatal_error("Unknown format '%s'.\n", line);
 }
 
-static D3D12_COMPARISON_FUNC parse_comparison_func(const char *line)
+static D3D12_COMPARISON_FUNC parse_comparison_func(const char *line, const char **rest)
 {
     static const struct
     {
@@ -416,7 +416,7 @@ static D3D12_COMPARISON_FUNC parse_comparison_func(const char *line)
 
     for (i = 0; i < ARRAY_SIZE(funcs); ++i)
     {
-        if (match_string(line, funcs[i].string, &line))
+        if (match_string(line, funcs[i].string, rest))
             return funcs[i].func;
     }
 
@@ -483,7 +483,7 @@ static void parse_sampler_directive(struct sampler *sampler, const char *line)
     else if (match_string(line, "comparison", &line))
     {
         sampler->filter |= D3D12_FILTER_REDUCTION_TYPE_COMPARISON << D3D12_FILTER_REDUCTION_TYPE_SHIFT;
-        sampler->func = parse_comparison_func(line);
+        sampler->func = parse_comparison_func(line, &line);
         return;
     }
     else
@@ -868,6 +868,8 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (sscanf(line, "%u %f %f %f %f", &slot, &v.x, &v.y, &v.z, &v.w) < 5)
             fatal_error("Malformed rtv clear arguments '%s'.\n", line);
 
+        set_default_target(runner);
+
         if (!(resource = shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot)))
             fatal_error("Resource not found.\n");
         runner->ops->clear(runner, resource, &v);
@@ -886,7 +888,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     }
     else if (match_string(line, "depth", &line))
     {
-        runner->depth_func = parse_comparison_func(line);
+        runner->depth_func = parse_comparison_func(line, &line);
     }
     else if (match_string(line, "draw quad", &line))
     {
@@ -1246,6 +1248,12 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         read_uint(&line, &sample_mask, false);
         runner->sample_mask = sample_mask;
+    }
+    else if (match_string(line, "alpha test", &line))
+    {
+        runner->alpha_test_func = (enum vkd3d_shader_comparison_func)parse_comparison_func(line, &line);
+        runner->alpha_test_ref = strtof(line, &rest);
+        line = rest;
     }
     else
     {
@@ -1636,6 +1644,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     runner->caps = caps;
     runner->minimum_shader_model = caps->minimum_shader_model;
     runner->maximum_shader_model = caps->maximum_shader_model;
+    runner->alpha_test_func = VKD3D_SHADER_COMPARISON_FUNC_ALWAYS;
 
     runner->sample_mask = ~0u;
 

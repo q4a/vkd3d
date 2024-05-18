@@ -197,6 +197,9 @@ struct shader_runner
     unsigned int compile_options;
 
     D3D12_COMPARISON_FUNC depth_func;
+
+    enum vkd3d_shader_comparison_func alpha_test_func;
+    float alpha_test_ref;
 };
 
 struct shader_runner_ops
