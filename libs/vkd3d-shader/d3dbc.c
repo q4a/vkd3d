@@ -1354,8 +1354,8 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
     return ret;
 }
 
-bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
-        bool output, enum vkd3d_shader_register_type *type, unsigned int *reg)
+bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
+        const struct hlsl_semantic *semantic, bool output, enum vkd3d_shader_register_type *type, unsigned int *reg)
 {
     unsigned int i;
 
@@ -1407,8 +1407,8 @@ bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
     {
         if (!ascii_strcasecmp(semantic->name, register_table[i].semantic)
                 && output == register_table[i].output
-                && ctx->profile->type == register_table[i].shader_type
-                && ctx->profile->major_version == register_table[i].major_version)
+                && version->type == register_table[i].shader_type
+                && version->major == register_table[i].major_version)
         {
             *type = register_table[i].type;
             if (register_table[i].type == VKD3DSPR_MISCTYPE || register_table[i].type == VKD3DSPR_RASTOUT)
@@ -1895,14 +1895,14 @@ static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer,
 
 static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct sm1_instruction *instr)
 {
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
-    struct hlsl_ctx *ctx = d3dbc->ctx;
     uint32_t token = instr->opcode;
     unsigned int i;
 
     token |= VKD3D_SM1_INSTRUCTION_FLAGS_MASK & (instr->flags << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT);
 
-    if (ctx->profile->major_version > 1)
+    if (version->major > 1)
         token |= (instr->has_dst + instr->src_count) << D3DSI_INSTLENGTH_SHIFT;
     put_u32(buffer, token);
 
@@ -2129,6 +2129,7 @@ static void d3dbc_write_cast(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
 
 static void d3dbc_write_constant_defs(struct d3dbc_compiler *d3dbc)
 {
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
     struct hlsl_ctx *ctx = d3dbc->ctx;
     unsigned int i, x;
@@ -2144,7 +2145,7 @@ static void d3dbc_write_constant_defs(struct d3dbc_compiler *d3dbc)
             .reg = constant_reg->index,
         };
 
-        if (ctx->profile->major_version > 1)
+        if (version->major > 1)
             token |= 5 << D3DSI_INSTLENGTH_SHIFT;
         put_u32(buffer, token);
 
@@ -2154,9 +2155,10 @@ static void d3dbc_write_constant_defs(struct d3dbc_compiler *d3dbc)
     }
 }
 
-static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_ir_var *var, bool output)
+static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_var *var, bool output)
 {
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
+    struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
     struct sm1_dst_register reg = {0};
     uint32_t token, usage_idx;
     D3DDECLUSAGE usage;
@@ -2165,7 +2167,7 @@ static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     if ((!output && !var->last_read) || (output && !var->first_write))
         return;
 
-    if (hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &reg.type, &reg.reg))
+    if (hlsl_sm1_register_from_semantic(version, &var->semantic, output, &reg.type, &reg.reg))
     {
         usage = 0;
         usage_idx = 0;
@@ -2179,7 +2181,7 @@ static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     }
 
     token = D3DSIO_DCL;
-    if (ctx->profile->major_version > 1)
+    if (version->major > 1)
         token |= 2 << D3DSI_INSTLENGTH_SHIFT;
     put_u32(buffer, token);
 
@@ -2194,35 +2196,37 @@ static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 
 static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
 {
-    struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     bool write_in = false, write_out = false;
     struct hlsl_ctx *ctx = d3dbc->ctx;
     struct hlsl_ir_var *var;
 
-    if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL && ctx->profile->major_version >= 2)
+    if (version->type == VKD3D_SHADER_TYPE_PIXEL && version->major >= 2)
         write_in = true;
-    else if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX && ctx->profile->major_version == 3)
+    else if (version->type == VKD3D_SHADER_TYPE_VERTEX && version->major == 3)
         write_in = write_out = true;
-    else if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX && ctx->profile->major_version < 3)
+    else if (version->type == VKD3D_SHADER_TYPE_VERTEX && version->major < 3)
         write_in = true;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (write_in && var->is_input_semantic)
-            write_sm1_semantic_dcl(ctx, buffer, var, false);
+            d3dbc_write_semantic_dcl(d3dbc, var, false);
         if (write_out && var->is_output_semantic)
-            write_sm1_semantic_dcl(ctx, buffer, var, true);
+            d3dbc_write_semantic_dcl(d3dbc, var, true);
     }
 }
 
-static void write_sm1_sampler_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+static void d3dbc_write_sampler_dcl(struct d3dbc_compiler *d3dbc,
         unsigned int reg_id, enum hlsl_sampler_dim sampler_dim)
 {
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
+    struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
     struct sm1_dst_register reg = {0};
     uint32_t token, res_type = 0;
 
     token = D3DSIO_DCL;
-    if (ctx->profile->major_version > 1)
+    if (version->major > 1)
         token |= 2 << D3DSI_INSTLENGTH_SHIFT;
     put_u32(buffer, token);
 
@@ -2258,13 +2262,13 @@ static void write_sm1_sampler_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_bu
 
 static void d3dbc_write_sampler_dcls(struct d3dbc_compiler *d3dbc)
 {
-    struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct hlsl_ctx *ctx = d3dbc->ctx;
     enum hlsl_sampler_dim sampler_dim;
     unsigned int i, count, reg_id;
     struct hlsl_ir_var *var;
 
-    if (ctx->profile->major_version < 2)
+    if (version->major < 2)
         return;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
@@ -2287,7 +2291,7 @@ static void d3dbc_write_sampler_dcls(struct d3dbc_compiler *d3dbc)
                 }
 
                 reg_id = var->regs[HLSL_REGSET_SAMPLERS].index + i;
-                write_sm1_sampler_dcl(ctx, buffer, reg_id, sampler_dim);
+                d3dbc_write_sampler_dcl(d3dbc, reg_id, sampler_dim);
             }
         }
     }
@@ -2336,6 +2340,7 @@ static void d3dbc_write_per_component_unary_op(struct d3dbc_compiler *d3dbc,
 
 static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
     struct hlsl_ir_node *arg1 = expr->operands[0].node;
     struct hlsl_ir_node *arg2 = expr->operands[1].node;
@@ -2446,13 +2451,13 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
             break;
 
         case HLSL_OP2_SLT:
-            if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+            if (version->type == VKD3D_SHADER_TYPE_PIXEL)
                 hlsl_fixme(ctx, &instr->loc, "Lower SLT instructions for pixel shaders.");
             d3dbc_write_binary_op(d3dbc, D3DSIO_SLT, &instr->reg, &arg1->reg, &arg2->reg);
             break;
 
         case HLSL_OP3_CMP:
-            if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
+            if (version->type == VKD3D_SHADER_TYPE_VERTEX)
                 hlsl_fixme(ctx, &instr->loc, "Lower CMP instructions for vertex shaders.");
             d3dbc_write_ternary_op(d3dbc, D3DSIO_CMP, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
             break;
@@ -2567,7 +2572,7 @@ static void d3dbc_write_load(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
     }
     else if (load->src.var->is_input_semantic)
     {
-        if (!hlsl_sm1_register_from_semantic(ctx, &load->src.var->semantic,
+        if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, &load->src.var->semantic,
                 false, &sm1_instr.srcs[0].type, &sm1_instr.srcs[0].reg))
         {
             assert(reg.allocated);
@@ -2655,6 +2660,7 @@ static void d3dbc_write_resource_load(struct d3dbc_compiler *d3dbc, const struct
 
 static void d3dbc_write_store(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     const struct hlsl_ir_store *store = hlsl_ir_store(instr);
     struct hlsl_ctx *ctx = d3dbc->ctx;
     const struct hlsl_reg reg = hlsl_reg_from_deref(ctx, &store->lhs);
@@ -2682,13 +2688,13 @@ static void d3dbc_write_store(struct d3dbc_compiler *d3dbc, const struct hlsl_ir
 
     if (store->lhs.var->is_output_semantic)
     {
-        if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL && ctx->profile->major_version == 1)
+        if (version->type == VKD3D_SHADER_TYPE_PIXEL && version->major == 1)
         {
             sm1_instr.dst.type = VKD3DSPR_TEMP;
             sm1_instr.dst.reg = 0;
         }
-        else if (!hlsl_sm1_register_from_semantic(ctx, &store->lhs.var->semantic,
-                true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
+        else if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version,
+                &store->lhs.var->semantic, true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
         {
             assert(reg.allocated);
             sm1_instr.dst.type = VKD3DSPR_OUTPUT;
@@ -2801,6 +2807,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
+    const struct vkd3d_shader_version *version = &program->shader_version;
     struct d3dbc_compiler d3dbc = {0};
     struct vkd3d_bytecode_buffer *buffer = &d3dbc.buffer;
 
@@ -2808,7 +2815,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     d3dbc.program = program;
     d3dbc.message_context = message_context;
 
-    put_u32(buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
+    put_u32(buffer, sm1_version(version->type, version->major, version->minor));
 
     bytecode_put_bytes(buffer, ctab->code, ctab->size);
 
