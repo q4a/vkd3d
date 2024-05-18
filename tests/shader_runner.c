@@ -639,12 +639,6 @@ struct resource *shader_runner_get_resource(struct shader_runner *runner, enum r
     return NULL;
 }
 
-static bool shader_runner_has_target(struct shader_runner *runner)
-{
-    return shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0)
-            || shader_runner_get_resource(runner, RESOURCE_TYPE_DEPTH_STENCIL, 0);
-}
-
 static void set_resource(struct shader_runner *runner, const struct resource_params *params)
 {
     struct resource *resource;
@@ -682,6 +676,27 @@ static void set_resource(struct shader_runner *runner, const struct resource_par
         fatal_error("Too many resources declared.\n");
 
     runner->resources[runner->resource_count++] = resource;
+}
+
+static void set_default_target(struct shader_runner *runner)
+{
+    struct resource_params params = {0};
+
+    if (shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0)
+            || shader_runner_get_resource(runner, RESOURCE_TYPE_DEPTH_STENCIL, 0))
+        return;
+
+    params.desc.slot = 0;
+    params.desc.type = RESOURCE_TYPE_RENDER_TARGET;
+    params.desc.dimension = RESOURCE_DIMENSION_2D;
+    params.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    params.data_type = TEXTURE_DATA_FLOAT;
+    params.desc.texel_size = 16;
+    params.desc.width = RENDER_TARGET_WIDTH;
+    params.desc.height = RENDER_TARGET_HEIGHT;
+    params.desc.level_count = 1;
+
+    set_resource(runner, &params);
 }
 
 static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
@@ -896,21 +911,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!runner->hs_source != !runner->ds_source)
             fatal_error("Have a domain or hull shader but not both.\n");
 
-        if (!shader_runner_has_target(runner))
-        {
-            memset(&params, 0, sizeof(params));
-            params.desc.slot = 0;
-            params.desc.type = RESOURCE_TYPE_RENDER_TARGET;
-            params.desc.dimension = RESOURCE_DIMENSION_2D;
-            params.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-            params.data_type = TEXTURE_DATA_FLOAT;
-            params.desc.texel_size = 16;
-            params.desc.width = RENDER_TARGET_WIDTH;
-            params.desc.height = RENDER_TARGET_HEIGHT;
-            params.desc.level_count = 1;
-
-            set_resource(runner, &params);
-        }
+        set_default_target(runner);
 
         for (i = 0; i < runner->input_element_count; ++i)
             free(runner->input_elements[i].name);
@@ -953,26 +954,11 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     {
         unsigned int vertex_count, instance_count;
         D3D_PRIMITIVE_TOPOLOGY topology;
-        struct resource_params params;
 
         if (!runner->hs_source != !runner->ds_source)
             fatal_error("Have a domain or hull shader but not both.\n");
 
-        if (!shader_runner_has_target(runner))
-        {
-            memset(&params, 0, sizeof(params));
-            params.desc.slot = 0;
-            params.desc.type = RESOURCE_TYPE_RENDER_TARGET;
-            params.desc.dimension = RESOURCE_DIMENSION_2D;
-            params.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-            params.data_type = TEXTURE_DATA_FLOAT;
-            params.desc.texel_size = 16;
-            params.desc.width = RENDER_TARGET_WIDTH;
-            params.desc.height = RENDER_TARGET_HEIGHT;
-            params.desc.level_count = 1;
-
-            set_resource(runner, &params);
-        }
+        set_default_target(runner);
 
         if (match_string(line, "triangle list", &line))
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
