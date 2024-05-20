@@ -1683,8 +1683,7 @@ static void sm1_sort_externs(struct hlsl_ctx *ctx)
     list_move_tail(&ctx->extern_vars, &sorted);
 }
 
-static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        struct hlsl_ir_function_decl *entry_func)
+void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
 {
     size_t ctab_offset, ctab_start, ctab_end, vars_start, size_offset, creator_offset, offset;
     unsigned int uniform_count = 0;
@@ -2784,7 +2783,7 @@ static void write_sm1_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
  * and be declared in vkd3d_shader_private.h and used without relying on HLSL
  * IR structs. */
 int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_compile_info *compile_info,
+        const struct vkd3d_shader_compile_info *compile_info, const struct vkd3d_shader_code *ctab,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
@@ -2792,7 +2791,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
 
     put_u32(&buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
 
-    write_sm1_uniforms(ctx, &buffer, entry_func);
+    bytecode_put_bytes(&buffer, ctab->code, ctab->size);
 
     write_sm1_constant_defs(ctx, &buffer);
     write_sm1_semantic_dcls(ctx, &buffer);

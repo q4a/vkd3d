@@ -5523,12 +5523,13 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 }
 
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
- * vsir_program, so it can be used as input to d3dbc_compile() without relying
- * on ctx and entry_func. */
+ * vsir_program and ctab blob, so they can be used as input to d3dbc_compile()
+ * without relying on ctx and entry_func. */
 static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
-        uint64_t config_flags, struct vsir_program *program)
+        uint64_t config_flags, struct vsir_program *program, struct vkd3d_shader_code *ctab)
 {
     struct vkd3d_shader_version version = {0};
+    struct vkd3d_bytecode_buffer buffer = {0};
 
     version.major = ctx->profile->major_version;
     version.minor = ctx->profile->minor_version;
@@ -5538,6 +5539,16 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
         return;
     }
+
+    write_sm1_uniforms(ctx, &buffer);
+    if (buffer.status)
+    {
+        vkd3d_free(buffer.data);
+        ctx->result = buffer.status;
+        return;
+    }
+    ctab->code = buffer.data;
+    ctab->size = buffer.size;
 }
 
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
@@ -5724,18 +5735,21 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         case VKD3D_SHADER_TARGET_D3D_BYTECODE:
         {
             uint32_t config_flags = vkd3d_shader_init_config_flags();
+            struct vkd3d_shader_code ctab = {0};
             struct vsir_program program;
             int result;
 
-            sm1_generate_vsir(ctx, entry_func, config_flags, &program);
+            sm1_generate_vsir(ctx, entry_func, config_flags, &program, &ctab);
             if (ctx->result)
             {
                 vsir_program_cleanup(&program);
+                vkd3d_shader_free_shader_code(&ctab);
                 return ctx->result;
             }
 
-            result = d3dbc_compile(&program, config_flags, NULL, out, ctx->message_context, ctx, entry_func);
+            result = d3dbc_compile(&program, config_flags, NULL, &ctab, out, ctx->message_context, ctx, entry_func);
             vsir_program_cleanup(&program);
+            vkd3d_shader_free_shader_code(&ctab);
             return result;
         }
 
