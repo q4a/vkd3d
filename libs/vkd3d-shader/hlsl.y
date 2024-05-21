@@ -6856,6 +6856,8 @@ parameter:
                 }
                 type = hlsl_new_array_type(ctx, type, $4.sizes[i]);
             }
+            vkd3d_free($4.sizes);
+
             $$.type = type;
 
             if (hlsl_version_ge(ctx, 5, 1) && type->class == HLSL_CLASS_ARRAY && hlsl_type_is_resource(type))
