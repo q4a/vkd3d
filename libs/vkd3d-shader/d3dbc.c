@@ -1354,8 +1354,8 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
     return ret;
 }
 
-bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
-        const struct hlsl_semantic *semantic, bool output, enum vkd3d_shader_register_type *type, unsigned int *reg)
+bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version, const char *semantic_name,
+        unsigned int semantic_index, bool output, enum vkd3d_shader_register_type *type, unsigned int *reg)
 {
     unsigned int i;
 
@@ -1405,7 +1405,7 @@ bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
 
     for (i = 0; i < ARRAY_SIZE(register_table); ++i)
     {
-        if (!ascii_strcasecmp(semantic->name, register_table[i].semantic)
+        if (!ascii_strcasecmp(semantic_name, register_table[i].semantic)
                 && output == register_table[i].output
                 && version->type == register_table[i].shader_type
                 && version->major == register_table[i].major_version)
@@ -1414,7 +1414,7 @@ bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
             if (register_table[i].type == VKD3DSPR_MISCTYPE || register_table[i].type == VKD3DSPR_RASTOUT)
                 *reg = register_table[i].offset;
             else
-                *reg = semantic->index;
+                *reg = semantic_index;
             return true;
         }
     }
@@ -1422,7 +1422,8 @@ bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
     return false;
 }
 
-bool hlsl_sm1_usage_from_semantic(const struct hlsl_semantic *semantic, D3DDECLUSAGE *usage, uint32_t *usage_idx)
+bool hlsl_sm1_usage_from_semantic(const char *semantic_name,
+        uint32_t semantic_index, D3DDECLUSAGE *usage, uint32_t *usage_idx)
 {
     static const struct
     {
@@ -1454,10 +1455,10 @@ bool hlsl_sm1_usage_from_semantic(const struct hlsl_semantic *semantic, D3DDECLU
 
     for (i = 0; i < ARRAY_SIZE(semantics); ++i)
     {
-        if (!ascii_strcasecmp(semantic->name, semantics[i].name))
+        if (!ascii_strcasecmp(semantic_name, semantics[i].name))
         {
             *usage = semantics[i].usage;
-            *usage_idx = semantic->index;
+            *usage_idx = semantic_index;
             return true;
         }
     }
@@ -2167,14 +2168,14 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc, const struct 
     if ((!output && !var->last_read) || (output && !var->first_write))
         return;
 
-    if (hlsl_sm1_register_from_semantic(version, &var->semantic, output, &reg.type, &reg.reg))
+    if (hlsl_sm1_register_from_semantic(version, var->semantic.name, var->semantic.index, output, &reg.type, &reg.reg))
     {
         usage = 0;
         usage_idx = 0;
     }
     else
     {
-        ret = hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx);
+        ret = hlsl_sm1_usage_from_semantic(var->semantic.name, var->semantic.index, &usage, &usage_idx);
         assert(ret);
         reg.type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
         reg.reg = var->regs[HLSL_REGSET_NUMERIC].id;
@@ -2572,8 +2573,8 @@ static void d3dbc_write_load(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
     }
     else if (load->src.var->is_input_semantic)
     {
-        if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, &load->src.var->semantic,
-                false, &sm1_instr.srcs[0].type, &sm1_instr.srcs[0].reg))
+        if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, load->src.var->semantic.name,
+                load->src.var->semantic.index, false, &sm1_instr.srcs[0].type, &sm1_instr.srcs[0].reg))
         {
             assert(reg.allocated);
             sm1_instr.srcs[0].type = VKD3DSPR_INPUT;
@@ -2693,8 +2694,8 @@ static void d3dbc_write_store(struct d3dbc_compiler *d3dbc, const struct hlsl_ir
             sm1_instr.dst.type = VKD3DSPR_TEMP;
             sm1_instr.dst.reg = 0;
         }
-        else if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version,
-                &store->lhs.var->semantic, true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
+        else if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, store->lhs.var->semantic.name,
+                store->lhs.var->semantic.index, true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
         {
             assert(reg.allocated);
             sm1_instr.dst.type = VKD3DSPR_OUTPUT;
