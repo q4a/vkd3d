@@ -5527,6 +5527,83 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
     } while (progress);
 }
 
+static void sm1_generate_vsir_signature_entry(struct hlsl_ctx *ctx,
+        struct vsir_program *program, bool output, struct hlsl_ir_var *var)
+{
+    enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
+    enum vkd3d_shader_register_type type;
+    struct shader_signature *signature;
+    struct signature_element *element;
+    unsigned int register_index, mask;
+
+    if ((!output && !var->last_read) || (output && !var->first_write))
+        return;
+
+    if (output)
+        signature = &program->output_signature;
+    else
+        signature = &program->input_signature;
+
+    if (!vkd3d_array_reserve((void **)&signature->elements, &signature->elements_capacity,
+            signature->element_count + 1, sizeof(*signature->elements)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+    element = &signature->elements[signature->element_count++];
+
+    if (!hlsl_sm1_register_from_semantic(&program->shader_version,
+            var->semantic.name, var->semantic.index, output, &type, &register_index))
+    {
+        unsigned int usage, usage_idx;
+        bool ret;
+
+        register_index = var->regs[HLSL_REGSET_NUMERIC].id;
+
+        ret = hlsl_sm1_usage_from_semantic(var->semantic.name, var->semantic.index, &usage, &usage_idx);
+        assert(ret);
+        /* With the exception of vertex POSITION output, none of these are
+         * system values. Pixel POSITION input is not equivalent to
+         * SV_Position; the closer equivalent is VPOS, which is not declared
+         * as a semantic. */
+        if (program->shader_version.type == VKD3D_SHADER_TYPE_VERTEX
+                && output && usage == VKD3D_DECL_USAGE_POSITION)
+            sysval = VKD3D_SHADER_SV_POSITION;
+    }
+    mask = (1 << var->data_type->dimx) - 1;
+
+    memset(element, 0, sizeof(*element));
+    if (!(element->semantic_name = vkd3d_strdup(var->semantic.name)))
+    {
+        --signature->element_count;
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+    element->semantic_index = var->semantic.index;
+    element->sysval_semantic = sysval;
+    element->component_type = VKD3D_SHADER_COMPONENT_FLOAT;
+    element->register_index = register_index;
+    element->target_location = register_index;
+    element->register_count = 1;
+    element->mask = mask;
+    element->used_mask = mask;
+    if (program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL && !output)
+        element->interpolation_mode = VKD3DSIM_LINEAR;
+}
+
+static void sm1_generate_vsir_signature(struct hlsl_ctx *ctx, struct vsir_program *program)
+{
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_input_semantic)
+            sm1_generate_vsir_signature_entry(ctx, program, false, var);
+        if (var->is_output_semantic)
+            sm1_generate_vsir_signature_entry(ctx, program, true, var);
+    }
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program and ctab blob, so they can be used as input to d3dbc_compile()
  * without relying on ctx and entry_func. */
@@ -5554,6 +5631,8 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     }
     ctab->code = buffer.data;
     ctab->size = buffer.size;
+
+    sm1_generate_vsir_signature(ctx, program);
 }
 
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
