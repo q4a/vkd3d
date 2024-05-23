@@ -1471,6 +1471,7 @@ struct d3dbc_compiler
     struct vsir_program *program;
     struct vkd3d_bytecode_buffer buffer;
     struct vkd3d_shader_message_context *message_context;
+    bool failed;
 
     /* OBJECTIVE: Store all the required information in the other fields so
      * that this hlsl_ctx is no longer necessary. */
@@ -2169,31 +2170,42 @@ static void d3dbc_write_cast(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
     }
 }
 
-static void d3dbc_write_constant_defs(struct d3dbc_compiler *d3dbc)
+static void d3dbc_write_vsir_def(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
-    struct hlsl_ctx *ctx = d3dbc->ctx;
-    unsigned int i, x;
+    uint32_t token;
 
-    for (i = 0; i < ctx->constant_defs.count; ++i)
+    const struct sm1_dst_register reg =
     {
-        const struct hlsl_constant_register *constant_reg = &ctx->constant_defs.regs[i];
-        uint32_t token = D3DSIO_DEF;
-        const struct sm1_dst_register reg =
-        {
-            .type = VKD3DSPR_CONST,
-            .writemask = VKD3DSP_WRITEMASK_ALL,
-            .reg = constant_reg->index,
-        };
+        .type = VKD3DSPR_CONST,
+        .writemask = VKD3DSP_WRITEMASK_ALL,
+        .reg = ins->dst[0].reg.idx[0].offset,
+    };
 
-        if (version->major > 1)
-            token |= 5 << D3DSI_INSTLENGTH_SHIFT;
-        put_u32(buffer, token);
+    token = VKD3D_SM1_OP_DEF;
+    if (version->major > 1)
+        token |= 5 << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
+    put_u32(buffer, token);
 
-        write_sm1_dst_register(buffer, &reg);
-        for (x = 0; x < 4; ++x)
-            put_f32(buffer, constant_reg->value.f[x]);
+    write_sm1_dst_register(buffer, &reg);
+    for (unsigned int x = 0; x < 4; ++x)
+        put_f32(buffer, ins->src[0].reg.u.immconst_f32[x]);
+}
+
+static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
+{
+    switch (ins->opcode)
+    {
+        case VKD3DSIH_DEF:
+            d3dbc_write_vsir_def(d3dbc, ins);
+            break;
+
+        default:
+            vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
+                   "vsir instruction with opcode %#x.", ins->opcode);
+            d3dbc->failed = true;
+            break;
     }
 }
 
@@ -2825,8 +2837,10 @@ static void d3dbc_write_swizzle(struct d3dbc_compiler *d3dbc, const struct hlsl_
 
 static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block)
 {
+    struct vkd3d_shader_instruction *vsir_instr;
     struct hlsl_ctx *ctx = d3dbc->ctx;
     const struct hlsl_ir_node *instr;
+    unsigned int vsir_instr_idx;
 
     LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
@@ -2879,6 +2893,12 @@ static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_bl
                 d3dbc_write_swizzle(d3dbc, instr);
                 break;
 
+            case HLSL_IR_VSIR_INSTRUCTION_REF:
+                vsir_instr_idx = hlsl_ir_vsir_instruction_ref(instr)->vsir_instr_idx;
+                vsir_instr = &d3dbc->program->instructions.elements[vsir_instr_idx];
+                d3dbc_write_vsir_instruction(d3dbc, vsir_instr);
+                break;
+
             default:
                 hlsl_fixme(ctx, &instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
         }
@@ -2897,6 +2917,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     const struct vkd3d_shader_version *version = &program->shader_version;
     struct d3dbc_compiler d3dbc = {0};
     struct vkd3d_bytecode_buffer *buffer = &d3dbc.buffer;
+    int result;
 
     d3dbc.ctx = ctx;
     d3dbc.program = program;
@@ -2906,17 +2927,19 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
 
     bytecode_put_bytes(buffer, ctab->code, ctab->size);
 
-    d3dbc_write_constant_defs(&d3dbc);
     d3dbc_write_semantic_dcls(&d3dbc);
     d3dbc_write_sampler_dcls(&d3dbc);
     d3dbc_write_block(&d3dbc, &entry_func->body);
 
     put_u32(buffer, D3DSIO_END);
 
+    result = ctx->result;
     if (buffer->status)
-        ctx->result = buffer->status;
+        result = buffer->status;
+    if (d3dbc.failed)
+        result = VKD3D_ERROR_INVALID_SHADER;
 
-    if (!ctx->result)
+    if (!result)
     {
         out->code = buffer->data;
         out->size = buffer->size;
@@ -2925,5 +2948,5 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     {
         vkd3d_free(buffer->data);
     }
-    return ctx->result;
+    return result;
 }

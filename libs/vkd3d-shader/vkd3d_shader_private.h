@@ -1389,6 +1389,9 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context);
 enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t config_flags,
         const char *source_name, struct vkd3d_shader_message_context *message_context);
+bool vsir_instruction_init_with_params(struct vsir_program *program,
+        struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_opcode opcode, unsigned int dst_count, unsigned int src_count);
 
 static inline struct vkd3d_shader_dst_param *vsir_program_get_dst_params(
         struct vsir_program *program, unsigned int count)

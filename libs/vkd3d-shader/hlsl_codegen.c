@@ -4822,7 +4822,8 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx,
     }
 }
 
-static void record_constant(struct hlsl_ctx *ctx, unsigned int component_index, float f)
+static void record_constant(struct hlsl_ctx *ctx, unsigned int component_index, float f,
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_constant_defs *defs = &ctx->constant_defs;
     struct hlsl_constant_register *reg;
@@ -4844,6 +4845,7 @@ static void record_constant(struct hlsl_ctx *ctx, unsigned int component_index, 
     memset(reg, 0, sizeof(*reg));
     reg->index = component_index / 4;
     reg->value.f[component_index % 4] = f;
+    reg->loc = *loc;
 }
 
 static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
@@ -4904,7 +4906,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                             vkd3d_unreachable();
                     }
 
-                    record_constant(ctx, constant->reg.id * 4 + x, f);
+                    record_constant(ctx, constant->reg.id * 4 + x, f, &constant->node.loc);
                 }
 
                 break;
@@ -4997,17 +4999,17 @@ static void allocate_sincos_const_registers(struct hlsl_ctx *ctx, struct hlsl_bl
 
             ctx->d3dsincosconst1 = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
             TRACE("Allocated D3DSINCOSCONST1 to %s.\n", debug_register('c', ctx->d3dsincosconst1, type));
-            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 0, -1.55009923e-06f);
-            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 1, -2.17013894e-05f);
-            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 2,  2.60416674e-03f);
-            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 3,  2.60416680e-04f);
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 0, -1.55009923e-06f, &instr->loc);
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 1, -2.17013894e-05f, &instr->loc);
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 2,  2.60416674e-03f, &instr->loc);
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 3,  2.60416680e-04f, &instr->loc);
 
             ctx->d3dsincosconst2 = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
             TRACE("Allocated D3DSINCOSCONST2 to %s.\n", debug_register('c', ctx->d3dsincosconst2, type));
-            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 0, -2.08333340e-02f);
-            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 1, -1.25000000e-01f);
-            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 2,  1.00000000e+00f);
-            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 3,  5.00000000e-01f);
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 0, -2.08333340e-02f, &instr->loc);
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 1, -1.25000000e-01f, &instr->loc);
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 2,  1.00000000e+00f, &instr->loc);
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 3,  5.00000000e-01f, &instr->loc);
 
             return;
         }
@@ -6012,6 +6014,61 @@ static void sm1_generate_vsir_signature(struct hlsl_ctx *ctx, struct vsir_progra
     }
 }
 
+static void sm1_generate_vsir_constant_defs(struct hlsl_ctx *ctx, struct vsir_program *program,
+        struct hlsl_block *block)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_src_param *src_param;
+    struct vkd3d_shader_instruction *ins;
+    struct hlsl_ir_node *vsir_instr;
+    unsigned int i, x;
+
+    for (i = 0; i < ctx->constant_defs.count; ++i)
+    {
+        const struct hlsl_constant_register *constant_reg = &ctx->constant_defs.regs[i];
+
+        if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+        {
+            ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+            return;
+        }
+
+        ins = &instructions->elements[instructions->count];
+        if (!vsir_instruction_init_with_params(program, ins, &constant_reg->loc, VKD3DSIH_DEF, 1, 1))
+        {
+            ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+            return;
+        }
+        ++instructions->count;
+
+        dst_param = &ins->dst[0];
+        vsir_register_init(&dst_param->reg, VKD3DSPR_CONST, VKD3D_DATA_FLOAT, 1);
+        ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+        ins->dst[0].reg.idx[0].offset = constant_reg->index;
+        ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL;
+
+        src_param = &ins->src[0];
+        vsir_register_init(&src_param->reg, VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+        src_param->reg.type = VKD3DSPR_IMMCONST;
+        src_param->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
+        src_param->reg.non_uniform = false;
+        src_param->reg.data_type = VKD3D_DATA_FLOAT;
+        src_param->reg.dimension = VSIR_DIMENSION_VEC4;
+        for (x = 0; x < 4; ++x)
+            src_param->reg.u.immconst_f32[x] = constant_reg->value.f[x];
+        src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+
+        if (!(vsir_instr = hlsl_new_vsir_instruction_ref(ctx, instructions->count - 1, NULL, NULL,
+                &constant_reg->loc)))
+        {
+            ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+            return;
+        }
+        hlsl_block_add_instr(block, vsir_instr);
+    }
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program and ctab blob, so they can be used as input to d3dbc_compile()
  * without relying on ctx and entry_func. */
@@ -6020,6 +6077,7 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
 {
     struct vkd3d_shader_version version = {0};
     struct vkd3d_bytecode_buffer buffer = {0};
+    struct hlsl_block block;
 
     version.major = ctx->profile->major_version;
     version.minor = ctx->profile->minor_version;
@@ -6041,6 +6099,10 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     ctab->size = buffer.size;
 
     sm1_generate_vsir_signature(ctx, program);
+
+    hlsl_block_init(&block);
+    sm1_generate_vsir_constant_defs(ctx, program, &block);
+    list_move_head(&entry_func->body.instrs, &block.instrs);
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,

@@ -1028,6 +1028,7 @@ struct hlsl_ctx
         {
             uint32_t index;
             struct hlsl_vec4 value;
+            struct vkd3d_shader_location loc;
         } *regs;
         size_t count, size;
     } constant_defs;
