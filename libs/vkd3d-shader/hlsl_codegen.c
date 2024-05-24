@@ -6069,6 +6069,94 @@ static void sm1_generate_vsir_constant_defs(struct hlsl_ctx *ctx, struct vsir_pr
     }
 }
 
+static void sm1_generate_vsir_sampler_dcls(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_block *block)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    enum vkd3d_shader_resource_type resource_type;
+    struct vkd3d_shader_register_range *range;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_semantic *semantic;
+    struct vkd3d_shader_instruction *ins;
+    enum hlsl_sampler_dim sampler_dim;
+    struct hlsl_ir_node *vsir_instr;
+    struct hlsl_ir_var *var;
+    unsigned int i, count;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->regs[HLSL_REGSET_SAMPLERS].allocated)
+            continue;
+
+        count = var->bind_count[HLSL_REGSET_SAMPLERS];
+        for (i = 0; i < count; ++i)
+        {
+            if (var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
+            {
+                sampler_dim = var->objects_usage[HLSL_REGSET_SAMPLERS][i].sampler_dim;
+
+                switch (sampler_dim)
+                {
+                    case HLSL_SAMPLER_DIM_2D:
+                        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+                        break;
+
+                    case HLSL_SAMPLER_DIM_CUBE:
+                        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_CUBE;
+                        break;
+
+                    case HLSL_SAMPLER_DIM_3D:
+                        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_3D;
+                        break;
+
+                    case HLSL_SAMPLER_DIM_GENERIC:
+                        /* These can appear in sm4-style combined sample instructions. */
+                        hlsl_fixme(ctx, &var->loc, "Generic samplers need to be lowered.");
+                        continue;
+
+                    default:
+                        vkd3d_unreachable();
+                        break;
+                }
+
+                if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+                {
+                    ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+                    return;
+                }
+
+                ins = &instructions->elements[instructions->count];
+                if (!vsir_instruction_init_with_params(program, ins, &var->loc, VKD3DSIH_DCL, 0, 0))
+                {
+                    ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+                    return;
+                }
+                ++instructions->count;
+
+                semantic = &ins->declaration.semantic;
+                semantic->resource_type = resource_type;
+
+                dst_param = &semantic->resource.reg;
+                vsir_register_init(&dst_param->reg, VKD3DSPR_SAMPLER, VKD3D_DATA_FLOAT, 1);
+                dst_param->reg.dimension = VSIR_DIMENSION_NONE;
+                dst_param->reg.idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].index + i;
+                dst_param->write_mask = 0;
+                range = &semantic->resource.range;
+                range->space = 0;
+                range->first = range->last = dst_param->reg.idx[0].offset;
+
+                if (!(vsir_instr = hlsl_new_vsir_instruction_ref(ctx, instructions->count - 1, NULL,
+                        NULL, &var->loc)))
+                {
+                    ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+                    return;
+                }
+                hlsl_block_add_instr(block, vsir_instr);
+            }
+        }
+    }
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program and ctab blob, so they can be used as input to d3dbc_compile()
  * without relying on ctx and entry_func. */
@@ -6102,6 +6190,7 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
 
     hlsl_block_init(&block);
     sm1_generate_vsir_constant_defs(ctx, program, &block);
+    sm1_generate_vsir_sampler_dcls(ctx, program, &block);
     list_move_head(&entry_func->body.instrs, &block.instrs);
 }
 

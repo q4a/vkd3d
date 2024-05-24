@@ -2193,12 +2193,81 @@ static void d3dbc_write_vsir_def(struct d3dbc_compiler *d3dbc, const struct vkd3
         put_f32(buffer, ins->src[0].reg.u.immconst_f32[x]);
 }
 
+static void d3dbc_write_vsir_sampler_dcl(struct d3dbc_compiler *d3dbc,
+        unsigned int reg_id, enum vkd3d_sm1_resource_type res_type)
+{
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
+    struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
+    struct sm1_dst_register reg = {0};
+    uint32_t token;
+
+    token = VKD3D_SM1_OP_DCL;
+    if (version->major > 1)
+        token |= 2 << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
+    put_u32(buffer, token);
+
+    token = VKD3D_SM1_INSTRUCTION_PARAMETER;
+    token |= res_type << VKD3D_SM1_RESOURCE_TYPE_SHIFT;
+    put_u32(buffer, token);
+
+    reg.type = VKD3DSPR_COMBINED_SAMPLER;
+    reg.writemask = VKD3DSP_WRITEMASK_ALL;
+    reg.reg = reg_id;
+
+    write_sm1_dst_register(buffer, &reg);
+}
+
+static void d3dbc_write_vsir_dcl(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
+{
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
+    const struct vkd3d_shader_semantic *semantic = &ins->declaration.semantic;
+    unsigned int reg_id;
+
+    if (version->major < 2)
+        return;
+
+    reg_id = semantic->resource.reg.reg.idx[0].offset;
+
+    if (semantic->resource.reg.reg.type != VKD3DSPR_SAMPLER)
+    {
+        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_REGISTER_TYPE,
+                "dcl instruction with register type %u.", semantic->resource.reg.reg.type);
+        d3dbc->failed = true;
+        return;
+    }
+
+    switch (semantic->resource_type)
+    {
+        case VKD3D_SHADER_RESOURCE_TEXTURE_2D:
+            d3dbc_write_vsir_sampler_dcl(d3dbc, reg_id, VKD3D_SM1_RESOURCE_TEXTURE_2D);
+            break;
+
+        case VKD3D_SHADER_RESOURCE_TEXTURE_CUBE:
+            d3dbc_write_vsir_sampler_dcl(d3dbc, reg_id, VKD3D_SM1_RESOURCE_TEXTURE_CUBE);
+            break;
+
+        case VKD3D_SHADER_RESOURCE_TEXTURE_3D:
+            d3dbc_write_vsir_sampler_dcl(d3dbc, reg_id, VKD3D_SM1_RESOURCE_TEXTURE_3D);
+            break;
+
+        default:
+            vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_RESOURCE_TYPE,
+                   "dcl instruction with resource_type %u.", semantic->resource_type);
+            d3dbc->failed = true;
+            return;
+    }
+}
+
 static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
 {
     switch (ins->opcode)
     {
         case VKD3DSIH_DEF:
             d3dbc_write_vsir_def(d3dbc, ins);
+            break;
+
+        case VKD3DSIH_DCL:
+            d3dbc_write_vsir_dcl(d3dbc, ins);
             break;
 
         default:
@@ -2271,86 +2340,6 @@ static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
     {
         for (unsigned int i = 0; i < program->output_signature.element_count; ++i)
             d3dbc_write_semantic_dcl(d3dbc, &program->output_signature.elements[i], true);
-    }
-}
-
-static void d3dbc_write_sampler_dcl(struct d3dbc_compiler *d3dbc,
-        unsigned int reg_id, enum hlsl_sampler_dim sampler_dim)
-{
-    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
-    struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
-    struct sm1_dst_register reg = {0};
-    uint32_t token, res_type = 0;
-
-    token = D3DSIO_DCL;
-    if (version->major > 1)
-        token |= 2 << D3DSI_INSTLENGTH_SHIFT;
-    put_u32(buffer, token);
-
-    switch (sampler_dim)
-    {
-        case HLSL_SAMPLER_DIM_2D:
-            res_type = VKD3D_SM1_RESOURCE_TEXTURE_2D;
-            break;
-
-        case HLSL_SAMPLER_DIM_CUBE:
-            res_type = VKD3D_SM1_RESOURCE_TEXTURE_CUBE;
-            break;
-
-        case HLSL_SAMPLER_DIM_3D:
-            res_type = VKD3D_SM1_RESOURCE_TEXTURE_3D;
-            break;
-
-        default:
-            vkd3d_unreachable();
-            break;
-    }
-
-    token = (1u << 31);
-    token |= res_type << VKD3D_SM1_RESOURCE_TYPE_SHIFT;
-    put_u32(buffer, token);
-
-    reg.type = VKD3DSPR_COMBINED_SAMPLER;
-    reg.writemask = VKD3DSP_WRITEMASK_ALL;
-    reg.reg = reg_id;
-
-    write_sm1_dst_register(buffer, &reg);
-}
-
-static void d3dbc_write_sampler_dcls(struct d3dbc_compiler *d3dbc)
-{
-    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
-    struct hlsl_ctx *ctx = d3dbc->ctx;
-    enum hlsl_sampler_dim sampler_dim;
-    unsigned int i, count, reg_id;
-    struct hlsl_ir_var *var;
-
-    if (version->major < 2)
-        return;
-
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        if (!var->regs[HLSL_REGSET_SAMPLERS].allocated)
-            continue;
-
-        count = var->bind_count[HLSL_REGSET_SAMPLERS];
-
-        for (i = 0; i < count; ++i)
-        {
-            if (var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
-            {
-                sampler_dim = var->objects_usage[HLSL_REGSET_SAMPLERS][i].sampler_dim;
-                if (sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
-                {
-                    /* These can appear in sm4-style combined sample instructions. */
-                    hlsl_fixme(ctx, &var->loc, "Generic samplers need to be lowered.");
-                    continue;
-                }
-
-                reg_id = var->regs[HLSL_REGSET_SAMPLERS].index + i;
-                d3dbc_write_sampler_dcl(d3dbc, reg_id, sampler_dim);
-            }
-        }
     }
 }
 
@@ -2928,7 +2917,6 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     bytecode_put_bytes(buffer, ctab->code, ctab->size);
 
     d3dbc_write_semantic_dcls(&d3dbc);
-    d3dbc_write_sampler_dcls(&d3dbc);
     d3dbc_write_block(&d3dbc, &entry_func->body);
 
     put_u32(buffer, D3DSIO_END);
