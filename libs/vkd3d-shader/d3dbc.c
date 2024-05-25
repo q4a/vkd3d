@@ -1865,7 +1865,7 @@ struct sm1_instruction
         D3DSHADER_PARAM_SRCMOD_TYPE mod;
         unsigned int swizzle;
         uint32_t reg;
-    } srcs[3];
+    } srcs[4];
     unsigned int src_count;
 
     unsigned int has_dst;
@@ -2573,6 +2573,8 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
 {
     const struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
     struct hlsl_ir_node *coords = load->coords.node;
+    struct hlsl_ir_node *ddx = load->ddx.node;
+    struct hlsl_ir_node *ddy = load->ddy.node;
     unsigned int sampler_offset, reg_id;
     struct sm1_instruction sm1_instr;
 
@@ -2611,6 +2613,20 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
             sm1_instr.opcode = D3DSIO_TEX;
             sm1_instr.opcode |= VKD3DSI_TEXLD_BIAS << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
+            break;
+
+        case HLSL_RESOURCE_SAMPLE_GRAD:
+            sm1_instr.opcode = D3DSIO_TEXLDD;
+
+            sm1_instr.srcs[2].type = D3DSPR_TEMP;
+            sm1_instr.srcs[2].reg = ddx->reg.id;
+            sm1_instr.srcs[2].swizzle = hlsl_swizzle_from_writemask(ddx->reg.writemask);
+
+            sm1_instr.srcs[3].type = D3DSPR_TEMP;
+            sm1_instr.srcs[3].reg = ddy->reg.id;
+            sm1_instr.srcs[3].swizzle = hlsl_swizzle_from_writemask(ddy->reg.writemask);
+
+            sm1_instr.src_count += 2;
             break;
 
         default:
