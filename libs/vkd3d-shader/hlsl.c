@@ -378,6 +378,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VERTEX_SHADER:
         case HLSL_CLASS_VOID:
+        case HLSL_CLASS_CONSTANT_BUFFER:
             break;
     }
 }
@@ -452,6 +453,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
         case HLSL_CLASS_MATRIX:
         case HLSL_CLASS_STRUCT:
         case HLSL_CLASS_ARRAY:
+        case HLSL_CLASS_CONSTANT_BUFFER:
             return false;
 
         case HLSL_CLASS_EFFECT_GROUP:
@@ -530,6 +532,12 @@ static unsigned int traverse_path_from_component_index(struct hlsl_ctx *ctx,
             vkd3d_unreachable();
         }
 
+        case HLSL_CLASS_CONSTANT_BUFFER:
+        {
+            *type_ptr = type->e.resource.format;
+            return traverse_path_from_component_index(ctx, type_ptr, index_ptr);
+        }
+
         default:
             vkd3d_unreachable();
     }
@@ -597,6 +605,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
             case HLSL_CLASS_TECHNIQUE:
             case HLSL_CLASS_VOID:
             case HLSL_CLASS_SCALAR:
+            case HLSL_CLASS_CONSTANT_BUFFER:
                 vkd3d_unreachable();
         }
         type = next_type;
@@ -870,6 +879,20 @@ struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim 
     return type;
 }
 
+struct hlsl_type *hlsl_new_cb_type(struct hlsl_ctx *ctx, struct hlsl_type *format)
+{
+    struct hlsl_type *type;
+
+    if (!(type = hlsl_alloc(ctx, sizeof(*type))))
+        return NULL;
+    type->class = HLSL_CLASS_CONSTANT_BUFFER;
+    type->dimy = 1;
+    type->e.resource.format = format;
+    hlsl_type_calculate_reg_size(ctx, type);
+    list_add_tail(&ctx->types, &type->entry);
+    return type;
+}
+
 static const char * get_case_insensitive_typename(const char *name)
 {
     static const char *const names[] =
@@ -961,6 +984,9 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_ARRAY:
             return hlsl_type_component_count(type->e.array.type) * type->e.array.elements_count;
 
+        case HLSL_CLASS_CONSTANT_BUFFER:
+            return hlsl_type_component_count(type->e.resource.format);
+
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
@@ -1042,6 +1068,9 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
 
         case HLSL_CLASS_TECHNIQUE:
             return t1->e.version == t2->e.version;
+
+        case HLSL_CLASS_CONSTANT_BUFFER:
+            return hlsl_types_are_equal(t1->e.resource.format, t2->e.resource.format);
 
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
@@ -2406,6 +2435,15 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
                 vkd3d_string_buffer_printf(string, "RWStructuredBuffer");
             else
                 vkd3d_string_buffer_printf(string, "RWTexture%s", dimensions[type->sampler_dim]);
+            if ((inner_string = hlsl_type_to_string(ctx, type->e.resource.format)))
+            {
+                vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
+                hlsl_release_string_buffer(ctx, inner_string);
+            }
+            return string;
+
+        case HLSL_CLASS_CONSTANT_BUFFER:
+            vkd3d_string_buffer_printf(string, "ConstantBuffer");
             if ((inner_string = hlsl_type_to_string(ctx, type->e.resource.format)))
             {
                 vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);

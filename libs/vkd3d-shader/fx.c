@@ -464,6 +464,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_TECHNIQUE:
+        case HLSL_CLASS_CONSTANT_BUFFER:
             vkd3d_unreachable();
 
         case HLSL_CLASS_STRING:
@@ -862,6 +863,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_TECHNIQUE:
+        case HLSL_CLASS_CONSTANT_BUFFER:
             /* This cannot appear as an extern variable. */
             break;
     }

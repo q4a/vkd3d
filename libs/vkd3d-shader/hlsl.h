@@ -89,6 +89,7 @@ enum hlsl_type_class
     HLSL_CLASS_TEXTURE,
     HLSL_CLASS_UAV,
     HLSL_CLASS_VERTEX_SHADER,
+    HLSL_CLASS_CONSTANT_BUFFER,
     HLSL_CLASS_VOID,
 };
 
@@ -1391,6 +1392,7 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
         unsigned int sample_count);
 struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
         struct hlsl_type *format, bool rasteriser_ordered);
+struct hlsl_type *hlsl_new_cb_type(struct hlsl_ctx *ctx, struct hlsl_type *format);
 struct hlsl_ir_node *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,

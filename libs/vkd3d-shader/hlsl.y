@@ -2376,6 +2376,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     struct hlsl_semantic new_semantic;
     uint32_t modifiers = v->modifiers;
     bool unbounded_res_array = false;
+    bool constant_buffer = false;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
     bool local = true;
@@ -2393,6 +2394,12 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     {
         for (i = 0; i < v->arrays.count; ++i)
             unbounded_res_array |= (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
+    }
+
+    if (type->class == HLSL_CLASS_CONSTANT_BUFFER)
+    {
+        type = type->e.resource.format;
+        constant_buffer = true;
     }
 
     if (unbounded_res_array)
@@ -2476,7 +2483,16 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
         return;
     }
 
-    var->buffer = ctx->cur_buffer;
+    if (constant_buffer && ctx->cur_scope == ctx->globals)
+    {
+        if (!(var_name = vkd3d_strdup(v->name)))
+            return;
+        var->buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT, var_name, modifiers, &v->reg_reservation, NULL, &v->loc);
+    }
+    else
+    {
+        var->buffer = ctx->cur_buffer;
+    }
 
     if (var->buffer == ctx->globals_buffer)
     {
@@ -5723,6 +5739,7 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %token KW_BREAK
 %token KW_BUFFER
 %token KW_CASE
+%token KW_CONSTANTBUFFER
 %token KW_CBUFFER
 %token KW_CENTROID
 %token KW_COLUMN_MAJOR
@@ -7068,6 +7085,13 @@ type_no_void:
     | KW_PIXELSHADER
         {
             $$ = hlsl_get_type(ctx->cur_scope, "PixelShader", true, true);
+        }
+    | KW_CONSTANTBUFFER '<' type '>'
+        {
+            if ($3->class != HLSL_CLASS_STRUCT)
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "ConstantBuffer<...> requires user-defined structure type.");
+            $$ = hlsl_new_cb_type(ctx, $3);
         }
 
 type:

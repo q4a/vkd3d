@@ -1643,6 +1643,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         case HLSL_CLASS_MATRIX:
         case HLSL_CLASS_ARRAY:
         case HLSL_CLASS_STRUCT:
+        case HLSL_CLASS_CONSTANT_BUFFER:
             /* FIXME: Actually we shouldn't even get here, but we don't split
              * matrices yet. */
             return false;
