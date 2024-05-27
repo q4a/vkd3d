@@ -70,6 +70,14 @@ static inline unsigned int hlsl_swizzle_get_component(uint32_t swizzle, unsigned
     return (swizzle >> HLSL_SWIZZLE_SHIFT(idx)) & HLSL_SWIZZLE_MASK;
 }
 
+static inline uint32_t vsir_swizzle_from_hlsl(uint32_t swizzle)
+{
+    return vkd3d_shader_create_swizzle(hlsl_swizzle_get_component(swizzle, 0),
+            hlsl_swizzle_get_component(swizzle, 1),
+            hlsl_swizzle_get_component(swizzle, 2),
+            hlsl_swizzle_get_component(swizzle, 3));
+}
+
 enum hlsl_type_class
 {
     HLSL_CLASS_SCALAR,
