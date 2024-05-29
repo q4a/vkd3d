@@ -2724,50 +2724,6 @@ static void d3dbc_write_jump(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
     }
 }
 
-static void d3dbc_write_load(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
-{
-    const struct hlsl_ir_load *load = hlsl_ir_load(instr);
-    struct hlsl_ctx *ctx = d3dbc->ctx;
-    const struct hlsl_reg reg = hlsl_reg_from_deref(ctx, &load->src);
-    struct sm1_instruction sm1_instr =
-    {
-        .opcode = D3DSIO_MOV,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.reg = instr->reg.id,
-        .dst.writemask = instr->reg.writemask,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].reg = reg.id,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(reg.writemask),
-        .src_count = 1,
-    };
-
-    VKD3D_ASSERT(instr->reg.allocated);
-
-    if (load->src.var->is_uniform)
-    {
-        VKD3D_ASSERT(reg.allocated);
-        sm1_instr.srcs[0].type = VKD3DSPR_CONST;
-    }
-    else if (load->src.var->is_input_semantic)
-    {
-        if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, load->src.var->semantic.name,
-                load->src.var->semantic.index, false, &sm1_instr.srcs[0].type, &sm1_instr.srcs[0].reg))
-        {
-            VKD3D_ASSERT(reg.allocated);
-            sm1_instr.srcs[0].type = VKD3DSPR_INPUT;
-            sm1_instr.srcs[0].reg = reg.id;
-        }
-        else
-            sm1_instr.srcs[0].swizzle = hlsl_swizzle_from_writemask((1 << load->src.var->data_type->dimx) - 1);
-    }
-
-    sm1_map_src_swizzle(&sm1_instr.srcs[0], sm1_instr.dst.writemask);
-    d3dbc_write_instruction(d3dbc, &sm1_instr);
-}
-
 static void d3dbc_write_resource_load(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
@@ -2947,10 +2903,6 @@ static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_bl
 
             case HLSL_IR_JUMP:
                 d3dbc_write_jump(d3dbc, instr);
-                break;
-
-            case HLSL_IR_LOAD:
-                d3dbc_write_load(d3dbc, instr);
                 break;
 
             case HLSL_IR_RESOURCE_LOAD:
