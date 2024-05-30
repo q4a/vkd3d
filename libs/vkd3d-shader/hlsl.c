@@ -3333,8 +3333,8 @@ void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
 {
     struct hlsl_src *src, *next;
 
-    VKD3D_ASSERT(old->data_type->dimx == new->data_type->dimx);
-    VKD3D_ASSERT(old->data_type->dimy == new->data_type->dimy);
+    VKD3D_ASSERT(old->data_type == new->data_type || old->data_type->dimx == new->data_type->dimx);
+    VKD3D_ASSERT(old->data_type == new->data_type || old->data_type->dimy == new->data_type->dimy);
 
     LIST_FOR_EACH_ENTRY_SAFE(src, next, &old->uses, struct hlsl_src, entry)
     {

@@ -2795,52 +2795,6 @@ static void d3dbc_write_resource_load(struct d3dbc_compiler *d3dbc, const struct
     d3dbc_write_instruction(d3dbc, &sm1_instr);
 }
 
-static void d3dbc_write_store(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
-{
-    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
-    const struct hlsl_ir_store *store = hlsl_ir_store(instr);
-    struct hlsl_ctx *ctx = d3dbc->ctx;
-    const struct hlsl_reg reg = hlsl_reg_from_deref(ctx, &store->lhs);
-    const struct hlsl_ir_node *rhs = store->rhs.node;
-    struct sm1_instruction sm1_instr =
-    {
-        .opcode = D3DSIO_MOV,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.reg = reg.id,
-        .dst.writemask = hlsl_combine_writemasks(reg.writemask, store->writemask),
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].reg = rhs->reg.id,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(rhs->reg.writemask),
-        .src_count = 1,
-    };
-
-    if (store->lhs.var->is_output_semantic)
-    {
-        if (version->type == VKD3D_SHADER_TYPE_PIXEL && version->major == 1)
-        {
-            sm1_instr.dst.type = VKD3DSPR_TEMP;
-            sm1_instr.dst.reg = 0;
-        }
-        else if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, store->lhs.var->semantic.name,
-                store->lhs.var->semantic.index, true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
-        {
-            VKD3D_ASSERT(reg.allocated);
-            sm1_instr.dst.type = VKD3DSPR_OUTPUT;
-            sm1_instr.dst.reg = reg.id;
-        }
-        else
-            sm1_instr.dst.writemask = (1u << store->lhs.var->data_type->dimx) - 1;
-    }
-    else
-        VKD3D_ASSERT(reg.allocated);
-
-    sm1_map_src_swizzle(&sm1_instr.srcs[0], sm1_instr.dst.writemask);
-    d3dbc_write_instruction(d3dbc, &sm1_instr);
-}
-
 static void d3dbc_write_swizzle(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(instr);
@@ -2907,10 +2861,6 @@ static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_bl
 
             case HLSL_IR_RESOURCE_LOAD:
                 d3dbc_write_resource_load(d3dbc, instr);
-                break;
-
-            case HLSL_IR_STORE:
-                d3dbc_write_store(d3dbc, instr);
                 break;
 
             case HLSL_IR_SWIZZLE:
