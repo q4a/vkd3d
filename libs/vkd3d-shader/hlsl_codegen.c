@@ -6348,6 +6348,48 @@ static void sm1_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
     hlsl_replace_node(instr, vsir_instr);
 }
 
+static void sm1_generate_vsir_instr_swizzle(struct hlsl_ctx *ctx, struct vsir_program *program,
+        struct hlsl_ir_swizzle *swizzle_instr)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct hlsl_ir_node *instr = &swizzle_instr->node, *val = swizzle_instr->val.node;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_src_param *src_param;
+    struct vkd3d_shader_instruction *ins;
+    struct hlsl_ir_node *vsir_instr;
+    uint32_t swizzle;
+
+    VKD3D_ASSERT(instr->reg.allocated);
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_MOV, 1, 1)))
+        return;
+
+    dst_param = &ins->dst[0];
+    vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    dst_param->reg.idx[0].offset = instr->reg.id;
+    dst_param->write_mask = instr->reg.writemask;
+
+    swizzle = hlsl_swizzle_from_writemask(val->reg.writemask);
+    swizzle = hlsl_combine_swizzles(swizzle, swizzle_instr->swizzle, instr->data_type->dimx);
+    swizzle = hlsl_map_swizzle(swizzle, ins->dst[0].write_mask);
+    swizzle = vsir_swizzle_from_hlsl(swizzle);
+
+    src_param = &ins->src[0];
+    vsir_register_init(&src_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    src_param->reg.idx[0].offset = val->reg.id;
+    src_param->swizzle = swizzle;
+
+    if (!(vsir_instr = hlsl_new_vsir_instruction_ref(ctx, instructions->count - 1, instr->data_type,
+            &instr->reg, &instr->loc)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+
+    list_add_before(&instr->entry, &vsir_instr->entry);
+    hlsl_replace_node(instr, vsir_instr);
+}
+
 static void sm1_generate_vsir_instr_store(struct hlsl_ctx *ctx, struct vsir_program *program,
         struct hlsl_ir_store *store)
 {
@@ -6394,6 +6436,10 @@ static bool sm1_generate_vsir_instr(struct hlsl_ctx *ctx, struct hlsl_ir_node *i
 
         case HLSL_IR_STORE:
             sm1_generate_vsir_instr_store(ctx, program, hlsl_ir_store(instr));
+            return true;
+
+        case HLSL_IR_SWIZZLE:
+            sm1_generate_vsir_instr_swizzle(ctx, program, hlsl_ir_swizzle(instr));
             return true;
 
         default:

@@ -2795,32 +2795,6 @@ static void d3dbc_write_resource_load(struct d3dbc_compiler *d3dbc, const struct
     d3dbc_write_instruction(d3dbc, &sm1_instr);
 }
 
-static void d3dbc_write_swizzle(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
-{
-    const struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(instr);
-    const struct hlsl_ir_node *val = swizzle->val.node;
-    struct sm1_instruction sm1_instr =
-    {
-        .opcode = D3DSIO_MOV,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.reg = instr->reg.id,
-        .dst.writemask = instr->reg.writemask,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].reg = val->reg.id,
-        .srcs[0].swizzle = hlsl_combine_swizzles(hlsl_swizzle_from_writemask(val->reg.writemask),
-                swizzle->swizzle, instr->data_type->dimx),
-        .src_count = 1,
-    };
-
-    VKD3D_ASSERT(instr->reg.allocated);
-    VKD3D_ASSERT(val->reg.allocated);
-    sm1_map_src_swizzle(&sm1_instr.srcs[0], sm1_instr.dst.writemask);
-    d3dbc_write_instruction(d3dbc, &sm1_instr);
-}
-
 static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block)
 {
     struct vkd3d_shader_instruction *vsir_instr;
@@ -2861,10 +2835,6 @@ static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_bl
 
             case HLSL_IR_RESOURCE_LOAD:
                 d3dbc_write_resource_load(d3dbc, instr);
-                break;
-
-            case HLSL_IR_SWIZZLE:
-                d3dbc_write_swizzle(d3dbc, instr);
                 break;
 
             case HLSL_IR_VSIR_INSTRUCTION_REF:
