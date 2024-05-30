@@ -1987,63 +1987,6 @@ static void d3dbc_write_dp2add(struct d3dbc_compiler *d3dbc, const struct hlsl_r
     d3dbc_write_instruction(d3dbc, &instr);
 }
 
-static void d3dbc_write_ternary_op(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
-        const struct hlsl_reg *dst, const struct hlsl_reg *src1,
-        const struct hlsl_reg *src2, const struct hlsl_reg *src3)
-{
-    struct sm1_instruction instr =
-    {
-        .opcode = opcode,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.writemask = dst->writemask,
-        .dst.reg = dst->id,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(src1->writemask),
-        .srcs[0].reg = src1->id,
-        .srcs[1].type = VKD3DSPR_TEMP,
-        .srcs[1].swizzle = hlsl_swizzle_from_writemask(src2->writemask),
-        .srcs[1].reg = src2->id,
-        .srcs[2].type = VKD3DSPR_TEMP,
-        .srcs[2].swizzle = hlsl_swizzle_from_writemask(src3->writemask),
-        .srcs[2].reg = src3->id,
-        .src_count = 3,
-    };
-
-    sm1_map_src_swizzle(&instr.srcs[0], instr.dst.writemask);
-    sm1_map_src_swizzle(&instr.srcs[1], instr.dst.writemask);
-    sm1_map_src_swizzle(&instr.srcs[2], instr.dst.writemask);
-    d3dbc_write_instruction(d3dbc, &instr);
-}
-
-static void d3dbc_write_binary_op(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
-        const struct hlsl_reg *dst, const struct hlsl_reg *src1, const struct hlsl_reg *src2)
-{
-    struct sm1_instruction instr =
-    {
-        .opcode = opcode,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.writemask = dst->writemask,
-        .dst.reg = dst->id,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(src1->writemask),
-        .srcs[0].reg = src1->id,
-        .srcs[1].type = VKD3DSPR_TEMP,
-        .srcs[1].swizzle = hlsl_swizzle_from_writemask(src2->writemask),
-        .srcs[1].reg = src2->id,
-        .src_count = 2,
-    };
-
-    sm1_map_src_swizzle(&instr.srcs[0], instr.dst.writemask);
-    sm1_map_src_swizzle(&instr.srcs[1], instr.dst.writemask);
-    d3dbc_write_instruction(d3dbc, &instr);
-}
-
 static void d3dbc_write_dot(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
         const struct hlsl_reg *dst, const struct hlsl_reg *src1, const struct hlsl_reg *src2)
 {
@@ -2332,7 +2275,13 @@ static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
     const struct vkd3d_sm1_opcode_info *info;
     struct sm1_instruction instr = {0};
 
-    info = shader_sm1_get_opcode_info_from_vsir(d3dbc, ins->opcode);
+    if (!(info = shader_sm1_get_opcode_info_from_vsir(d3dbc, ins->opcode)))
+    {
+        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
+                "Opcode %#x not supported for shader profile.", ins->opcode);
+        d3dbc->failed = true;
+        return;
+    }
 
     if (ins->dst_count != info->dst_count)
     {
@@ -2375,7 +2324,18 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
             d3dbc_write_vsir_dcl(d3dbc, ins);
             break;
 
+        case VKD3DSIH_ABS:
+        case VKD3DSIH_ADD:
+        case VKD3DSIH_CMP:
+        case VKD3DSIH_DSX:
+        case VKD3DSIH_DSY:
+        case VKD3DSIH_FRC:
+        case VKD3DSIH_MAD:
+        case VKD3DSIH_MAX:
+        case VKD3DSIH_MIN:
         case VKD3DSIH_MOV:
+        case VKD3DSIH_MUL:
+        case VKD3DSIH_SLT:
             d3dbc_write_vsir_simple_instruction(d3dbc, ins);
             break;
 
@@ -2510,7 +2470,6 @@ static void d3dbc_write_sincos(struct d3dbc_compiler *d3dbc, enum hlsl_ir_expr_o
 
 static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
-    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
     struct hlsl_ir_node *arg1 = expr->operands[0].node;
     struct hlsl_ir_node *arg2 = expr->operands[1].node;
@@ -2540,32 +2499,12 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP1_ABS:
-            d3dbc_write_unary_op(d3dbc, VKD3D_SM1_OP_ABS, &instr->reg, &arg1->reg, 0, 0);
-            break;
-
-        case HLSL_OP1_DSX:
-            d3dbc_write_unary_op(d3dbc, VKD3D_SM1_OP_DSX, &instr->reg, &arg1->reg, 0, 0);
-            break;
-
-        case HLSL_OP1_DSY:
-            d3dbc_write_unary_op(d3dbc, VKD3D_SM1_OP_DSY, &instr->reg, &arg1->reg, 0, 0);
-            break;
-
         case HLSL_OP1_EXP2:
             d3dbc_write_per_component_unary_op(d3dbc, instr, VKD3D_SM1_OP_EXP);
             break;
 
         case HLSL_OP1_LOG2:
             d3dbc_write_per_component_unary_op(d3dbc, instr, VKD3D_SM1_OP_LOG);
-            break;
-
-        case HLSL_OP1_NEG:
-            d3dbc_write_unary_op(d3dbc, VKD3D_SM1_OP_MOV, &instr->reg, &arg1->reg, D3DSPSM_NEG, 0);
-            break;
-
-        case HLSL_OP1_SAT:
-            d3dbc_write_unary_op(d3dbc, VKD3D_SM1_OP_MOV, &instr->reg, &arg1->reg, 0, D3DSPDM_SATURATE);
             break;
 
         case HLSL_OP1_RCP:
@@ -2579,26 +2518,6 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
         case HLSL_OP1_COS_REDUCED:
         case HLSL_OP1_SIN_REDUCED:
             d3dbc_write_sincos(d3dbc, expr->op, &instr->reg, &arg1->reg);
-            break;
-
-        case HLSL_OP2_ADD:
-            d3dbc_write_binary_op(d3dbc, VKD3D_SM1_OP_ADD, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_OP2_MAX:
-            d3dbc_write_binary_op(d3dbc, VKD3D_SM1_OP_MAX, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_OP2_MIN:
-            d3dbc_write_binary_op(d3dbc, VKD3D_SM1_OP_MIN, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_OP2_MUL:
-            d3dbc_write_binary_op(d3dbc, VKD3D_SM1_OP_MUL, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_OP1_FRACT:
-            d3dbc_write_unary_op(d3dbc, VKD3D_SM1_OP_FRC, &instr->reg, &arg1->reg, D3DSPSM_NONE, 0);
             break;
 
         case HLSL_OP2_DOT:
@@ -2617,32 +2536,8 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
             }
             break;
 
-        case HLSL_OP2_LOGIC_AND:
-            d3dbc_write_binary_op(d3dbc, VKD3D_SM1_OP_MIN, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_OP2_LOGIC_OR:
-            d3dbc_write_binary_op(d3dbc, VKD3D_SM1_OP_MAX, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_OP2_SLT:
-            if (version->type == VKD3D_SHADER_TYPE_PIXEL)
-                hlsl_fixme(ctx, &instr->loc, "Lower SLT instructions for pixel shaders.");
-            d3dbc_write_binary_op(d3dbc, VKD3D_SM1_OP_SLT, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_OP3_CMP:
-            if (version->type == VKD3D_SHADER_TYPE_VERTEX)
-                hlsl_fixme(ctx, &instr->loc, "Lower CMP instructions for vertex shaders.");
-            d3dbc_write_ternary_op(d3dbc, VKD3D_SM1_OP_CMP, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
-            break;
-
         case HLSL_OP3_DP2ADD:
             d3dbc_write_dp2add(d3dbc, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
-            break;
-
-        case HLSL_OP3_MAD:
-            d3dbc_write_ternary_op(d3dbc, VKD3D_SM1_OP_MAD, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
             break;
 
         default:
