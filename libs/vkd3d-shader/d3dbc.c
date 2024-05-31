@@ -2269,18 +2269,17 @@ static void d3dbc_write_vsir_dcl(struct d3dbc_compiler *d3dbc, const struct vkd3
     }
 }
 
-static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
-        const struct vkd3d_shader_instruction *ins)
+static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir_instruction(
+        struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_sm1_opcode_info *info;
-    struct sm1_instruction instr = {0};
 
     if (!(info = shader_sm1_get_opcode_info_from_vsir(d3dbc, ins->opcode)))
     {
         vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
                 "Opcode %#x not supported for shader profile.", ins->opcode);
         d3dbc->failed = true;
-        return;
+        return NULL;
     }
 
     if (ins->dst_count != info->dst_count)
@@ -2289,7 +2288,7 @@ static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
                 "Invalid destination count %u for vsir instruction %#x (expected %u).",
                 ins->dst_count, ins->opcode, info->dst_count);
         d3dbc->failed = true;
-        return;
+        return NULL;
     }
     if (ins->src_count != info->src_count)
     {
@@ -2297,8 +2296,20 @@ static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
                 "Invalid source count %u for vsir instruction %#x (expected %u).",
                 ins->src_count, ins->opcode, info->src_count);
         d3dbc->failed = true;
-        return;
+        return NULL;
     }
+
+    return info;
+}
+
+static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
+        const struct vkd3d_shader_instruction *ins)
+{
+    struct sm1_instruction instr = {0};
+    const struct vkd3d_sm1_opcode_info *info;
+
+    if (!(info = shader_sm1_get_opcode_info_from_vsir_instruction(d3dbc, ins)))
+        return;
 
     instr.opcode = info->sm1_opcode;
     instr.has_dst = info->dst_count;
@@ -2314,6 +2325,8 @@ static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
 
 static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
 {
+    uint32_t writemask;
+
     switch (ins->opcode)
     {
         case VKD3DSIH_DEF:
@@ -2336,6 +2349,23 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_MOV:
         case VKD3DSIH_MUL:
         case VKD3DSIH_SLT:
+            d3dbc_write_vsir_simple_instruction(d3dbc, ins);
+            break;
+
+        case VKD3DSIH_EXP:
+        case VKD3DSIH_LOG:
+        case VKD3DSIH_RCP:
+        case VKD3DSIH_RSQ:
+            writemask = ins->dst->write_mask;
+            if (writemask != VKD3DSP_WRITEMASK_0 && writemask != VKD3DSP_WRITEMASK_1
+                    && writemask != VKD3DSP_WRITEMASK_2 && writemask != VKD3DSP_WRITEMASK_3)
+            {
+                vkd3d_shader_error(d3dbc->message_context, &ins->location,
+                        VKD3D_SHADER_ERROR_D3DBC_INVALID_WRITEMASK,
+                        "writemask %#x for vsir instruction with opcode %#x is not single component.",
+                        writemask, ins->opcode);
+                d3dbc->failed = true;
+            }
             d3dbc_write_vsir_simple_instruction(d3dbc, ins);
             break;
 
@@ -2412,23 +2442,6 @@ static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
     }
 }
 
-static void d3dbc_write_per_component_unary_op(struct d3dbc_compiler *d3dbc,
-        const struct hlsl_ir_node *instr, enum vkd3d_sm1_opcode opcode)
-{
-    struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
-    struct hlsl_ir_node *arg1 = expr->operands[0].node;
-    unsigned int i;
-
-    for (i = 0; i < instr->data_type->dimx; ++i)
-    {
-        struct hlsl_reg src = arg1->reg, dst = instr->reg;
-
-        src.writemask = hlsl_combine_writemasks(src.writemask, 1u << i);
-        dst.writemask = hlsl_combine_writemasks(dst.writemask, 1u << i);
-        d3dbc_write_unary_op(d3dbc, opcode, &dst, &src, 0, 0);
-    }
-}
-
 static void d3dbc_write_sincos(struct d3dbc_compiler *d3dbc, enum hlsl_ir_expr_op op,
         const struct hlsl_reg *dst, const struct hlsl_reg *src)
 {
@@ -2499,22 +2512,6 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP1_EXP2:
-            d3dbc_write_per_component_unary_op(d3dbc, instr, VKD3D_SM1_OP_EXP);
-            break;
-
-        case HLSL_OP1_LOG2:
-            d3dbc_write_per_component_unary_op(d3dbc, instr, VKD3D_SM1_OP_LOG);
-            break;
-
-        case HLSL_OP1_RCP:
-            d3dbc_write_per_component_unary_op(d3dbc, instr, VKD3D_SM1_OP_RCP);
-            break;
-
-        case HLSL_OP1_RSQ:
-            d3dbc_write_per_component_unary_op(d3dbc, instr, VKD3D_SM1_OP_RSQ);
-            break;
-
         case HLSL_OP1_COS_REDUCED:
         case HLSL_OP1_SIN_REDUCED:
             d3dbc_write_sincos(d3dbc, expr->op, &instr->reg, &arg1->reg);
