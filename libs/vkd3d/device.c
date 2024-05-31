@@ -4749,7 +4749,8 @@ static void d3d12_device_get_copyable_footprints(struct d3d12_device *device,
         depth = d3d12_resource_desc_get_depth(desc, miplevel_idx);
         row_count = height / format->block_height;
         row_size = (width / format->block_width) * format->byte_count * format->block_byte_count;
-        row_pitch = align(row_size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+        /* Direct3D 12 requires double the alignment for dual planes. */
+        row_pitch = align(row_size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT * plane_count);
 
         if (layouts)
         {
@@ -4766,7 +4767,7 @@ static void d3d12_device_get_copyable_footprints(struct d3d12_device *device,
             row_sizes[i] = row_size;
 
         size = max(0, row_count - 1) * row_pitch + row_size;
-        size = max(0, depth - 1) * align(size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) + size;
+        size = max(0, depth - 1) * align(size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT * plane_count) + size;
 
         total = offset + size;
         offset = align(total, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);

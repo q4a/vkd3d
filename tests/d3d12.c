@@ -20263,12 +20263,10 @@ static void check_copyable_footprints_(const char *file, unsigned int line, cons
     unsigned int i, sub_resources_per_plane, plane_count, plane_idx;
     DXGI_FORMAT expected_format = desc->Format;
     uint64_t offset, size, total;
-    bool format_is_ds;
 
     sub_resources_per_plane = desc->MipLevels
             * (desc->Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D ? desc->DepthOrArraySize : 1);
     plane_count = format_plane_count(desc->Format);
-    format_is_ds = plane_count > 1;
 
     offset = total = 0;
     for (i = 0; i < sub_resource_count; ++i)
@@ -20291,7 +20289,6 @@ static void check_copyable_footprints_(const char *file, unsigned int line, cons
             const D3D12_PLACED_SUBRESOURCE_FOOTPRINT *l = &layouts[i];
             const D3D12_SUBRESOURCE_FOOTPRINT *f = &l->Footprint;
 
-            todo_if(format_is_ds && l->Offset != base_offset + offset)
             ok_(file, line)(l->Offset == base_offset + offset,
                     "Got offset %"PRIu64", expected %"PRIu64".\n", l->Offset, base_offset + offset);
             ok_(file, line)(f->Format == expected_format, "Got format %#x, expected %#x.\n",
@@ -20299,7 +20296,6 @@ static void check_copyable_footprints_(const char *file, unsigned int line, cons
             ok_(file, line)(f->Width == width, "Got width %u, expected %u.\n", f->Width, width);
             ok_(file, line)(f->Height == height, "Got height %u, expected %u.\n", f->Height, height);
             ok_(file, line)(f->Depth == depth, "Got depth %u, expected %u.\n", f->Depth, depth);
-            todo_if(format_is_ds)
             ok_(file, line)(f->RowPitch == row_pitch, "Got row pitch %u, expected %u.\n", f->RowPitch, row_pitch);
         }
 
@@ -20318,10 +20314,7 @@ static void check_copyable_footprints_(const char *file, unsigned int line, cons
     }
 
     if (total_size)
-    {
-        todo_if(format_is_ds && *total_size != total)
         ok_(file, line)(*total_size == total, "Got total size %"PRIu64", expected %"PRIu64".\n", *total_size, total);
-    }
 }
 
 static void test_get_copyable_footprints(void)
