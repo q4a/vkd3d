@@ -1987,30 +1987,6 @@ static void d3dbc_write_dp2add(struct d3dbc_compiler *d3dbc, const struct hlsl_r
     d3dbc_write_instruction(d3dbc, &instr);
 }
 
-static void d3dbc_write_dot(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
-        const struct hlsl_reg *dst, const struct hlsl_reg *src1, const struct hlsl_reg *src2)
-{
-    struct sm1_instruction instr =
-    {
-        .opcode = opcode,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.writemask = dst->writemask,
-        .dst.reg = dst->id,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(src1->writemask),
-        .srcs[0].reg = src1->id,
-        .srcs[1].type = VKD3DSPR_TEMP,
-        .srcs[1].swizzle = hlsl_swizzle_from_writemask(src2->writemask),
-        .srcs[1].reg = src2->id,
-        .src_count = 2,
-    };
-
-    d3dbc_write_instruction(d3dbc, &instr);
-}
-
 static void d3dbc_write_unary_op(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
         const struct hlsl_reg *dst, const struct hlsl_reg *src,
         D3DSHADER_PARAM_SRCMOD_TYPE src_mod, D3DSHADER_PARAM_DSTMOD_TYPE dst_mod)
@@ -2340,6 +2316,8 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_ABS:
         case VKD3DSIH_ADD:
         case VKD3DSIH_CMP:
+        case VKD3DSIH_DP3:
+        case VKD3DSIH_DP4:
         case VKD3DSIH_DSX:
         case VKD3DSIH_DSY:
         case VKD3DSIH_FRC:
@@ -2515,22 +2493,6 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
         case HLSL_OP1_COS_REDUCED:
         case HLSL_OP1_SIN_REDUCED:
             d3dbc_write_sincos(d3dbc, expr->op, &instr->reg, &arg1->reg);
-            break;
-
-        case HLSL_OP2_DOT:
-            switch (arg1->data_type->dimx)
-            {
-                case 4:
-                    d3dbc_write_dot(d3dbc, VKD3D_SM1_OP_DP4, &instr->reg, &arg1->reg, &arg2->reg);
-                    break;
-
-                case 3:
-                    d3dbc_write_dot(d3dbc, VKD3D_SM1_OP_DP3, &instr->reg, &arg1->reg, &arg2->reg);
-                    break;
-
-                default:
-                    vkd3d_unreachable();
-            }
             break;
 
         case HLSL_OP3_DP2ADD:
