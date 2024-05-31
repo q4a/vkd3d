@@ -1960,33 +1960,6 @@ static void sm1_map_src_swizzle(struct sm1_src_register *src, unsigned int map_w
     src->swizzle = hlsl_map_swizzle(src->swizzle, map_writemask);
 }
 
-static void d3dbc_write_dp2add(struct d3dbc_compiler *d3dbc, const struct hlsl_reg *dst,
-        const struct hlsl_reg *src1, const struct hlsl_reg *src2, const struct hlsl_reg *src3)
-{
-    struct sm1_instruction instr =
-    {
-        .opcode = VKD3D_SM1_OP_DP2ADD,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.writemask = dst->writemask,
-        .dst.reg = dst->id,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(src1->writemask),
-        .srcs[0].reg = src1->id,
-        .srcs[1].type = VKD3DSPR_TEMP,
-        .srcs[1].swizzle = hlsl_swizzle_from_writemask(src2->writemask),
-        .srcs[1].reg = src2->id,
-        .srcs[2].type = VKD3DSPR_TEMP,
-        .srcs[2].swizzle = hlsl_swizzle_from_writemask(src3->writemask),
-        .srcs[2].reg = src3->id,
-        .src_count = 3,
-    };
-
-    d3dbc_write_instruction(d3dbc, &instr);
-}
-
 static void d3dbc_write_unary_op(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
         const struct hlsl_reg *dst, const struct hlsl_reg *src,
         D3DSHADER_PARAM_SRCMOD_TYPE src_mod, D3DSHADER_PARAM_DSTMOD_TYPE dst_mod)
@@ -2316,6 +2289,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_ABS:
         case VKD3DSIH_ADD:
         case VKD3DSIH_CMP:
+        case VKD3DSIH_DP2ADD:
         case VKD3DSIH_DP3:
         case VKD3DSIH_DP4:
         case VKD3DSIH_DSX:
@@ -2425,8 +2399,6 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
 {
     struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
     struct hlsl_ir_node *arg1 = expr->operands[0].node;
-    struct hlsl_ir_node *arg2 = expr->operands[1].node;
-    struct hlsl_ir_node *arg3 = expr->operands[2].node;
     struct hlsl_ctx *ctx = d3dbc->ctx;
 
     VKD3D_ASSERT(instr->reg.allocated);
@@ -2450,16 +2422,7 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
         return;
     }
 
-    switch (expr->op)
-    {
-        case HLSL_OP3_DP2ADD:
-            d3dbc_write_dp2add(d3dbc, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
-            break;
-
-        default:
-            hlsl_fixme(ctx, &instr->loc, "SM1 \"%s\" expression.", debug_hlsl_expr_op(expr->op));
-            break;
-    }
+    hlsl_fixme(ctx, &instr->loc, "SM1 \"%s\" expression.", debug_hlsl_expr_op(expr->op));
 }
 
 static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block);
