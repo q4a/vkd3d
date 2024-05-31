@@ -20294,7 +20294,6 @@ static void check_copyable_footprints_(const char *file, unsigned int line, cons
             todo_if(format_is_ds && l->Offset != base_offset + offset)
             ok_(file, line)(l->Offset == base_offset + offset,
                     "Got offset %"PRIu64", expected %"PRIu64".\n", l->Offset, base_offset + offset);
-            todo_if(format_is_ds)
             ok_(file, line)(f->Format == expected_format, "Got format %#x, expected %#x.\n",
                     f->Format, expected_format);
             ok_(file, line)(f->Width == width, "Got width %u, expected %u.\n", f->Width, width);
@@ -20308,11 +20307,8 @@ static void check_copyable_footprints_(const char *file, unsigned int line, cons
             ok_(file, line)(row_counts[i] == row_count, "Got row count %u, expected %u.\n", row_counts[i], row_count);
 
         if (row_sizes)
-        {
-            todo_if(format_is_ds && (plane_idx || format_size(desc->Format) > 4))
             ok_(file, line)(row_sizes[i] == row_size, "Got row size %"PRIu64", expected %u.\n",
                     row_sizes[i], row_size);
-        }
 
         size = max(0, row_count - 1) * row_pitch + row_size;
         size = max(0, depth - 1) * align(size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT * plane_count) + size;
