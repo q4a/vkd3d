@@ -547,6 +547,19 @@ static bool is_typed_uav_format_supported(ID3D12Device *device, DXGI_FORMAT form
     return format_support.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
 }
 
+static bool is_ds_format_supported(ID3D12Device *device, DXGI_FORMAT format)
+{
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT format_support = {0};
+    HRESULT hr;
+
+    format_support.Format = format;
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_FORMAT_SUPPORT,
+            &format_support, sizeof(format_support));
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    return format_support.Support1 & D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL;
+}
+
 static bool are_unaligned_block_textures_supported(ID3D12Device *device)
 {
     D3D12_FEATURE_DATA_D3D12_OPTIONS8 options;
@@ -21021,11 +21034,12 @@ static void test_depth_stencil_sampling(void)
         DXGI_FORMAT depth_view_format;
         DXGI_FORMAT stencil_view_format;
         bool is_mvk_bug;
+        bool is_qualcomm_todo;
     }
     tests[] =
     {
         {DXGI_FORMAT_R32G8X24_TYPELESS, DXGI_FORMAT_D32_FLOAT_S8X24_UINT,
-                DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS, DXGI_FORMAT_X32_TYPELESS_G8X24_UINT},
+                DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS, DXGI_FORMAT_X32_TYPELESS_G8X24_UINT, false, true},
         {DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_D32_FLOAT,
                 DXGI_FORMAT_R32_FLOAT},
         {DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT,
@@ -21117,7 +21131,18 @@ static void test_depth_stencil_sampling(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
+        bool supported = is_ds_format_supported(device, tests[i].dsv_format);
+
         vkd3d_test_push_context("Test %u", i);
+
+        todo_if(tests[i].is_qualcomm_todo && is_qualcomm_device(device))
+        ok(supported, "Depth/stencil format %#x is not supported.\n", tests[i].dsv_format);
+
+        if (!supported)
+        {
+            vkd3d_test_pop_context();
+            continue;
+        }
 
         reset_command_list(command_list, context.allocator);
 
