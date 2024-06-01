@@ -2405,16 +2405,9 @@ static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
 static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
     struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
-    struct hlsl_ir_node *arg1 = expr->operands[0].node;
     struct hlsl_ctx *ctx = d3dbc->ctx;
 
     VKD3D_ASSERT(instr->reg.allocated);
-
-    if (expr->op == HLSL_OP1_REINTERPRET)
-    {
-        d3dbc_write_unary_op(d3dbc, VKD3D_SM1_OP_MOV, &instr->reg, &arg1->reg, 0, 0);
-        return;
-    }
 
     if (expr->op == HLSL_OP1_CAST)
     {
