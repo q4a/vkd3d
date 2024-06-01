@@ -15616,6 +15616,12 @@ static void test_sample_c_lz(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
+        if (is_qualcomm_device(device))
+        {
+            skip("Sampling a cube texture crashes on Qualcomm.\n");
+            break;
+        }
+
         vkd3d_test_push_context("test %u", i);
 
         ps_constant.x = tests[i].d_ref;

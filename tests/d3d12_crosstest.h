@@ -417,6 +417,11 @@ static inline bool is_nvidia_device(ID3D12Device *device)
     return false;
 }
 
+static inline bool is_qualcomm_device(ID3D12Device *device)
+{
+    return false;
+}
+
 static inline bool is_radv_device(ID3D12Device *device)
 {
     return false;
@@ -707,6 +712,14 @@ static inline bool is_nvidia_device(ID3D12Device *device)
 
     get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_NVIDIA_PROPRIETARY_KHR;
+}
+
+static inline bool is_qualcomm_device(ID3D12Device *device)
+{
+    VkPhysicalDeviceDriverPropertiesKHR properties;
+
+    get_driver_properties(device, NULL, &properties);
+    return properties.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY_KHR;
 }
 
 static inline bool is_radv_device(ID3D12Device *device)
