@@ -6684,14 +6684,109 @@ static void sm1_generate_vsir_instr_expr_sincos(struct hlsl_ctx *ctx, struct vsi
     hlsl_replace_node(instr, vsir_instr);
 }
 
+static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_expr *expr)
+{
+    const struct hlsl_type *src_type, *dst_type;
+    const struct hlsl_ir_node *arg1, *instr;
+
+    arg1 = expr->operands[0].node;
+    src_type = arg1->data_type;
+    instr = &expr->node;
+    dst_type = instr->data_type;
+
+    /* Narrowing casts were already lowered. */
+    VKD3D_ASSERT(src_type->dimx == dst_type->dimx);
+
+    switch (dst_type->e.numeric.type)
+    {
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_FLOAT:
+            switch (src_type->e.numeric.type)
+            {
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                case HLSL_TYPE_BOOL:
+                    /* Integrals are internally represented as floats, so no change is necessary.*/
+                case HLSL_TYPE_HALF:
+                case HLSL_TYPE_FLOAT:
+                    sm1_generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_DOUBLE:
+                    hlsl_fixme(ctx, &instr->loc, "SM1 cast from double to float.");
+                    break;
+
+                default:
+                    vkd3d_unreachable();
+            }
+            break;
+
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            switch(src_type->e.numeric.type)
+            {
+                case HLSL_TYPE_HALF:
+                case HLSL_TYPE_FLOAT:
+                    /* A compilation pass turns these into FLOOR+REINTERPRET, so we should not
+                     * reach this case unless we are missing something. */
+                    hlsl_fixme(ctx, &instr->loc, "Unlowered SM1 cast from float to integer.");
+                    break;
+
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                    sm1_generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_BOOL:
+                    hlsl_fixme(ctx, &instr->loc, "SM1 cast from bool to integer.");
+                    break;
+
+                case HLSL_TYPE_DOUBLE:
+                    hlsl_fixme(ctx, &instr->loc, "SM1 cast from double to integer.");
+                    break;
+
+                default:
+                    vkd3d_unreachable();
+            }
+            break;
+
+        case HLSL_TYPE_DOUBLE:
+            hlsl_fixme(ctx, &instr->loc, "SM1 cast to double.");
+            break;
+
+        case HLSL_TYPE_BOOL:
+            /* Casts to bool should have already been lowered. */
+        default:
+            hlsl_fixme(ctx, &expr->node.loc, "SM1 cast from %s to %s.",
+                debug_hlsl_type(ctx, src_type), debug_hlsl_type(ctx, dst_type));
+            break;
+    }
+
+    return false;
+}
+
 static bool sm1_generate_vsir_instr_expr(struct hlsl_ctx *ctx, struct vsir_program *program,
         struct hlsl_ir_expr *expr)
 {
+    struct hlsl_ir_node *instr = &expr->node;
+
+    if (expr->op != HLSL_OP1_REINTERPRET && expr->op != HLSL_OP1_CAST
+            && instr->data_type->e.numeric.type != HLSL_TYPE_FLOAT)
+    {
+        /* These need to be lowered. */
+        hlsl_fixme(ctx, &instr->loc, "SM1 non-float expression.");
+        return false;
+    }
+
     switch (expr->op)
     {
         case HLSL_OP1_ABS:
             sm1_generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_ABS, 0, 0, true);
             break;
+
+        case HLSL_OP1_CAST:
+            return sm1_generate_vsir_instr_expr_cast(ctx, program, expr);
 
         case HLSL_OP1_COS_REDUCED:
             VKD3D_ASSERT(expr->node.reg.writemask == VKD3DSP_WRITEMASK_0);
