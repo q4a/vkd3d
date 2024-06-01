@@ -15506,6 +15506,8 @@ static void test_sample_c_lz(void)
 
     transition_resource_state(command_list, ds.texture,
             D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    transition_resource_state(command_list, ds_offset.texture,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
     memset(&ps_constant, 0, sizeof(ps_constant));
     for (j = 0; j < ARRAY_SIZE(shaders_2d_array); ++j)
