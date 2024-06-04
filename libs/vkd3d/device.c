@@ -2563,7 +2563,9 @@ static void device_init_descriptor_pool_sizes(struct d3d12_device *device)
                 VKD3D_MAX_UAV_CLEAR_DESCRIPTORS_PER_TYPE);
         pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         pool_sizes[1].descriptorCount = pool_sizes[0].descriptorCount;
-        device->vk_pool_count = 2;
+        pool_sizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+        pool_sizes[2].descriptorCount = min(limits->sampler_max_descriptors, D3D12_MAX_LIVE_STATIC_SAMPLERS);
+        device->vk_pool_count = 3;
         return;
     }
 
