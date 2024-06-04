@@ -2162,6 +2162,7 @@ static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
         return;
 
     instr.opcode = info->sm1_opcode;
+    instr.flags = ins->flags;
     instr.has_dst = info->dst_count;
     instr.src_count = info->src_count;
 
@@ -2195,7 +2196,10 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_DP4:
         case VKD3DSIH_DSX:
         case VKD3DSIH_DSY:
+        case VKD3DSIH_ELSE:
+        case VKD3DSIH_ENDIF:
         case VKD3DSIH_FRC:
+        case VKD3DSIH_IFC:
         case VKD3DSIH_MAD:
         case VKD3DSIH_MAX:
         case VKD3DSIH_MIN:
@@ -2299,48 +2303,6 @@ static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
     }
 }
 
-static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block);
-
-static void d3dbc_write_if(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
-{
-    const struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-    const struct hlsl_ir_node *condition;
-    struct sm1_instruction sm1_ifc, sm1_else, sm1_endif;
-
-    condition = iff->condition.node;
-    VKD3D_ASSERT(condition->data_type->dimx == 1 && condition->data_type->dimy == 1);
-
-    sm1_ifc = (struct sm1_instruction)
-    {
-        .opcode = VKD3D_SM1_OP_IFC,
-        .flags = VKD3D_SHADER_REL_OP_NE, /* Make it a "if_ne" instruction. */
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(condition->reg.writemask),
-        .srcs[0].reg = condition->reg.id,
-        .srcs[0].mod = 0,
-
-        .srcs[1].type = VKD3DSPR_TEMP,
-        .srcs[1].swizzle = hlsl_swizzle_from_writemask(condition->reg.writemask),
-        .srcs[1].reg = condition->reg.id,
-        .srcs[1].mod = VKD3DSPSM_NEG,
-
-        .src_count = 2,
-    };
-    d3dbc_write_instruction(d3dbc, &sm1_ifc);
-    d3dbc_write_block(d3dbc, &iff->then_block);
-
-    if (!list_empty(&iff->else_block.instrs))
-    {
-        sm1_else = (struct sm1_instruction){.opcode = VKD3D_SM1_OP_ELSE};
-        d3dbc_write_instruction(d3dbc, &sm1_else);
-        d3dbc_write_block(d3dbc, &iff->else_block);
-    }
-
-    sm1_endif = (struct sm1_instruction){.opcode = VKD3D_SM1_OP_ENDIF};
-    d3dbc_write_instruction(d3dbc, &sm1_endif);
-}
-
 static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block)
 {
     struct vkd3d_shader_instruction *vsir_instr;
@@ -2363,13 +2325,6 @@ static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_bl
         {
             case HLSL_IR_CALL:
                 vkd3d_unreachable();
-
-            case HLSL_IR_IF:
-                if (hlsl_version_ge(ctx, 2, 1))
-                    d3dbc_write_if(d3dbc, instr);
-                else
-                    hlsl_fixme(ctx, &instr->loc, "Flatten \"if\" conditionals branches.");
-                break;
 
             case HLSL_IR_VSIR_INSTRUCTION_REF:
                 vsir_instr_idx = hlsl_ir_vsir_instruction_ref(instr)->vsir_instr_idx;
