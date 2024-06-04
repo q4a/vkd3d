@@ -2204,6 +2204,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_SINCOS:
         case VKD3DSIH_SLT:
         case VKD3DSIH_TEX:
+        case VKD3DSIH_TEXKILL:
         case VKD3DSIH_TEXLDD:
             d3dbc_write_vsir_simple_instruction(d3dbc, ins);
             break;
@@ -2340,35 +2341,6 @@ static void d3dbc_write_if(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_no
     d3dbc_write_instruction(d3dbc, &sm1_endif);
 }
 
-static void d3dbc_write_jump(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
-{
-    const struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
-
-    switch (jump->type)
-    {
-        case HLSL_IR_JUMP_DISCARD_NEG:
-        {
-            struct hlsl_reg *reg = &jump->condition.node->reg;
-
-            struct sm1_instruction sm1_instr =
-            {
-                .opcode = VKD3D_SM1_OP_TEXKILL,
-
-                .dst.type = VKD3DSPR_TEMP,
-                .dst.reg = reg->id,
-                .dst.writemask = reg->writemask,
-                .has_dst = 1,
-            };
-
-            d3dbc_write_instruction(d3dbc, &sm1_instr);
-            break;
-        }
-
-        default:
-            hlsl_fixme(d3dbc->ctx, &jump->node.loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
-    }
-}
-
 static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block)
 {
     struct vkd3d_shader_instruction *vsir_instr;
@@ -2397,10 +2369,6 @@ static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_bl
                     d3dbc_write_if(d3dbc, instr);
                 else
                     hlsl_fixme(ctx, &instr->loc, "Flatten \"if\" conditionals branches.");
-                break;
-
-            case HLSL_IR_JUMP:
-                d3dbc_write_jump(d3dbc, instr);
                 break;
 
             case HLSL_IR_VSIR_INSTRUCTION_REF:

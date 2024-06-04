@@ -7203,6 +7203,42 @@ static void sm1_generate_vsir_instr_store(struct hlsl_ctx *ctx, struct vsir_prog
     hlsl_replace_node(instr, vsir_instr);
 }
 
+static void sm1_generate_vsir_instr_jump(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_jump *jump)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct hlsl_ir_node *condition = jump->condition.node;
+    struct hlsl_ir_node *instr = &jump->node;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_instruction *ins;
+    struct hlsl_ir_node *vsir_instr;
+
+    if (jump->type == HLSL_IR_JUMP_DISCARD_NEG)
+    {
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_TEXKILL, 1, 0)))
+            return;
+
+        dst_param = &ins->dst[0];
+        vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+        dst_param->reg.idx[0].offset = condition->reg.id;
+        dst_param->write_mask = condition->reg.writemask;
+
+        if (!(vsir_instr = hlsl_new_vsir_instruction_ref(ctx,
+                instructions->count - 1, instr->data_type, NULL, &instr->loc)))
+        {
+            ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+            return;
+        }
+
+        list_add_before(&instr->entry, &vsir_instr->entry);
+        hlsl_replace_node(instr, vsir_instr);
+    }
+    else
+    {
+        hlsl_fixme(ctx, &instr->loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
+    }
+}
+
 static bool sm1_generate_vsir_instr(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct vsir_program *program = context;
@@ -7215,6 +7251,10 @@ static bool sm1_generate_vsir_instr(struct hlsl_ctx *ctx, struct hlsl_ir_node *i
 
         case HLSL_IR_EXPR:
             return sm1_generate_vsir_instr_expr(ctx, program, hlsl_ir_expr(instr));
+
+        case HLSL_IR_JUMP:
+            sm1_generate_vsir_instr_jump(ctx, program, hlsl_ir_jump(instr));
+            return true;
 
         case HLSL_IR_LOAD:
             sm1_generate_vsir_instr_load(ctx, program, hlsl_ir_load(instr));
