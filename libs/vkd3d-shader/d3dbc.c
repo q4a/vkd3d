@@ -2203,6 +2203,8 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_MUL:
         case VKD3DSIH_SINCOS:
         case VKD3DSIH_SLT:
+        case VKD3DSIH_TEX:
+        case VKD3DSIH_TEXLDD:
             d3dbc_write_vsir_simple_instruction(d3dbc, ins);
             break;
 
@@ -2367,77 +2369,6 @@ static void d3dbc_write_jump(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
     }
 }
 
-static void d3dbc_write_resource_load(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
-{
-    const struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
-    struct hlsl_ir_node *coords = load->coords.node;
-    struct hlsl_ir_node *ddx = load->ddx.node;
-    struct hlsl_ir_node *ddy = load->ddy.node;
-    unsigned int sampler_offset, reg_id;
-    struct hlsl_ctx *ctx = d3dbc->ctx;
-    struct sm1_instruction sm1_instr;
-
-    sampler_offset = hlsl_offset_from_deref_safe(ctx, &load->resource);
-    reg_id = load->resource.var->regs[HLSL_REGSET_SAMPLERS].index + sampler_offset;
-
-    sm1_instr = (struct sm1_instruction)
-    {
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.reg = instr->reg.id,
-        .dst.writemask = instr->reg.writemask,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].reg = coords->reg.id,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(coords->reg.writemask),
-
-        .srcs[1].type = VKD3DSPR_COMBINED_SAMPLER,
-        .srcs[1].reg = reg_id,
-        .srcs[1].swizzle = hlsl_swizzle_from_writemask(VKD3DSP_WRITEMASK_ALL),
-
-        .src_count = 2,
-    };
-
-    switch (load->load_type)
-    {
-        case HLSL_RESOURCE_SAMPLE:
-            sm1_instr.opcode = VKD3D_SM1_OP_TEX;
-            break;
-
-        case HLSL_RESOURCE_SAMPLE_PROJ:
-            sm1_instr.opcode = VKD3D_SM1_OP_TEX;
-            sm1_instr.opcode |= VKD3DSI_TEXLD_PROJECT << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
-            break;
-
-        case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
-            sm1_instr.opcode = VKD3D_SM1_OP_TEX;
-            sm1_instr.opcode |= VKD3DSI_TEXLD_BIAS << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
-            break;
-
-        case HLSL_RESOURCE_SAMPLE_GRAD:
-            sm1_instr.opcode = VKD3D_SM1_OP_TEXLDD;
-
-            sm1_instr.srcs[2].type = VKD3DSPR_TEMP;
-            sm1_instr.srcs[2].reg = ddx->reg.id;
-            sm1_instr.srcs[2].swizzle = hlsl_swizzle_from_writemask(ddx->reg.writemask);
-
-            sm1_instr.srcs[3].type = VKD3DSPR_TEMP;
-            sm1_instr.srcs[3].reg = ddy->reg.id;
-            sm1_instr.srcs[3].swizzle = hlsl_swizzle_from_writemask(ddy->reg.writemask);
-
-            sm1_instr.src_count += 2;
-            break;
-
-        default:
-            hlsl_fixme(ctx, &instr->loc, "Resource load type %u.", load->load_type);
-            return;
-    }
-
-    VKD3D_ASSERT(instr->reg.allocated);
-
-    d3dbc_write_instruction(d3dbc, &sm1_instr);
-}
-
 static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block)
 {
     struct vkd3d_shader_instruction *vsir_instr;
@@ -2470,10 +2401,6 @@ static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_bl
 
             case HLSL_IR_JUMP:
                 d3dbc_write_jump(d3dbc, instr);
-                break;
-
-            case HLSL_IR_RESOURCE_LOAD:
-                d3dbc_write_resource_load(d3dbc, instr);
                 break;
 
             case HLSL_IR_VSIR_INSTRUCTION_REF:
