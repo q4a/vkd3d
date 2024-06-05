@@ -326,8 +326,6 @@ enum hlsl_ir_node_type
 
     HLSL_IR_COMPILE,
     HLSL_IR_STATEBLOCK_CONSTANT,
-
-    HLSL_IR_VSIR_INSTRUCTION_REF,
 };
 
 /* Common data for every type of IR instruction node. */
@@ -904,16 +902,6 @@ struct hlsl_ir_stateblock_constant
     char *name;
 };
 
-/* A vkd3d_shader_instruction that can be inserted in a hlsl_block.
- * Only used for the HLSL IR to vsir translation, might be removed once this translation is complete. */
-struct hlsl_ir_vsir_instruction_ref
-{
-    struct hlsl_ir_node node;
-
-    /* Index to a vkd3d_shader_instruction within a vkd3d_shader_instruction_array in a vsir_program. */
-    unsigned int vsir_instr_idx;
-};
-
 struct hlsl_scope
 {
     /* Item entry for hlsl_ctx.scopes. */
@@ -1218,12 +1206,6 @@ static inline struct hlsl_ir_stateblock_constant *hlsl_ir_stateblock_constant(co
 {
     VKD3D_ASSERT(node->type == HLSL_IR_STATEBLOCK_CONSTANT);
     return CONTAINING_RECORD(node, struct hlsl_ir_stateblock_constant, node);
-}
-
-static inline struct hlsl_ir_vsir_instruction_ref *hlsl_ir_vsir_instruction_ref(const struct hlsl_ir_node *node)
-{
-    VKD3D_ASSERT(node->type == HLSL_IR_VSIR_INSTRUCTION_REF);
-    return CONTAINING_RECORD(node, struct hlsl_ir_vsir_instruction_ref, node);
 }
 
 static inline void hlsl_block_init(struct hlsl_block *block)
@@ -1539,9 +1521,6 @@ struct hlsl_ir_switch_case *hlsl_new_switch_case(struct hlsl_ctx *ctx, unsigned 
         struct hlsl_block *body, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_switch(struct hlsl_ctx *ctx, struct hlsl_ir_node *selector,
         struct list *cases, const struct vkd3d_shader_location *loc);
-
-struct hlsl_ir_node *hlsl_new_vsir_instruction_ref(struct hlsl_ctx *ctx, unsigned int vsir_instr_idx,
-        struct hlsl_type *type, const struct hlsl_reg *reg, const struct vkd3d_shader_location *loc);
 
 void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5);

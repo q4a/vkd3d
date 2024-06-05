@@ -2303,39 +2303,13 @@ static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
     }
 }
 
-static void d3dbc_write_block(struct d3dbc_compiler *d3dbc, const struct hlsl_block *block)
+static void d3dbc_write_program_instructions(struct d3dbc_compiler *d3dbc)
 {
-    struct vkd3d_shader_instruction *vsir_instr;
-    struct hlsl_ctx *ctx = d3dbc->ctx;
-    const struct hlsl_ir_node *instr;
-    unsigned int vsir_instr_idx;
+    struct vsir_program *program = d3dbc->program;
+    unsigned int i;
 
-    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
-    {
-        if (instr->data_type)
-        {
-            if (instr->data_type->class != HLSL_CLASS_SCALAR && instr->data_type->class != HLSL_CLASS_VECTOR)
-            {
-                hlsl_fixme(ctx, &instr->loc, "Class %#x should have been lowered or removed.", instr->data_type->class);
-                break;
-            }
-        }
-
-        switch (instr->type)
-        {
-            case HLSL_IR_CALL:
-                vkd3d_unreachable();
-
-            case HLSL_IR_VSIR_INSTRUCTION_REF:
-                vsir_instr_idx = hlsl_ir_vsir_instruction_ref(instr)->vsir_instr_idx;
-                vsir_instr = &d3dbc->program->instructions.elements[vsir_instr_idx];
-                d3dbc_write_vsir_instruction(d3dbc, vsir_instr);
-                break;
-
-            default:
-                hlsl_fixme(ctx, &instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
-        }
-    }
+    for (i = 0; i < program->instructions.count; ++i)
+        d3dbc_write_vsir_instruction(d3dbc, &program->instructions.elements[i]);
 }
 
 /* OBJECTIVE: Stop relying on ctx and entry_func on this function, receiving
@@ -2376,7 +2350,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     bytecode_put_bytes(buffer, ctab->code, ctab->size);
 
     d3dbc_write_semantic_dcls(&d3dbc);
-    d3dbc_write_block(&d3dbc, &entry_func->body);
+    d3dbc_write_program_instructions(&d3dbc);
 
     put_u32(buffer, VKD3D_SM1_OP_END);
 

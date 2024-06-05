@@ -1680,22 +1680,6 @@ struct hlsl_ir_node *hlsl_new_switch(struct hlsl_ctx *ctx, struct hlsl_ir_node *
     return &s->node;
 }
 
-struct hlsl_ir_node *hlsl_new_vsir_instruction_ref(struct hlsl_ctx *ctx, unsigned int vsir_instr_idx,
-        struct hlsl_type *type, const struct hlsl_reg *reg, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_vsir_instruction_ref *vsir_instr;
-
-    if (!(vsir_instr = hlsl_alloc(ctx, sizeof(*vsir_instr))))
-        return NULL;
-    init_node(&vsir_instr->node, HLSL_IR_VSIR_INSTRUCTION_REF, type, loc);
-    vsir_instr->vsir_instr_idx = vsir_instr_idx;
-
-    if (reg)
-        vsir_instr->node.reg = *reg;
-
-    return &vsir_instr->node;
-}
-
 struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc)
 {
@@ -2442,9 +2426,6 @@ static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
 
         case HLSL_IR_STATEBLOCK_CONSTANT:
             return clone_stateblock_constant(ctx, map, hlsl_ir_stateblock_constant(instr));
-
-        case HLSL_IR_VSIR_INSTRUCTION_REF:
-            vkd3d_unreachable();
     }
 
     vkd3d_unreachable();
@@ -2860,7 +2841,6 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
 
         [HLSL_IR_COMPILE]             = "HLSL_IR_COMPILE",
         [HLSL_IR_STATEBLOCK_CONSTANT] = "HLSL_IR_STATEBLOCK_CONSTANT",
-        [HLSL_IR_VSIR_INSTRUCTION_REF] = "HLSL_IR_VSIR_INSTRUCTION_REF",
     };
 
     if (type >= ARRAY_SIZE(names))
@@ -3442,11 +3422,6 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
         case HLSL_IR_STATEBLOCK_CONSTANT:
             dump_ir_stateblock_constant(buffer, hlsl_ir_stateblock_constant(instr));
             break;
-
-        case HLSL_IR_VSIR_INSTRUCTION_REF:
-            vkd3d_string_buffer_printf(buffer, "vsir_program instruction %u",
-                    hlsl_ir_vsir_instruction_ref(instr)->vsir_instr_idx);
-            break;
     }
 }
 
@@ -3743,10 +3718,6 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_STATEBLOCK_CONSTANT:
             free_ir_stateblock_constant(hlsl_ir_stateblock_constant(node));
-            break;
-
-        case HLSL_IR_VSIR_INSTRUCTION_REF:
-            vkd3d_free(hlsl_ir_vsir_instruction_ref(node));
             break;
     }
 }

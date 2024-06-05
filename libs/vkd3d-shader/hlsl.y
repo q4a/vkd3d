@@ -632,8 +632,6 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
                 hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "Expected literal expression.");
                 break;
-            case HLSL_IR_VSIR_INSTRUCTION_REF:
-                vkd3d_unreachable();
         }
     }
 
