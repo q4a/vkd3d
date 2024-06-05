@@ -4599,6 +4599,7 @@ static void sort_uniforms_by_numeric_bind_count(struct hlsl_ctx *ctx)
 
 static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
+    struct register_allocator allocator_used = {0};
     struct register_allocator allocator = {0};
     struct hlsl_ir_var *var;
 
@@ -4607,6 +4608,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+        unsigned int bind_count = var->bind_count[HLSL_REGSET_NUMERIC];
 
         if (!var->is_uniform || reg_size == 0)
             continue;
@@ -4619,12 +4621,15 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
             assert(reg_size % 4 == 0);
             for (i = 0; i < reg_size / 4; ++i)
             {
-                if (get_available_writemask(&allocator, 1, UINT_MAX, reg_idx + i) != VKD3DSP_WRITEMASK_ALL)
+                if (i < bind_count)
                 {
-                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
-                            "Overlapping register() reservations on 'c%u'.", reg_idx + i);
+                    if (get_available_writemask(&allocator_used, 1, UINT_MAX, reg_idx + i) != VKD3DSP_WRITEMASK_ALL)
+                    {
+                        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                                "Overlapping register() reservations on 'c%u'.", reg_idx + i);
+                    }
+                    record_allocation(ctx, &allocator_used, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX);
                 }
-
                 record_allocation(ctx, &allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX);
             }
 
@@ -4636,6 +4641,8 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
                     debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
     }
+
+    vkd3d_free(allocator_used.allocations);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
