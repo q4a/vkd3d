@@ -1474,10 +1474,6 @@ struct d3dbc_compiler
     struct vkd3d_bytecode_buffer buffer;
     struct vkd3d_shader_message_context *message_context;
     bool failed;
-
-    /* OBJECTIVE: Store all the required information in the other fields so
-     * that this hlsl_ctx is no longer necessary. */
-    struct hlsl_ctx *ctx;
 };
 
 static uint32_t sm1_version(enum vkd3d_shader_type type, unsigned int major, unsigned int minor)
@@ -2312,21 +2308,15 @@ static void d3dbc_write_program_instructions(struct d3dbc_compiler *d3dbc)
         d3dbc_write_vsir_instruction(d3dbc, &program->instructions.elements[i]);
 }
 
-/* OBJECTIVE: Stop relying on ctx and entry_func on this function, receiving
- * data from the other parameters instead, so it can be removed as an argument
- * and be declared in vkd3d_shader_private.h and used without relying on HLSL
- * IR structs. */
 int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, const struct vkd3d_shader_code *ctab,
-        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
-        struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_version *version = &program->shader_version;
     struct d3dbc_compiler d3dbc = {0};
     struct vkd3d_bytecode_buffer *buffer = &d3dbc.buffer;
     int result;
 
-    d3dbc.ctx = ctx;
     d3dbc.program = program;
     d3dbc.message_context = message_context;
     switch (version->type)
@@ -2354,7 +2344,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
 
     put_u32(buffer, VKD3D_SM1_OP_END);
 
-    result = ctx->result;
+    result = VKD3D_OK;
     if (buffer->status)
         result = buffer->status;
     if (d3dbc.failed)
