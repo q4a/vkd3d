@@ -36,6 +36,15 @@ sampler sam
 float4 main() : sv_target { return 0; }
 
 
+[pixel shader fail(sm<6) todo]
+sampler sam
+{
+    Setblendstate(1, 2, 3); // Test case-sensitivity.
+};
+
+float4 main() : sv_target { return 0; }
+
+
 % It is allowed to use functions together with assignment syntax.
 [pixel shader]
 sampler sam
