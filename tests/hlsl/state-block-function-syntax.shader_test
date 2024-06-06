@@ -3,16 +3,25 @@
 [pixel shader todo]
 sampler sam
 {
-    SetBlendState(foo, bar, baz);      // 3 parameters
-    SetDepthStencilState(foo, 2);      // 2 parameters
-    SetRasterizerState(foo);           // 1 parameter
-    SetVertexShader(vs);               // 1 parameter
-    SetDomainShader(ds);               // 1 paramter
-    SetHullShader(100);                // 1 parameter
-    SetGeometryShader(foo + bar);      // 1 parameter
-    SetPixelShader(ps1);               // 1 parameter
-    SetComputeShader("random string"); // 1 parameter
+    SetBlendState(foo, bar, baz); // 3 parameters
+    SetDepthStencilState(foo, 2); // 2 parameters
+    SetRasterizerState(foo);      // 1 parameter
+    SetVertexShader(vs);          // 1 parameter
+    SetDomainShader(ds);          // 1 paramter
+    SetHullShader(100);           // 1 parameter
+    SetGeometryShader(foo + bar); // 1 parameter
+    SetPixelShader(ps1);          // 1 parameter
+    SetComputeShader(ARG);        // 1 parameter
     OMSetRenderTargets(RTV0, RTV1, RTV2, RTV3, RTV4, RTV5, RTV6, RTV7, DSV); // 2 to 9 parameters
+};
+
+float4 main() : sv_target { return 0; }
+
+
+[pixel shader todo]
+sampler sam
+{
+    SetComputeShader("random string");
 };
 
 float4 main() : sv_target { return 0; }
