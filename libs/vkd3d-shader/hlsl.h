@@ -1293,6 +1293,9 @@ bool hlsl_clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block, const 
 void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func);
 void hlsl_dump_var_default_values(const struct hlsl_ir_var *var);
 
+bool hlsl_validate_state_block_entry(struct hlsl_ctx *ctx, struct hlsl_state_block_entry *entry,
+        const struct vkd3d_shader_location *loc);
+
 void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body);
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out);

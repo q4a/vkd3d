@@ -56,6 +56,70 @@ static void string_storage_destroy(struct rb_entry *entry, void *context)
     vkd3d_free(string_entry);
 }
 
+struct state_block_function_info
+{
+    const char *name;
+    unsigned int min_args, max_args;
+};
+
+static const struct state_block_function_info *get_state_block_function_info(const char *name)
+{
+    static const struct state_block_function_info valid_functions[] =
+    {
+        {"SetBlendState",        3, 3},
+        {"SetDepthStencilState", 2, 2},
+        {"SetRasterizerState",   1, 1},
+        {"SetVertexShader",      1, 1},
+        {"SetDomainShader",      1, 1},
+        {"SetHullShader",        1, 1},
+        {"SetGeometryShader",    1, 1},
+        {"SetPixelShader",       1, 1},
+        {"SetComputeShader",     1, 1},
+        {"OMSetRenderTargets",   2, 9},
+    };
+
+    for (unsigned int i = 0; i < ARRAY_SIZE(valid_functions); ++i)
+    {
+        if (!strcmp(name, valid_functions[i].name))
+            return &valid_functions[i];
+    }
+    return NULL;
+}
+
+bool hlsl_validate_state_block_entry(struct hlsl_ctx *ctx, struct hlsl_state_block_entry *entry,
+        const struct vkd3d_shader_location *loc)
+{
+    if (entry->is_function_call)
+    {
+        const struct state_block_function_info *info = get_state_block_function_info(entry->name);
+
+        if (!info)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_STATE_BLOCK_ENTRY,
+                    "Invalid state block function '%s'.", entry->name);
+            return false;
+        }
+        if (entry->args_count < info->min_args || entry->args_count > info->max_args)
+        {
+            if (info->min_args == info->max_args)
+            {
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_STATE_BLOCK_ENTRY,
+                        "Invalid argument count for state block function '%s' (expected %u).",
+                        entry->name, info->min_args);
+            }
+            else
+            {
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_STATE_BLOCK_ENTRY,
+                        "Invalid argument count for state block function '%s' (expected from %u to %u).",
+                        entry->name, info->min_args, info->max_args);
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
 struct fx_write_context;
 
 struct fx_write_context_ops

@@ -7405,6 +7405,8 @@ state_block:
                 hlsl_src_from_node(&entry->args[i], $4.args[i]);
             vkd3d_free($4.args);
 
+            hlsl_validate_state_block_entry(ctx, entry, &@4);
+
             $$ = $1;
             state_block_add_entry($$, entry);
         }
