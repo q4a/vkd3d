@@ -458,44 +458,96 @@ enum vkd3d_shader_binding_flag
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_BINDING_FLAG),
 };
 
+/**
+ * The manner in which a parameter value is provided to the shader, used in
+ * struct vkd3d_shader_parameter and struct vkd3d_shader_parameter1.
+ */
 enum vkd3d_shader_parameter_type
 {
     VKD3D_SHADER_PARAMETER_TYPE_UNKNOWN,
+    /** The parameter value is embedded directly in the shader. */
     VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT,
+    /**
+     * The parameter value is provided to the shader via a specialization
+     * constant. This value is only supported for the SPIR-V target type.
+     */
     VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_TYPE),
 };
 
+/**
+ * The format of data provided to the shader, used in
+ * struct vkd3d_shader_parameter and struct vkd3d_shader_parameter1.
+ */
 enum vkd3d_shader_parameter_data_type
 {
     VKD3D_SHADER_PARAMETER_DATA_TYPE_UNKNOWN,
+    /** The parameter is provided as a 32-bit unsigned integer. */
     VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_DATA_TYPE),
 };
 
+/**
+ * Names a specific shader parameter, used in
+ * struct vkd3d_shader_parameter and struct vkd3d_shader_parameter1.
+ */
 enum vkd3d_shader_parameter_name
 {
     VKD3D_SHADER_PARAMETER_NAME_UNKNOWN,
+    /**
+     * The sample count of the framebuffer, as returned by the HLSL function
+     * GetRenderTargetSampleCount() or the GLSL builtin gl_NumSamples.
+     *
+     * This parameter should be specified when compiling to SPIR-V, which
+     * provides no builtin ability to query this information from the shader.
+     *
+     * The default value is 1.
+     */
     VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_NAME),
 };
 
+/**
+ * The value of an immediate constant parameter, used in
+ * struct vkd3d_shader_parameter and struct vkd3d_shader_parameter1.
+ */
 struct vkd3d_shader_parameter_immediate_constant
 {
     union
     {
+        /**
+         * The value if the parameter's data type is
+         * VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32.
+         */
         uint32_t u32;
     } u;
 };
 
+/**
+ * The linkage of a specialization constant parameter, used in
+ * struct vkd3d_shader_parameter and struct vkd3d_shader_parameter1.
+ */
 struct vkd3d_shader_parameter_specialization_constant
 {
+    /** The ID of the specialization constant. */
     uint32_t id;
 };
 
+/**
+ * An individual shader parameter.
+ *
+ * This structure is an earlier version of struct vkd3d_shader_parameter1
+ * which supports fewer parameter types;
+ * refer to that structure for usage information.
+ *
+ * Only the following types may be used with this structure:
+ *
+ * - VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT
+ * - VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT
+ */
 struct vkd3d_shader_parameter
 {
     enum vkd3d_shader_parameter_name name;
@@ -508,14 +560,45 @@ struct vkd3d_shader_parameter
     } u;
 };
 
+/**
+ * An individual shader parameter.
+ *
+ * This structure is used in struct vkd3d_shader_parameter_info; see there for
+ * explanation of shader parameters.
+ *
+ * For example, to specify the rasterizer sample count to the shader via an
+ * unsigned integer specialization constant with ID 3,
+ * set the following members:
+ *
+ * - \a name = VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT
+ * - \a type = VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT
+ * - \a data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32
+ * - \a u.specialization_constant.id = 3
+ *
+ * This structure is an extended version of struct vkd3d_shader_parameter.
+ */
 struct vkd3d_shader_parameter1
 {
+    /** The builtin parameter to be mapped. */
     enum vkd3d_shader_parameter_name name;
+    /** How the parameter will be provided to the shader. */
     enum vkd3d_shader_parameter_type type;
+    /**
+     * The data type of the supplied parameter, which determines how it is to
+     * be interpreted.
+     */
     enum vkd3d_shader_parameter_data_type data_type;
     union
     {
+        /**
+         * Additional information if \a type is
+         * VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT.
+         */
         struct vkd3d_shader_parameter_immediate_constant immediate_constant;
+        /**
+         * Additional information if \a type is
+         * VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT.
+         */
         struct vkd3d_shader_parameter_specialization_constant specialization_constant;
         void *_pointer_pad;
         uint32_t _pad[4];
