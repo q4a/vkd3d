@@ -105,6 +105,11 @@ enum vkd3d_shader_structure_type
      * \since 1.10
      */
     VKD3D_SHADER_STRUCTURE_TYPE_SCAN_COMBINED_RESOURCE_SAMPLER_INFO,
+    /**
+     * The structure is a vkd3d_shader_parameter_info structure.
+     * \since 1.13
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_PARAMETER_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
@@ -500,6 +505,20 @@ struct vkd3d_shader_parameter
     {
         struct vkd3d_shader_parameter_immediate_constant immediate_constant;
         struct vkd3d_shader_parameter_specialization_constant specialization_constant;
+    } u;
+};
+
+struct vkd3d_shader_parameter1
+{
+    enum vkd3d_shader_parameter_name name;
+    enum vkd3d_shader_parameter_type type;
+    enum vkd3d_shader_parameter_data_type data_type;
+    union
+    {
+        struct vkd3d_shader_parameter_immediate_constant immediate_constant;
+        struct vkd3d_shader_parameter_specialization_constant specialization_constant;
+        void *_pointer_pad;
+        uint32_t _pad[4];
     } u;
 };
 
@@ -1994,6 +2013,44 @@ struct vkd3d_shader_varying_map_info
     unsigned int varying_count;
 };
 
+/**
+ * Interface information regarding a builtin shader parameter.
+ *
+ * Like compile options specified with struct vkd3d_shader_compile_option,
+ * parameters are used to specify certain values which are not part of the
+ * source shader bytecode but which need to be specified in the shader bytecode
+ * in the target format.
+ * Unlike struct vkd3d_shader_compile_option, however, this structure allows
+ * parameters to be specified in a variety of different ways, as described by
+ * enum vkd3d_shader_parameter_type.
+ *
+ * This structure is an extended version of struct vkd3d_shader_parameter as
+ * used in struct vkd3d_shader_spirv_target_info, which allows more parameter
+ * types to be used, and also allows specifying parameters when compiling
+ * shaders to target types other than SPIR-V. If this structure is chained
+ * along with vkd3d_shader_spirv_target_info, any parameters specified in the
+ * latter structure are ignored.
+ *
+ * This structure is passed to vkd3d_shader_compile() and extends
+ * vkd3d_shader_compile_info.
+ *
+ * This structure contains only input parameters.
+ *
+ * \since 1.13
+ */
+struct vkd3d_shader_parameter_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_PARAMETER_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /** Pointer to an array of dynamic parameters for this shader instance. */
+    const struct vkd3d_shader_parameter1 *parameters;
+    /** Size, in elements, of \ref parameters. */
+    unsigned int parameter_count;
+};
+
 #ifdef LIBVKD3D_SHADER_SOURCE
 # define VKD3D_SHADER_API VKD3D_EXPORT
 #else
@@ -2077,6 +2134,7 @@ VKD3D_SHADER_API const enum vkd3d_shader_target_type *vkd3d_shader_get_supported
  * - vkd3d_shader_descriptor_offset_info
  * - vkd3d_shader_hlsl_source_info
  * - vkd3d_shader_interface_info
+ * - vkd3d_shader_parameter_info
  * - vkd3d_shader_preprocess_info
  * - vkd3d_shader_scan_combined_resource_sampler_info
  * - vkd3d_shader_scan_descriptor_info

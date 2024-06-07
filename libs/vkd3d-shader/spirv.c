@@ -2418,6 +2418,8 @@ struct spirv_compiler
     uint32_t *descriptor_offset_ids;
     struct vkd3d_push_constant_buffer_binding *push_constants;
     const struct vkd3d_shader_spirv_target_info *spirv_target_info;
+    const struct vkd3d_shader_parameter1 *parameters;
+    unsigned int parameter_count;
 
     bool prolog_emitted;
     struct shader_signature input_signature;
@@ -3290,16 +3292,15 @@ static uint32_t spirv_compiler_emit_array_variable(struct spirv_compiler *compil
     return vkd3d_spirv_build_op_variable(builder, stream, ptr_type_id, storage_class, 0);
 }
 
-static const struct vkd3d_shader_parameter *spirv_compiler_get_shader_parameter(
+static const struct vkd3d_shader_parameter1 *spirv_compiler_get_shader_parameter(
         struct spirv_compiler *compiler, enum vkd3d_shader_parameter_name name)
 {
-    const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
     unsigned int i;
 
-    for (i = 0; info && i < info->parameter_count; ++i)
+    for (i = 0; i < compiler->parameter_count; ++i)
     {
-        if (info->parameters[i].name == name)
-            return &info->parameters[i];
+        if (compiler->parameters[i].name == name)
+            return &compiler->parameters[i];
     }
 
     return NULL;
@@ -3396,7 +3397,7 @@ static uint32_t spirv_compiler_get_spec_constant(struct spirv_compiler *compiler
 static uint32_t spirv_compiler_emit_uint_shader_parameter(struct spirv_compiler *compiler,
         enum vkd3d_shader_parameter_name name)
 {
-    const struct vkd3d_shader_parameter *parameter;
+    const struct vkd3d_shader_parameter1 *parameter;
 
     if (!(parameter = spirv_compiler_get_shader_parameter(compiler, name)))
     {
@@ -10569,6 +10570,9 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
         spirv_compiler_allocate_ssa_register_ids(compiler, program->ssa_count);
 
     spirv_compiler_emit_descriptor_declarations(compiler);
+
+    compiler->parameter_count = program->parameter_count;
+    compiler->parameters = program->parameters;
 
     if (program->block_count && !spirv_compiler_init_blocks(compiler, program->block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;

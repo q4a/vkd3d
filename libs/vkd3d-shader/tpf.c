@@ -2493,7 +2493,7 @@ fail:
 }
 
 static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, struct vsir_program *program,
-        const uint32_t *byte_code, size_t byte_code_size, const char *source_name,
+        const uint32_t *byte_code, size_t byte_code_size, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_version version;
@@ -2552,9 +2552,9 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, struct vsir_pro
     version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
 
     /* Estimate instruction count to avoid reallocation in most shaders. */
-    if (!vsir_program_init(program, &version, token_count / 7u + 20))
+    if (!vsir_program_init(program, compile_info, &version, token_count / 7u + 20))
         return false;
-    vkd3d_shader_parser_init(&sm4->p, program, message_context, source_name);
+    vkd3d_shader_parser_init(&sm4->p, program, message_context, compile_info->source_name);
     sm4->ptr = sm4->start;
 
     init_sm4_lookup_tables(&sm4->lookup);
@@ -2651,7 +2651,7 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
     }
 
     if (!shader_sm4_init(&sm4, program, dxbc_desc.byte_code, dxbc_desc.byte_code_size,
-            compile_info->source_name, message_context))
+            compile_info, message_context))
     {
         WARN("Failed to initialise shader parser.\n");
         free_dxbc_shader_desc(&dxbc_desc);

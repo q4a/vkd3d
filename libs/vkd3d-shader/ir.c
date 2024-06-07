@@ -19,9 +19,73 @@
 #include "vkd3d_shader_private.h"
 #include "vkd3d_types.h"
 
-bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve)
+static int convert_parameter_info(const struct vkd3d_shader_compile_info *compile_info,
+        unsigned int *ret_count, const struct vkd3d_shader_parameter1 **ret_parameters)
+{
+    const struct vkd3d_shader_spirv_target_info *spirv_info;
+    struct vkd3d_shader_parameter1 *parameters;
+
+    *ret_count = 0;
+    *ret_parameters = NULL;
+
+    if (!(spirv_info = vkd3d_find_struct(compile_info->next, SPIRV_TARGET_INFO)) || !spirv_info->parameter_count)
+        return VKD3D_OK;
+
+    if (!(parameters = vkd3d_calloc(spirv_info->parameter_count, sizeof(*parameters))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    for (unsigned int i = 0; i < spirv_info->parameter_count; ++i)
+    {
+        const struct vkd3d_shader_parameter *src = &spirv_info->parameters[i];
+        struct vkd3d_shader_parameter1 *dst = &parameters[i];
+
+        dst->name = src->name;
+        dst->type = src->type;
+        dst->data_type = src->data_type;
+
+        if (src->type == VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)
+        {
+            dst->u.immediate_constant = src->u.immediate_constant;
+        }
+        else if (src->type == VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT)
+        {
+            dst->u.specialization_constant = src->u.specialization_constant;
+        }
+        else
+        {
+            ERR("Invalid parameter type %#x.\n", src->type);
+            return VKD3D_ERROR_INVALID_ARGUMENT;
+        }
+    }
+
+    *ret_count = spirv_info->parameter_count;
+    *ret_parameters = parameters;
+
+    return VKD3D_OK;
+}
+
+bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
+        const struct vkd3d_shader_version *version, unsigned int reserve)
 {
     memset(program, 0, sizeof(*program));
+
+    if (compile_info)
+    {
+        const struct vkd3d_shader_parameter_info *parameter_info;
+
+        if ((parameter_info = vkd3d_find_struct(compile_info->next, PARAMETER_INFO)))
+        {
+            program->parameter_count = parameter_info->parameter_count;
+            program->parameters = parameter_info->parameters;
+        }
+        else
+        {
+            if (convert_parameter_info(compile_info, &program->parameter_count, &program->parameters) < 0)
+                return false;
+            program->free_parameters = true;
+        }
+    }
+
     program->shader_version = *version;
     return shader_instruction_array_init(&program->instructions, reserve);
 }
@@ -30,6 +94,8 @@ void vsir_program_cleanup(struct vsir_program *program)
 {
     size_t i;
 
+    if (program->free_parameters)
+        vkd3d_free((void *)program->parameters);
     for (i = 0; i < program->block_name_count; ++i)
         vkd3d_free((void *)program->block_names[i]);
     vkd3d_free(program->block_names);
