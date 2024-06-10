@@ -94,6 +94,7 @@ struct fx_write_context
     uint32_t texture_count;
     uint32_t uav_count;
     uint32_t sampler_state_count;
+    uint32_t depth_stencil_state_count;
     int status;
 
     bool child_effect;
@@ -402,6 +403,9 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         case HLSL_CLASS_UAV:
             return uav_type_names[type->sampler_dim];
 
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
+            return "DepthStencilState";
+
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
             return "DepthStencilView";
 
@@ -446,6 +450,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             put_u32_unaligned(buffer, 1);
             break;
 
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
@@ -556,6 +561,10 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     else if (type->class == HLSL_CLASS_VERTEX_SHADER)
     {
         put_u32_unaligned(buffer, 6);
+    }
+    else if (type->class == HLSL_CLASS_DEPTH_STENCIL_STATE)
+    {
+        put_u32_unaligned(buffer, 3);
     }
     else if (hlsl_is_numeric_type(type))
     {
@@ -854,6 +863,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
             hlsl_fixme(ctx, loc, "Write fx 2.0 parameter class %#x.", type->class);
             return false;
 
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
@@ -1177,6 +1187,30 @@ static void fold_state_value(struct hlsl_ctx *ctx, struct hlsl_state_block_entry
     } while (progress);
 }
 
+enum state_property_component_type
+{
+    FX_BOOL,
+    FX_FLOAT,
+    FX_UINT,
+    FX_UINT8,
+};
+
+static inline enum hlsl_base_type hlsl_type_from_fx_type(enum state_property_component_type type)
+{
+    switch (type)
+    {
+        case FX_BOOL:
+            return HLSL_TYPE_BOOL;
+        case FX_FLOAT:
+            return HLSL_TYPE_FLOAT;
+        case FX_UINT:
+        case FX_UINT8:
+            return HLSL_TYPE_UINT;
+        default:
+            vkd3d_unreachable();
+     }
+}
+
 static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl_state_block_entry *entry,
         struct fx_write_context *fx)
 {
@@ -1226,28 +1260,76 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { NULL }
     };
 
+    static const struct rhs_named_value depth_write_mask_values[] =
+    {
+        { "ZERO", 0 },
+        { "ALL",  1 },
+        { NULL }
+    };
+
+    static const struct rhs_named_value comparison_values[] =
+    {
+        { "NEVER", 1 },
+        { "LESS",  2 },
+        { "EQUAL", 3 },
+        { "LESS_EQUAL", 4 },
+        { "GREATER", 5 },
+        { "NOT_EQUAL", 6 },
+        { "GREATER_EQUAL", 7 },
+        { "ALWAYS", 8 },
+        { NULL }
+    };
+
+    static const struct rhs_named_value stencil_op_values[] =
+    {
+        { "KEEP", 1 },
+        { "ZERO", 2 },
+        { "REPLACE", 3 },
+        { "INCR_SAT", 4 },
+        { "DECR_SAT", 5 },
+        { "INVERT", 6 },
+        { "INCR", 7 },
+        { "DECR", 8 },
+        { NULL }
+    };
+
     static const struct state
     {
         const char *name;
         enum hlsl_type_class container;
         enum hlsl_type_class class;
-        enum hlsl_base_type type;
+        enum state_property_component_type type;
         unsigned int dimx;
         uint32_t id;
         const struct rhs_named_value *values;
     }
     states[] =
     {
-        { "Filter",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 45, filter_values },
-        { "AddressU",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 46, address_values },
-        { "AddressV",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 47, address_values },
-        { "AddressW",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 48, address_values },
-        { "MipLODBias",     HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_FLOAT,  1, 49 },
-        { "MaxAnisotropy",  HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 50 },
-        { "ComparisonFunc", HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_UINT,   1, 51, compare_func_values },
-        { "BorderColor",    HLSL_CLASS_SAMPLER, HLSL_CLASS_VECTOR,  HLSL_TYPE_FLOAT,  4, 52 },
-        { "MinLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_FLOAT,  1, 53 },
-        { "MaxLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  HLSL_TYPE_FLOAT,  1, 54 },
+        { "DepthEnable",               HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 22 },
+        { "DepthWriteMask",            HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 23, depth_write_mask_values },
+        { "DepthFunc",                 HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 24, comparison_values },
+        { "StencilEnable",             HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 25 },
+        { "StencilReadMask",           HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT8, 1, 26 },
+        { "StencilWriteMask",          HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT8, 1, 27 },
+        { "FrontFaceStencilFail",      HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 28, stencil_op_values },
+        { "FrontFaceStencilDepthFail", HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 29, stencil_op_values },
+        { "FrontFaceStencilPass",      HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 30, stencil_op_values },
+        { "FrontFaceStencilFunc",      HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 31, comparison_values },
+        { "BackFaceStencilFail",       HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 32, stencil_op_values },
+        { "BackFaceStencilDepthFail",  HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 33, stencil_op_values },
+        { "BackFaceStencilPass",       HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 34, stencil_op_values },
+        { "BackFaceStencilFunc",       HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 35, comparison_values },
+
+        { "Filter",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_UINT,    1, 45, filter_values },
+        { "AddressU",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_UINT,    1, 46, address_values },
+        { "AddressV",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_UINT,    1, 47, address_values },
+        { "AddressW",       HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_UINT,    1, 48, address_values },
+        { "MipLODBias",     HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 49 },
+        { "MaxAnisotropy",  HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_UINT,    1, 50 },
+        { "ComparisonFunc", HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_UINT,    1, 51, compare_func_values },
+        { "BorderColor",    HLSL_CLASS_SAMPLER, HLSL_CLASS_VECTOR,  FX_FLOAT,   4, 52 },
+        { "MinLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 53 },
+        { "MaxLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 54 },
         /* TODO: "Texture" field */
     };
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
@@ -1256,6 +1338,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     struct hlsl_ir_node *node, *cast;
     const struct state *state = NULL;
     struct hlsl_ctx *ctx = fx->ctx;
+    enum hlsl_base_type base_type;
     unsigned int i;
 
     for (i = 0; i < ARRAY_SIZE(states); ++i)
@@ -1292,13 +1375,14 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
 
     /* Now cast and run folding again. */
 
+    base_type = hlsl_type_from_fx_type(state->type);
     switch (state->class)
     {
         case HLSL_CLASS_VECTOR:
-            state_type = hlsl_get_vector_type(ctx, state->type, state->dimx);
+            state_type = hlsl_get_vector_type(ctx, base_type, state->dimx);
             break;
         case HLSL_CLASS_SCALAR:
-            state_type = hlsl_get_scalar_type(ctx, state->type);
+            state_type = hlsl_get_scalar_type(ctx, base_type);
             break;
         case HLSL_CLASS_TEXTURE:
             hlsl_fixme(ctx, &ctx->location, "Object type fields are not supported.");
@@ -1313,6 +1397,20 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         if (!(cast = hlsl_new_cast(ctx, node, state_type, &var->loc)))
             return;
         list_add_after(&node->entry, &cast->entry);
+
+        /* FX_UINT8 values are using 32-bits in the binary. Mask higher 24 bits for those. */
+        if (state->type == FX_UINT8)
+        {
+            struct hlsl_ir_node *mask;
+
+            if (!(mask = hlsl_new_uint_constant(ctx, 0xff, &var->loc)))
+                return;
+            list_add_after(&cast->entry, &mask->entry);
+
+            if (!(cast = hlsl_new_binary_expr(ctx, HLSL_OP2_BIT_AND, cast, mask)))
+                return;
+            list_add_after(&mask->entry, &cast->entry);
+        }
 
         hlsl_src_remove(entry->args);
         hlsl_src_from_node(entry->args, cast);
@@ -1409,6 +1507,11 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
 
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
             fx->dsv_count += elements_count;
+            break;
+
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
+            write_fx_4_state_object_initializer(var, fx);
+            fx->depth_stencil_state_count += elements_count;
             break;
 
         case HLSL_CLASS_SAMPLER:
@@ -1514,6 +1617,7 @@ static bool is_supported_object_variable(const struct hlsl_ctx *ctx, const struc
 
     switch (type->class)
     {
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
@@ -1582,7 +1686,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
     put_u32(&buffer, 0); /* String count. */
     put_u32(&buffer, fx.texture_count);
-    put_u32(&buffer, 0); /* Depth stencil state count. */
+    put_u32(&buffer, fx.depth_stencil_state_count);
     put_u32(&buffer, 0); /* Blend state count. */
     put_u32(&buffer, 0); /* Rasterizer state count. */
     put_u32(&buffer, fx.sampler_state_count);
@@ -1640,7 +1744,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
     put_u32(&buffer, 0); /* String count. */
     put_u32(&buffer, fx.texture_count);
-    put_u32(&buffer, 0); /* Depth stencil state count. */
+    put_u32(&buffer, fx.depth_stencil_state_count);
     put_u32(&buffer, 0); /* Blend state count. */
     put_u32(&buffer, 0); /* Rasterizer state count. */
     put_u32(&buffer, fx.sampler_state_count);

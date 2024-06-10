@@ -525,7 +525,7 @@ float4 main() : sv_target { return 0; }
 
 
 % State blocks are valid for DepthStencilState
-[pixel shader todo]
+[pixel shader]
 DepthStencilState dss1
 {
     DepthEnable = false;
@@ -583,7 +583,7 @@ DepthStencilState dss1
 
 
 % Undefined identifiers can be swizzled with .x which proves that they are considered scalar
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target { return 0; }
 
 DepthStencilState dss1
@@ -601,7 +601,7 @@ DepthStencilState dss1
 
 
 % The type of previously defined variables is respected, but array indexes are not checked.
-[pixel shader todo]
+[pixel shader]
 float4 arr[3];
 
 float4 main() : sv_target { return 0; }

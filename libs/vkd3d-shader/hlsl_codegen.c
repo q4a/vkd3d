@@ -1631,6 +1631,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
 
     switch (type->class)
     {
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_PIXEL_SHADER:
