@@ -472,6 +472,13 @@ enum vkd3d_shader_parameter_type
      * constant. This value is only supported for the SPIR-V target type.
      */
     VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT,
+    /**
+     * The parameter value is provided to the shader as part of a uniform
+     * buffer.
+     *
+     * \since 1.13
+     */
+    VKD3D_SHADER_PARAMETER_TYPE_BUFFER,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_TYPE),
 };
@@ -534,6 +541,23 @@ struct vkd3d_shader_parameter_specialization_constant
 {
     /** The ID of the specialization constant. */
     uint32_t id;
+};
+
+/**
+ * The linkage of a parameter specified through a uniform buffer, used in
+ * struct vkd3d_shader_parameter1.
+ */
+struct vkd3d_shader_parameter_buffer
+{
+    /**
+     * The set of the uniform buffer descriptor. If the target environment does
+     * not support descriptor sets, this value must be set to 0.
+     */
+    unsigned int set;
+    /** The binding index of the uniform buffer descriptor. */
+    unsigned int binding;
+    /** The byte offset of the parameter within the buffer. */
+    uint32_t offset;
 };
 
 /**
@@ -600,6 +624,11 @@ struct vkd3d_shader_parameter1
          * VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT.
          */
         struct vkd3d_shader_parameter_specialization_constant specialization_constant;
+        /**
+         * Additional information if \a type is
+         * VKD3D_SHADER_PARAMETER_TYPE_BUFFER.
+         */
+        struct vkd3d_shader_parameter_buffer buffer;
         void *_pointer_pad;
         uint32_t _pad[4];
     } u;
