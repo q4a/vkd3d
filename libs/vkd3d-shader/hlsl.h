@@ -638,6 +638,7 @@ struct hlsl_ir_switch
 enum hlsl_ir_expr_op
 {
     HLSL_OP0_VOID,
+    HLSL_OP0_RASTERIZER_SAMPLE_COUNT,
 
     HLSL_OP1_ABS,
     HLSL_OP1_BIT_NOT,

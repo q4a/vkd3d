@@ -2793,6 +2793,7 @@ const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
     static const char *const op_names[] =
     {
         [HLSL_OP0_VOID]         = "void",
+        [HLSL_OP0_RASTERIZER_SAMPLE_COUNT] = "GetRenderTargetSampleCount",
 
         [HLSL_OP1_ABS]          = "abs",
         [HLSL_OP1_BIT_NOT]      = "~",

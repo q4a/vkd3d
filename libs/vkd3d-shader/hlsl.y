@@ -4688,6 +4688,20 @@ static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool intrinsic_GetRenderTargetSampleCount(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_ir_node *expr;
+
+    if (!(expr = hlsl_new_expr(ctx, HLSL_OP0_RASTERIZER_SAMPLE_COUNT,
+            operands, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
+        return false;
+    hlsl_block_add_instr(params->instrs, expr);
+
+    return true;
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -4700,6 +4714,7 @@ intrinsic_functions[] =
 {
     /* Note: these entries should be kept in alphabetical order. */
     {"D3DCOLORtoUBYTE4",                    1, true,  intrinsic_d3dcolor_to_ubyte4},
+    {"GetRenderTargetSampleCount",          0, true,  intrinsic_GetRenderTargetSampleCount},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},

@@ -5042,6 +5042,25 @@ static void write_sm4_store_uav_typed(const struct tpf_writer *tpf, const struct
     write_sm4_instruction(tpf, &instr);
 }
 
+static void write_sm4_rasterizer_sample_count(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst)
+{
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_SAMPLE_INFO;
+    instr.extra_bits |= VKD3DSI_SAMPLE_INFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
+
+    sm4_dst_from_node(&instr.dsts[0], dst);
+    instr.dst_count = 1;
+
+    instr.srcs[0].reg.type = VKD3DSPR_RASTERIZER;
+    instr.srcs[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    instr.srcs[0].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+    instr.src_count = 1;
+
+    write_sm4_instruction(tpf, &instr);
+}
+
 static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr)
 {
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
@@ -5057,6 +5076,14 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
 
     switch (expr->op)
     {
+        case HLSL_OP0_RASTERIZER_SAMPLE_COUNT:
+            if (tpf->ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL && hlsl_version_ge(tpf->ctx, 4, 1))
+                write_sm4_rasterizer_sample_count(tpf, &expr->node);
+            else
+                hlsl_error(tpf->ctx, &expr->node.loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                        "GetRenderTargetSampleCount() can only be used from a pixel shader using version 4.1 or higher.");
+            break;
+
         case HLSL_OP1_ABS:
             switch (dst_type->e.numeric.type)
             {
