@@ -17,7 +17,14 @@
  */
 
 #include "vkd3d_test.h"
+#include "utils.h"
 #include <vkd3d_shader.h>
+#ifdef HAVE_OPENGL
+#define GL_GLEXT_PROTOTYPES
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GL/gl.h>
+#endif
 
 #include <locale.h>
 
@@ -1693,6 +1700,415 @@ static void test_warning_options(void)
     vkd3d_shader_free_messages(messages);
 }
 
+#ifdef HAVE_OPENGL
+static PFNGLSPECIALIZESHADERPROC p_glSpecializeShader;
+
+#define RENDER_TARGET_WIDTH 4
+#define RENDER_TARGET_HEIGHT 4
+
+struct gl_test_context
+{
+    EGLContext context;
+    EGLDisplay display;
+    GLuint fbo, backbuffer;
+};
+
+static bool check_gl_extension(const char *extension, GLint extension_count)
+{
+    for (GLint i = 0; i < extension_count; ++i)
+    {
+        if (!strcmp(extension, (const char *)glGetStringi(GL_EXTENSIONS, i)))
+            return true;
+    }
+
+    return false;
+}
+
+static bool check_gl_extensions(void)
+{
+    GLint count;
+
+    static const char *required_extensions[] =
+    {
+        "GL_ARB_clip_control",
+        "GL_ARB_compute_shader",
+        "GL_ARB_sampler_objects",
+        "GL_ARB_shader_image_load_store",
+        "GL_ARB_texture_storage",
+        "GL_ARB_internalformat_query",
+        "GL_ARB_gl_spirv",
+    };
+
+    glGetIntegerv(GL_NUM_EXTENSIONS, &count);
+
+    for (unsigned int i = 0; i < ARRAY_SIZE(required_extensions); ++i)
+    {
+        if (!check_gl_extension(required_extensions[i], count))
+            return false;
+    }
+
+    return true;
+}
+
+static bool check_gl_client_extension(const char *extension)
+{
+    const char *extensions, *p;
+    size_t len;
+
+    if (!(extensions = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS)))
+        return false;
+
+    len = strlen(extension);
+    for (;;)
+    {
+        if (!(p = strchr(extensions, ' ')))
+            p = &extensions[strlen(extensions)];
+        if (p - extensions == len && !memcmp(extensions, extension, len))
+            return true;
+        if (!*p)
+            break;
+        extensions = p + 1;
+    }
+    return false;
+}
+
+static void debug_output(GLenum source, GLenum type, GLuint id, GLenum severity,
+        GLsizei length, const GLchar *message, const void *userParam)
+{
+    if (message[length - 1] == '\n')
+        --length;
+    trace("%.*s\n", length, message);
+}
+
+static bool init_gl_test_context(struct gl_test_context *test_context)
+{
+    PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT;
+    EGLDeviceEXT *devices;
+    EGLContext context;
+    EGLDisplay display;
+    EGLBoolean ret;
+    EGLint count;
+    GLuint vao;
+
+    static const EGLint attributes[] =
+    {
+        EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
+        EGL_CONTEXT_FLAGS_KHR, EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR,
+        EGL_CONTEXT_MAJOR_VERSION, 3,
+        EGL_CONTEXT_MINOR_VERSION, 2,
+        EGL_NONE,
+    };
+
+    if (!check_gl_client_extension("EGL_EXT_device_enumeration")
+            || !(eglQueryDevicesEXT = (void *)eglGetProcAddress("eglQueryDevicesEXT")))
+    {
+        skip("Failed to retrieve eglQueryDevicesEXT.\n");
+        return false;
+    }
+
+    ret = eglQueryDevicesEXT(0, NULL, &count);
+    ok(ret, "Failed to query device count.\n");
+
+    devices = calloc(count, sizeof(*devices));
+    ret = eglQueryDevicesEXT(count, devices, &count);
+    ok(ret, "Failed to query devices.\n");
+
+    for (unsigned int i = 0; i < count; ++i)
+    {
+        if ((display = eglGetPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, devices[i], NULL)) == EGL_NO_DISPLAY)
+        {
+            trace("Failed to get EGL display connection for device %u.\n", i);
+            continue;
+        }
+
+        if (!eglInitialize(display, NULL, NULL))
+        {
+            trace("Failed to initialise EGL display connection for device %u.\n", i);
+            continue;
+        }
+
+        if (!eglBindAPI(EGL_OPENGL_API))
+        {
+            trace("Failed to bind OpenGL API for device %u.\n", i);
+            eglTerminate(display);
+            continue;
+        }
+
+        if ((context = eglCreateContext(display, NULL, EGL_NO_CONTEXT, attributes)) == EGL_NO_CONTEXT)
+        {
+            trace("Failed to create EGL context for device %u.\n", i);
+            eglTerminate(display);
+            continue;
+        }
+
+        if (!eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, context))
+        {
+            trace("Failed to make EGL context current for device %u.\n", i);
+            eglDestroyContext(display, context);
+            eglTerminate(display);
+            continue;
+        }
+
+        if (!check_gl_extensions())
+        {
+            trace("Device %u lacks required extensions.\n", i);
+            eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+            eglDestroyContext(display, context);
+            eglTerminate(display);
+            continue;
+        }
+
+        trace("Using device %u.\n", i);
+        test_context->display = display;
+        test_context->context = context;
+        break;
+    }
+
+    free(devices);
+
+    if (!test_context->context)
+    {
+        skip("Failed to find a usable OpenGL device.\n");
+        return false;
+    }
+
+    trace("                  GL_VENDOR: %s\n", glGetString(GL_VENDOR));
+    trace("                GL_RENDERER: %s\n", glGetString(GL_RENDERER));
+    trace("                 GL_VERSION: %s\n", glGetString(GL_VERSION));
+
+    p_glSpecializeShader = (void *)eglGetProcAddress("glSpecializeShader");
+
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
+    glDebugMessageCallback(debug_output, NULL);
+    glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
+    glFrontFace(GL_CW);
+    glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    glGenTextures(1, &test_context->backbuffer);
+    glBindTexture(GL_TEXTURE_2D, test_context->backbuffer);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
+
+    glGenFramebuffers(1, &test_context->fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, test_context->fbo);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, test_context->backbuffer, 0);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+    glViewport(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
+    glScissor(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
+
+    return true;
+}
+
+static void destroy_gl_test_context(struct gl_test_context *context)
+{
+    EGLBoolean ret;
+
+    glDeleteFramebuffers(1, &context->fbo);
+    glDeleteTextures(1, &context->backbuffer);
+
+    ret = eglMakeCurrent(context->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    ok(ret, "Failed to release current EGL context.\n");
+    ret = eglDestroyContext(context->display, context->context);
+    ok(ret, "Failed to destroy EGL context.\n");
+    ret = eglTerminate(context->display);
+    ok(ret, "Failed to terminate EGL display connection.\n");
+}
+
+static void gl_draw_triangle(GLuint vs_id, GLuint fs_id)
+{
+    GLuint program_id = glCreateProgram();
+    GLint status;
+
+    glAttachShader(program_id, vs_id);
+    glAttachShader(program_id, fs_id);
+    glLinkProgram(program_id);
+    glGetProgramiv(program_id, GL_LINK_STATUS, &status);
+    ok(status, "Failed to link program.\n");
+
+    glUseProgram(program_id);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    glDeleteProgram(program_id);
+}
+
+static void gl_get_backbuffer_color(struct gl_test_context *context,
+        unsigned int x, unsigned int y, struct vec4 *colour)
+{
+    struct vec4 *data = malloc(RENDER_TARGET_WIDTH * RENDER_TARGET_HEIGHT * sizeof(struct vec4));
+
+    memset(data, 0xcc, RENDER_TARGET_WIDTH * RENDER_TARGET_HEIGHT * sizeof(struct vec4));
+    glBindTexture(GL_TEXTURE_2D, context->backbuffer);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, data);
+    *colour = data[y * RENDER_TARGET_WIDTH + x];
+    free(data);
+}
+
+#endif
+
+static void test_parameters(void)
+{
+#ifdef HAVE_OPENGL
+    struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};
+    struct vkd3d_shader_parameter_info parameter_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_PARAMETER_INFO};
+    struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
+    struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    GLuint vs_id, fs_id, spec_id, spec_value, ubo_id;
+    struct vkd3d_shader_code vs_spirv, ps_spirv;
+    struct vkd3d_shader_parameter1 parameter1;
+    struct vkd3d_shader_parameter parameter;
+    uint32_t buffer_data[2] = {0, 5};
+    struct gl_test_context context;
+    struct vec4 colour;
+    char *messages;
+    GLint status;
+    int ret;
+
+    static const char vs_code[] =
+        "float4 main(uint id : SV_VertexID) : SV_Position\n"
+        "{\n"
+        "    float2 coords = float2((id << 1) & 2, id & 2);\n"
+        "    return float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);\n"
+        "}";
+
+    static const char ps_code[] =
+        "float4 main() : SV_Target\n"
+        "{\n"
+        "    return GetRenderTargetSampleCount();\n"
+        "}";
+
+    if (!init_gl_test_context(&context))
+        return;
+
+    info.next = &hlsl_info;
+    info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+    info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
+    info.log_level = VKD3D_SHADER_LOG_WARNING;
+
+    hlsl_info.next = &spirv_info;
+    hlsl_info.entry_point = "main";
+
+    spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5;
+
+    info.source.code = vs_code;
+    info.source.size = strlen(vs_code);
+    hlsl_info.profile = "vs_4_0";
+    ret = vkd3d_shader_compile(&info, &vs_spirv, &messages);
+    ok(!ret, "Failed to compile, error %d.\n", ret);
+    ok(!messages, "Got unexpected messages.\n");
+
+    vs_id = glCreateShader(GL_VERTEX_SHADER);
+    glShaderBinary(1, &vs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, vs_spirv.code, vs_spirv.size);
+    p_glSpecializeShader(vs_id, "main", 0, NULL, NULL);
+    glGetShaderiv(vs_id, GL_COMPILE_STATUS, &status);
+    ok(status, "Failed to compile vertex shader.\n");
+
+    info.source.code = ps_code;
+    info.source.size = strlen(ps_code);
+    hlsl_info.profile = "ps_4_1";
+
+    /* Immediate constant, old API. */
+
+    spirv_info.parameters = &parameter;
+    spirv_info.parameter_count = 1;
+
+    parameter.name = VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT;
+    parameter.type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameter.data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
+    parameter.u.immediate_constant.u.u32 = 2;
+
+    ret = vkd3d_shader_compile(&info, &ps_spirv, &messages);
+    ok(!ret, "Failed to compile, error %d.\n", ret);
+    ok(!messages, "Got unexpected messages.\n");
+
+    fs_id = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderBinary(1, &fs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, ps_spirv.code, ps_spirv.size);
+    p_glSpecializeShader(fs_id, "main", 0, NULL, NULL);
+    glGetShaderiv(fs_id, GL_COMPILE_STATUS, &status);
+    ok(status, "Failed to compile fragment shader.\n");
+
+    gl_draw_triangle(vs_id, fs_id);
+    gl_get_backbuffer_color(&context, 0, 0, &colour);
+    ok(colour.x == 2.0f, "Got colour %.8e.\n", colour.x);
+
+    /* Immediate constant, new API. */
+
+    spirv_info.next = &parameter_info;
+
+    parameter_info.parameter_count = 1;
+    parameter_info.parameters = &parameter1;
+
+    parameter1.name = VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT;
+    parameter1.type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameter1.data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
+    parameter1.u.immediate_constant.u.u32 = 3;
+
+    ret = vkd3d_shader_compile(&info, &ps_spirv, &messages);
+    ok(!ret, "Failed to compile, error %d.\n", ret);
+    ok(!messages, "Got unexpected messages.\n");
+
+    fs_id = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderBinary(1, &fs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, ps_spirv.code, ps_spirv.size);
+    p_glSpecializeShader(fs_id, "main", 0, NULL, NULL);
+    glGetShaderiv(fs_id, GL_COMPILE_STATUS, &status);
+    ok(status, "Failed to compile fragment shader.\n");
+
+    gl_draw_triangle(vs_id, fs_id);
+    gl_get_backbuffer_color(&context, 0, 0, &colour);
+    ok(colour.x == 3.0f, "Got colour %.8e.\n", colour.x);
+
+    /* Specialization constant, new API. */
+
+    parameter1.type = VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT;
+    parameter1.u.specialization_constant.id = 1;
+
+    ret = vkd3d_shader_compile(&info, &ps_spirv, &messages);
+    ok(!ret, "Failed to compile, error %d.\n", ret);
+    ok(!messages, "Got unexpected messages.\n");
+
+    fs_id = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderBinary(1, &fs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, ps_spirv.code, ps_spirv.size);
+    spec_id = 1;
+    spec_value = 4;
+    p_glSpecializeShader(fs_id, "main", 1, &spec_id, &spec_value);
+    glGetShaderiv(fs_id, GL_COMPILE_STATUS, &status);
+    ok(status, "Failed to compile fragment shader.\n");
+
+    gl_draw_triangle(vs_id, fs_id);
+    gl_get_backbuffer_color(&context, 0, 0, &colour);
+    ok(colour.x == 4.0f, "Got colour %.8e.\n", colour.x);
+
+    /* Uniform buffer, new API. */
+
+    glGenBuffers(1, &ubo_id);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 2, ubo_id);
+    glBufferData(GL_UNIFORM_BUFFER, 8, buffer_data, GL_STATIC_DRAW);
+
+    parameter1.type = VKD3D_SHADER_PARAMETER_TYPE_BUFFER;
+    parameter1.u.buffer.set = 0;
+    parameter1.u.buffer.binding = 2;
+    parameter1.u.buffer.offset = 4;
+
+    ret = vkd3d_shader_compile(&info, &ps_spirv, &messages);
+    ok(!ret, "Failed to compile, error %d.\n", ret);
+    ok(!messages, "Got unexpected messages.\n");
+
+    fs_id = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderBinary(1, &fs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, ps_spirv.code, ps_spirv.size);
+    p_glSpecializeShader(fs_id, "main", 0, NULL, NULL);
+    glGetShaderiv(fs_id, GL_COMPILE_STATUS, &status);
+    ok(status, "Failed to compile fragment shader.\n");
+
+    gl_draw_triangle(vs_id, fs_id);
+    gl_get_backbuffer_color(&context, 0, 0, &colour);
+    ok(colour.x == 5.0f, "Got colour %.8e.\n", colour.x);
+
+    glDeleteBuffers(1, &ubo_id);
+    destroy_gl_test_context(&context);
+#endif
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -1708,4 +2124,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_scan_combined_resource_samplers);
     run_test(test_emit_signature);
     run_test(test_warning_options);
+    run_test(test_parameters);
 }
