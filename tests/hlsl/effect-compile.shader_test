@@ -66,6 +66,17 @@ technique
 float4 main() : sv_target { return 0; }
 
 
+[pixel shader fail(sm<6)]
+float4 fun() : sv_target { return 0; }
+
+float4 main() : sv_target
+{
+    PixelShader ps1 = compile ps_2_0 fun(); // Object literals not allowed inside functions.
+
+    return 0;
+}
+
+
 % Test the CompileShader() syntax.
 [pixel shader todo fail(sm>=6)]
 float arg1, arg2;
@@ -139,3 +150,14 @@ float4 main() : sv_target { return 0; }
 
 PixelShader ps1 = CompileShader(ps_2_0, main());
 PixelShader ps2 = ps1;
+
+
+[pixel shader fail(sm<6)]
+float4 fun() : sv_target { return 0; }
+
+float4 main() : sv_target
+{
+    PixelShader ps1 = CompileShader(ps_2_0, fun()); // Object literals not allowed inside functions.
+
+    return 0;
+}
