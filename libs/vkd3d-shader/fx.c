@@ -95,6 +95,7 @@ struct fx_write_context
     uint32_t uav_count;
     uint32_t sampler_state_count;
     uint32_t depth_stencil_state_count;
+    uint32_t rasterizer_state_count;
     int status;
 
     bool child_effect;
@@ -562,6 +563,10 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     else if (type->class == HLSL_CLASS_VERTEX_SHADER)
     {
         put_u32_unaligned(buffer, 6);
+    }
+    else if (type->class == HLSL_CLASS_RASTERIZER_STATE)
+    {
+        put_u32_unaligned(buffer, 4);
     }
     else if (type->class == HLSL_CLASS_DEPTH_STENCIL_STATE)
     {
@@ -1295,6 +1300,21 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { NULL }
     };
 
+    static const struct rhs_named_value fill_values[] =
+    {
+        { "WIREFRAME", 2 },
+        { "SOLID", 3 },
+        { NULL }
+    };
+
+    static const struct rhs_named_value cull_values[] =
+    {
+        { "NONE", 1 },
+        { "FRONT", 2 },
+        { "BACK", 3 },
+        { NULL }
+    };
+
     static const struct state
     {
         const char *name;
@@ -1307,6 +1327,17 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
     states[] =
     {
+        { "FillMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 12, fill_values },
+        { "CullMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 13, cull_values },
+        { "FrontCounterClockwise", HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 14 },
+        { "DepthBias",             HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 15 },
+        { "DepthBiasClamp",        HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_FLOAT, 1, 16 },
+        { "SlopeScaledDepthBias",  HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_FLOAT, 1, 17 },
+        { "DepthClipEnable",       HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 18 },
+        { "ScissorEnable",         HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 19 },
+        { "MultisampleEnable",     HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 20 },
+        { "AntializedLineEnable",  HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 21 },
+
         { "DepthEnable",               HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 22 },
         { "DepthWriteMask",            HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 23, depth_write_mask_values },
         { "DepthFunc",                 HLSL_CLASS_DEPTH_STENCIL_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 24, comparison_values },
@@ -1521,6 +1552,11 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             fx->sampler_state_count += elements_count;
             break;
 
+        case HLSL_CLASS_RASTERIZER_STATE:
+            write_fx_4_state_object_initializer(var, fx);
+            fx->rasterizer_state_count += elements_count;
+            break;
+
         default:
             hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.",
                     type->e.numeric.type);
@@ -1691,7 +1727,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, fx.depth_stencil_state_count);
     put_u32(&buffer, 0); /* Blend state count. */
-    put_u32(&buffer, 0); /* Rasterizer state count. */
+    put_u32(&buffer, fx.rasterizer_state_count);
     put_u32(&buffer, fx.sampler_state_count);
     put_u32(&buffer, fx.rtv_count);
     put_u32(&buffer, fx.dsv_count);
@@ -1749,7 +1785,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, fx.depth_stencil_state_count);
     put_u32(&buffer, 0); /* Blend state count. */
-    put_u32(&buffer, 0); /* Rasterizer state count. */
+    put_u32(&buffer, fx.rasterizer_state_count);
     put_u32(&buffer, fx.sampler_state_count);
     put_u32(&buffer, fx.rtv_count);
     put_u32(&buffer, fx.dsv_count);
