@@ -492,6 +492,8 @@ enum vkd3d_shader_parameter_data_type
     VKD3D_SHADER_PARAMETER_DATA_TYPE_UNKNOWN,
     /** The parameter is provided as a 32-bit unsigned integer. */
     VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32,
+    /** The parameter is provided as a 32-bit float. \since 1.13 */
+    VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_DATA_TYPE),
 };
@@ -511,8 +513,46 @@ enum vkd3d_shader_parameter_name
      * provides no builtin ability to query this information from the shader.
      *
      * The default value is 1.
+     *
+     * The data type for this parameter must be
+     * VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32.
      */
     VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT,
+    /**
+     * Alpha test comparison function. When this parameter is provided, if the
+     * alpha component of the pixel shader colour output at location 0 fails the
+     * test, as defined by this function and the reference value provided by
+     * VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF, the fragment will be
+     * discarded.
+     *
+     * This parameter, along with VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF,
+     * can be used to implement fixed function alpha test, as present in
+     * Direct3D versions up to 9, if the target environment does not support
+     * alpha test as part of its own fixed-function API (as Vulkan and core
+     * OpenGL).
+     *
+     * The default value is VKD3D_SHADER_COMPARISON_FUNC_ALWAYS.
+     *
+     * The data type for this parameter must be
+     * VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32. The value specified must be
+     * a member of enum vkd3d_shader_comparison_func.
+     *
+     * Only VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT is supported in this
+     * version of vkd3d-shader.
+     *
+     * \since 1.13
+     */
+    VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_FUNC,
+    /**
+     * Alpha test reference value.
+     * See VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_FUNC for documentation of
+     * alpha test.
+     *
+     * The default value is zero.
+     *
+     * \since 1.13
+     */
+    VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_NAME),
 };
@@ -530,6 +570,13 @@ struct vkd3d_shader_parameter_immediate_constant
          * VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32.
          */
         uint32_t u32;
+        /**
+         * The value if the parameter's data type is
+         * VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32.
+         *
+         * \since 1.13
+         */
+        float f32;
     } u;
 };
 

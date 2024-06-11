@@ -732,6 +732,12 @@ static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigne
     dst->write_mask = VKD3DSP_WRITEMASK_0;
 }
 
+static void src_param_init_temp_float(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    src->reg.idx[0].offset = idx;
+}
+
 static void src_param_init_temp_uint(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
     vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
@@ -742,6 +748,12 @@ static void src_param_init_const_uint(struct vkd3d_shader_src_param *src, uint32
 {
     vsir_src_param_init(src, VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
     src->reg.u.immconst_u32[0] = value;
+}
+
+static void src_param_init_parameter(struct vkd3d_shader_src_param *src, uint32_t idx, enum vkd3d_data_type type)
+{
+    vsir_src_param_init(src, VKD3DSPR_PARAMETER, type, 1);
+    src->reg.idx[0].offset = idx;
 }
 
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
@@ -5348,6 +5360,203 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(stru
     return VKD3D_OK;
 }
 
+static bool find_colour_signature_idx(const struct shader_signature *signature, uint32_t *index)
+{
+    for (unsigned int i = 0; i < signature->element_count; ++i)
+    {
+        if (signature->elements[i].sysval_semantic == VKD3D_SHADER_SV_TARGET
+                && !signature->elements[i].register_index)
+        {
+            *index = i;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *program,
+        const struct vkd3d_shader_instruction *ret, enum vkd3d_shader_comparison_func compare_func,
+        const struct vkd3d_shader_parameter1 *ref, uint32_t colour_signature_idx, uint32_t colour_temp, size_t *ret_pos)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    size_t pos = ret - instructions->elements;
+    struct vkd3d_shader_instruction *ins;
+
+    static const struct
+    {
+        enum vkd3d_shader_opcode float_opcode;
+        enum vkd3d_shader_opcode uint_opcode;
+        bool swap;
+    }
+    opcodes[] =
+    {
+        [VKD3D_SHADER_COMPARISON_FUNC_EQUAL]         = {VKD3DSIH_EQO, VKD3DSIH_IEQ},
+        [VKD3D_SHADER_COMPARISON_FUNC_NOT_EQUAL]     = {VKD3DSIH_NEO, VKD3DSIH_INE},
+        [VKD3D_SHADER_COMPARISON_FUNC_GREATER_EQUAL] = {VKD3DSIH_GEO, VKD3DSIH_UGE},
+        [VKD3D_SHADER_COMPARISON_FUNC_LESS]          = {VKD3DSIH_LTO, VKD3DSIH_ULT},
+        [VKD3D_SHADER_COMPARISON_FUNC_LESS_EQUAL]    = {VKD3DSIH_GEO, VKD3DSIH_UGE, true},
+        [VKD3D_SHADER_COMPARISON_FUNC_GREATER]       = {VKD3DSIH_LTO, VKD3DSIH_ULT, true},
+    };
+
+    if (compare_func == VKD3D_SHADER_COMPARISON_FUNC_NEVER)
+    {
+        if (!shader_instruction_array_insert_at(&program->instructions, pos, 1))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        ins = &program->instructions.elements[pos];
+
+        vsir_instruction_init_with_params(program, ins, &ret->location, VKD3DSIH_DISCARD, 0, 1);
+        ins->flags = VKD3D_SHADER_CONDITIONAL_OP_Z;
+        src_param_init_const_uint(&ins->src[0], 0);
+
+        *ret_pos = pos + 1;
+        return VKD3D_OK;
+    }
+
+    if (!shader_instruction_array_insert_at(&program->instructions, pos, 3))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    ins = &program->instructions.elements[pos];
+
+    switch (ref->data_type)
+    {
+        case VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32:
+            vsir_instruction_init_with_params(program, ins, &ret->location, opcodes[compare_func].float_opcode, 1, 2);
+            src_param_init_temp_float(&ins->src[opcodes[compare_func].swap ? 1 : 0], colour_temp);
+            src_param_init_parameter(&ins->src[opcodes[compare_func].swap ? 0 : 1],
+                    VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF, VKD3D_DATA_FLOAT);
+            break;
+
+        case VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32:
+            vsir_instruction_init_with_params(program, ins, &ret->location, opcodes[compare_func].uint_opcode, 1, 2);
+            src_param_init_temp_uint(&ins->src[opcodes[compare_func].swap ? 1 : 0], colour_temp);
+            src_param_init_parameter(&ins->src[opcodes[compare_func].swap ? 0 : 1],
+                    VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF, VKD3D_DATA_UINT);
+            break;
+
+        default:
+            FIXME("Unhandled parameter data type %#x.\n", ref->data_type);
+            return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+
+    dst_param_init_ssa_bool(&ins->dst[0], program->ssa_count);
+    ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->src[0].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
+    ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->src[1].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
+
+    ++ins;
+    vsir_instruction_init_with_params(program, ins, &ret->location, VKD3DSIH_DISCARD, 0, 1);
+    ins->flags = VKD3D_SHADER_CONDITIONAL_OP_Z;
+    src_param_init_ssa_bool(&ins->src[0], program->ssa_count);
+
+    ++program->ssa_count;
+
+    ++ins;
+    vsir_instruction_init_with_params(program, ins, &ret->location, VKD3DSIH_MOV, 1, 1);
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VKD3D_DATA_FLOAT, 1);
+    ins->dst[0].reg.idx[0].offset = colour_signature_idx;
+    ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->dst[0].write_mask = program->output_signature.elements[colour_signature_idx].mask;
+    src_param_init_temp_float(&ins->src[0], colour_temp);
+    ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
+
+    *ret_pos = pos + 3;
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    const struct vkd3d_shader_parameter1 *func = NULL, *ref = NULL;
+    static const struct vkd3d_shader_location no_loc;
+    enum vkd3d_shader_comparison_func compare_func;
+    uint32_t colour_signature_idx, colour_temp;
+    struct vkd3d_shader_instruction *ins;
+    size_t new_pos;
+    int ret;
+
+    if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
+        return VKD3D_OK;
+
+    if (!find_colour_signature_idx(&program->output_signature, &colour_signature_idx)
+            || !(program->output_signature.elements[colour_signature_idx].mask & VKD3DSP_WRITEMASK_3))
+        return VKD3D_OK;
+
+    for (unsigned int i = 0; i < program->parameter_count; ++i)
+    {
+        const struct vkd3d_shader_parameter1 *parameter = &program->parameters[i];
+
+        if (parameter->name == VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_FUNC)
+            func = parameter;
+        else if (parameter->name == VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF)
+            ref = parameter;
+    }
+
+    if (!func || !ref)
+        return VKD3D_OK;
+
+    if (func->type != VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)
+    {
+        vkd3d_shader_error(message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                "Unsupported alpha test function parameter type %#x.\n", func->type);
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+    if (func->data_type != VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32)
+    {
+        vkd3d_shader_error(message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid alpha test function parameter data type %#x.\n", func->data_type);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+    compare_func = func->u.immediate_constant.u.u32;
+
+    if (compare_func == VKD3D_SHADER_COMPARISON_FUNC_ALWAYS)
+        return VKD3D_OK;
+
+    /* We're going to be reading from the output, so we need to go
+     * through the whole shader and convert it to a temp. */
+
+    if (compare_func != VKD3D_SHADER_COMPARISON_FUNC_NEVER)
+        colour_temp = program->temp_count++;
+
+    for (size_t i = 0; i < program->instructions.count; ++i)
+    {
+        ins = &program->instructions.elements[i];
+
+        if (vsir_instruction_is_dcl(ins))
+            continue;
+
+        if (ins->opcode == VKD3DSIH_RET)
+        {
+            if ((ret = insert_alpha_test_before_ret(program, ins, compare_func,
+                    ref, colour_signature_idx, colour_temp, &new_pos)) < 0)
+                return ret;
+            i = new_pos;
+            continue;
+        }
+
+        /* No need to convert it if the comparison func is NEVER; we don't
+         * read from the output in that case. */
+        if (compare_func == VKD3D_SHADER_COMPARISON_FUNC_NEVER)
+            continue;
+
+        for (size_t j = 0; j < ins->dst_count; ++j)
+        {
+            struct vkd3d_shader_dst_param *dst = &ins->dst[j];
+
+            /* Note we run after I/O normalization. */
+            if (dst->reg.type == VKD3DSPR_OUTPUT && dst->reg.idx[0].offset == colour_signature_idx)
+            {
+                dst->reg.type = VKD3DSPR_TEMP;
+                dst->reg.idx[0].offset = colour_temp;
+            }
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 struct validation_context
 {
     struct vkd3d_shader_message_context *message_context;
@@ -6339,6 +6548,9 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
                 && (result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
             return result;
     }
+
+    if ((result = vsir_program_insert_alpha_test(program, message_context)) < 0)
+        return result;
 
     if (TRACE_ON())
         vkd3d_shader_trace(program);

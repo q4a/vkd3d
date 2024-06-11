@@ -3320,6 +3320,7 @@ static const struct vkd3d_spec_constant_info
 vkd3d_shader_parameters[] =
 {
     {VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT, 1, "sample_count"},
+    {VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF, 0, "alpha_test_ref"},
 };
 
 static const struct vkd3d_spec_constant_info *get_spec_constant_info(enum vkd3d_shader_parameter_name name)
@@ -3358,7 +3359,7 @@ static uint32_t spirv_compiler_alloc_spec_constant_id(struct spirv_compiler *com
 }
 
 static uint32_t spirv_compiler_emit_spec_constant(struct spirv_compiler *compiler,
-        enum vkd3d_shader_parameter_name name, uint32_t spec_id)
+        enum vkd3d_shader_parameter_name name, uint32_t spec_id, enum vkd3d_data_type type)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_spec_constant_info *info;
@@ -3367,7 +3368,7 @@ static uint32_t spirv_compiler_emit_spec_constant(struct spirv_compiler *compile
     info = get_spec_constant_info(name);
     default_value = info ? info->default_value : 0;
 
-    type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
+    type_id = vkd3d_spirv_get_type_id(builder, vkd3d_component_type_from_data_type(type), 1);
     id = vkd3d_spirv_build_op_spec_constant(builder, type_id, default_value);
     vkd3d_spirv_build_op_decorate1(builder, id, SpvDecorationSpecId, spec_id);
 
@@ -3386,7 +3387,7 @@ static uint32_t spirv_compiler_emit_spec_constant(struct spirv_compiler *compile
 }
 
 static uint32_t spirv_compiler_get_spec_constant(struct spirv_compiler *compiler,
-        enum vkd3d_shader_parameter_name name, uint32_t spec_id)
+        enum vkd3d_shader_parameter_name name, uint32_t spec_id, enum vkd3d_data_type type)
 {
     unsigned int i;
 
@@ -3396,17 +3397,17 @@ static uint32_t spirv_compiler_get_spec_constant(struct spirv_compiler *compiler
             return compiler->spec_constants[i].id;
     }
 
-    return spirv_compiler_emit_spec_constant(compiler, name, spec_id);
+    return spirv_compiler_emit_spec_constant(compiler, name, spec_id, type);
 }
 
 static uint32_t spirv_compiler_get_buffer_parameter(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_parameter1 *parameter)
+        const struct vkd3d_shader_parameter1 *parameter, enum vkd3d_data_type type)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     unsigned int index = parameter - compiler->parameters;
     uint32_t type_id, ptr_id, ptr_type_id;
 
-    type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
+    type_id = vkd3d_spirv_get_type_id(builder, vkd3d_component_type_from_data_type(type), 1);
     ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassUniform, type_id);
     ptr_id = vkd3d_spirv_build_op_access_chain1(builder, ptr_type_id,
             compiler->spirv_parameter_info[index].buffer_id,
@@ -3414,10 +3415,11 @@ static uint32_t spirv_compiler_get_buffer_parameter(struct spirv_compiler *compi
     return vkd3d_spirv_build_op_load(builder, type_id, ptr_id, SpvMemoryAccessMaskNone);
 }
 
-static uint32_t spirv_compiler_emit_uint_shader_parameter(struct spirv_compiler *compiler,
+static uint32_t spirv_compiler_emit_shader_parameter(struct spirv_compiler *compiler,
         enum vkd3d_shader_parameter_name name)
 {
     const struct vkd3d_shader_parameter1 *parameter;
+    enum vkd3d_data_type type = VKD3D_DATA_UINT;
 
     if (!(parameter = spirv_compiler_get_shader_parameter(compiler, name)))
     {
@@ -3426,17 +3428,28 @@ static uint32_t spirv_compiler_emit_uint_shader_parameter(struct spirv_compiler 
     }
 
     if (parameter->type == VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)
-        return spirv_compiler_get_constant_uint(compiler, parameter->u.immediate_constant.u.u32);
+    {
+        if (parameter->data_type == VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32)
+            return spirv_compiler_get_constant_float(compiler, parameter->u.immediate_constant.u.f32);
+        else
+            return spirv_compiler_get_constant_uint(compiler, parameter->u.immediate_constant.u.u32);
+    }
+
+    if (parameter->data_type == VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32)
+        type = VKD3D_DATA_FLOAT;
+    else
+        type = VKD3D_DATA_UINT;
+
     if (parameter->type == VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT)
-        return spirv_compiler_get_spec_constant(compiler, name, parameter->u.specialization_constant.id);
+        return spirv_compiler_get_spec_constant(compiler, name, parameter->u.specialization_constant.id, type);
     if (parameter->type == VKD3D_SHADER_PARAMETER_TYPE_BUFFER)
-        return spirv_compiler_get_buffer_parameter(compiler, parameter);
+        return spirv_compiler_get_buffer_parameter(compiler, parameter, type);
 
     FIXME("Unhandled parameter type %#x.\n", parameter->type);
 
 default_parameter:
     return spirv_compiler_get_spec_constant(compiler,
-            name, spirv_compiler_alloc_spec_constant_id(compiler));
+            name, spirv_compiler_alloc_spec_constant_id(compiler), type);
 }
 
 static uint32_t spirv_compiler_emit_construct_vector(struct spirv_compiler *compiler,
@@ -4211,6 +4224,8 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
         return spirv_compiler_emit_load_constant64(compiler, reg, swizzle, write_mask);
     else if (reg->type == VKD3DSPR_UNDEF)
         return spirv_compiler_emit_load_undef(compiler, reg, write_mask);
+    else if (reg->type == VKD3DSPR_PARAMETER)
+        return spirv_compiler_emit_shader_parameter(compiler, reg->idx[0].offset);
 
     component_count = vsir_write_mask_component_count(write_mask);
     component_type = vkd3d_component_type_from_data_type(reg->data_type);
@@ -9550,7 +9565,7 @@ static uint32_t spirv_compiler_emit_query_sample_count(struct spirv_compiler *co
 
     if (src->reg.type == VKD3DSPR_RASTERIZER)
     {
-        val_id = spirv_compiler_emit_uint_shader_parameter(compiler,
+        val_id = spirv_compiler_emit_shader_parameter(compiler,
                 VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT);
     }
     else
