@@ -8152,6 +8152,8 @@ static void spirv_compiler_emit_discard(struct spirv_compiler *compiler,
     if (src->reg.data_type != VKD3D_DATA_BOOL)
         condition_id = spirv_compiler_emit_int_to_bool(compiler,
                 instruction->flags, src->reg.data_type, 1, condition_id);
+    else if (instruction->flags & VKD3D_SHADER_CONDITIONAL_OP_Z)
+        condition_id = vkd3d_spirv_build_op_logical_not(builder, vkd3d_spirv_get_op_type_bool(builder), condition_id);
     void_id = vkd3d_spirv_get_op_type_void(builder);
     vkd3d_spirv_build_op_function_call(builder, void_id, spirv_compiler_get_discard_function_id(compiler),
             &condition_id, 1);
