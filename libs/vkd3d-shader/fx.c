@@ -1016,6 +1016,68 @@ static const struct fx_write_context_ops fx_4_ops =
     .are_child_effects_supported = true,
 };
 
+static uint32_t write_fx_4_default_value(struct hlsl_type *value_type, struct hlsl_default_value *value,
+            struct fx_write_context *fx)
+{
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(value_type);
+    uint32_t elements_count = hlsl_get_multiarray_size(value_type), i, j;
+    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
+    struct hlsl_ctx *ctx = fx->ctx;
+    uint32_t offset = buffer->size;
+    unsigned int comp_count;
+
+    if (!value)
+        return 0;
+
+    comp_count = hlsl_type_component_count(type);
+
+    for (i = 0; i < elements_count; ++i)
+    {
+        switch (type->class)
+        {
+            case HLSL_CLASS_SCALAR:
+            case HLSL_CLASS_VECTOR:
+            case HLSL_CLASS_MATRIX:
+            {
+                switch (type->e.numeric.type)
+                {
+                    case HLSL_TYPE_FLOAT:
+                    case HLSL_TYPE_INT:
+                    case HLSL_TYPE_UINT:
+                    case HLSL_TYPE_BOOL:
+
+                        for (j = 0; j < comp_count; ++j)
+                        {
+                            put_u32_unaligned(buffer, value->value.u);
+                            value++;
+                        }
+                        break;
+                    default:
+                        hlsl_fixme(ctx, &ctx->location, "Writing default values for numeric type %u is not implemented.",
+                                type->e.numeric.type);
+                }
+
+                break;
+            }
+            case HLSL_CLASS_STRUCT:
+            {
+                struct hlsl_struct_field *fields = type->e.record.fields;
+
+                for (j = 0; j < type->e.record.field_count; ++j)
+                {
+                    write_fx_4_default_value(fields[i].type, value, fx);
+                    value += hlsl_type_component_count(fields[i].type);
+                }
+                break;
+            }
+            default:
+                hlsl_fixme(ctx, &ctx->location, "Writing default values for class %u is not implemented.", type->class);
+        }
+    }
+
+    return offset;
+}
+
 static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
@@ -1039,7 +1101,7 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
 
     semantic_offset = put_u32(buffer, semantic_offset); /* Semantic */
     put_u32(buffer, var->buffer_offset * 4); /* Offset in the constant buffer, in bytes. */
-    value_offset = put_u32(buffer, 0); /* Default value offset */
+    value_offset = put_u32(buffer, 0);
     put_u32(buffer, flags); /* Flags */
 
     if (shared)
@@ -1048,10 +1110,8 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
     }
     else
     {
-        /* FIXME: write default value */
-        set_u32(buffer, value_offset, 0);
-        if (var->default_values)
-            hlsl_fixme(fx->ctx, &var->loc, "Write default values.\n");
+        uint32_t offset = write_fx_4_default_value(var->data_type, var->default_values, fx);
+        set_u32(buffer, value_offset, offset);
 
         put_u32(buffer, 0); /* Annotations count */
         if (has_annotations(var))
