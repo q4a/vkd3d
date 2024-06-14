@@ -456,8 +456,10 @@ struct hlsl_ir_var
      * This pointer is NULL for others. */
     struct hlsl_default_value
     {
+        /* Default value, in case the component is a string, othewise it is NULL. */
+        const char *string;
         /* Default value, in case the component is a numeric value. */
-        union hlsl_constant_value_component value;
+        union hlsl_constant_value_component number;
     } *default_values;
 
     /* A dynamic array containing the state block on the variable's declaration, if any.

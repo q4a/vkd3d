@@ -3607,7 +3607,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
                                 hlsl_fixme(ctx, &var->loc, "Write double default values.");
 
                             set_u32(&buffer, default_value_offset + comp_offset * sizeof(uint32_t),
-                                    var->default_values[k].value.u);
+                                    var->default_values[k].number.u);
                         }
                     }
                 }

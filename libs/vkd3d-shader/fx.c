@@ -1243,7 +1243,7 @@ static uint32_t write_fx_4_default_value(struct hlsl_type *value_type, struct hl
 
                         for (j = 0; j < comp_count; ++j)
                         {
-                            put_u32_unaligned(buffer, value->value.u);
+                            put_u32_unaligned(buffer, value->number.u);
                             value++;
                         }
                         break;

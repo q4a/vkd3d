@@ -1830,17 +1830,17 @@ void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buff
                                 break;
 
                             case HLSL_TYPE_INT:
-                                uni.f = var->default_values[k].value.i;
+                                uni.f = var->default_values[k].number.i;
                                 break;
 
                             case HLSL_TYPE_UINT:
                             case HLSL_TYPE_BOOL:
-                                uni.f = var->default_values[k].value.u;
+                                uni.f = var->default_values[k].number.u;
                                 break;
 
                             case HLSL_TYPE_HALF:
                             case HLSL_TYPE_FLOAT:
-                                uni.u = var->default_values[k].value.u;
+                                uni.u = var->default_values[k].number.u;
                                 break;
 
                             default:

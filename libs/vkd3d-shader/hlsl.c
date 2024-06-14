@@ -167,7 +167,14 @@ void hlsl_free_var(struct hlsl_ir_var *decl)
     for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
         vkd3d_free((void *)decl->objects_usage[k]);
 
-    vkd3d_free(decl->default_values);
+    if (decl->default_values)
+    {
+        unsigned int component_count = hlsl_type_component_count(decl->data_type);
+
+        for (k = 0; k < component_count; ++k)
+            vkd3d_free((void *)decl->default_values[k].string);
+        vkd3d_free(decl->default_values);
+    }
 
     for (i = 0; i < decl->state_block_count; ++i)
         hlsl_free_state_block(decl->state_blocks[i]);
@@ -3280,9 +3287,15 @@ void hlsl_dump_var_default_values(const struct hlsl_ir_var *var)
     vkd3d_string_buffer_printf(&buffer, "var \"%s\" default values:", var->name);
     for (k = 0; k < component_count; ++k)
     {
-        if (k % 4 == 0)
+        bool is_string = var->default_values[k].string;
+
+        if (k % 4 == 0 || is_string)
             vkd3d_string_buffer_printf(&buffer, "\n   ");
-        vkd3d_string_buffer_printf(&buffer, " 0x%08x", var->default_values[k].value.u);
+
+        if (is_string)
+            vkd3d_string_buffer_printf(&buffer, " %s", debugstr_a(var->default_values[k].string));
+        else
+            vkd3d_string_buffer_printf(&buffer, " 0x%08x", var->default_values[k].number.u);
     }
     vkd3d_string_buffer_printf(&buffer, "\n");
 

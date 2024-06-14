@@ -598,11 +598,10 @@ static void check_loop_attributes(struct hlsl_ctx *ctx, const struct parse_attri
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Unroll attribute can't be used with 'fastopt' attribute.");
 }
 
-static union hlsl_constant_value_component evaluate_static_expression(struct hlsl_ctx *ctx,
+static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx,
         struct hlsl_block *block, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
-    union hlsl_constant_value_component ret = {0};
-    struct hlsl_ir_constant *constant;
+    struct hlsl_default_value ret = {0};
     struct hlsl_ir_node *node;
     struct hlsl_block expr;
     struct hlsl_src src;
@@ -654,8 +653,16 @@ static union hlsl_constant_value_component evaluate_static_expression(struct hls
 
     if (node->type == HLSL_IR_CONSTANT)
     {
-        constant = hlsl_ir_constant(node);
-        ret = constant->value.u[0];
+        struct hlsl_ir_constant *constant = hlsl_ir_constant(node);
+
+        ret.number = constant->value.u[0];
+    }
+    else if (node->type == HLSL_IR_STRING_CONSTANT)
+    {
+        struct hlsl_ir_string_constant *string = hlsl_ir_string_constant(node);
+
+        if (!(ret.string = vkd3d_strdup(string->string)))
+            return ret;
     }
     else if (node->type == HLSL_IR_STRING_CONSTANT)
     {
@@ -675,10 +682,11 @@ static union hlsl_constant_value_component evaluate_static_expression(struct hls
 static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct vkd3d_shader_location *loc)
 {
-    union hlsl_constant_value_component res;
+    struct hlsl_default_value res;
 
     res = evaluate_static_expression(ctx, block, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
-    return res.u;
+    VKD3D_ASSERT(!res.string);
+    return res.number.u;
 }
 
 static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
@@ -2373,7 +2381,7 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
 
             if (!hlsl_clone_block(ctx, &block, instrs))
                 return;
-            default_value.value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
+            default_value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
 
             if (dst->is_param)
                 dst_index = *store_index;
@@ -2931,14 +2939,17 @@ static bool add_user_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fu
             struct hlsl_ir_node *comp;
             struct hlsl_block store_block;
 
-            value.u[0] = param->default_values[j].value;
-            if (!(comp = hlsl_new_constant(ctx, type, &value, loc)))
-                return false;
-            hlsl_block_add_instr(args->instrs, comp);
+            if (!param->default_values[j].string)
+            {
+                value.u[0] = param->default_values[j].number;
+                if (!(comp = hlsl_new_constant(ctx, type, &value, loc)))
+                    return false;
+                hlsl_block_add_instr(args->instrs, comp);
 
-            if (!hlsl_new_store_component(ctx, &store_block, &param_deref, j, comp))
-                return false;
-            hlsl_block_add_block(args->instrs, &store_block);
+                if (!hlsl_new_store_component(ctx, &store_block, &param_deref, j, comp))
+                    return false;
+                hlsl_block_add_block(args->instrs, &store_block);
+            }
         }
     }
 
