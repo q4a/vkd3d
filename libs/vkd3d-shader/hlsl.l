@@ -208,6 +208,15 @@ while                   {return KW_WHILE;               }
                                 return NEW_IDENTIFIER;
                         }
 
+{STRING}                {
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+                            char *string = hlsl_strdup(ctx, yytext + 1);
+
+                            string[strlen(string) - 1] = 0;
+                            yylval->name = string;
+                            return STRING;
+                        }
+
 [0-9]*\.[0-9]+([eE][+-]?[0-9]+)?[h|H|f|F]? {
                             yylval->floatval = atof(yytext);
                             return C_FLOAT;

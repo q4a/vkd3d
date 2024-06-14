@@ -1499,6 +1499,24 @@ struct hlsl_ir_node *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n
     return hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &value, loc);
 }
 
+struct hlsl_ir_node *hlsl_new_string_constant(struct hlsl_ctx *ctx, const char *str,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_string_constant *s;
+
+    if (!(s = hlsl_alloc(ctx, sizeof(*s))))
+        return NULL;
+
+    init_node(&s->node, HLSL_IR_STRING_CONSTANT, ctx->builtin_types.string, loc);
+
+    if (!(s->string = hlsl_strdup(ctx, str)))
+    {
+        hlsl_free_instr(&s->node);
+        return NULL;
+    }
+    return &s->node;
+}
+
 struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *data_type, const struct vkd3d_shader_location *loc)
@@ -2054,6 +2072,11 @@ static struct hlsl_ir_node *clone_resource_store(struct hlsl_ctx *ctx,
     return &dst->node;
 }
 
+static struct hlsl_ir_node *clone_string_constant(struct hlsl_ctx *ctx, struct hlsl_ir_string_constant *src)
+{
+    return hlsl_new_string_constant(ctx, src->string, &src->node.loc);
+}
+
 static struct hlsl_ir_node *clone_store(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_store *src)
 {
     struct hlsl_ir_store *dst;
@@ -2219,6 +2242,9 @@ static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
 
         case HLSL_IR_RESOURCE_STORE:
             return clone_resource_store(ctx, map, hlsl_ir_resource_store(instr));
+
+        case HLSL_IR_STRING_CONSTANT:
+            return clone_string_constant(ctx, hlsl_ir_string_constant(instr));
 
         case HLSL_IR_STORE:
             return clone_store(ctx, map, hlsl_ir_store(instr));
@@ -2626,19 +2652,21 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
 {
     static const char * const names[] =
     {
-        [HLSL_IR_CALL          ] = "HLSL_IR_CALL",
-        [HLSL_IR_CONSTANT      ] = "HLSL_IR_CONSTANT",
-        [HLSL_IR_EXPR          ] = "HLSL_IR_EXPR",
-        [HLSL_IR_IF            ] = "HLSL_IR_IF",
-        [HLSL_IR_INDEX         ] = "HLSL_IR_INDEX",
-        [HLSL_IR_LOAD          ] = "HLSL_IR_LOAD",
-        [HLSL_IR_LOOP          ] = "HLSL_IR_LOOP",
-        [HLSL_IR_JUMP          ] = "HLSL_IR_JUMP",
-        [HLSL_IR_RESOURCE_LOAD ] = "HLSL_IR_RESOURCE_LOAD",
-        [HLSL_IR_RESOURCE_STORE] = "HLSL_IR_RESOURCE_STORE",
-        [HLSL_IR_STORE         ] = "HLSL_IR_STORE",
-        [HLSL_IR_SWITCH        ] = "HLSL_IR_SWITCH",
-        [HLSL_IR_SWIZZLE       ] = "HLSL_IR_SWIZZLE",
+        [HLSL_IR_CALL           ] = "HLSL_IR_CALL",
+        [HLSL_IR_CONSTANT       ] = "HLSL_IR_CONSTANT",
+        [HLSL_IR_EXPR           ] = "HLSL_IR_EXPR",
+        [HLSL_IR_IF             ] = "HLSL_IR_IF",
+        [HLSL_IR_INDEX          ] = "HLSL_IR_INDEX",
+        [HLSL_IR_LOAD           ] = "HLSL_IR_LOAD",
+        [HLSL_IR_LOOP           ] = "HLSL_IR_LOOP",
+        [HLSL_IR_JUMP           ] = "HLSL_IR_JUMP",
+        [HLSL_IR_RESOURCE_LOAD  ] = "HLSL_IR_RESOURCE_LOAD",
+        [HLSL_IR_RESOURCE_STORE ] = "HLSL_IR_RESOURCE_STORE",
+        [HLSL_IR_STRING_CONSTANT] = "HLSL_IR_STRING_CONSTANT",
+        [HLSL_IR_STORE          ] = "HLSL_IR_STORE",
+        [HLSL_IR_SWITCH         ] = "HLSL_IR_SWITCH",
+        [HLSL_IR_SWIZZLE        ] = "HLSL_IR_SWIZZLE",
+        [HLSL_IR_STATEBLOCK_CONSTANT] = "HLSL_IR_STATEBLOCK_CONSTANT",
     };
 
     if (type >= ARRAY_SIZE(names))
@@ -3044,6 +3072,11 @@ static void dump_ir_resource_store(struct vkd3d_string_buffer *buffer, const str
     vkd3d_string_buffer_printf(buffer, ")");
 }
 
+static void dump_ir_string(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_string_constant *string)
+{
+    vkd3d_string_buffer_printf(buffer, "\"%s\"", debugstr_a(string->string));
+}
+
 static void dump_ir_store(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_store *store)
 {
     vkd3d_string_buffer_printf(buffer, "= (");
@@ -3161,6 +3194,10 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 
         case HLSL_IR_RESOURCE_STORE:
             dump_ir_resource_store(buffer, hlsl_ir_resource_store(instr));
+            break;
+
+        case HLSL_IR_STRING_CONSTANT:
+            dump_ir_string(buffer, hlsl_ir_string_constant(instr));
             break;
 
         case HLSL_IR_STORE:
@@ -3341,6 +3378,12 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
     vkd3d_free(load);
 }
 
+static void free_ir_string_constant(struct hlsl_ir_string_constant *string)
+{
+    vkd3d_free(string->string);
+    vkd3d_free(string);
+}
+
 static void free_ir_resource_store(struct hlsl_ir_resource_store *store)
 {
     hlsl_cleanup_deref(&store->resource);
@@ -3423,6 +3466,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_RESOURCE_LOAD:
             free_ir_resource_load(hlsl_ir_resource_load(node));
+            break;
+
+        case HLSL_IR_STRING_CONSTANT:
+            free_ir_string_constant(hlsl_ir_string_constant(node));
             break;
 
         case HLSL_IR_RESOURCE_STORE:
@@ -3868,6 +3915,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         ctx->builtin_types.sampler[bt] = type;
     }
 
+    ctx->builtin_types.string = hlsl_new_simple_type(ctx, "STRING", HLSL_CLASS_STRING);
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilView", HLSL_CLASS_DEPTH_STENCIL_VIEW));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilState", HLSL_CLASS_DEPTH_STENCIL_STATE));
@@ -3876,7 +3924,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "pixelshader", HLSL_CLASS_PIXEL_SHADER));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "RasterizerState", HLSL_CLASS_RASTERIZER_STATE));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "RenderTargetView", HLSL_CLASS_RENDER_TARGET_VIEW));
-    hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "STRING", HLSL_CLASS_STRING));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "texture", HLSL_CLASS_TEXTURE));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "vertexshader", HLSL_CLASS_VERTEX_SHADER));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "ComputeShader", HLSL_CLASS_COMPUTE_SHADER));

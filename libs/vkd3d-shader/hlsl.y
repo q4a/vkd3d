@@ -590,6 +590,7 @@ static union hlsl_constant_value_component evaluate_static_expression(struct hls
         {
             case HLSL_IR_CONSTANT:
             case HLSL_IR_EXPR:
+            case HLSL_IR_STRING_CONSTANT:
             case HLSL_IR_SWIZZLE:
             case HLSL_IR_LOAD:
             case HLSL_IR_INDEX:
@@ -632,6 +633,10 @@ static union hlsl_constant_value_component evaluate_static_expression(struct hls
     {
         constant = hlsl_ir_constant(node);
         ret = constant->value.u[0];
+    }
+    else if (node->type == HLSL_IR_STRING_CONSTANT)
+    {
+        hlsl_fixme(ctx, &node->loc, "Evaluate string constants as static expressions.");
     }
     else
     {
@@ -8258,6 +8263,23 @@ primary_expr:
 
             if (!(c = hlsl_new_bool_constant(ctx, $1, &@1)))
                 YYABORT;
+            if (!($$ = make_block(ctx, c)))
+            {
+                hlsl_free_instr(c);
+                YYABORT;
+            }
+        }
+    | STRING
+        {
+            struct hlsl_ir_node *c;
+
+            if (!(c = hlsl_new_string_constant(ctx, $1, &@1)))
+            {
+                vkd3d_free($1);
+                YYABORT;
+            }
+            vkd3d_free($1);
+
             if (!($$ = make_block(ctx, c)))
             {
                 hlsl_free_instr(c);

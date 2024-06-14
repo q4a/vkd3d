@@ -3933,6 +3933,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
         case HLSL_IR_INDEX:
         case HLSL_IR_LOAD:
         case HLSL_IR_RESOURCE_LOAD:
+        case HLSL_IR_STRING_CONSTANT:
         case HLSL_IR_SWIZZLE:
             if (list_empty(&instr->uses))
             {
@@ -4213,6 +4214,7 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             break;
         }
         case HLSL_IR_CONSTANT:
+        case HLSL_IR_STRING_CONSTANT:
             break;
         }
     }

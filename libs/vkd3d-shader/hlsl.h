@@ -309,6 +309,7 @@ enum hlsl_ir_node_type
     HLSL_IR_JUMP,
     HLSL_IR_RESOURCE_LOAD,
     HLSL_IR_RESOURCE_STORE,
+    HLSL_IR_STRING_CONSTANT,
     HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
     HLSL_IR_SWITCH,
@@ -841,6 +842,12 @@ struct hlsl_ir_constant
     struct hlsl_reg reg;
 };
 
+struct hlsl_ir_string_constant
+{
+    struct hlsl_ir_node node;
+    char *string;
+};
+
 /* Stateblock constants are undeclared values found on state blocks or technique passes descriptions,
  *   that do not concern regular pixel, vertex, or compute shaders, except for parsing. */
 struct hlsl_ir_stateblock_constant
@@ -987,6 +994,7 @@ struct hlsl_ctx
         /* matrix[HLSL_TYPE_FLOAT][1][3] is a float4x2, i.e. dimx = 2, dimy = 4 */
         struct hlsl_type *matrix[HLSL_TYPE_LAST_SCALAR + 1][4][4];
         struct hlsl_type *sampler[HLSL_SAMPLER_DIM_LAST_SAMPLER + 1];
+        struct hlsl_type *string;
         struct hlsl_type *Void;
     } builtin_types;
 
@@ -1060,6 +1068,12 @@ static inline struct hlsl_ir_constant *hlsl_ir_constant(const struct hlsl_ir_nod
 {
     VKD3D_ASSERT(node->type == HLSL_IR_CONSTANT);
     return CONTAINING_RECORD(node, struct hlsl_ir_constant, node);
+}
+
+static inline struct hlsl_ir_string_constant *hlsl_ir_string_constant(const struct hlsl_ir_node *node)
+{
+    VKD3D_ASSERT(node->type == HLSL_IR_STRING_CONSTANT);
+    return CONTAINING_RECORD(node, struct hlsl_ir_string_constant, node);
 }
 
 static inline struct hlsl_ir_expr *hlsl_ir_expr(const struct hlsl_ir_node *node)
@@ -1421,6 +1435,8 @@ struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_stateblock_constant(struct hlsl_ctx *ctx, const char *name,
         struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_new_string_constant(struct hlsl_ctx *ctx, const char *str,
+        const struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *template,
         struct hlsl_type *type, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_synthetic_var_named(struct hlsl_ctx *ctx, const char *name,

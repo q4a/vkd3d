@@ -18,7 +18,7 @@ sampler sam
 float4 main() : sv_target { return 0; }
 
 
-[pixel shader todo]
+[pixel shader]
 sampler sam
 {
     SetComputeShader("random string");

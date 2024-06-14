@@ -420,7 +420,7 @@ float4 main() : sv_target { return 0; }
 
 
 % State blocks may have bracket initializers on the rhs.
-[pixel shader todo]
+[pixel shader]
 sampler sam
 {
     MaxAnisotropy = 3;
@@ -475,7 +475,7 @@ float4 main() : sv_target { return 0; }
 
 
 % Same rules apply for technique passes
-[pixel shader todo]
+[pixel shader]
 technique
 {
     pass
