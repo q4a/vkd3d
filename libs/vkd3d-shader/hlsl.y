@@ -2224,6 +2224,9 @@ static unsigned int get_component_index_from_default_initializer_index(struct hl
     if (ctx->profile->major_version < 4)
         return index;
 
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT)
+        return index;
+
     switch (type->class)
     {
         case HLSL_CLASS_MATRIX:
