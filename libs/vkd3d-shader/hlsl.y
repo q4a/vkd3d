@@ -2625,7 +2625,8 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             unsigned int size, k;
 
             is_default_values_initializer = (ctx->cur_buffer != ctx->globals_buffer)
-                    || (var->storage_modifiers & HLSL_STORAGE_UNIFORM);
+                    || (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
+                    || ctx->cur_scope->annotations;
 
             if (is_default_values_initializer)
             {
@@ -6058,19 +6059,31 @@ pass:
 
 annotations_list:
       variables_def_typed ';'
+        {
+            struct hlsl_block *block;
+
+            block = initialize_vars(ctx, $1);
+            destroy_block(block);
+        }
     | annotations_list variables_def_typed ';'
+        {
+            struct hlsl_block *block;
+
+            block = initialize_vars(ctx, $2);
+            destroy_block(block);
+        }
 
 annotations_opt:
       %empty
         {
             $$ = NULL;
         }
-    | '<' scope_start '>'
+    | '<' annotations_scope_start '>'
         {
             hlsl_pop_scope(ctx);
             $$ = NULL;
         }
-    | '<' scope_start annotations_list '>'
+    | '<' annotations_scope_start annotations_list '>'
         {
             struct hlsl_scope *scope = ctx->cur_scope;
 
@@ -6596,6 +6609,13 @@ switch_scope_start:
         {
             hlsl_push_scope(ctx);
             ctx->cur_scope->_switch = true;
+        }
+
+annotations_scope_start:
+      %empty
+        {
+            hlsl_push_scope(ctx);
+            ctx->cur_scope->annotations = true;
         }
 
 var_identifier:

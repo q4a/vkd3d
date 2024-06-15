@@ -388,6 +388,7 @@ struct hlsl_attribute
 #define HLSL_STORAGE_LINEAR              0x00010000
 #define HLSL_MODIFIER_SINGLE             0x00020000
 #define HLSL_MODIFIER_EXPORT             0x00040000
+#define HLSL_STORAGE_ANNOTATION          0x00080000
 
 #define HLSL_TYPE_MODIFIERS_MASK     (HLSL_MODIFIER_PRECISE | HLSL_MODIFIER_VOLATILE | \
                                       HLSL_MODIFIER_CONST | HLSL_MODIFIER_ROW_MAJOR | \
@@ -841,6 +842,8 @@ struct hlsl_scope
     bool loop;
     /* The scope was created for the switch statement. */
     bool _switch;
+    /* The scope contains annotation variables. */
+    bool annotations;
 };
 
 struct hlsl_profile_info

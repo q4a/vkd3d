@@ -70,7 +70,7 @@ technique10
 // Without initializer
 technique10 < int a; > {}
 
-[effect fail todo]
+[effect fail]
 // Only numeric types and strings are allowed
 technique10 < DepthStencilState ds = { 0 }; > {}
 
@@ -82,9 +82,9 @@ technique10 < struct s { int a; } var = { 2 }; > {}
 // Static modifier is not allowed
 technique10 < static int a = 5; > {}
 
-[effect fail todo]
+[effect fail]
 // Initializer should not depend on other annotations
 technique10 < int a = 1, b = a; > {}
 
-[effect fail todo]
+[effect fail]
 technique10 < int a = 1; int b = a; > {}
