@@ -2629,7 +2629,14 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
 
             if (is_default_values_initializer)
             {
-                assert(!var->default_values);
+                /* Default values might have been allocated already for another variable of the same name,
+                   in the same scope. */
+                if (var->default_values)
+                {
+                    free_parse_variable_def(v);
+                    continue;
+                }
+
                 if (!(var->default_values = hlsl_calloc(ctx, component_count, sizeof(*var->default_values))))
                 {
                     free_parse_variable_def(v);
