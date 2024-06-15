@@ -63,6 +63,7 @@ struct fx_write_context_ops
     uint32_t (*write_string)(const char *string, struct fx_write_context *fx);
     void (*write_technique)(struct hlsl_ir_var *var, struct fx_write_context *fx);
     void (*write_pass)(struct hlsl_ir_var *var, struct fx_write_context *fx);
+    void (*write_annotation)(struct hlsl_ir_var *var, struct fx_write_context *fx);
     bool are_child_effects_supported;
 };
 
@@ -130,8 +131,41 @@ static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
     fx->ops->write_pass(var, fx);
 }
 
+static uint32_t write_annotations(struct hlsl_scope *scope, struct fx_write_context *fx)
+{
+    struct hlsl_ctx *ctx = fx->ctx;
+    struct hlsl_ir_var *v;
+    uint32_t count = 0;
+
+    if (!scope)
+        return 0;
+
+    LIST_FOR_EACH_ENTRY(v, &scope->vars, struct hlsl_ir_var, scope_entry)
+    {
+        if (!v->default_values)
+            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                    "Annotation variable is missing default value.");
+
+        fx->ops->write_annotation(v, fx);
+        ++count;
+    }
+
+    return count;
+}
+
+static void write_fx_4_annotations(struct hlsl_scope *scope, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t count_offset, count;
+
+    count_offset = put_u32(buffer, 0);
+    count = write_annotations(scope, fx);
+    set_u32(buffer, count_offset, count);
+}
+
 static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx);
 static const char * get_fx_4_type_name(const struct hlsl_type *type);
+static void write_fx_4_annotation(struct hlsl_ir_var *var, struct fx_write_context *fx);
 
 static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
@@ -281,9 +315,9 @@ static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
     put_u32(buffer, 0); /* Assignment count. */
-    put_u32(buffer, 0); /* Annotation count. */
 
-    /* TODO: annotations */
+    write_fx_4_annotations(var->annotations, fx);
+
     /* TODO: assignments */
 }
 
@@ -629,8 +663,9 @@ static void write_fx_4_technique(struct hlsl_ir_var *var, struct fx_write_contex
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
     count_offset = put_u32(buffer, 0);
-    put_u32(buffer, 0); /* Annotation count. */
+    write_fx_4_annotations(var->annotations, fx);
 
+    count = 0;
     LIST_FOR_EACH_ENTRY(pass, &var->scope->vars, struct hlsl_ir_var, scope_entry)
     {
         write_pass(pass, fx);
@@ -665,7 +700,7 @@ static void write_group(struct hlsl_ir_var *var, struct fx_write_context *fx)
 
     put_u32(buffer, name_offset);
     count_offset = put_u32(buffer, 0); /* Technique count */
-    put_u32(buffer, 0); /* Annotation count */
+    write_fx_4_annotations(var ? var->annotations : NULL, fx);
 
     count = fx->technique_count;
     write_techniques(var ? var->scope : fx->ctx->globals, fx);
@@ -1026,6 +1061,7 @@ static const struct fx_write_context_ops fx_4_ops =
     .write_string = write_fx_4_string,
     .write_technique = write_fx_4_technique,
     .write_pass = write_fx_4_pass,
+    .write_annotation = write_fx_4_annotation,
     .are_child_effects_supported = true,
 };
 
@@ -1100,7 +1136,6 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
     {
         HAS_EXPLICIT_BIND_POINT = 0x4,
     };
-    struct hlsl_ctx *ctx = fx->ctx;
 
     if (var->has_explicit_bind_point)
         flags |= HAS_EXPLICIT_BIND_POINT;
@@ -1126,11 +1161,33 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
         uint32_t offset = write_fx_4_default_value(var->data_type, var->default_values, fx);
         set_u32(buffer, value_offset, offset);
 
-        put_u32(buffer, 0); /* Annotations count */
-        if (has_annotations(var))
-            hlsl_fixme(ctx, &ctx->location, "Writing annotations for numeric variables is not implemented.");
+        write_fx_4_annotations(var->annotations, fx);
 
         fx->numeric_variable_count++;
+    }
+}
+
+static void write_fx_4_annotation(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t name_offset, type_offset, offset;
+    struct hlsl_ctx *ctx = fx->ctx;
+
+    name_offset = write_string(var->name, fx);
+    type_offset = write_type(var->data_type, fx);
+
+    put_u32(buffer, name_offset);
+    put_u32(buffer, type_offset);
+
+    if (hlsl_is_numeric_type(type))
+    {
+        offset = write_fx_4_default_value(var->data_type, var->default_values, fx);
+        put_u32(buffer, offset);
+    }
+    else
+    {
+        hlsl_fixme(ctx, &var->loc, "Writing annotations for type class %u is not implemented.", type->class);
     }
 }
 
@@ -1654,9 +1711,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
                     type->e.numeric.type);
     }
 
-    put_u32(buffer, 0); /* Annotations count */
-    if (has_annotations(var))
-        hlsl_fixme(ctx, &ctx->location, "Writing annotations for object variables is not implemented.");
+    write_fx_4_annotations(var->annotations, fx);
 
     ++fx->object_variable_count;
 }
@@ -1699,9 +1754,7 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
     }
     else
     {
-        put_u32(buffer, 0); /* Annotations count */
-        if (b->annotations)
-            hlsl_fixme(ctx, &b->loc, "Writing annotations for buffers is not implemented.");
+        write_fx_4_annotations(b->annotations, fx);
         ++fx->buffer_count;
     }
 

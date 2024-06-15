@@ -66,7 +66,7 @@ technique10
     pass < int a = 0; float a = 1.0; > {}
 }
 
-[effect fail todo]
+[effect fail]
 // Without initializer
 technique10 < int a; > {}
 
