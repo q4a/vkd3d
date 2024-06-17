@@ -114,48 +114,48 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     unsigned int buffer_offset = 0;
     D3D12_RESOURCE_STATES state;
 
-    if (params->level_count > ARRAY_SIZE(resource_data))
-        fatal_error("Level count %u is too high.\n", params->level_count);
+    if (params->desc.level_count > ARRAY_SIZE(resource_data))
+        fatal_error("Level count %u is too high.\n", params->desc.level_count);
 
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
-    for (unsigned int level = 0; level < params->level_count; ++level)
+    for (unsigned int level = 0; level < params->desc.level_count; ++level)
     {
-        unsigned int level_width = get_level_dimension(params->width, level);
-        unsigned int level_height = get_level_dimension(params->height, level);
+        unsigned int level_width = get_level_dimension(params->desc.width, level);
+        unsigned int level_height = get_level_dimension(params->desc.height, level);
 
         resource_data[level].pData = &params->data[buffer_offset];
-        resource_data[level].RowPitch = level_width * params->texel_size;
+        resource_data[level].RowPitch = level_width * params->desc.texel_size;
         resource_data[level].SlicePitch = level_height * resource_data[level].RowPitch;
         buffer_offset += resource_data[level].SlicePitch;
     }
 
-    switch (params->type)
+    switch (params->desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
             if (!runner->rtv_heap)
                 runner->rtv_heap = create_cpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_RTV, MAX_RESOURCE_DESCRIPTORS);
 
-            if (params->slot >= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT)
-                fatal_error("RTV slot %u is too high.\n", params->slot);
-            if (params->sample_count > 1 && params->level_count > 1)
+            if (params->desc.slot >= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT)
+                fatal_error("RTV slot %u is too high.\n", params->desc.slot);
+            if (params->desc.sample_count > 1 && params->desc.level_count > 1)
                 fatal_error("Multisampled texture has multiple levels.\n");
 
             resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                    params->width, params->height, 1, params->level_count, params->sample_count, params->format,
+                    params->desc.width, params->desc.height, 1, params->desc.level_count, params->desc.sample_count, params->desc.format,
                     D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
-                    NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot));
+                    NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.desc.slot));
             break;
 
         case RESOURCE_TYPE_DEPTH_STENCIL:
             if (!runner->dsv_heap)
                 runner->dsv_heap = create_cpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
 
-            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
-                    params->format, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+            resource->resource = create_default_texture2d(device, params->desc.width, params->desc.height, 1, params->desc.level_count,
+                    params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_RESOURCE_STATE_DEPTH_WRITE);
             ID3D12Device_CreateDepthStencilView(device, resource->resource,
                     NULL, get_cpu_dsv_handle(test_context, runner->dsv_heap, 0));
             break;
@@ -165,7 +165,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
             {
                 D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = { 0 };
 
@@ -177,38 +177,38 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                         D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
                 reset_command_list(test_context->list, test_context->allocator);
 
-                srv_desc.Format = params->format;
+                srv_desc.Format = params->desc.format;
                 srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
                 srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                srv_desc.Buffer.NumElements = params->width * params->height;
+                srv_desc.Buffer.NumElements = params->desc.width * params->desc.height;
 
                 ID3D12Device_CreateShaderResourceView(device, resource->resource,
-                        &srv_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                        &srv_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot));
             }
             else
             {
-                if (params->sample_count > 1 && params->level_count > 1)
+                if (params->desc.sample_count > 1 && params->desc.level_count > 1)
                     fatal_error("Multisampled texture has multiple levels.\n");
 
                 resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                        params->width, params->height, 1, params->level_count, params->sample_count, params->format,
+                        params->desc.width, params->desc.height, 1, params->desc.level_count, params->desc.sample_count, params->desc.format,
                         /* Multisampled textures must have ALLOW_RENDER_TARGET set. */
-                        (params->sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0,
+                        (params->desc.sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0,
                         D3D12_RESOURCE_STATE_COPY_DEST);
 
                 if (params->data)
                 {
-                    if (params->sample_count > 1)
+                    if (params->desc.sample_count > 1)
                         fatal_error("Cannot upload data to a multisampled texture.\n");
                     upload_texture_data_with_states(resource->resource, resource_data,
-                            params->level_count, test_context->queue, test_context->list,
+                            params->desc.level_count, test_context->queue, test_context->list,
                             RESOURCE_STATE_DO_NOT_CHANGE,
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
                     reset_command_list(test_context->list, test_context->allocator);
                 }
 
                 ID3D12Device_CreateShaderResourceView(device, resource->resource,
-                        NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                        NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot));
             }
             break;
 
@@ -217,7 +217,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
             {
                 D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = { 0 };
 
@@ -228,30 +228,30 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                         RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
                 reset_command_list(test_context->list, test_context->allocator);
 
-                uav_desc.Format = params->format;
+                uav_desc.Format = params->desc.format;
                 uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                uav_desc.Buffer.NumElements = params->width * params->height;
+                uav_desc.Buffer.NumElements = params->desc.width * params->desc.height;
                 uav_desc.Buffer.StructureByteStride = params->stride;
                 uav_desc.Buffer.Flags = params->is_raw ? D3D12_BUFFER_UAV_FLAG_RAW : 0;
 
                 ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
                         params->is_uav_counter ? resource->resource : NULL, &uav_desc,
-                        get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                        get_cpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot + MAX_RESOURCES));
             }
             else
             {
                 state = params->data ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
-                        params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, state);
+                resource->resource = create_default_texture2d(device, params->desc.width, params->desc.height, 1, params->desc.level_count,
+                        params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, state);
                 if (params->data)
                 {
                     upload_texture_data_with_states(resource->resource, resource_data,
-                            params->level_count, test_context->queue, test_context->list,
+                            params->desc.level_count, test_context->queue, test_context->list,
                             RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
                     reset_command_list(test_context->list, test_context->allocator);
                 }
                 ID3D12Device_CreateUnorderedAccessView(device, resource->resource, NULL, NULL,
-                        get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                        get_cpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot + MAX_RESOURCES));
             }
             break;
 
@@ -306,13 +306,13 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
         struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
         D3D12_DESCRIPTOR_RANGE *range;
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
                 range = &resource->descriptor_range;
 
-                if (base_resource && resource->r.type == base_resource->r.type && resource->r.slot == slot + 1)
+                if (base_resource && resource->r.desc.type == base_resource->r.desc.type && resource->r.desc.slot == slot + 1)
                 {
                     ++base_resource->descriptor_range.NumDescriptors;
                     resource->descriptor_range.NumDescriptors = 0;
@@ -327,17 +327,17 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
                 root_param->DescriptorTable.pDescriptorRanges = range;
                 root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                if (resource->r.type == RESOURCE_TYPE_UAV)
+                if (resource->r.desc.type == RESOURCE_TYPE_UAV)
                     range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                 else
                     range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                 range->NumDescriptors = 1;
-                range->BaseShaderRegister = resource->r.slot;
+                range->BaseShaderRegister = resource->r.desc.slot;
                 range->RegisterSpace = 0;
                 range->OffsetInDescriptorsFromTableStart = 0;
 
                 base_resource = resource;
-                slot = resource->r.slot;
+                slot = resource->r.desc.slot;
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
@@ -424,18 +424,18 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     {
         struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_TEXTURE:
                 if (resource->descriptor_range.NumDescriptors)
                     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
-                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot));
                 break;
 
             case RESOURCE_TYPE_UAV:
                 if (resource->descriptor_range.NumDescriptors)
                     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
-                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot + MAX_RESOURCES));
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
@@ -472,10 +472,10 @@ static void d3d12_runner_clear(struct shader_runner *r, struct resource *resourc
     D3D12_CPU_DESCRIPTOR_HANDLE view;
     HRESULT hr;
 
-    switch (resource->type)
+    switch (resource->desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
-            view = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->slot);
+            view = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->desc.slot);
             ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, view, (const float *)clear_value, 0, NULL);
             break;
 
@@ -486,7 +486,7 @@ static void d3d12_runner_clear(struct shader_runner *r, struct resource *resourc
             break;
 
         default:
-            fatal_error("Clears are not implemented for resource type %u.\n", resource->type);
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->desc.type);
     }
 
     hr = ID3D12GraphicsCommandList_Close(command_list);
@@ -588,18 +588,18 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     {
         struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
 
-        if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
+        if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
         {
-            pso_desc.RTVFormats[resource->r.slot] = resource->r.format;
-            pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.slot + 1);
-            pso_desc.BlendState.RenderTarget[resource->r.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-            if (resource->r.sample_count)
-                sample_count = resource->r.sample_count;
+            pso_desc.RTVFormats[resource->r.desc.slot] = resource->r.desc.format;
+            pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.desc.slot + 1);
+            pso_desc.BlendState.RenderTarget[resource->r.desc.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+            if (resource->r.desc.sample_count)
+                sample_count = resource->r.desc.sample_count;
         }
-        else if (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
         {
-            assert(!resource->r.slot);
-            pso_desc.DSVFormat = resource->r.format;
+            assert(!resource->r.desc.slot);
+            pso_desc.DSVFormat = resource->r.desc.format;
             pso_desc.DepthStencilState.DepthEnable = true;
             pso_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
             pso_desc.DepthStencilState.DepthFunc = runner->r.depth_func;
@@ -675,11 +675,11 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
         D3D12_VERTEX_BUFFER_VIEW vbv;
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
-                rtvs[resource->r.slot] = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot);
-                rtv_count = max(rtv_count, resource->r.slot + 1);
+                rtvs[resource->r.desc.slot] = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.desc.slot);
+                rtv_count = max(rtv_count, resource->r.desc.slot + 1);
                 break;
 
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -689,21 +689,21 @@ static bool d3d12_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_TEXTURE:
                 if (resource->descriptor_range.NumDescriptors)
                     ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
-                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot));
                 break;
 
             case RESOURCE_TYPE_UAV:
                 if (resource->descriptor_range.NumDescriptors)
                     ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
-                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot + MAX_RESOURCES));
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(resource->resource);
-                vbv.StrideInBytes = get_vb_stride(&runner->r, resource->r.slot);
-                vbv.SizeInBytes = resource->r.width;
+                vbv.StrideInBytes = get_vb_stride(&runner->r, resource->r.desc.slot);
+                vbv.SizeInBytes = resource->r.desc.width;
 
-                ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, resource->r.slot, 1, &vbv);
+                ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, resource->r.desc.slot, 1, &vbv);
                 break;
         }
     }
@@ -734,9 +734,9 @@ static struct resource_readback *d3d12_runner_get_resource_readback(struct shade
     struct d3d12_resource *resource = d3d12_resource(res);
     D3D12_RESOURCE_STATES state;
 
-    if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
+    if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
         state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    else if (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+    else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
         state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     else
         state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;

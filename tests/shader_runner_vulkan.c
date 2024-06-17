@@ -268,20 +268,20 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
 {
     VkImageUsageFlagBits usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    VkFormat format = vkd3d_get_vk_format(params->format);
+    VkFormat format = vkd3d_get_vk_format(params->desc.format);
     VkDevice device = runner->device;
     unsigned int buffer_offset = 0;
     VkDeviceMemory staging_memory;
     VkBuffer staging_buffer;
     void *data;
 
-    if (params->type == RESOURCE_TYPE_UAV)
+    if (params->desc.type == RESOURCE_TYPE_UAV)
     {
         layout = VK_IMAGE_LAYOUT_GENERAL;
         usage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
 
-    resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
+    resource->image = create_2d_image(runner, params->desc.width, params->desc.height, params->desc.level_count,
             usage, format, &resource->memory);
     resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -305,10 +305,10 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
     transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    for (unsigned int level = 0; level < params->level_count; ++level)
+    for (unsigned int level = 0; level < params->desc.level_count; ++level)
     {
-        unsigned int level_width = get_level_dimension(params->width, level);
-        unsigned int level_height = get_level_dimension(params->height, level);
+        unsigned int level_width = get_level_dimension(params->desc.width, level);
+        unsigned int level_height = get_level_dimension(params->desc.height, level);
         VkBufferImageCopy region = {0};
 
         region.bufferOffset = buffer_offset;
@@ -321,7 +321,7 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
         VK_CALL(vkCmdCopyBufferToImage(runner->cmd_buffer, staging_buffer, resource->image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 
-        buffer_offset += level_width * level_height * params->texel_size;
+        buffer_offset += level_width * level_height * params->desc.texel_size;
     }
 
     transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout);
@@ -335,12 +335,12 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
 static void resource_init_buffer(struct vulkan_shader_runner *runner, struct vulkan_resource *resource,
         const struct resource_params *params)
 {
-    VkFormat format = vkd3d_get_vk_format(params->format);
+    VkFormat format = vkd3d_get_vk_format(params->desc.format);
     VkDevice device = runner->device;
     VkBufferUsageFlagBits usage;
     void *data;
 
-    if (params->type == RESOURCE_TYPE_UAV)
+    if (params->desc.type == RESOURCE_TYPE_UAV)
         usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
     else
         usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
@@ -369,12 +369,12 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
-    switch (params->type)
+    switch (params->desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
-            format = vkd3d_get_vk_format(params->format);
+            format = vkd3d_get_vk_format(params->desc.format);
 
-            resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
+            resource->image = create_2d_image(runner, params->desc.width, params->desc.height, params->desc.level_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
             resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -385,9 +385,9 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             break;
 
         case RESOURCE_TYPE_DEPTH_STENCIL:
-            format = vkd3d_get_vk_format(params->format);
+            format = vkd3d_get_vk_format(params->desc.format);
 
-            resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
+            resource->image = create_2d_image(runner, params->desc.width, params->desc.height, params->desc.level_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, format,
                     &resource->memory);
             resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -400,7 +400,7 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
-            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 resource_init_buffer(runner, resource, params);
             else
                 resource_init_2d(runner, resource, params);
@@ -553,7 +553,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     {
         const struct vulkan_resource *resource = vulkan_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -563,14 +563,14 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
                 binding = &bindings[interface_info.binding_count++];
-                if (resource->r.type == RESOURCE_TYPE_UAV)
+                if (resource->r.desc.type == RESOURCE_TYPE_UAV)
                     binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
                 else
                     binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
                 binding->register_space = 0;
-                binding->register_index = resource->r.slot;
+                binding->register_index = resource->r.desc.slot;
                 binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
-                if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
                     binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
                 else
                     binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
@@ -792,7 +792,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     {
         const struct vulkan_resource *resource = vulkan_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
@@ -822,13 +822,13 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
             {
                 VkVertexInputBindingDescription *binding = &input_bindings[input_desc.vertexBindingDescriptionCount++];
 
-                binding->binding = resource->r.slot;
+                binding->binding = resource->r.desc.slot;
                 binding->stride = 0;
                 binding->inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
                 for (j = 0; j < runner->r.input_element_count; ++j)
                 {
-                    if (runner->r.input_elements[j].slot == resource->r.slot)
+                    if (runner->r.input_elements[j].slot == resource->r.desc.slot)
                     {
                         input_attributes[j].offset = binding->stride;
                         binding->stride += runner->r.input_elements[j].texel_size;
@@ -943,7 +943,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
     {
         struct vulkan_resource *resource = vulkan_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -957,16 +957,16 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
                 resource->binding = binding_index++;
 
                 binding->binding = resource->binding;
-                if (resource->r.type == RESOURCE_TYPE_UAV)
+                if (resource->r.desc.type == RESOURCE_TYPE_UAV)
                 {
-                    if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                    if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
                         binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
                     else
                         binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                 }
                 else
                 {
-                    if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                    if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
                         binding->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
                     else
                         binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -1032,11 +1032,11 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
         static const VkDeviceSize zero_offset;
         VkDescriptorImageInfo image_info;
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
-                if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 {
                     write.dstSet = descriptor_set;
                     write.dstBinding = resource->binding;
@@ -1045,7 +1045,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                     write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
                     write.pTexelBufferView = &resource->buffer_view;
 
-                    if (resource->r.type == RESOURCE_TYPE_UAV)
+                    if (resource->r.desc.type == RESOURCE_TYPE_UAV)
                         write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
 
                     VK_CALL(vkUpdateDescriptorSets(runner->device, 1, &write, 0, NULL));
@@ -1062,7 +1062,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                     write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                     write.pImageInfo = &image_info;
 
-                    if (resource->r.type == RESOURCE_TYPE_UAV)
+                    if (resource->r.desc.type == RESOURCE_TYPE_UAV)
                     {
                         image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                         write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -1074,7 +1074,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 if (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS)
-                    VK_CALL(vkCmdBindVertexBuffers(cmd_buffer, resource->r.slot, 1, &resource->buffer, &zero_offset));
+                    VK_CALL(vkCmdBindVertexBuffers(cmd_buffer, resource->r.desc.slot, 1, &resource->buffer, &zero_offset));
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
@@ -1111,13 +1111,13 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
         VkAttachmentDescription *attachment_desc = &attachment_descs[view_count];
         VkAttachmentReference *color_ref = &color_refs[color_ref_count];
 
-        if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.type != RESOURCE_TYPE_DEPTH_STENCIL)
+        if (resource->r.desc.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.desc.type != RESOURCE_TYPE_DEPTH_STENCIL)
             continue;
 
-        is_ds = resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL;
+        is_ds = resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL;
         layout = is_ds ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        attachment_desc->format = vkd3d_get_vk_format(resource->r.format);
+        attachment_desc->format = vkd3d_get_vk_format(resource->r.desc.format);
         attachment_desc->samples = VK_SAMPLE_COUNT_1_BIT;
         attachment_desc->loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
         attachment_desc->storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1211,7 +1211,7 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
     struct vulkan_resource *resource = vulkan_resource(res);
 
-    size_t width = resource->r.width, height = resource->r.height;
+    size_t width = resource->r.desc.width, height = resource->r.desc.height;
     VkSubpassDescription sub_pass_desc = {0};
     VkAttachmentDescription attachment_desc;
     VkRenderPassCreateInfo pass_desc = {0};
@@ -1224,7 +1224,7 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
     VkFramebuffer fb;
 
     attachment_desc.flags = 0;
-    attachment_desc.format = vkd3d_get_vk_format(resource->r.format);
+    attachment_desc.format = vkd3d_get_vk_format(resource->r.desc.format);
     attachment_desc.samples = VK_SAMPLE_COUNT_1_BIT;
     attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1234,7 +1234,7 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
 
     sub_pass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-    switch (resource->r.type)
+    switch (resource->r.desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
             attachment_desc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1251,7 +1251,7 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
             break;
 
         default:
-            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.type);
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.desc.type);
     }
 
     attachment_desc.finalLayout = attachment_desc.initialLayout;
@@ -1374,16 +1374,16 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     VkBufferImageCopy region = {0};
     VkImageLayout layout;
 
-    rb->rb.width = resource->r.width;
-    rb->rb.height = resource->r.height;
+    rb->rb.width = resource->r.desc.width;
+    rb->rb.height = resource->r.desc.height;
     rb->rb.depth = 1;
 
-    rb->rb.row_pitch = rb->rb.width * resource->r.texel_size;
+    rb->rb.row_pitch = rb->rb.width * resource->r.desc.texel_size;
 
     rb->buffer = create_buffer(runner, rb->rb.row_pitch * rb->rb.height,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &rb->memory);
 
-    if (resource->r.type == RESOURCE_TYPE_UAV && resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+    if (resource->r.desc.type == RESOURCE_TYPE_UAV && resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
     {
         void *data;
 
@@ -1394,12 +1394,12 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     }
     else
     {
-        aspect_mask = (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        aspect_mask = (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
                 ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
-        if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
+        if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
             layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        else if (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
             layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         else
             layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -1410,8 +1410,8 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
 
         region.imageSubresource.aspectMask = aspect_mask;
         region.imageSubresource.layerCount = 1;
-        region.imageExtent.width = resource->r.width;
-        region.imageExtent.height = resource->r.height;
+        region.imageExtent.width = resource->r.desc.width;
+        region.imageExtent.height = resource->r.desc.height;
         region.imageExtent.depth = 1;
 
         VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resource->image,

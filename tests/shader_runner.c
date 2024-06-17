@@ -496,44 +496,46 @@ static void parse_resource_directive(struct resource_params *resource, const cha
 {
     if (match_string(line, "format", &line))
     {
-        resource->format = parse_format(line, &resource->data_type, &resource->texel_size, &resource->is_shadow, &line);
+        resource->desc.format = parse_format(line, &resource->data_type,
+                &resource->desc.texel_size, &resource->is_shadow, &line);
     }
     else if (match_string(line, "stride", &line))
     {
         if (sscanf(line, "%u", &resource->stride) < 1)
             fatal_error("Malformed texture stride '%s'.\n", line);
-        resource->texel_size = resource->stride;
-        resource->format = DXGI_FORMAT_UNKNOWN;
+        resource->desc.texel_size = resource->stride;
+        resource->desc.format = DXGI_FORMAT_UNKNOWN;
     }
     else if (match_string(line, "size", &line))
     {
-        if (sscanf(line, "( buffer , %u ) ", &resource->width) == 1)
+        if (sscanf(line, "( buffer , %u ) ", &resource->desc.width) == 1)
         {
-            resource->dimension = RESOURCE_DIMENSION_BUFFER;
-            resource->height = 1;
+            resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
+            resource->desc.height = 1;
         }
-        else if (sscanf(line, "( raw_buffer , %u ) ", &resource->width) == 1)
+        else if (sscanf(line, "( raw_buffer , %u ) ", &resource->desc.width) == 1)
         {
-            resource->dimension = RESOURCE_DIMENSION_BUFFER;
-            resource->height = 1;
+            resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
+            resource->desc.height = 1;
             resource->is_raw = true;
         }
-        else if (sscanf(line, "( counter_buffer , %u ) ", &resource->width) == 1)
+        else if (sscanf(line, "( counter_buffer , %u ) ", &resource->desc.width) == 1)
         {
-            resource->dimension = RESOURCE_DIMENSION_BUFFER;
-            resource->height = 1;
+            resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
+            resource->desc.height = 1;
             resource->is_uav_counter = true;
             resource->stride = sizeof(uint32_t);
-            resource->texel_size = resource->stride;
-            resource->format = DXGI_FORMAT_UNKNOWN;
+            resource->desc.texel_size = resource->stride;
+            resource->desc.format = DXGI_FORMAT_UNKNOWN;
         }
-        else if (sscanf(line, "( 2d , %u , %u ) ", &resource->width, &resource->height) == 2)
+        else if (sscanf(line, "( 2d , %u , %u ) ", &resource->desc.width, &resource->desc.height) == 2)
         {
-            resource->dimension = RESOURCE_DIMENSION_2D;
+            resource->desc.dimension = RESOURCE_DIMENSION_2D;
         }
-        else if (sscanf(line, "( 2dms , %u , %u , %u ) ", &resource->sample_count, &resource->width, &resource->height) == 3)
+        else if (sscanf(line, "( 2dms , %u , %u , %u ) ",
+                &resource->desc.sample_count, &resource->desc.width, &resource->desc.height) == 3)
         {
-            resource->dimension = RESOURCE_DIMENSION_2D;
+            resource->desc.dimension = RESOURCE_DIMENSION_2D;
         }
         else
         {
@@ -544,7 +546,7 @@ static void parse_resource_directive(struct resource_params *resource, const cha
     {
         char *rest;
 
-        resource->level_count = strtoul(line, &rest, 10);
+        resource->desc.level_count = strtoul(line, &rest, 10);
         if (rest == line)
             fatal_error("Malformed texture directive '%s'.\n", line);
     }
@@ -618,14 +620,7 @@ static void parse_input_layout_directive(struct shader_runner *runner, const cha
 
 void init_resource(struct resource *resource, const struct resource_params *params)
 {
-    resource->type = params->type;
-    resource->dimension = params->dimension;
-    resource->slot = params->slot;
-    resource->format = params->format;
-    resource->texel_size = params->texel_size;
-    resource->width = params->width;
-    resource->height = params->height;
-    resource->sample_count = params->sample_count;
+    resource->desc = params->desc;
 }
 
 struct resource *shader_runner_get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
@@ -637,7 +632,7 @@ struct resource *shader_runner_get_resource(struct shader_runner *runner, enum r
     {
         resource = runner->resources[i];
 
-        if (resource->type == type && resource->slot == slot)
+        if (resource->desc.type == type && resource->desc.slot == slot)
             return resource;
     }
 
@@ -657,24 +652,25 @@ static void set_resource(struct shader_runner *runner, const struct resource_par
 
     if (!(resource = runner->ops->create_resource(runner, params)))
     {
-        if (!bitmap_is_set(runner->failed_resources[params->type], params->slot))
+        if (!bitmap_is_set(runner->failed_resources[params->desc.type], params->desc.slot))
         {
             ++runner->failed_resource_count;
-            bitmap_set(runner->failed_resources[params->type], params->slot);
+            bitmap_set(runner->failed_resources[params->desc.type], params->desc.slot);
         }
         return;
     }
 
-    if (bitmap_is_set(runner->failed_resources[params->type], params->slot))
+    if (bitmap_is_set(runner->failed_resources[params->desc.type], params->desc.slot))
     {
         assert(runner->failed_resource_count);
         --runner->failed_resource_count;
-        bitmap_clear(runner->failed_resources[params->type], params->slot);
+        bitmap_clear(runner->failed_resources[params->desc.type], params->desc.slot);
     }
 
     for (i = 0; i < runner->resource_count; ++i)
     {
-        if (runner->resources[i]->slot == resource->slot && runner->resources[i]->type == resource->type)
+        if (runner->resources[i]->desc.slot == resource->desc.slot
+                && runner->resources[i]->desc.type == resource->desc.type)
         {
             runner->ops->destroy_resource(runner, runner->resources[i]);
             runner->resources[i] = resource;
@@ -903,15 +899,15 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!shader_runner_has_target(runner))
         {
             memset(&params, 0, sizeof(params));
-            params.slot = 0;
-            params.type = RESOURCE_TYPE_RENDER_TARGET;
-            params.dimension = RESOURCE_DIMENSION_2D;
-            params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            params.desc.slot = 0;
+            params.desc.type = RESOURCE_TYPE_RENDER_TARGET;
+            params.desc.dimension = RESOURCE_DIMENSION_2D;
+            params.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
             params.data_type = TEXTURE_DATA_FLOAT;
-            params.texel_size = 16;
-            params.width = RENDER_TARGET_WIDTH;
-            params.height = RENDER_TARGET_HEIGHT;
-            params.level_count = 1;
+            params.desc.texel_size = 16;
+            params.desc.width = RENDER_TARGET_WIDTH;
+            params.desc.height = RENDER_TARGET_HEIGHT;
+            params.desc.level_count = 1;
 
             set_resource(runner, &params);
         }
@@ -930,10 +926,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         runner->input_element_count = 1;
 
         memset(&params, 0, sizeof(params));
-        params.slot = 0;
-        params.type = RESOURCE_TYPE_VERTEX_BUFFER;
-        params.dimension = RESOURCE_DIMENSION_BUFFER;
-        params.width = sizeof(quad);
+        params.desc.slot = 0;
+        params.desc.type = RESOURCE_TYPE_VERTEX_BUFFER;
+        params.desc.dimension = RESOURCE_DIMENSION_BUFFER;
+        params.desc.width = sizeof(quad);
         params.data = malloc(sizeof(quad));
         memcpy(params.data, quad, sizeof(quad));
         params.data_size = sizeof(quad);
@@ -957,15 +953,15 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!shader_runner_has_target(runner))
         {
             memset(&params, 0, sizeof(params));
-            params.slot = 0;
-            params.type = RESOURCE_TYPE_RENDER_TARGET;
-            params.dimension = RESOURCE_DIMENSION_2D;
-            params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            params.desc.slot = 0;
+            params.desc.type = RESOURCE_TYPE_RENDER_TARGET;
+            params.desc.dimension = RESOURCE_DIMENSION_2D;
+            params.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
             params.data_type = TEXTURE_DATA_FLOAT;
-            params.texel_size = 16;
-            params.width = RENDER_TARGET_WIDTH;
-            params.height = RENDER_TARGET_HEIGHT;
-            params.level_count = 1;
+            params.desc.texel_size = 16;
+            params.desc.width = RENDER_TARGET_WIDTH;
+            params.desc.height = RENDER_TARGET_HEIGHT;
+            params.desc.level_count = 1;
 
             set_resource(runner, &params);
         }
@@ -1671,8 +1667,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_RESOURCE:
-                    if (current_resource.type == RESOURCE_TYPE_VERTEX_BUFFER)
-                        current_resource.width = current_resource.data_size;
+                    if (current_resource.desc.type == RESOURCE_TYPE_VERTEX_BUFFER)
+                        current_resource.desc.width = current_resource.data_size;
 
                     /* Not every backend supports every resource type
                      * (specifically, D3D9 doesn't support UAVs and
@@ -1907,12 +1903,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 memset(&current_resource, 0, sizeof(current_resource));
 
-                current_resource.slot = index;
-                current_resource.type = RESOURCE_TYPE_RENDER_TARGET;
-                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_resource.desc.slot = index;
+                current_resource.desc.type = RESOURCE_TYPE_RENDER_TARGET;
+                current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
-                current_resource.texel_size = 16;
-                current_resource.level_count = 1;
+                current_resource.desc.texel_size = 16;
+                current_resource.desc.level_count = 1;
             }
             else if (!strcmp(line, "[dsv]\n"))
             {
@@ -1920,13 +1916,13 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 memset(&current_resource, 0, sizeof(current_resource));
 
-                current_resource.slot = 0;
-                current_resource.type = RESOURCE_TYPE_DEPTH_STENCIL;
-                current_resource.format = DXGI_FORMAT_D32_FLOAT;
+                current_resource.desc.slot = 0;
+                current_resource.desc.type = RESOURCE_TYPE_DEPTH_STENCIL;
+                current_resource.desc.format = DXGI_FORMAT_D32_FLOAT;
                 current_resource.is_shadow = true;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
-                current_resource.texel_size = 4;
-                current_resource.level_count = 1;
+                current_resource.desc.texel_size = 4;
+                current_resource.desc.level_count = 1;
             }
             else if (sscanf(line, "[srv %u]\n", &index))
             {
@@ -1934,12 +1930,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 memset(&current_resource, 0, sizeof(current_resource));
 
-                current_resource.slot = index;
-                current_resource.type = RESOURCE_TYPE_TEXTURE;
-                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_resource.desc.slot = index;
+                current_resource.desc.type = RESOURCE_TYPE_TEXTURE;
+                current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
-                current_resource.texel_size = 16;
-                current_resource.level_count = 1;
+                current_resource.desc.texel_size = 16;
+                current_resource.desc.level_count = 1;
             }
             else if (sscanf(line, "[uav %u]\n", &index))
             {
@@ -1947,12 +1943,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 memset(&current_resource, 0, sizeof(current_resource));
 
-                current_resource.slot = index;
-                current_resource.type = RESOURCE_TYPE_UAV;
-                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_resource.desc.slot = index;
+                current_resource.desc.type = RESOURCE_TYPE_UAV;
+                current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
-                current_resource.texel_size = 16;
-                current_resource.level_count = 1;
+                current_resource.desc.texel_size = 16;
+                current_resource.desc.level_count = 1;
             }
             else if (sscanf(line, "[vb %u]\n", &index))
             {
@@ -1960,9 +1956,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 memset(&current_resource, 0, sizeof(current_resource));
 
-                current_resource.slot = index;
-                current_resource.type = RESOURCE_TYPE_VERTEX_BUFFER;
-                current_resource.dimension = RESOURCE_DIMENSION_BUFFER;
+                current_resource.desc.slot = index;
+                current_resource.desc.type = RESOURCE_TYPE_VERTEX_BUFFER;
+                current_resource.desc.dimension = RESOURCE_DIMENSION_BUFFER;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
             }
             else if (!strcmp(line, "[test]\n"))

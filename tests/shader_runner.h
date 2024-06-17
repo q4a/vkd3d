@@ -84,36 +84,36 @@ enum resource_dimension
     RESOURCE_DIMENSION_2D,
 };
 
-struct resource_params
+struct resource_desc
 {
     unsigned int slot;
     enum resource_type type;
     enum resource_dimension dimension;
 
     DXGI_FORMAT format;
+    unsigned int texel_size;
+    unsigned int width, height;
+    unsigned int level_count;
+    unsigned int sample_count;
+};
+
+struct resource_params
+{
+    struct resource_desc desc;
+
     bool is_shadow;
     bool is_raw;
     bool is_uav_counter;
     enum texture_data_type data_type;
-    unsigned int texel_size;
     unsigned int stride;
-    unsigned int width, height;
-    unsigned int level_count;
-    unsigned int sample_count;
+
     uint8_t *data;
     size_t data_size, data_capacity;
 };
 
 struct resource
 {
-    unsigned int slot;
-    enum resource_type type;
-    enum resource_dimension dimension;
-
-    DXGI_FORMAT format;
-    unsigned int texel_size;
-    unsigned int width, height;
-    unsigned int sample_count;
+    struct resource_desc desc;
 };
 
 struct input_element

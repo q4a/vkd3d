@@ -370,34 +370,35 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     UINT quality_levels;
     HRESULT hr;
 
-    if (params->level_count > ARRAY_SIZE(resource_data))
-        fatal_error("Level count %u is too high.\n", params->level_count);
+    if (params->desc.level_count > ARRAY_SIZE(resource_data))
+        fatal_error("Level count %u is too high.\n", params->desc.level_count);
 
-    if (params->sample_count > 1)
+    if (params->desc.sample_count > 1)
     {
-        if (params->level_count > 1)
+        if (params->desc.level_count > 1)
             fatal_error("Multisampled texture has multiple levels.\n");
 
         if (FAILED(ID3D11Device_CheckMultisampleQualityLevels(device,
-                params->format, params->sample_count, &quality_levels)) || !quality_levels)
+                params->desc.format, params->desc.sample_count, &quality_levels)) || !quality_levels)
         {
-            trace("Format #%x with sample count %u is not supported; skipping.\n", params->format, params->sample_count);
+            trace("Format #%x with sample count %u is not supported; skipping.\n",
+                    params->desc.format, params->desc.sample_count);
             return false;
         }
     }
 
-    desc.Width = params->width;
-    desc.Height = params->height;
-    desc.MipLevels = params->level_count;
+    desc.Width = params->desc.width;
+    desc.Height = params->desc.height;
+    desc.MipLevels = params->desc.level_count;
     desc.ArraySize = 1;
-    desc.Format = params->format;
-    desc.SampleDesc.Count = max(params->sample_count, 1);
+    desc.Format = params->desc.format;
+    desc.SampleDesc.Count = max(params->desc.sample_count, 1);
     desc.Usage = D3D11_USAGE_DEFAULT;
-    if (params->type == RESOURCE_TYPE_UAV)
+    if (params->desc.type == RESOURCE_TYPE_UAV)
         desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-    else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
+    else if (params->desc.type == RESOURCE_TYPE_RENDER_TARGET)
         desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-    else if (params->type == RESOURCE_TYPE_DEPTH_STENCIL)
+    else if (params->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
         desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     else
         desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -406,16 +407,16 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     {
         unsigned int buffer_offset = 0;
 
-        if (params->sample_count > 1)
+        if (params->desc.sample_count > 1)
             fatal_error("Cannot upload data to a multisampled texture.\n");
 
-        for (unsigned int level = 0; level < params->level_count; ++level)
+        for (unsigned int level = 0; level < params->desc.level_count; ++level)
         {
-            unsigned int level_width = get_level_dimension(params->width, level);
-            unsigned int level_height = get_level_dimension(params->height, level);
+            unsigned int level_width = get_level_dimension(params->desc.width, level);
+            unsigned int level_height = get_level_dimension(params->desc.height, level);
 
             resource_data[level].pSysMem = &params->data[buffer_offset];
-            resource_data[level].SysMemPitch = level_width * params->texel_size;
+            resource_data[level].SysMemPitch = level_width * params->desc.texel_size;
             resource_data[level].SysMemSlicePitch = level_height * resource_data[level].SysMemPitch;
             buffer_offset += resource_data[level].SysMemSlicePitch;
         }
@@ -428,11 +429,11 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
     resource->resource = (ID3D11Resource *)resource->texture;
-    if (params->type == RESOURCE_TYPE_UAV)
+    if (params->desc.type == RESOURCE_TYPE_UAV)
         hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, NULL, &resource->uav);
-    else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
+    else if (params->desc.type == RESOURCE_TYPE_RENDER_TARGET)
         hr = ID3D11Device_CreateRenderTargetView(device, resource->resource, NULL, &resource->rtv);
-    else if (params->type == RESOURCE_TYPE_DEPTH_STENCIL)
+    else if (params->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
         hr = ID3D11Device_CreateDepthStencilView(device, resource->resource, NULL, &resource->dsv);
     else
         hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, NULL, &resource->srv);
@@ -452,10 +453,10 @@ static void init_resource_srv_buffer(struct d3d11_shader_runner *runner, struct 
             params->stride, params->data);
     resource->resource = (ID3D11Resource *)resource->buffer;
 
-    srv_desc.Format = params->format;
+    srv_desc.Format = params->desc.format;
     srv_desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     srv_desc.Buffer.FirstElement = 0;
-    srv_desc.Buffer.NumElements = params->data_size / params->texel_size;
+    srv_desc.Buffer.NumElements = params->data_size / params->desc.texel_size;
     hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, &srv_desc, &resource->srv);
     ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
 }
@@ -472,10 +473,10 @@ static void init_resource_uav_buffer(struct d3d11_shader_runner *runner, struct 
     resource->resource = (ID3D11Resource *)resource->buffer;
     resource->is_uav_counter = params->is_uav_counter;
 
-    uav_desc.Format = params->format;
+    uav_desc.Format = params->desc.format;
     uav_desc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     uav_desc.Buffer.FirstElement = 0;
-    uav_desc.Buffer.NumElements = params->data_size / params->texel_size;
+    uav_desc.Buffer.NumElements = params->data_size / params->desc.texel_size;
     if (params->is_raw)
         uav_desc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
     else if (params->is_uav_counter)
@@ -495,19 +496,19 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
-    switch (params->type)
+    switch (params->desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_TEXTURE:
-            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_srv_buffer(runner, resource, params);
             else if (!init_resource_2d(runner, resource, params))
                 return NULL;
             break;
 
         case RESOURCE_TYPE_UAV:
-            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_uav_buffer(runner, resource, params);
             else if (!init_resource_2d(runner, resource, params))
                 return NULL;
@@ -590,14 +591,14 @@ static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     {
         struct d3d11_resource *resource = d3d11_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_TEXTURE:
-                ID3D11DeviceContext_CSSetShaderResources(context, resource->r.slot, 1, &resource->srv);
+                ID3D11DeviceContext_CSSetShaderResources(context, resource->r.desc.slot, 1, &resource->srv);
                 break;
 
             case RESOURCE_TYPE_UAV:
-                ID3D11DeviceContext_CSSetUnorderedAccessViews(context, resource->r.slot, 1, &resource->uav, NULL);
+                ID3D11DeviceContext_CSSetUnorderedAccessViews(context, resource->r.desc.slot, 1, &resource->uav, NULL);
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
@@ -631,7 +632,7 @@ static void d3d11_runner_clear(struct shader_runner *r, struct resource *res, co
     ID3D11DeviceContext *context = runner->immediate_context;
     struct d3d11_resource *resource = d3d11_resource(res);
 
-    switch (resource->r.type)
+    switch (resource->r.desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
             ID3D11DeviceContext_ClearRenderTargetView(context, resource->rtv, (const float *)clear_value);
@@ -642,7 +643,7 @@ static void d3d11_runner_clear(struct shader_runner *r, struct resource *res, co
             break;
 
         default:
-            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.type);
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.desc.type);
     }
 }
 
@@ -757,14 +758,14 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         struct d3d11_resource *resource = d3d11_resource(runner->r.resources[i]);
-        unsigned int stride = get_vb_stride(&runner->r, resource->r.slot);
+        unsigned int stride = get_vb_stride(&runner->r, resource->r.desc.slot);
         unsigned int offset = 0;
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
-                rtvs[resource->r.slot] = resource->rtv;
-                rtv_count = max(rtv_count, resource->r.slot + 1);
+                rtvs[resource->r.desc.slot] = resource->rtv;
+                rtv_count = max(rtv_count, resource->r.desc.slot + 1);
                 break;
 
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -778,16 +779,16 @@ static bool d3d11_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
-                ID3D11DeviceContext_PSSetShaderResources(context, resource->r.slot, 1, &resource->srv);
+                ID3D11DeviceContext_PSSetShaderResources(context, resource->r.desc.slot, 1, &resource->srv);
                 break;
 
             case RESOURCE_TYPE_UAV:
-                uavs[resource->r.slot] = resource->uav;
-                min_uav_slot = min(min_uav_slot, resource->r.slot);
+                uavs[resource->r.desc.slot] = resource->uav;
+                min_uav_slot = min(min_uav_slot, resource->r.desc.slot);
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
-                ID3D11DeviceContext_IASetVertexBuffers(context, resource->r.slot, 1,
+                ID3D11DeviceContext_IASetVertexBuffers(context, resource->r.desc.slot, 1,
                         (ID3D11Buffer **)&resource->resource, &stride, &offset);
                 break;
         }
@@ -884,12 +885,12 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
     HRESULT hr;
 
     src_resource = resource->resource;
-    switch (resource->r.type)
+    switch (resource->r.desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_UAV:
-            if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+            if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
             {
                 ID3D11Buffer_GetDesc(resource->buffer, &buffer_desc);
                 buffer_desc.Usage = D3D11_USAGE_STAGING;
@@ -941,8 +942,8 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
 
     rb->rb.data = map_desc.pData;
     rb->rb.row_pitch = map_desc.RowPitch;
-    rb->rb.width = resource->r.width;
-    rb->rb.height = resource->r.height;
+    rb->rb.width = resource->r.desc.width;
+    rb->rb.height = resource->r.desc.height;
     rb->rb.depth = 1;
     return &rb->rb;
 }

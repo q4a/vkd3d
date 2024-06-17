@@ -357,36 +357,36 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
 {
     unsigned int offset, w, h, i;
 
-    resource->format = get_format_info(params->format, params->is_shadow);
+    resource->format = get_format_info(params->desc.format, params->is_shadow);
 
-    if (params->sample_count > 1)
+    if (params->desc.sample_count > 1)
     {
         GLint max_sample_count;
 
         glGetInternalformativ(GL_TEXTURE_2D_MULTISAMPLE, resource->format->internal_format, GL_SAMPLES, 1, &max_sample_count);
-        if (max_sample_count < params->sample_count)
+        if (max_sample_count < params->desc.sample_count)
         {
-            trace("Format #%x with sample count %u is not supported; skipping.\n", params->format, params->sample_count);
+            trace("Format #%x with sample count %u is not supported; skipping.\n", params->desc.format, params->desc.sample_count);
             return false;
         }
     }
 
     glGenTextures(1, &resource->id);
     glBindTexture(GL_TEXTURE_2D, resource->id);
-    glTexStorage2D(GL_TEXTURE_2D, params->level_count,
-            resource->format->internal_format, params->width, params->height);
+    glTexStorage2D(GL_TEXTURE_2D, params->desc.level_count,
+            resource->format->internal_format, params->desc.width, params->desc.height);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
     if (!params->data)
         return true;
 
-    for (i = 0, offset = 0; i < params->level_count; ++i)
+    for (i = 0, offset = 0; i < params->desc.level_count; ++i)
     {
-        w = get_level_dimension(params->width, i);
-        h = get_level_dimension(params->height, i);
+        w = get_level_dimension(params->desc.width, i);
+        h = get_level_dimension(params->desc.height, i);
         glTexSubImage2D(GL_TEXTURE_2D, i, 0, 0, w, h, resource->format->format,
                 resource->format->type, params->data + offset);
-        offset += w * h * params->texel_size;
+        offset += w * h * params->desc.texel_size;
     }
 
     return true;
@@ -394,7 +394,7 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
 
 static void init_resource_buffer(struct gl_resource *resource, const struct resource_params *params)
 {
-    resource->format = get_format_info(params->format, false);
+    resource->format = get_format_info(params->desc.format, false);
 
     glGenBuffers(1, &resource->id);
     glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
@@ -412,13 +412,13 @@ static struct resource *gl_runner_create_resource(struct shader_runner *r, const
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
-    switch (params->type)
+    switch (params->desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
-            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_buffer(resource, params);
             else if (!init_resource_2d(resource, params))
                 return NULL;
@@ -438,13 +438,13 @@ static void gl_runner_destroy_resource(struct shader_runner *r, struct resource 
 {
     struct gl_resource *resource = gl_resource(res);
 
-    switch (resource->r.type)
+    switch (resource->r.desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
-            if (res->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (res->desc.dimension == RESOURCE_DIMENSION_BUFFER)
             {
                 glDeleteTextures(1, &resource->tbo_id);
                 glDeleteBuffers(1, &resource->id);
@@ -580,20 +580,20 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
     {
         const struct gl_resource *resource = gl_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_UAV:
                 binding = &bindings[interface_info.binding_count++];
                 binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
                 binding->register_space = 0;
-                binding->register_index = resource->r.slot;
+                binding->register_index = resource->r.desc.slot;
                 binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
-                if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
                     binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
                 else
                     binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
                 binding->binding.set = 0;
-                binding->binding.binding = resource->r.slot;
+                binding->binding.binding = resource->r.desc.slot;
                 binding->binding.count = 1;
                 break;
 
@@ -725,7 +725,7 @@ static bool gl_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned
     {
         struct gl_resource *resource = gl_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -734,8 +734,8 @@ static bool gl_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned
                 break;
 
             case RESOURCE_TYPE_UAV:
-                if (resource->r.dimension != RESOURCE_DIMENSION_BUFFER)
-                    glBindImageTexture(resource->r.slot, resource->id, 0, GL_TRUE,
+                if (resource->r.desc.dimension != RESOURCE_DIMENSION_BUFFER)
+                    glBindImageTexture(resource->r.desc.slot, resource->id, 0, GL_TRUE,
                             0, GL_READ_WRITE, resource->format->internal_format);
                 break;
         }
@@ -957,7 +957,7 @@ static void gl_runner_clear(struct shader_runner *r, struct resource *res, const
         glGenFramebuffers(1, &runner->fbo_id);
     glBindFramebuffer(GL_FRAMEBUFFER, runner->fbo_id);
 
-    switch (resource->r.type)
+    switch (resource->r.desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
             glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, resource->id, 0);
@@ -974,10 +974,10 @@ static void gl_runner_clear(struct shader_runner *r, struct resource *res, const
             break;
 
         default:
-            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.type);
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.desc.type);
     }
 
-    glScissor(0, 0, res->width, res->height);
+    glScissor(0, 0, res->desc.width, res->desc.height);
     glClear(clear_mask);
 }
 
@@ -1053,7 +1053,7 @@ static bool gl_runner_draw(struct shader_runner *r,
         if (!(resource = shader_runner_get_resource(r, RESOURCE_TYPE_TEXTURE, s->resource_index)))
             fatal_error("Resource not found.\n");
 
-        if (resource->dimension == RESOURCE_DIMENSION_BUFFER)
+        if (resource->desc.dimension == RESOURCE_DIMENSION_BUFFER)
         {
             glActiveTexture(GL_TEXTURE0 + s->binding.binding);
             glBindTexture(GL_TEXTURE_BUFFER, gl_resource(resource)->tbo_id);
@@ -1078,15 +1078,15 @@ static bool gl_runner_draw(struct shader_runner *r,
     {
         struct gl_resource *resource = gl_resource(runner->r.resources[i]);
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
-                glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + resource->r.slot, resource->id, 0);
-                if (resource->r.slot >= ARRAY_SIZE(draw_buffers))
-                    fatal_error("Unsupported render target index %u.\n", resource->r.slot);
-                draw_buffers[resource->r.slot] = GL_COLOR_ATTACHMENT0 + resource->r.slot;
-                if (resource->r.slot >= rt_count)
-                    rt_count = resource->r.slot + 1;
+                glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + resource->r.desc.slot, resource->id, 0);
+                if (resource->r.desc.slot >= ARRAY_SIZE(draw_buffers))
+                    fatal_error("Unsupported render target index %u.\n", resource->r.desc.slot);
+                draw_buffers[resource->r.desc.slot] = GL_COLOR_ATTACHMENT0 + resource->r.desc.slot;
+                if (resource->r.desc.slot >= rt_count)
+                    rt_count = resource->r.desc.slot + 1;
                 break;
 
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -1100,28 +1100,28 @@ static bool gl_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_UAV:
-                if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 {
-                    glBindImageTexture(resource->r.slot, resource->tbo_id, 0, GL_TRUE,
+                    glBindImageTexture(resource->r.desc.slot, resource->tbo_id, 0, GL_TRUE,
                             0, GL_READ_WRITE, resource->format->internal_format);
                 }
                 else
                 {
-                    glBindImageTexture(resource->r.slot, resource->id, 0, GL_TRUE,
+                    glBindImageTexture(resource->r.desc.slot, resource->id, 0, GL_TRUE,
                             0, GL_READ_WRITE, resource->format->internal_format);
                 }
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
-                assert(resource->r.slot < ARRAY_SIZE(vbo_info));
-                vbo_info[resource->r.slot].id = resource->id;
+                assert(resource->r.desc.slot < ARRAY_SIZE(vbo_info));
+                vbo_info[resource->r.desc.slot].id = resource->id;
                 for (j = 0; j < runner->r.input_element_count; ++j)
                 {
-                    if (runner->r.input_elements[j].slot != resource->r.slot)
+                    if (runner->r.input_elements[j].slot != resource->r.desc.slot)
                         continue;
                     assert(j < ARRAY_SIZE(attribute_offsets));
-                    attribute_offsets[j] = (uint8_t *)(uintptr_t)vbo_info[resource->r.slot].stride;
-                    vbo_info[resource->r.slot].stride += runner->r.input_elements[j].texel_size;
+                    attribute_offsets[j] = (uint8_t *)(uintptr_t)vbo_info[resource->r.desc.slot].stride;
+                    vbo_info[resource->r.desc.slot].stride += runner->r.input_elements[j].texel_size;
                 }
                 break;
         }
@@ -1193,20 +1193,20 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
     struct gl_resource *resource = gl_resource(res);
     struct resource_readback *rb;
 
-    if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.type != RESOURCE_TYPE_DEPTH_STENCIL
-            && resource->r.type != RESOURCE_TYPE_UAV)
-        fatal_error("Unhandled resource type %#x.\n", resource->r.type);
+    if (resource->r.desc.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.desc.type != RESOURCE_TYPE_DEPTH_STENCIL
+            && resource->r.desc.type != RESOURCE_TYPE_UAV)
+        fatal_error("Unhandled resource type %#x.\n", resource->r.desc.type);
 
     rb = malloc(sizeof(*rb));
 
-    rb->width = resource->r.width;
-    rb->height = resource->r.height;
+    rb->width = resource->r.desc.width;
+    rb->height = resource->r.desc.height;
     rb->depth = 1;
 
-    rb->row_pitch = rb->width * resource->r.texel_size;
+    rb->row_pitch = rb->width * resource->r.desc.texel_size;
     rb->data = malloc(rb->row_pitch * rb->height);
 
-    if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+    if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
     {
         glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
         glGetBufferSubData(GL_TEXTURE_BUFFER, 0, rb->row_pitch * rb->height, rb->data);

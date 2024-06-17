@@ -201,7 +201,7 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
-    switch (params->format)
+    switch (params->desc.format)
     {
         case DXGI_FORMAT_R32G32B32A32_FLOAT:
             format = D3DFMT_A32B32G32R32F;
@@ -216,10 +216,10 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
             break;
     }
 
-    switch (params->type)
+    switch (params->desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
-            hr = IDirect3DDevice9_CreateRenderTarget(device, params->width, params->height,
+            hr = IDirect3DDevice9_CreateRenderTarget(device, params->desc.width, params->desc.height,
                     format, D3DMULTISAMPLE_NONE, 0, FALSE, &resource->surface, NULL);
             ok(hr == D3D_OK, "Failed to create render target, hr %#lx.\n", hr);
             break;
@@ -230,7 +230,7 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
 
         case RESOURCE_TYPE_TEXTURE:
         {
-            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
             {
                 fatal_error("Buffer resources are not supported.\n");
                 break;
@@ -238,15 +238,15 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
 
             unsigned int src_buffer_offset = 0;
 
-            hr = IDirect3DDevice9_CreateTexture(device, params->width, params->height,
-                    params->level_count, 0, format, D3DPOOL_MANAGED, &resource->texture, NULL);
+            hr = IDirect3DDevice9_CreateTexture(device, params->desc.width, params->desc.height,
+                    params->desc.level_count, 0, format, D3DPOOL_MANAGED, &resource->texture, NULL);
             ok(hr == D3D_OK, "Failed to create texture, hr %#lx.\n", hr);
 
-            for (unsigned int level = 0; level < params->level_count; ++level)
+            for (unsigned int level = 0; level < params->desc.level_count; ++level)
             {
-                unsigned int level_width = get_level_dimension(params->width, level);
-                unsigned int level_height = get_level_dimension(params->height, level);
-                unsigned int src_row_pitch = level_width * params->texel_size;
+                unsigned int level_width = get_level_dimension(params->desc.width, level);
+                unsigned int level_height = get_level_dimension(params->desc.height, level);
+                unsigned int src_row_pitch = level_width * params->desc.texel_size;
                 unsigned int src_slice_pitch = level_height * src_row_pitch;
 
                 hr = IDirect3DTexture9_LockRect(resource->texture, level, &map_desc, NULL, 0);
@@ -387,10 +387,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
         struct d3d9_resource *resource = d3d9_resource(runner->r.resources[i]);
         unsigned int stride = 0;
 
-        switch (resource->r.type)
+        switch (resource->r.desc.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
-                hr = IDirect3DDevice9_SetRenderTarget(device, resource->r.slot, resource->surface);
+                hr = IDirect3DDevice9_SetRenderTarget(device, resource->r.desc.slot, resource->surface);
                 ok(hr == D3D_OK, "Failed to set render target, hr %#lx.\n", hr);
                 break;
 
@@ -398,9 +398,9 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 vkd3d_unreachable();
 
             case RESOURCE_TYPE_TEXTURE:
-                assert(resource->r.dimension != RESOURCE_DIMENSION_BUFFER);
+                assert(resource->r.desc.dimension != RESOURCE_DIMENSION_BUFFER);
 
-                hr = IDirect3DDevice9_SetTexture(device, resource->r.slot, (IDirect3DBaseTexture9 *)resource->texture);
+                hr = IDirect3DDevice9_SetTexture(device, resource->r.desc.slot, (IDirect3DBaseTexture9 *)resource->texture);
                 ok(hr == D3D_OK, "Failed to set texture, hr %#lx.\n", hr);
                 break;
 
@@ -410,14 +410,14 @@ static bool d3d9_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 for (j = 0; j < runner->r.input_element_count; ++j)
                 {
-                    if (runner->r.input_elements[j].slot == resource->r.slot)
+                    if (runner->r.input_elements[j].slot == resource->r.desc.slot)
                     {
                         decl_elements[j].Offset = stride;
                         stride += runner->r.input_elements[j].texel_size;
                     }
                 }
 
-                hr = IDirect3DDevice9_SetStreamSource(device, resource->r.slot, resource->vb, 0, stride);
+                hr = IDirect3DDevice9_SetStreamSource(device, resource->r.desc.slot, resource->vb, 0, stride);
                 ok(hr == D3D_OK, "Failed to set vertex buffer, hr %#lx.\n", hr);
                 break;
         }
@@ -507,7 +507,7 @@ static struct resource_readback *d3d9_runner_get_resource_readback(struct shader
     D3DSURFACE_DESC desc;
     HRESULT hr;
 
-    assert(resource->r.type == RESOURCE_TYPE_RENDER_TARGET);
+    assert(resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET);
 
     hr = IDirect3DSurface9_GetDesc(resource->surface, &desc);
     ok(hr == D3D_OK, "Failed to get surface desc, hr %#lx.\n", hr);
