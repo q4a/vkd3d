@@ -622,7 +622,6 @@ void init_resource(struct resource *resource, const struct resource_params *para
     resource->dimension = params->dimension;
     resource->slot = params->slot;
     resource->format = params->format;
-    resource->size = params->data_size;
     resource->texel_size = params->texel_size;
     resource->width = params->width;
     resource->height = params->height;
@@ -934,6 +933,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         params.slot = 0;
         params.type = RESOURCE_TYPE_VERTEX_BUFFER;
         params.dimension = RESOURCE_DIMENSION_BUFFER;
+        params.width = sizeof(quad);
         params.data = malloc(sizeof(quad));
         memcpy(params.data, quad, sizeof(quad));
         params.data_size = sizeof(quad);
@@ -1671,6 +1671,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_RESOURCE:
+                    if (current_resource.type == RESOURCE_TYPE_VERTEX_BUFFER)
+                        current_resource.width = current_resource.data_size;
+
                     /* Not every backend supports every resource type
                      * (specifically, D3D9 doesn't support UAVs and
                      * textures with data type other than float). */

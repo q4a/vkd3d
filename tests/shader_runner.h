@@ -111,7 +111,6 @@ struct resource
     enum resource_dimension dimension;
 
     DXGI_FORMAT format;
-    unsigned int size;
     unsigned int texel_size;
     unsigned int width, height;
     unsigned int sample_count;

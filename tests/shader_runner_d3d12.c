@@ -701,7 +701,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(resource->resource);
                 vbv.StrideInBytes = get_vb_stride(&runner->r, resource->r.slot);
-                vbv.SizeInBytes = resource->r.size;
+                vbv.SizeInBytes = resource->r.width;
 
                 ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, resource->r.slot, 1, &vbv);
                 break;
