@@ -161,7 +161,7 @@ const char *debugstr_w(const WCHAR *wstr, size_t wchar_size);
 #define VKD3D_DBG_LOG(level) \
         do { \
         const enum vkd3d_dbg_level vkd3d_dbg_level = VKD3D_DBG_LEVEL_##level; \
-        VKD3D_DBG_PRINTF
+        VKD3D_DBG_PRINTF_##level
 
 #define VKD3D_DBG_LOG_ONCE(first_time_level, level) \
         do { \
@@ -169,10 +169,24 @@ const char *debugstr_w(const WCHAR *wstr, size_t wchar_size);
         const enum vkd3d_dbg_level vkd3d_dbg_level = vkd3d_dbg_next_time \
         ? VKD3D_DBG_LEVEL_##level : VKD3D_DBG_LEVEL_##first_time_level; \
         vkd3d_dbg_next_time = true; \
-        VKD3D_DBG_PRINTF
+        VKD3D_DBG_PRINTF_##level
 
 #define VKD3D_DBG_PRINTF(...) \
         vkd3d_dbg_printf(vkd3d_dbg_level, __FUNCTION__, __VA_ARGS__); } while (0)
+
+#define VKD3D_DBG_PRINTF_TRACE(...) VKD3D_DBG_PRINTF(__VA_ARGS__)
+#define VKD3D_DBG_PRINTF_WARN(...) VKD3D_DBG_PRINTF(__VA_ARGS__)
+#define VKD3D_DBG_PRINTF_FIXME(...) VKD3D_DBG_PRINTF(__VA_ARGS__)
+#define VKD3D_DBG_PRINTF_MESSAGE(...) VKD3D_DBG_PRINTF(__VA_ARGS__)
+
+#ifdef VKD3D_ABORT_ON_ERR
+#define VKD3D_DBG_PRINTF_ERR(...) \
+        vkd3d_dbg_printf(vkd3d_dbg_level, __FUNCTION__, __VA_ARGS__); \
+        abort(); \
+        } while (0)
+#else
+#define VKD3D_DBG_PRINTF_ERR(...) VKD3D_DBG_PRINTF(__VA_ARGS__)
+#endif
 
 #ifndef TRACE
 #define TRACE   VKD3D_DBG_LOG(TRACE)
