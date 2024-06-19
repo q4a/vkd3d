@@ -939,6 +939,14 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!runner->vs_source)
             runner->vs_source = strdup(vs_source);
 
+        runner->sample_count = 1;
+        for (i = 0; i < runner->resource_count; ++i)
+        {
+            if (runner->resources[i]->desc.type == RESOURCE_TYPE_RENDER_TARGET
+                    || runner->resources[i]->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+                runner->sample_count = max(runner->sample_count, runner->resources[i]->desc.sample_count);
+        }
+
         runner->last_render_failed = !runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3, 1);
     }
     else if (match_string(line, "draw", &line))
@@ -989,6 +997,14 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         instance_count = strtoul(line = rest, &rest, 10);
         if (line == rest)
             instance_count = 1;
+
+        runner->sample_count = 1;
+        for (unsigned int i = 0; i < runner->resource_count; ++i)
+        {
+            if (runner->resources[i]->desc.type == RESOURCE_TYPE_RENDER_TARGET
+                    || runner->resources[i]->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+                runner->sample_count = max(runner->sample_count, runner->resources[i]->desc.sample_count);
+        }
 
         runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count, instance_count);
     }
@@ -1634,6 +1650,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     runner->caps = caps;
     runner->minimum_shader_model = caps->minimum_shader_model;
     runner->maximum_shader_model = caps->maximum_shader_model;
+
+    runner->sample_mask = ~0u;
 
     if ((testname = strrchr(test_options.filename, '/')))
         ++testname;
