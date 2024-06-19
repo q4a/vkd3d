@@ -355,6 +355,7 @@ static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool i
 
 static bool init_resource_2d(struct gl_resource *resource, const struct resource_params *params)
 {
+    GLenum target = params->desc.sample_count > 1 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
     unsigned int offset, w, h, i;
 
     resource->format = get_format_info(params->desc.format, params->is_shadow);
@@ -372,11 +373,19 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
     }
 
     glGenTextures(1, &resource->id);
-    glBindTexture(GL_TEXTURE_2D, resource->id);
-    glTexStorage2D(GL_TEXTURE_2D, params->desc.level_count,
-            resource->format->internal_format, params->desc.width, params->desc.height);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    glBindTexture(target, resource->id);
+    if (params->desc.sample_count > 1)
+    {
+        glTexStorage2DMultisample(target, params->desc.sample_count,
+                resource->format->internal_format, params->desc.width, params->desc.height, GL_FALSE);
+    }
+    else
+    {
+        glTexStorage2D(target, params->desc.level_count,
+                resource->format->internal_format, params->desc.width, params->desc.height);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    }
     if (!params->data)
         return true;
 
@@ -384,7 +393,7 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
     {
         w = get_level_dimension(params->desc.width, i);
         h = get_level_dimension(params->desc.height, i);
-        glTexSubImage2D(GL_TEXTURE_2D, i, 0, 0, w, h, resource->format->format,
+        glTexSubImage2D(target, i, 0, 0, w, h, resource->format->format,
                 resource->format->type, params->data + offset);
         offset += w * h * params->desc.texel_size;
     }
@@ -497,6 +506,7 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
     struct vkd3d_shader_scan_combined_resource_sampler_info combined_sampler_info;
     struct vkd3d_shader_combined_resource_sampler *sampler;
     struct vkd3d_shader_resource_binding *binding;
+    struct vkd3d_shader_parameter parameters[1];
     unsigned int count, i;
     char *messages;
     int ret;
@@ -605,6 +615,14 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
     interface_info.bindings = bindings;
     interface_info.combined_samplers = runner->combined_samplers;
     interface_info.combined_sampler_count = runner->combined_sampler_count;
+
+    parameters[0].name = VKD3D_SHADER_PARAMETER_NAME_RASTERIZER_SAMPLE_COUNT;
+    parameters[0].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[0].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
+    parameters[0].u.immediate_constant.u.u32 = runner->r.sample_count;
+
+    spirv_info.parameter_count = ARRAY_SIZE(parameters);
+    spirv_info.parameters = parameters;
 
     ret = vkd3d_shader_compile(&info, out, &messages);
     if (messages && vkd3d_test_state.debug_level)
@@ -1053,16 +1071,13 @@ static bool gl_runner_draw(struct shader_runner *r,
         if (!(resource = shader_runner_get_resource(r, RESOURCE_TYPE_TEXTURE, s->resource_index)))
             fatal_error("Resource not found.\n");
 
+        glActiveTexture(GL_TEXTURE0 + s->binding.binding);
         if (resource->desc.dimension == RESOURCE_DIMENSION_BUFFER)
-        {
-            glActiveTexture(GL_TEXTURE0 + s->binding.binding);
             glBindTexture(GL_TEXTURE_BUFFER, gl_resource(resource)->tbo_id);
-        }
+        else if (resource->desc.sample_count > 1)
+            glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, gl_resource(resource)->id);
         else
-        {
-            glActiveTexture(GL_TEXTURE0 + s->binding.binding);
             glBindTexture(GL_TEXTURE_2D, gl_resource(resource)->id);
-        }
 
         if (s->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX)
             continue;
@@ -1127,8 +1142,8 @@ static bool gl_runner_draw(struct shader_runner *r,
         }
     }
 
-    /* TODO: sample count and mask. */
-
+    glEnable(GL_SAMPLE_MASK);
+    glSampleMaski(0, runner->r.sample_mask);
     glViewport(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
     glScissor(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
     glDrawBuffers(rt_count, draw_buffers);
@@ -1191,6 +1206,7 @@ struct gl_resource_readback
 static struct resource_readback *gl_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
     struct gl_resource *resource = gl_resource(res);
+    struct gl_runner *runner = gl_runner(r);
     struct resource_readback *rb;
 
     if (resource->r.desc.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.desc.type != RESOURCE_TYPE_DEPTH_STENCIL
@@ -1210,6 +1226,36 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
     {
         glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
         glGetBufferSubData(GL_TEXTURE_BUFFER, 0, rb->row_pitch * rb->height, rb->data);
+    }
+    else if (resource->r.desc.sample_count > 1)
+    {
+        GLuint src_fbo, dst_fbo;
+        GLuint resolved;
+
+        glGenTextures(1, &resolved);
+        glBindTexture(GL_TEXTURE_2D, resolved);
+        glTexStorage2D(GL_TEXTURE_2D, resource->r.desc.level_count,
+                resource->format->internal_format, resource->r.desc.width, resource->r.desc.height);
+
+        glGenFramebuffers(1, &src_fbo);
+        glGenFramebuffers(1, &dst_fbo);
+
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, src_fbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst_fbo);
+
+        glFramebufferTexture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, resource->id, 0);
+        glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, resolved, 0);
+
+        glBlitFramebuffer(0, 0, resource->r.desc.width, resource->r.desc.height,
+                0, 0, resource->r.desc.width, resource->r.desc.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, runner->fbo_id);
+        glDeleteFramebuffers(1, &src_fbo);
+        glDeleteFramebuffers(1, &dst_fbo);
+
+        glGetTexImage(GL_TEXTURE_2D, 0, resource->format->format, resource->format->type, rb->data);
+
+        glDeleteTextures(1, &resolved);
     }
     else
     {
