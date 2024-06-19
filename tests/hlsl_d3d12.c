@@ -2059,12 +2059,14 @@ static void test_signature_reflection(void)
         "void main(\n"
         "        in float2 a : apple,\n"
         "        out float4 b : sv_target2,\n"
-        "        out float c : sv_depth,\n"
+        "        out uint c : sv_coverage,\n"
         "        in float4 d : position,\n"
-        "        in float4 e : sv_position)\n"
+        "        in float4 e : sv_position,\n"
+        "        out float f : sv_depth)\n"
         "{\n"
         "    b = d;\n"
         "    c = 0;\n"
+        "    f = 1;\n"
         "}";
 
     static const D3D12_SIGNATURE_PARAMETER_DESC ps1_inputs[] =
@@ -2076,8 +2078,9 @@ static void test_signature_reflection(void)
 
     static const D3D12_SIGNATURE_PARAMETER_DESC ps1_outputs[] =
     {
-        {"sv_target",   2, 2,   D3D_NAME_TARGET, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
-        {"sv_depth",    0, ~0u, D3D_NAME_DEPTH,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_target",   2, 2,   D3D_NAME_TARGET,    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"sv_coverage", 0, ~0u, D3D_NAME_COVERAGE,  D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"sv_depth",    0, ~0u, D3D_NAME_DEPTH,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
     };
 
     static const char ps2_source[] =
@@ -2123,7 +2126,7 @@ static void test_signature_reflection(void)
         {vs1_source,  "vs_4_0", true,  vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
         {vs2_source,  "vs_4_0", false, vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
         {vs2_source,  "vs_4_0", true,  vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_legacy_outputs, ARRAY_SIZE(vs2_legacy_outputs)},
-        {ps1_source,  "ps_4_0", false, ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
+        {ps1_source,  "ps_4_1", false, ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
         {ps2_source,  "ps_4_0", true,  ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
         {cs1_source,  "cs_5_0", false, NULL, 0, NULL, 0},
     };
