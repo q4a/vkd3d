@@ -4333,6 +4333,30 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
     return ret;
 }
 
+/* Allocate a register with writemask, while reserving reg_writemask. */
+static struct hlsl_reg allocate_register_with_masks(struct hlsl_ctx *ctx, struct register_allocator *allocator,
+        unsigned int first_write, unsigned int last_read, uint32_t reg_writemask, uint32_t writemask)
+{
+    struct hlsl_reg ret = {0};
+    uint32_t reg_idx;
+
+    assert((reg_writemask & writemask) == writemask);
+
+    for (reg_idx = 0;; ++reg_idx)
+    {
+        if ((get_available_writemask(allocator, first_write, last_read, reg_idx) & reg_writemask) == reg_writemask)
+            break;
+    }
+
+    record_allocation(ctx, allocator, reg_idx, reg_writemask, first_write, last_read);
+
+    ret.id = reg_idx;
+    ret.allocation_size = 1;
+    ret.writemask = writemask;
+    ret.allocated = true;
+    return ret;
+}
+
 static bool is_range_available(const struct register_allocator *allocator,
         unsigned int first_write, unsigned int last_read, uint32_t reg_idx, unsigned int reg_size)
 {
@@ -4536,6 +4560,44 @@ static void calculate_resource_register_counts(struct hlsl_ctx *ctx)
     }
 }
 
+static void allocate_instr_temp_register(struct hlsl_ctx *ctx,
+        struct hlsl_ir_node *instr, struct register_allocator *allocator)
+{
+    unsigned int reg_writemask = 0, dst_writemask = 0;
+
+    if (instr->reg.allocated || !instr->last_read)
+        return;
+
+    if (instr->type == HLSL_IR_EXPR)
+    {
+        switch (hlsl_ir_expr(instr)->op)
+        {
+            case HLSL_OP1_COS_REDUCED:
+                dst_writemask = VKD3DSP_WRITEMASK_0;
+                reg_writemask = ctx->profile->major_version < 3 ? (1 << 3) - 1 : VKD3DSP_WRITEMASK_0;
+                break;
+
+            case HLSL_OP1_SIN_REDUCED:
+                dst_writemask = VKD3DSP_WRITEMASK_1;
+                reg_writemask = ctx->profile->major_version < 3 ? (1 << 3) - 1 : VKD3DSP_WRITEMASK_1;
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    if (reg_writemask)
+        instr->reg = allocate_register_with_masks(ctx, allocator,
+                instr->index, instr->last_read, reg_writemask, dst_writemask);
+    else
+        instr->reg = allocate_numeric_registers_for_type(ctx, allocator,
+                instr->index, instr->last_read, instr->data_type);
+
+    TRACE("Allocated anonymous expression @%u to %s (liveness %u-%u).\n", instr->index,
+            debug_register('r', instr->reg, instr->data_type), instr->index, instr->last_read);
+}
+
 static void allocate_variable_temp_register(struct hlsl_ctx *ctx,
         struct hlsl_ir_var *var, struct register_allocator *allocator)
 {
@@ -4575,13 +4637,7 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx,
         if (ctx->profile->major_version >= 4 && instr->type == HLSL_IR_CONSTANT)
             continue;
 
-        if (!instr->reg.allocated && instr->last_read)
-        {
-            instr->reg = allocate_numeric_registers_for_type(ctx, allocator, instr->index, instr->last_read,
-                    instr->data_type);
-            TRACE("Allocated anonymous expression @%u to %s (liveness %u-%u).\n", instr->index,
-                    debug_register('r', instr->reg, instr->data_type), instr->index, instr->last_read);
-        }
+        allocate_instr_temp_register(ctx, instr, allocator);
 
         switch (instr->type)
         {
