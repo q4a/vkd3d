@@ -570,6 +570,9 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         case HLSL_CLASS_VERTEX_SHADER:
             return "VertexShader";
 
+        case HLSL_CLASS_GEOMETRY_SHADER:
+            return "GeometryShader";
+
         case HLSL_CLASS_PIXEL_SHADER:
             return "PixelShader";
 

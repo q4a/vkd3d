@@ -7797,6 +7797,11 @@ stateblock_lhs_identifier:
             if (!($$ = hlsl_strdup(ctx, "vertexshader")))
                 YYABORT;
         }
+    | KW_GEOMETRYSHADER
+        {
+            if (!($$ = hlsl_strdup(ctx, "geometryshader")))
+                YYABORT;
+        }
 
 state_block_index_opt:
       %empty

@@ -969,6 +969,7 @@ static const char * get_case_insensitive_typename(const char *name)
     {
         "dword",
         "float",
+        "geometryshader",
         "matrix",
         "pixelshader",
         "texture",
