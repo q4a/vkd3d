@@ -77,6 +77,12 @@ VKD3D_UTILS_API HRESULT WINAPI D3D12SerializeVersionedRootSignature(const D3D12_
 VKD3D_UTILS_API HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filename,
         const D3D_SHADER_MACRO *defines, ID3DInclude *include, const char *entrypoint,
         const char *target, UINT flags, UINT effect_flags, ID3DBlob **shader, ID3DBlob **error_messages);
+/**
+ * D3DCompile2() targets the behaviour of d3dcompiler_47.dll. To target the
+ * behaviour of other d3dcompiler versions, use D3DCompile2VKD3D().
+ *
+ * \since 1.3
+ */
 VKD3D_UTILS_API HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filename,
         const D3D_SHADER_MACRO *defines, ID3DInclude *include, const char *entrypoint,
         const char *target, UINT flags, UINT effect_flags, UINT secondary_flags,
@@ -121,6 +127,22 @@ VKD3D_UTILS_API HRESULT WINAPI D3DDisassemble(const void *data,
         SIZE_T data_size, UINT flags, const char *comments, ID3DBlob **blob);
 /** \since 1.11 */
 VKD3D_UTILS_API HRESULT WINAPI D3DReflect(const void *data, SIZE_T data_size, REFIID iid, void **reflection);
+
+/**
+ * As D3DCompile2(), but with an extra argument that allows targeting
+ * different d3dcompiler versions.
+ *
+ * \param compiler_version The d3dcompiler version to target. This should be
+ * set to the numerical value in the d3dcompiler library name. E.g. to target
+ * the behaviour of d3dcompiler_36.dll, set this parameter to 36.
+ *
+ * \since 1.14
+ */
+VKD3D_UTILS_API HRESULT WINAPI D3DCompile2VKD3D(const void *data, SIZE_T data_size, const char *filename,
+        const D3D_SHADER_MACRO *defines, ID3DInclude *include, const char *entrypoint,
+        const char *target, UINT flags, UINT effect_flags, UINT secondary_flags,
+        const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader,
+        ID3DBlob **error_messages, unsigned int compiler_version);
 
 #ifdef __cplusplus
 }

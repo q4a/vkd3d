@@ -235,15 +235,15 @@ static enum vkd3d_shader_target_type get_target_for_profile(const char *profile)
     return VKD3D_SHADER_TARGET_DXBC_TPF;
 }
 
-HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filename,
+HRESULT WINAPI D3DCompile2VKD3D(const void *data, SIZE_T data_size, const char *filename,
         const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *entry_point,
         const char *profile, UINT flags, UINT effect_flags, UINT secondary_flags,
         const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader_blob,
-        ID3DBlob **messages_blob)
+        ID3DBlob **messages_blob, unsigned int compiler_version)
 {
     struct vkd3d_shader_preprocess_info preprocess_info;
     struct vkd3d_shader_hlsl_source_info hlsl_info;
-    struct vkd3d_shader_compile_option options[5];
+    struct vkd3d_shader_compile_option options[6];
     struct vkd3d_shader_compile_info compile_info;
     struct vkd3d_shader_compile_option *option;
     struct vkd3d_shader_code byte_code;
@@ -254,10 +254,10 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
 
     TRACE("data %p, data_size %"PRIuPTR", filename %s, macros %p, include %p, entry_point %s, "
             "profile %s, flags %#x, effect_flags %#x, secondary_flags %#x, secondary_data %p, "
-            "secondary_data_size %"PRIuPTR", shader_blob %p, messages_blob %p.\n",
+            "secondary_data_size %"PRIuPTR", shader_blob %p, messages_blob %p, compiler_version %u.\n",
             data, (uintptr_t)data_size, debugstr_a(filename), macros, include, debugstr_a(entry_point),
             debugstr_a(profile), flags, effect_flags, secondary_flags, secondary_data,
-            (uintptr_t)secondary_data_size, shader_blob, messages_blob);
+            (uintptr_t)secondary_data_size, shader_blob, messages_blob, compiler_version);
 
     if (flags & ~(D3DCOMPILE_DEBUG | D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR))
         FIXME("Ignoring flags %#x.\n", flags);
@@ -336,6 +336,13 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
         option->value = true;
     }
 
+    if (compiler_version <= 39)
+    {
+        option = &options[compile_info.option_count++];
+        option->name = VKD3D_SHADER_COMPILE_OPTION_INCLUDE_EMPTY_BUFFERS_IN_EFFECTS;
+        option->value = true;
+    }
+
     ret = vkd3d_shader_compile(&compile_info, &byte_code, &messages);
 
     if (messages && messages_blob)
@@ -374,6 +381,24 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     }
 
     return hresult_from_vkd3d_result(ret);
+}
+
+HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filename,
+        const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *entry_point,
+        const char *profile, UINT flags, UINT effect_flags, UINT secondary_flags,
+        const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader_blob,
+        ID3DBlob **messages_blob)
+{
+    TRACE("data %p, data_size %"PRIuPTR", filename %s, macros %p, include %p, entry_point %s, "
+            "profile %s, flags %#x, effect_flags %#x, secondary_flags %#x, secondary_data %p, "
+            "secondary_data_size %"PRIuPTR", shader_blob %p, messages_blob %p.\n",
+            data, (uintptr_t)data_size, debugstr_a(filename), macros, include, debugstr_a(entry_point),
+            debugstr_a(profile), flags, effect_flags, secondary_flags, secondary_data,
+            (uintptr_t)secondary_data_size, shader_blob, messages_blob);
+
+    return D3DCompile2VKD3D(data, data_size, filename, macros, include,
+            entry_point, profile, flags, effect_flags, secondary_flags,
+            secondary_data, secondary_data_size, shader_blob, messages_blob, 47);
 }
 
 HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filename,
