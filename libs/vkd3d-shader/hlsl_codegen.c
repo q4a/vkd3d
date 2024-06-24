@@ -4050,6 +4050,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
     switch (instr->type)
     {
         case HLSL_IR_CONSTANT:
+        case HLSL_IR_COMPILE:
         case HLSL_IR_EXPR:
         case HLSL_IR_INDEX:
         case HLSL_IR_LOAD:
@@ -4342,6 +4343,9 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
         }
         case HLSL_IR_CONSTANT:
         case HLSL_IR_STRING_CONSTANT:
+            break;
+        case HLSL_IR_COMPILE:
+            /* Compile calls are skipped as they are only relevent to effects. */
             break;
         }
     }

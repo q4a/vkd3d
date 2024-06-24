@@ -1,5 +1,5 @@
 % Test special "compile" keyword syntax to compile pixel and vertex shaders
-[pixel shader todo]
+[pixel shader]
 float4 fun() : sv_target
 {
     return 0;
@@ -13,7 +13,7 @@ sampler sam
 float4 main() : sv_target { return 0; }
 
 
-[pixel shader todo]
+[pixel shader]
 float4 fun() : sv_target
 {
     return 0;
@@ -31,7 +31,7 @@ float4 main() : sv_target { return 0; }
 
 
 % Only uniform arguments are expected, even if undefined identifiers are used.
-[pixel shader todo]
+[pixel shader]
 float4 fun(uniform float4 a, float4 b, uniform float4 c) : sv_target
 {
     return a + b + c;
@@ -185,7 +185,7 @@ float4 main() : sv_target
 
 
 % Default values are allowed for uniform variables.
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 float4 fun(uniform float4 a, uniform float4 b = {1, 2, 3, 4}) : sv_target
 {
     return 8*a + b;
@@ -202,7 +202,7 @@ technique10 T1
 float4 main() : sv_target { return 0; }
 
 
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 float4 fun(float4 a : COLOR0 = {-1, -2, -3, -4}, uniform float4 b = {1, 2, 3, 4}) : sv_target
 {
     return 8*a + b;
