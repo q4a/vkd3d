@@ -5224,7 +5224,8 @@ static struct hlsl_block *add_shader_compilation(struct hlsl_ctx *ctx, const cha
         return NULL;
     }
 
-    if (!(compile = hlsl_new_compile(ctx, profile_name, &call_to_compile, 1, args->instrs, loc)))
+    if (!(compile = hlsl_new_compile(ctx, HLSL_COMPILE_TYPE_COMPILE,
+            profile_name, &call_to_compile, 1, args->instrs, loc)))
     {
         free_parse_initializer(args);
         return NULL;

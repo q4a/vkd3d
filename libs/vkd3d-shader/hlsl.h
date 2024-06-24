@@ -875,14 +875,20 @@ struct hlsl_ir_compile
 {
     struct hlsl_ir_node node;
 
-    /* Special field to store the profile argument. */
+    enum hlsl_compile_type
+    {
+        /* A shader compilation through the CompileShader() function or the "compile" syntax. */
+        HLSL_COMPILE_TYPE_COMPILE,
+    } compile_type;
+
+    /* Special field to store the profile argument for HLSL_COMPILE_TYPE_COMPILE. */
     const struct hlsl_profile_info *profile;
 
     /* Block containing the instructions required by the arguments of the
      * compilation call. */
     struct hlsl_block instrs;
 
-    /* Arguments to the compilation call. For a "compile" or "CompileShader()"
+    /* Arguments to the compilation call. For HLSL_COMPILE_TYPE_COMPILE
      * args[0] is an hlsl_ir_call to the specified function. */
     struct hlsl_src *args;
     unsigned int args_count;
@@ -1491,9 +1497,9 @@ bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index);
 bool hlsl_index_is_resource_access(struct hlsl_ir_index *index);
 bool hlsl_index_chain_has_resource_access(struct hlsl_ir_index *index);
 
-struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, const char *profile_name,
-        struct hlsl_ir_node **args, unsigned int args_count, struct hlsl_block *args_instrs,
-        const struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, enum hlsl_compile_type compile_type,
+        const char *profile_name, struct hlsl_ir_node **args, unsigned int args_count,
+        struct hlsl_block *args_instrs, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx,

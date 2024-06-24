@@ -1847,30 +1847,36 @@ struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned
     return &swizzle->node;
 }
 
-struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, const char *profile_name,
-        struct hlsl_ir_node **args, unsigned int args_count, struct hlsl_block *args_instrs,
-        const struct vkd3d_shader_location *loc)
+struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, enum hlsl_compile_type compile_type,
+        const char *profile_name, struct hlsl_ir_node **args, unsigned int args_count,
+        struct hlsl_block *args_instrs, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_profile_info *profile_info = NULL;
     struct hlsl_ir_compile *compile;
     struct hlsl_type *type = NULL;
     unsigned int i;
 
-    if (!(profile_info = hlsl_get_target_info(profile_name)))
+    switch (compile_type)
     {
-        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_PROFILE, "Unknown profile \"%s\".", profile_name);
-        return NULL;
-    }
+        case HLSL_COMPILE_TYPE_COMPILE:
+            if (!(profile_info = hlsl_get_target_info(profile_name)))
+            {
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_PROFILE, "Unknown profile \"%s\".", profile_name);
+                return NULL;
+            }
 
-    if (profile_info->type == VKD3D_SHADER_TYPE_PIXEL)
-        type = hlsl_get_type(ctx->cur_scope, "PixelShader", true, true);
-    else if (profile_info->type == VKD3D_SHADER_TYPE_VERTEX)
-        type = hlsl_get_type(ctx->cur_scope, "VertexShader", true, true);
+            if (profile_info->type == VKD3D_SHADER_TYPE_PIXEL)
+                type = hlsl_get_type(ctx->cur_scope, "PixelShader", true, true);
+            else if (profile_info->type == VKD3D_SHADER_TYPE_VERTEX)
+                type = hlsl_get_type(ctx->cur_scope, "VertexShader", true, true);
 
-    if (!type)
-    {
-        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_PROFILE, "Invalid profile \"%s\".", profile_name);
-        return NULL;
+            if (!type)
+            {
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_PROFILE, "Invalid profile \"%s\".", profile_name);
+                return NULL;
+            }
+
+            break;
     }
 
     if (!(compile = hlsl_alloc(ctx, sizeof(*compile))))
@@ -1878,6 +1884,7 @@ struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, const char *profile_
 
     init_node(&compile->node, HLSL_IR_COMPILE, type, loc);
 
+    compile->compile_type = compile_type;
     compile->profile = profile_info;
 
     hlsl_block_init(&compile->instrs);
@@ -2271,7 +2278,8 @@ static struct hlsl_ir_node *clone_compile(struct hlsl_ctx *ctx,
     if (compile->profile)
         profile_name = compile->profile->name;
 
-    if (!(node = hlsl_new_compile(ctx, profile_name, args, compile->args_count, &block, &compile->node.loc)))
+    if (!(node = hlsl_new_compile(ctx, compile->compile_type, profile_name,
+            args, compile->args_count, &block, &compile->node.loc)))
     {
         hlsl_block_cleanup(&block);
         vkd3d_free(args);
@@ -3300,7 +3308,12 @@ static void dump_ir_compile(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *bu
 {
     unsigned int i;
 
-    vkd3d_string_buffer_printf(buffer, "compile %s {\n", compile->profile->name);
+    switch (compile->compile_type)
+    {
+        case HLSL_COMPILE_TYPE_COMPILE:
+            vkd3d_string_buffer_printf(buffer, "compile %s {\n", compile->profile->name);
+            break;
+    }
 
     dump_block(ctx, buffer, &compile->instrs);
 
