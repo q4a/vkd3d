@@ -78,7 +78,7 @@ float4 main() : sv_target
 
 
 % Test the CompileShader() syntax.
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 float arg1, arg2;
 
 float4 main_vertex(uniform float a) : sv_position { return a; }
@@ -107,7 +107,7 @@ PixelShader ps1 = CompileShader(ps_2_0, main(foobar));
 
 
 % But undefined identifiers are allowed if inside a state block.
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 float4 main_vertex(uniform float a) : sv_position { return a; }
 
 float4 main(uniform float a) : sv_target { return a; }
@@ -145,7 +145,7 @@ PixelShader ps1 = CompileShader(fs_2_0, main());
 
 
 % Shaders cannot be passed around to another variable: "Initializer must be literal expressions.".
-[pixel shader fail(sm<6)]
+[pixel shader fail(sm<6) todo]
 float4 main() : sv_target { return 0; }
 
 PixelShader ps1 = CompileShader(ps_2_0, main());

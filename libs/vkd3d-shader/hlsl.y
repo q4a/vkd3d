@@ -6135,6 +6135,7 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %token KW_CENTROID
 %token KW_COLUMN_MAJOR
 %token KW_COMPILE
+%token KW_COMPILESHADER
 %token KW_COMPUTESHADER
 %token KW_CONST
 %token KW_CONTINUE
@@ -8479,6 +8480,17 @@ primary_expr:
             }
             vkd3d_free($2);
             vkd3d_free($3);
+        }
+    | KW_COMPILESHADER '(' any_identifier ',' var_identifier '(' func_arguments ')' ')'
+        {
+            if (!($$ = add_shader_compilation(ctx, $3, $5, &$7, &@1)))
+            {
+                vkd3d_free($3);
+                vkd3d_free($5);
+                YYABORT;
+            }
+            vkd3d_free($3);
+            vkd3d_free($5);
         }
     | var_identifier '(' func_arguments ')'
         {
