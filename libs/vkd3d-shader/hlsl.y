@@ -5235,6 +5235,36 @@ static struct hlsl_block *add_shader_compilation(struct hlsl_ctx *ctx, const cha
     return make_block(ctx, compile);
 }
 
+static struct hlsl_block *add_compile_variant(struct hlsl_ctx *ctx, enum hlsl_compile_type compile_type,
+        struct parse_initializer *args, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *compile;
+
+    switch (compile_type)
+    {
+        case HLSL_COMPILE_TYPE_COMPILE:
+            vkd3d_unreachable();
+
+        case HLSL_COMPILE_TYPE_CONSTRUCTGSWITHSO:
+            if (args->args_count != 2 && args->args_count != 6)
+            {
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                        "Wrong number of arguments to ConstructGSWithSO: expected 2 or 6, but got %u.",
+                        args->args_count);
+            }
+            break;
+    }
+
+    if (!(compile = hlsl_new_compile(ctx, compile_type, NULL, args->args, args->args_count, args->instrs, loc)))
+    {
+        free_parse_initializer(args);
+        return NULL;
+    }
+
+    free_parse_initializer(args);
+    return make_block(ctx, compile);
+}
+
 static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
         struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -6236,6 +6266,7 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %token KW_COMPILESHADER
 %token KW_COMPUTESHADER
 %token KW_CONST
+%token KW_CONSTRUCTGSWITHSO
 %token KW_CONTINUE
 %token KW_DEFAULT
 %token KW_DEPTHSTENCILSTATE
@@ -8595,6 +8626,11 @@ primary_expr:
             }
             vkd3d_free($3);
             vkd3d_free($5);
+        }
+    | KW_CONSTRUCTGSWITHSO '(' func_arguments ')'
+        {
+            if (!($$ = add_compile_variant(ctx, HLSL_COMPILE_TYPE_CONSTRUCTGSWITHSO, &$3, &@1)))
+                YYABORT;
         }
     | var_identifier '(' func_arguments ')'
         {

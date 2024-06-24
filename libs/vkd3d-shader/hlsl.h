@@ -879,6 +879,8 @@ struct hlsl_ir_compile
     {
         /* A shader compilation through the CompileShader() function or the "compile" syntax. */
         HLSL_COMPILE_TYPE_COMPILE,
+        /* A call to ConstructGSWithSO(), which receives a geometry shader and retrieves one as well. */
+        HLSL_COMPILE_TYPE_CONSTRUCTGSWITHSO,
     } compile_type;
 
     /* Special field to store the profile argument for HLSL_COMPILE_TYPE_COMPILE. */

@@ -1878,6 +1878,10 @@ struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, enum hlsl_compile_ty
             }
 
             break;
+
+        case HLSL_COMPILE_TYPE_CONSTRUCTGSWITHSO:
+            type = hlsl_get_type(ctx->cur_scope, "GeometryShader", true, true);
+            break;
     }
 
     if (!(compile = hlsl_alloc(ctx, sizeof(*compile))))
@@ -3313,6 +3317,10 @@ static void dump_ir_compile(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *bu
     {
         case HLSL_COMPILE_TYPE_COMPILE:
             vkd3d_string_buffer_printf(buffer, "compile %s {\n", compile->profile->name);
+            break;
+
+        case HLSL_COMPILE_TYPE_CONSTRUCTGSWITHSO:
+            vkd3d_string_buffer_printf(buffer, "ConstructGSWithSO {\n");
             break;
     }
 
