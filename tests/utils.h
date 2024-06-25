@@ -542,7 +542,6 @@ struct test_options
     unsigned int adapter_idx;
     bool enable_debug_layer;
     bool enable_gpu_based_validation;
-    const char *filename;
 };
 
 extern struct test_options test_options;
@@ -561,8 +560,6 @@ static inline void parse_args(int argc, char **argv)
             test_options.enable_debug_layer = true;
         else if (!strcmp(argv[i], "--gbv"))
             test_options.enable_gpu_based_validation = true;
-        else if (argv[i][0] != '-')
-            test_options.filename = argv[i];
     }
 }
 
