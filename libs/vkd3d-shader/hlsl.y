@@ -609,6 +609,7 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
     {
         switch (node->type)
         {
+            case HLSL_IR_COMPILE:
             case HLSL_IR_CONSTANT:
             case HLSL_IR_EXPR:
             case HLSL_IR_STRING_CONSTANT:
@@ -627,7 +628,6 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
             case HLSL_IR_RESOURCE_LOAD:
             case HLSL_IR_RESOURCE_STORE:
             case HLSL_IR_SWITCH:
-            case HLSL_IR_COMPILE:
             case HLSL_IR_STATEBLOCK_CONSTANT:
                 hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "Expected literal expression.");
@@ -1227,7 +1227,8 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type,
 }
 
 static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
-        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src);
+        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src,
+        bool is_default_values_initializer);
 
 static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters *parameters,
         struct parse_parameter *param, const struct vkd3d_shader_location *loc)
@@ -1285,7 +1286,8 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
 
         for (i = 0; i < param->initializer.args_count; ++i)
         {
-            initialize_var_components(ctx, param->initializer.instrs, var, &store_index, param->initializer.args[i]);
+            initialize_var_components(ctx, param->initializer.instrs, var,
+                    &store_index, param->initializer.args[i], true);
         }
 
         free_parse_initializer(&param->initializer);
@@ -2368,7 +2370,8 @@ static unsigned int get_component_index_from_default_initializer_index(struct hl
 }
 
 static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
-        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src)
+        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src,
+        bool is_default_values_initializer)
 {
     unsigned int src_comp_count = hlsl_type_component_count(src->data_type);
     struct hlsl_deref dst_deref;
@@ -2387,23 +2390,43 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
 
         dst_comp_type = hlsl_type_get_component_type(ctx, dst->data_type, *store_index);
 
-        if (dst->default_values)
+        if (is_default_values_initializer)
         {
             struct hlsl_default_value default_value = {0};
             unsigned int dst_index;
 
-            if (!hlsl_clone_block(ctx, &block, instrs))
-                return;
-            default_value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
+            if (hlsl_is_numeric_type(dst_comp_type))
+            {
+                if (src->type == HLSL_IR_COMPILE)
+                {
+                    /* Default values are discarded if they contain an object
+                     * literal expression for a numeric component. */
+                    if (dst->default_values)
+                    {
+                        hlsl_warning(ctx, &src->loc, VKD3D_SHADER_WARNING_HLSL_IGNORED_DEFAULT_VALUE,
+                                "Component %u in variable '%s' initializer is object literal. Default values discarded.",
+                                k, dst->name);
+                        vkd3d_free(dst->default_values);
+                        dst->default_values = NULL;
+                    }
+                }
+                else
+                {
+                    if (!hlsl_clone_block(ctx, &block, instrs))
+                        return;
+                    default_value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
 
-            if (dst->is_param)
-                dst_index = *store_index;
-            else
-                dst_index = get_component_index_from_default_initializer_index(ctx, dst->data_type, *store_index);
+                    if (dst->is_param)
+                        dst_index = *store_index;
+                    else
+                        dst_index = get_component_index_from_default_initializer_index(ctx, dst->data_type, *store_index);
 
-            dst->default_values[dst_index] = default_value;
+                    if (dst->default_values)
+                        dst->default_values[dst_index] = default_value;
 
-            hlsl_block_cleanup(&block);
+                    hlsl_block_cleanup(&block);
+                }
+            }
         }
         else
         {
@@ -2793,7 +2816,8 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
 
             for (k = 0; k < v->initializer.args_count; ++k)
             {
-                initialize_var_components(ctx, v->initializer.instrs, var, &store_index, v->initializer.args[k]);
+                initialize_var_components(ctx, v->initializer.instrs, var,
+                        &store_index, v->initializer.args[k], is_default_values_initializer);
             }
 
             if (is_default_values_initializer)
@@ -4785,17 +4809,17 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
         if (!(var = hlsl_new_synthetic_var(ctx, "coords", hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 2), loc)))
             return false;
 
-        initialize_var_components(ctx, params->instrs, var, &idx, coords);
+        initialize_var_components(ctx, params->instrs, var, &idx, coords, false);
         if (hlsl_version_ge(ctx, 4, 0))
         {
             if (!(half = hlsl_new_float_constant(ctx, 0.5f, loc)))
                 return false;
             hlsl_block_add_instr(params->instrs, half);
 
-            initialize_var_components(ctx, params->instrs, var, &idx, half);
+            initialize_var_components(ctx, params->instrs, var, &idx, half, false);
         }
         else
-            initialize_var_components(ctx, params->instrs, var, &idx, coords);
+            initialize_var_components(ctx, params->instrs, var, &idx, coords, false);
 
         if (!(load = hlsl_new_var_load(ctx, var, loc)))
             return false;
@@ -5276,7 +5300,7 @@ static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type
         return NULL;
 
     for (i = 0; i < params->args_count; ++i)
-        initialize_var_components(ctx, params->instrs, var, &idx, params->args[i]);
+        initialize_var_components(ctx, params->instrs, var, &idx, params->args[i], false);
 
     if (!(load = hlsl_new_var_load(ctx, var, loc)))
         return NULL;

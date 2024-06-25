@@ -294,6 +294,17 @@ float4 main() : sv_target
 }
 
 
+% This compiles but default values for 'p' aren't written to the output binary.
+[pixel shader fail(sm>=6)]
+float4 fun() { return 0; };
+float2 p = {5, CompileShader(ps_2_0, fun())};
+
+float4 main() : sv_target
+{
+    return p.xyxy;
+}
+
+
 [require]
 shader model >= 5.0
 
