@@ -441,6 +441,36 @@ sampler sam
 float4 main() : sv_target { return 0; }
 
 
+% The number of parameters must also match.
+[pixel shader fail(sm<6)]
+float4 fun(float a, float b)
+{
+    return 0;
+}
+
+sampler sam
+{
+    cat = fun(foo); // no matching 1 parameter function.
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Compiler assumes that unknown stateblock constants are 'const int'.
+[pixel shader fail(sm<6)]
+float4 fun(float p[2])
+{
+    return 0;
+}
+
+sampler sam
+{
+    cat = fun(foo); // cannot convert from 'const int' to 'float[2]'.
+};
+
+float4 main() : sv_target { return 0; }
+
+
 % PixelShader and VertexShader are valid identifiers for the lhs
 [pixel shader]
 sampler sam
