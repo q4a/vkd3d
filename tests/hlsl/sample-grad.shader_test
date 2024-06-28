@@ -35,6 +35,26 @@ uniform 0 float4 2.0 2.0 2.0 2.0
 todo(glsl) draw quad
 probe (0,0) rgba (0.0, 0.0, 1.0, 0.0)
 
+[pixel shader fail(sm>=6)]
+sampler s;
+float4 grad;
+
+float4 main() : sv_target
+{
+    return tex2Dgrad(s, float2(0.5, 0.5), grad.xy, grad.zw);
+}
+
+[test]
+uniform 0 float4 0.0 0.0 0.0 0.0
+todo(glsl) draw quad
+probe (0,0) rgba (1.0, 0.0, 1.0, 0.0)
+uniform 0 float4 1.0 1.0 1.0 1.0
+todo(glsl) draw quad
+probe (0,0) rgba (0.0, 0.0, 1.0, 0.0)
+uniform 0 float4 2.0 2.0 2.0 2.0
+todo(glsl) draw quad
+probe (0,0) rgba (0.0, 0.0, 1.0, 0.0)
+
 [require]
 shader model >= 4.0
 
