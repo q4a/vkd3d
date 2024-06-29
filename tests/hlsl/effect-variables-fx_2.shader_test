@@ -24,3 +24,23 @@ Texture3D tex7;
 technique
 {
 }
+
+[effect]
+struct s
+{
+    Texture t;
+    float4 f;
+};
+
+technique {}
+
+[effect fail]
+struct s
+{
+    Texture t;
+    float4 f;
+};
+
+s var;
+
+technique {}

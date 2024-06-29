@@ -1,0 +1,19 @@
+[require]
+shader model >= 4.0
+shader model < 6.0
+
+[effect]
+struct s
+{
+    Texture t;
+    float4 f;
+};
+
+[effect fail]
+struct s
+{
+    Texture t;
+    float4 f;
+};
+
+s var;
