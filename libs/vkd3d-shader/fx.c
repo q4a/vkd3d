@@ -536,6 +536,12 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             put_u32_unaligned(buffer, field->offset);
             put_u32_unaligned(buffer, field->type);
         }
+
+        if (ctx->profile->major_version == 5)
+        {
+            put_u32_unaligned(buffer, 0); /* Base class type */
+            put_u32_unaligned(buffer, 0); /* Interface count */
+        }
     }
     else if (type->class == HLSL_CLASS_TEXTURE)
     {
