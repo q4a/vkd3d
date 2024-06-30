@@ -433,8 +433,8 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         uint32_t offset;
         uint32_t type;
     };
+    uint32_t name_offset, offset, total_size, packed_size, stride, numeric_desc;
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
-    uint32_t name_offset, offset, size, stride, numeric_desc;
     struct field_offsets *field_offsets = NULL;
     struct hlsl_ctx *ctx = fx->ctx;
     uint32_t elements_count = 0;
@@ -507,15 +507,22 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             return 0;
     }
 
-    size = stride = type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float);
+    /* Structures can only contain numeric fields, this is validated during variable declaration. */
+    total_size = stride = type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float);
+    packed_size = 0;
+    if (type->class == HLSL_CLASS_STRUCT || hlsl_is_numeric_type(type))
+        packed_size = hlsl_type_component_count(type) * sizeof(float);
     if (elements_count)
-        size *= elements_count;
+    {
+        total_size *= elements_count;
+        packed_size *= elements_count;
+    }
     stride = align(stride, 4 * sizeof(float));
 
     put_u32_unaligned(buffer, elements_count);
-    put_u32_unaligned(buffer, size); /* Total size. */
-    put_u32_unaligned(buffer, stride); /* Stride. */
-    put_u32_unaligned(buffer, size);
+    put_u32_unaligned(buffer, total_size);
+    put_u32_unaligned(buffer, stride);
+    put_u32_unaligned(buffer, packed_size);
 
     if (type->class == HLSL_CLASS_STRUCT)
     {
