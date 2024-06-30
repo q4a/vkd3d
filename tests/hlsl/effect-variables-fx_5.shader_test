@@ -9,7 +9,7 @@ struct s
     float4 f;
 };
 
-[effect fail todo]
+[effect fail]
 struct s
 {
     Texture t;

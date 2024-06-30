@@ -2518,8 +2518,11 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
         if (!(modifiers & HLSL_STORAGE_STATIC))
             var->storage_modifiers |= HLSL_STORAGE_UNIFORM;
 
-        if (ctx->profile->major_version < 5 && (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+        if ((ctx->profile->major_version < 5 || ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT)
+                && (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+        {
             check_invalid_object_fields(ctx, var);
+        }
 
         if ((func = hlsl_get_first_func_decl(ctx, var->name)))
         {
