@@ -426,10 +426,20 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
 
 static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
+    struct field_offsets
+    {
+        uint32_t name;
+        uint32_t semantic;
+        uint32_t offset;
+        uint32_t type;
+    };
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     uint32_t name_offset, offset, size, stride, numeric_desc;
+    struct field_offsets *field_offsets = NULL;
+    struct hlsl_ctx *ctx = fx->ctx;
     uint32_t elements_count = 0;
     const char *name;
+    size_t i;
 
     /* Resolve arrays to element type and number of elements. */
     if (type->class == HLSL_CLASS_ARRAY)
@@ -441,6 +451,22 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     name = get_fx_4_type_name(type);
 
     name_offset = write_string(name, fx);
+    if (type->class == HLSL_CLASS_STRUCT)
+    {
+        if (!(field_offsets = hlsl_calloc(ctx, type->e.record.field_count, sizeof(*field_offsets))))
+            return 0;
+
+        for (i = 0; i < type->e.record.field_count; ++i)
+        {
+            const struct hlsl_struct_field *field = &type->e.record.fields[i];
+
+            field_offsets[i].name = write_string(field->name, fx);
+            field_offsets[i].semantic = write_string(field->semantic.raw_name, fx);
+            field_offsets[i].offset = field->reg_offset[HLSL_REGSET_NUMERIC];
+            field_offsets[i].type = write_type(field->type, fx);
+        }
+    }
+
     offset = put_u32_unaligned(buffer, name_offset);
 
     switch (type->class)
@@ -493,22 +519,15 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
     if (type->class == HLSL_CLASS_STRUCT)
     {
-        size_t i;
-
         put_u32_unaligned(buffer, type->e.record.field_count);
         for (i = 0; i < type->e.record.field_count; ++i)
         {
-            const struct hlsl_struct_field *field = &type->e.record.fields[i];
-            uint32_t semantic_offset, field_type_offset;
+            const struct field_offsets *field = &field_offsets[i];
 
-            name_offset = write_string(field->name, fx);
-            semantic_offset = write_string(field->semantic.raw_name, fx);
-            field_type_offset = write_type(field->type, fx);
-
-            put_u32_unaligned(buffer, name_offset);
-            put_u32_unaligned(buffer, semantic_offset);
-            put_u32_unaligned(buffer, field->reg_offset[HLSL_REGSET_NUMERIC]);
-            put_u32_unaligned(buffer, field_type_offset);
+            put_u32_unaligned(buffer, field->name);
+            put_u32_unaligned(buffer, field->semantic);
+            put_u32_unaligned(buffer, field->offset);
+            put_u32_unaligned(buffer, field->type);
         }
     }
     else if (type->class == HLSL_CLASS_TEXTURE)
@@ -581,9 +600,9 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         FIXME("Type %u is not supported.\n", type->class);
         set_status(fx, VKD3D_ERROR_NOT_IMPLEMENTED);
-        return 0;
     }
 
+    vkd3d_free(field_offsets);
     return offset;
 }
 
