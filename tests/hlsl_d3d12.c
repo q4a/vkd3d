@@ -1504,10 +1504,18 @@ static void test_reflection(void)
         "    Texture1DArray<float> b;\n"
         "    struct { SamplerState a; } c;\n"
         "} k;\n"
+        "cbuffer buf : register(b3[-1])\n"
+        "{\n"
+        "    float4 v;\n"
+        "};\n"
+        "cbuffer buf2 : register(b[4])\n"
+        "{\n"
+        "   float4 vv;\n"
+        "};\n"
         "float4 main(float2 pos : texcoord) : SV_TARGET\n"
         "{\n"
         "    return a.Sample(b, pos) + a.Sample(c, pos) + a.Sample(d, pos) + tex2D(f, pos) + tex2D(e, pos)"
-        "            + tex2D(g, pos) + h.b.Load(h.c).x + k.b.Sample(k.c.a, pos);\n"
+        "            + tex2D(g, pos) + h.b.Load(h.c).x + k.b.Sample(k.c.a, pos) + v + vv;\n"
         "}";
 
     static const D3D12_SHADER_INPUT_BIND_DESC ps_bindings[] =
@@ -1525,7 +1533,9 @@ static void test_reflection(void)
         {"a", D3D_SIT_TEXTURE, 3, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 3},
         {"k.b", D3D_SIT_TEXTURE, 5, 1, 0, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE1DARRAY, ~0u, 0, 5},
         {"h.b", D3D_SIT_TEXTURE, 7, 1, D3D_SIF_USERPACKED | D3D_SIF_TEXTURE_COMPONENT_0, D3D_RETURN_TYPE_SINT, D3D_SRV_DIMENSION_TEXTURE1D, ~0u, 0, 7},
-        {"$Globals", D3D_SIT_CBUFFER, 0, 1},
+        {"buf2", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .uID = 0},
+        {"$Globals", D3D_SIT_CBUFFER, 1, 1, .uID = 1},
+        {"buf", D3D_SIT_CBUFFER, 3, 1, D3D_SIF_USERPACKED, .uID = 3},
     };
 
     static const D3D12_SHADER_TYPE_DESC ps_h_field_types[] =
@@ -1544,9 +1554,22 @@ static void test_reflection(void)
         {{"h",  0, 8, D3D_SVF_USED, NULL,   7, 1, ~0u, 0}, {D3D_SVC_STRUCT, D3D_SVT_VOID, 1, 4, 0, ARRAY_SIZE(ps_h_field_types), 0, "<unnamed>"}, ps_h_field_types},
         {{"i", 16, 4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT, D3D_SVT_VOID, 1, 3, 0, ARRAY_SIZE(ps_i_field_types), 0, "<unnamed>"}, ps_i_field_types},
     };
+
+    static const struct shader_variable ps_buf_vars[] =
+    {
+        {{"v", 0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR, D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}},
+    };
+
+    static const struct shader_variable ps_buf2_vars[] =
+    {
+        {{"vv", 0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR, D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}},
+    };
+
     static const struct shader_buffer ps_buffers[] =
     {
-        {{"$Globals", D3D_CT_CBUFFER, ARRAY_SIZE(ps_globals_vars), 32}, ps_globals_vars},
+        {{"$Globals", D3D_CT_CBUFFER,  ARRAY_SIZE(ps_globals_vars), 32}, ps_globals_vars},
+        {{"buf",      D3D_CT_CBUFFER,  ARRAY_SIZE(ps_buf_vars),     16}, ps_buf_vars},
+        {{"buf2",     D3D_CT_CBUFFER,  ARRAY_SIZE(ps_buf2_vars),    16}, ps_buf2_vars},
     };
 
     static const char ps51_source[] =
@@ -1559,10 +1582,12 @@ static void test_reflection(void)
         "RWBuffer<float> g : register(u1, space1);\n"
         "SamplerState h : register(s1, space2147483647);\n"
         "SamplerState i : register(s2147483647, space1);\n"
+        "cbuffer w : register(b3[-1]) { float4 j; };\n"
+        "cbuffer v : register(b[4]) { float4 k; };\n"
         "float4 main(void) : SV_TARGET\n"
         "{\n"
         "    g[0] = 0;\n"
-        "    return a + c + d + e.Sample(h, 0) + f.Sample(i, 0);\n"
+        "    return a + c + d + e.Sample(h, 0) + f.Sample(i, 0) + j + k;\n"
         "}";
 
     static const struct shader_variable ps51_x_vars =
@@ -1571,11 +1596,18 @@ static void test_reflection(void)
         {{"c",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
     static const struct shader_variable ps51_globals_vars =
         {{"d",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+    static const struct shader_variable ps51_w_vars =
+        {{"j", 0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0},   {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+    static const struct shader_variable ps51_v_vars =
+        {{"k", 0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0},   {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+
     static const struct shader_buffer ps51_buffers[] =
     {
         {{"$Globals", D3D_CT_CBUFFER, 1, 16}, &ps51_globals_vars},
         {{"x", D3D_CT_CBUFFER, 1, 16}, &ps51_x_vars},
         {{"z", D3D_CT_CBUFFER, 1, 16}, &ps51_z_vars},
+        {{"w", D3D_CT_CBUFFER, 1, 16}, &ps51_w_vars},
+        {{"v", D3D_CT_CBUFFER, 1, 16}, &ps51_v_vars},
     };
 
     static const D3D12_SHADER_INPUT_BIND_DESC ps51_bindings[] =
@@ -1587,7 +1619,9 @@ static void test_reflection(void)
         {"g", D3D_SIT_UAV_RWTYPED, 1, 1, 0, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_BUFFER, ~0u, 1, 0},
         {"z", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .Space = 0, .uID = 0},
         {"$Globals", D3D_SIT_CBUFFER, 1, 1, .uID = 1},
-        {"x", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .Space = 1, .uID = 2},
+        {"w", D3D_SIT_CBUFFER, 2, 1, D3D_SIF_USERPACKED, .uID = 2},
+        {"v", D3D_SIT_CBUFFER, 4, 1, D3D_SIF_USERPACKED, .uID = 3},
+        {"x", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .Space = 1, .uID = 4},
     };
 
     static const struct
@@ -1598,18 +1632,19 @@ static void test_reflection(void)
         size_t binding_count;
         const struct shader_buffer *buffers;
         size_t buffer_count;
+        UINT flags;
     }
     tests[] =
     {
-        {vs_source, "vs_5_0", vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers)},
-        {ps_source, "ps_5_0", ps_bindings, ARRAY_SIZE(ps_bindings), ps_buffers, ARRAY_SIZE(ps_buffers)},
-        {ps51_source, "ps_5_1", ps51_bindings, ARRAY_SIZE(ps51_bindings), ps51_buffers, ARRAY_SIZE(ps51_buffers)},
+        {vs_source, "vs_5_0", vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
+        {ps_source, "ps_5_0", ps_bindings, ARRAY_SIZE(ps_bindings), ps_buffers, ARRAY_SIZE(ps_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
+        {ps51_source, "ps_5_1", ps51_bindings, ARRAY_SIZE(ps51_bindings), ps51_buffers, ARRAY_SIZE(ps51_buffers), 0}
     };
 
     for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
     {
         ID3D10Blob *code = compile_shader_flags(tests[t].source,
-                tests[t].profile, strstr(tests[t].profile, "5_1") ? 0 : D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY);
+                tests[t].profile, tests[t].flags);
         ID3D12ShaderReflectionConstantBuffer *cbuffer;
         D3D12_SHADER_TYPE_DESC type_desc, field_desc;
         D3D12_SHADER_INPUT_BIND_DESC binding_desc;
