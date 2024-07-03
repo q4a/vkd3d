@@ -1214,12 +1214,23 @@ static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl
     return true;
 }
 
-static bool parse_reservation_index(const char *string, char *type, uint32_t *index)
+static bool parse_reservation_index(const char *string, char *type, uint32_t *index, unsigned int bracket_offset)
 {
-    if (!sscanf(string + 1, "%u", index))
-        return false;
+    char *endptr;
 
     *type = ascii_tolower(string[0]);
+
+    if (string[1] == '\0')
+    {
+        *index = bracket_offset;
+        return true;
+    }
+
+    *index = strtoul(string + 1, &endptr, 10) + bracket_offset;
+
+    if (endptr == string + 1)
+        return false;
+
     return true;
 }
 
@@ -6545,22 +6556,35 @@ register_reservation:
       ':' KW_REGISTER '(' any_identifier ')'
         {
             memset(&$$, 0, sizeof($$));
-            if (!parse_reservation_index($4, &$$.reg_type, &$$.reg_index))
+            if (!parse_reservation_index($4, &$$.reg_type, &$$.reg_index, 0))
                 hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $4);
 
             vkd3d_free($4);
         }
+    | ':' KW_REGISTER '(' any_identifier '[' expr ']' ')'
+        {
+            memset(&$$, 0, sizeof($$));
+            if (!parse_reservation_index($4, &$$.reg_type, &$$.reg_index,
+                    evaluate_static_expression_as_uint(ctx, $6, &@6)))
+            {
+                hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Invalid register reservation '%s'.", $4);
+            }
+
+            vkd3d_free($4);
+            vkd3d_free($6);
+        }
     | ':' KW_REGISTER '(' any_identifier ',' any_identifier ')'
         {
             memset(&$$, 0, sizeof($$));
-            if (parse_reservation_index($6, &$$.reg_type, &$$.reg_index))
+            if (parse_reservation_index($6, &$$.reg_type, &$$.reg_index, 0))
             {
                 hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
             }
             else if (parse_reservation_space($6, &$$.reg_space))
             {
-                if (!parse_reservation_index($4, &$$.reg_type, &$$.reg_index))
+                if (!parse_reservation_index($4, &$$.reg_type, &$$.reg_index, 0))
                     hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                             "Invalid register reservation '%s'.", $4);
             }
@@ -6573,12 +6597,47 @@ register_reservation:
             vkd3d_free($4);
             vkd3d_free($6);
         }
+    | ':' KW_REGISTER '(' any_identifier '[' expr ']' ',' any_identifier ')'
+        {
+            memset(&$$, 0, sizeof($$));
+
+            if (!parse_reservation_space($9, &$$.reg_space))
+                hlsl_error(ctx, &@9, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Invalid register space reservation '%s'.", $9);
+
+            if (!parse_reservation_index($4, &$$.reg_type, &$$.reg_index,
+                    evaluate_static_expression_as_uint(ctx, $6, &@6)))
+            {
+                hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Invalid register reservation '%s'.", $4);
+            }
+
+            vkd3d_free($4);
+            vkd3d_free($6);
+            vkd3d_free($9);
+        }
+    | ':' KW_REGISTER '(' any_identifier ',' any_identifier '[' expr ']' ')'
+        {
+            hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
+
+            memset(&$$, 0, sizeof($$));
+            if (!parse_reservation_index($6, &$$.reg_type, &$$.reg_index,
+                    evaluate_static_expression_as_uint(ctx, $8, &@8)))
+            {
+                hlsl_error(ctx, &@6, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Invalid register reservation '%s'.", $6);
+            }
+
+            vkd3d_free($4);
+            vkd3d_free($6);
+            vkd3d_free($8);
+        }
     | ':' KW_REGISTER '(' any_identifier ',' any_identifier ',' any_identifier ')'
         {
             hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
 
             memset(&$$, 0, sizeof($$));
-            if (!parse_reservation_index($6, &$$.reg_type, &$$.reg_index))
+            if (!parse_reservation_index($6, &$$.reg_type, &$$.reg_index, 0))
                 hlsl_error(ctx, &@6, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $6);
 
@@ -6589,6 +6648,27 @@ register_reservation:
             vkd3d_free($4);
             vkd3d_free($6);
             vkd3d_free($8);
+        }
+    | ':' KW_REGISTER '(' any_identifier ',' any_identifier '[' expr ']' ',' any_identifier ')'
+        {
+            hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
+
+            memset(&$$, 0, sizeof($$));
+            if (!parse_reservation_index($6, &$$.reg_type, &$$.reg_index,
+                    evaluate_static_expression_as_uint(ctx, $8, &@8)))
+            {
+                hlsl_error(ctx, &@6, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Invalid register reservation '%s'.", $6);
+            }
+
+            if (!parse_reservation_space($11, &$$.reg_space))
+                hlsl_error(ctx, &@11, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Invalid register space reservation '%s'.", $11);
+
+            vkd3d_free($4);
+            vkd3d_free($6);
+            vkd3d_free($8);
+            vkd3d_free($11);
         }
 
 packoffset_reservation:

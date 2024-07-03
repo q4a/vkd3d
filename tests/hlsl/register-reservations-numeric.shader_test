@@ -296,7 +296,7 @@ uniform 0 float 1.0
 todo(glsl) draw quad
 probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 
-[pixel shader todo]
+[pixel shader]
 // Numeric expr, no offset in the identifier. DXC ignores this.
 float a : register (c[1 + 1 * 2 * 0]);
 
@@ -308,11 +308,11 @@ float4 main() : sv_target
 [test]
 uniform 0 float 1.0
 uniform 4 float 2.0
-todo(glsl|sm<6) draw quad
+todo(glsl) draw quad
 if(sm<6) probe (0, 0) rgba (2.0, 2.0, 2.0, 2.0)
 if(sm>=6) probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
 
-[pixel shader todo]
+[pixel shader]
 // Numeric expr. DXC also ignores this.
 float a : register (c0[1 + 1 * 2 * 0]);
 
@@ -324,11 +324,11 @@ float4 main() : sv_target
 [test]
 uniform 0 float 0.0
 uniform 4 float 1.0
-todo(glsl|sm<6) draw quad
+todo(glsl) draw quad
 if(sm<6) probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 if(sm>=6) probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader todo]
+[pixel shader]
 // Float offsets truncate.
 float a : register (c0[0.6 + 0.6]);
 
@@ -340,11 +340,11 @@ float4 main() : sv_target
 [test]
 uniform 0 float 0.0
 uniform 4 float 1.0
-todo(glsl|sm<6) draw quad
+todo(glsl) draw quad
 if(sm<6) probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 if(sm>=6) probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader todo]
+[pixel shader]
 // Booleans are interpreted as integers in the usual way.
 float a : register (c0[true + false * true]);
 
@@ -356,11 +356,11 @@ float4 main() : sv_target
 [test]
 uniform 0 float 0.0
 uniform 4 float 1.0
-todo(glsl|sm<6) draw quad
+todo(glsl) draw quad
 if(sm<6) probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 if(sm>=6) probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader fail(sm>=6) todo]
+[pixel shader fail(sm>=6)]
 // Negative offsets. DXC fails to compile this.
 float a : register (c2[-1]);
 
@@ -371,7 +371,7 @@ float4 main() : sv_target
 
 [test]
 uniform 4 float 1.0
-todo draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 
 % Weird FXC behavior.
@@ -484,7 +484,7 @@ size (2d, 1, 2)
 [require]
 shader model >= 4.0
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex : register(t[1]);
 sampler sam : register(s[1]);
 
@@ -494,6 +494,6 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 if(sm<6) probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
 if(sm>=6) probe (0, 0) rgba(0.5, 0.5, 0.5, 0.5)

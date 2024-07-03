@@ -30,7 +30,7 @@ todo(glsl) draw quad
 probe (0, 0) rgba (1, 1, 1, 99)
 
 % Bracket syntax for registers. Ignored in SM>=6.
-[pixel shader todo]
+[pixel shader]
 Texture2D tex1 : register(t[1], space0);
 
 float4 main() : sv_target
@@ -39,7 +39,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 if(sm>=6) probe (0, 0) rgba (0, 0, 0, 99)
 if(sm<6) probe (0, 0) rgba (1, 1, 1, 99)
 
