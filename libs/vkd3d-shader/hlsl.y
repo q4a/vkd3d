@@ -1214,12 +1214,18 @@ static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl
     return true;
 }
 
-static bool parse_reservation_index(const char *string, unsigned int bracket_offset,
+static bool parse_reservation_index(struct hlsl_ctx *ctx, const char *string, unsigned int bracket_offset,
         struct hlsl_reg_reservation *reservation)
 {
     char *endptr;
 
     reservation->reg_type = ascii_tolower(string[0]);
+
+    /* Prior to SM5.1, fxc simply ignored bracket offsets for 'b' types. */
+    if (reservation->reg_type == 'b' && hlsl_version_lt(ctx, 5, 1))
+    {
+        bracket_offset = 0;
+    }
 
     if (string[1] == '\0')
     {
@@ -6557,7 +6563,7 @@ register_reservation:
       ':' KW_REGISTER '(' any_identifier ')'
         {
             memset(&$$, 0, sizeof($$));
-            if (!parse_reservation_index($4, 0, &$$))
+            if (!parse_reservation_index(ctx, $4, 0, &$$))
                 hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $4);
 
@@ -6566,7 +6572,7 @@ register_reservation:
     | ':' KW_REGISTER '(' any_identifier '[' expr ']' ')'
         {
             memset(&$$, 0, sizeof($$));
-            if (!parse_reservation_index($4, evaluate_static_expression_as_uint(ctx, $6, &@6), &$$))
+            if (!parse_reservation_index(ctx, $4, evaluate_static_expression_as_uint(ctx, $6, &@6), &$$))
             {
                 hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $4);
@@ -6578,13 +6584,13 @@ register_reservation:
     | ':' KW_REGISTER '(' any_identifier ',' any_identifier ')'
         {
             memset(&$$, 0, sizeof($$));
-            if (parse_reservation_index($6, 0, &$$))
+            if (parse_reservation_index(ctx, $6, 0, &$$))
             {
                 hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
             }
             else if (parse_reservation_space($6, &$$.reg_space))
             {
-                if (!parse_reservation_index($4, 0, &$$))
+                if (!parse_reservation_index(ctx, $4, 0, &$$))
                     hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                             "Invalid register reservation '%s'.", $4);
             }
@@ -6605,7 +6611,7 @@ register_reservation:
                 hlsl_error(ctx, &@9, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register space reservation '%s'.", $9);
 
-            if (!parse_reservation_index($4, evaluate_static_expression_as_uint(ctx, $6, &@6), &$$))
+            if (!parse_reservation_index(ctx, $4, evaluate_static_expression_as_uint(ctx, $6, &@6), &$$))
             {
                 hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $4);
@@ -6620,7 +6626,7 @@ register_reservation:
             hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
 
             memset(&$$, 0, sizeof($$));
-            if (!parse_reservation_index($6, evaluate_static_expression_as_uint(ctx, $8, &@8), &$$))
+            if (!parse_reservation_index(ctx, $6, evaluate_static_expression_as_uint(ctx, $8, &@8), &$$))
             {
                 hlsl_error(ctx, &@6, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $6);
@@ -6635,7 +6641,7 @@ register_reservation:
             hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
 
             memset(&$$, 0, sizeof($$));
-            if (!parse_reservation_index($6, 0, &$$))
+            if (!parse_reservation_index(ctx, $6, 0, &$$))
                 hlsl_error(ctx, &@6, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $6);
 
@@ -6652,7 +6658,7 @@ register_reservation:
             hlsl_fixme(ctx, &@4, "Reservation shader target %s.", $4);
 
             memset(&$$, 0, sizeof($$));
-            if (!parse_reservation_index($6, evaluate_static_expression_as_uint(ctx, $8, &@8), &$$))
+            if (!parse_reservation_index(ctx, $6, evaluate_static_expression_as_uint(ctx, $8, &@8), &$$))
             {
                 hlsl_error(ctx, &@6, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Invalid register reservation '%s'.", $6);
