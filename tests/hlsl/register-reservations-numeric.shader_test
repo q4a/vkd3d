@@ -433,7 +433,7 @@ probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
 [require]
 shader model >= 4.0
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 cbuffer buf : register(b0manymanyletters)
 {
@@ -451,7 +451,7 @@ float4 main() : sv_target
 
 % DXC fails during parsing.
 
-[pixel shader fail todo]
+[pixel shader fail]
 cbuffer buf : register(banana)
 {
     float a;
@@ -497,3 +497,452 @@ float4 main() : sv_target
 todo(glsl) draw quad
 if(sm<6) probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
 if(sm>=6) probe (0, 0) rgba(0.5, 0.5, 0.5, 0.5)
+
+% cbuffer reservation limits.
+[pixel shader]
+cbuffer buf0 : register(b0)
+{
+    float a;
+};
+
+cbuffer buf1 : register(b1)
+{
+    float b;
+};
+
+cbuffer buf2 : register(b2)
+{
+    float c;
+};
+
+cbuffer buf3 : register(b3)
+{
+    float d;
+};
+
+cbuffer buf4 : register(b4)
+{
+    float e;
+};
+
+cbuffer buf5 : register(b5)
+{
+    float f;
+};
+
+cbuffer buf6 : register(b6)
+{
+    float g;
+};
+
+cbuffer buf7 : register(b7)
+{
+    float h;
+};
+
+cbuffer buf8 : register(b8)
+{
+    float i;
+};
+
+cbuffer buf9 : register(b9)
+{
+    float j;
+};
+
+cbuffer buf10 : register(b10)
+{
+    float k;
+};
+
+cbuffer buf11 : register(b11)
+{
+    float l;
+};
+
+cbuffer buf12 : register(b12)
+{
+    float m;
+};
+
+cbuffer buf13 : register(b13)
+{
+    float n;
+};
+
+float4 main() : sv_target
+{
+    return a * b * c * d * e * f * g * h * i * j * k * l * m * n;
+}
+
+[pixel shader fail(sm>=6)]
+// $Globals and $Params count towards the 14 cbuffer limit.
+float glob;
+
+cbuffer buf0 : register(b0)
+{
+    float a;
+};
+
+cbuffer buf1 : register(b1)
+{
+    float b;
+};
+
+cbuffer buf2 : register(b2)
+{
+    float c;
+};
+
+cbuffer buf3 : register(b3)
+{
+    float d;
+};
+
+cbuffer buf4 : register(b4)
+{
+    float e;
+};
+
+cbuffer buf5 : register(b5)
+{
+    float f;
+};
+
+cbuffer buf6 : register(b6)
+{
+    float g;
+};
+
+cbuffer buf7 : register(b7)
+{
+    float h;
+};
+
+cbuffer buf8 : register(b8)
+{
+    float i;
+};
+
+cbuffer buf9 : register(b9)
+{
+    float j;
+};
+
+cbuffer buf10 : register(b10)
+{
+    float k;
+};
+
+cbuffer buf11 : register(b11)
+{
+    float l;
+};
+
+float4 main(uniform float param) : sv_target
+{
+    return glob * param * a * b * c * d * e * f * g * h * i * j * k * l;
+}
+
+[pixel shader fail]
+float glob;
+
+cbuffer buf0 : register(b0)
+{
+    float a;
+};
+
+cbuffer buf1 : register(b1)
+{
+    float b;
+};
+
+cbuffer buf2 : register(b2)
+{
+    float c;
+};
+
+cbuffer buf3 : register(b3)
+{
+    float d;
+};
+
+cbuffer buf4 : register(b4)
+{
+    float e;
+};
+
+cbuffer buf5 : register(b5)
+{
+    float f;
+};
+
+cbuffer buf6 : register(b6)
+{
+    float g;
+};
+
+cbuffer buf7 : register(b7)
+{
+    float h;
+};
+
+cbuffer buf8 : register(b8)
+{
+    float i;
+};
+
+cbuffer buf9 : register(b9)
+{
+    float j;
+};
+
+cbuffer buf10 : register(b10)
+{
+    float k;
+};
+
+cbuffer buf11 : register(b11)
+{
+    float l;
+};
+
+cbuffer buf12 : register(b12)
+{
+    float m;
+};
+
+float4 main(uniform float param) : sv_target
+{
+    return glob * param * a * b * c * d * e * f * g * h * i * j * k * l * m;
+}
+
+[pixel shader fail todo]
+// Unused cbuffers still reserve their slot, and count towards the limit.
+float glob;
+
+cbuffer buf0 : register(b0)
+{
+    float a;
+};
+
+cbuffer buf1 : register(b1)
+{
+    float b;
+};
+
+cbuffer buf2 : register(b2)
+{
+    float c;
+};
+
+cbuffer buf3 : register(b3)
+{
+    float d;
+};
+
+cbuffer buf4 : register(b4)
+{
+    float e;
+};
+
+cbuffer buf5 : register(b5)
+{
+    float f;
+};
+
+cbuffer buf6 : register(b6)
+{
+    float g;
+};
+
+cbuffer buf7 : register(b7)
+{
+    float h;
+};
+
+cbuffer buf8 : register(b8)
+{
+    float i;
+};
+
+cbuffer buf9 : register(b9)
+{
+    float j;
+};
+
+cbuffer buf10 : register(b10)
+{
+    float k;
+};
+
+cbuffer buf11 : register(b11)
+{
+    float l;
+};
+
+cbuffer buf12 : register(b12)
+{
+    float m;
+};
+
+float4 main(uniform float param) : sv_target
+{
+    return glob * param * a * b * c * d * e * f * g * h * i * j * k * l;
+}
+
+[require]
+shader model >= 5.1
+
+[pixel shader fail(sm>=6)]
+// 5.1 and up have unlimited CBV slots.
+float glob;
+
+cbuffer buf0 : register(b0)
+{
+    float a;
+};
+
+cbuffer buf1 : register(b1)
+{
+    float b;
+};
+
+cbuffer buf2 : register(b2)
+{
+    float c;
+};
+
+cbuffer buf3 : register(b3)
+{
+    float d;
+};
+
+cbuffer buf4 : register(b4)
+{
+    float e;
+};
+
+cbuffer buf5 : register(b5)
+{
+    float f;
+};
+
+cbuffer buf6 : register(b6)
+{
+    float g;
+};
+
+cbuffer buf7 : register(b7)
+{
+    float h;
+};
+
+cbuffer buf8 : register(b8)
+{
+    float i;
+};
+
+cbuffer buf9 : register(b9)
+{
+    float j;
+};
+
+cbuffer buf10 : register(b10)
+{
+    float k;
+};
+
+cbuffer buf11 : register(b11)
+{
+    float l;
+};
+
+cbuffer buf12 : register(b12)
+{
+    float m;
+};
+
+float4 main(uniform float param) : sv_target
+{
+    return glob * param * a * b * c * d * e * f * g * h * i * j * k * l * m;
+}
+
+[pixel shader]
+// SM6 doesn't support uniform parameters (why??)
+float glob;
+
+cbuffer buf0 : register(b0)
+{
+    float a;
+};
+
+cbuffer buf1 : register(b1)
+{
+    float b;
+};
+
+cbuffer buf2 : register(b2)
+{
+    float c;
+};
+
+cbuffer buf3 : register(b3)
+{
+    float d;
+};
+
+cbuffer buf4 : register(b4)
+{
+    float e;
+};
+
+cbuffer buf5 : register(b5)
+{
+    float f;
+};
+
+cbuffer buf6 : register(b6)
+{
+    float g;
+};
+
+cbuffer buf7 : register(b7)
+{
+    float h;
+};
+
+cbuffer buf8 : register(b8)
+{
+    float i;
+};
+
+cbuffer buf9 : register(b9)
+{
+    float j;
+};
+
+cbuffer buf10 : register(b10)
+{
+    float k;
+};
+
+cbuffer buf11 : register(b11)
+{
+    float l;
+};
+
+cbuffer buf12 : register(b12)
+{
+    float m;
+};
+
+cbuffer buf13 : register(b13)
+{
+    float n;
+};
+
+float4 main() : sv_target
+{
+    return glob * a * b * c * d * e * f * g * h * i * j * k * l * m * n;
+}

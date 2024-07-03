@@ -4925,6 +4925,14 @@ void hlsl_calculate_buffer_offsets(struct hlsl_ctx *ctx)
     }
 }
 
+static unsigned int get_max_cbuffer_reg_index(struct hlsl_ctx *ctx)
+{
+    if (hlsl_version_ge(ctx, 5, 1))
+        return UINT_MAX;
+
+    return 13;
+}
+
 static void allocate_buffers(struct hlsl_ctx *ctx)
 {
     struct hlsl_buffer *buffer;
@@ -4956,6 +4964,12 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
             {
                 const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx,
                         reservation->reg_space, reservation->reg_index);
+                unsigned int max_index = get_max_cbuffer_reg_index(ctx);
+
+                if (buffer->reservation.reg_index > max_index)
+                    hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                            "Buffer reservation cb%u exceeds target's maximum (cb%u).",
+                            buffer->reservation.reg_index, max_index);
 
                 if (reserved_buffer && reserved_buffer != buffer)
                 {
@@ -4980,8 +4994,13 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
             }
             else if (!reservation->reg_type)
             {
+                unsigned int max_index = get_max_cbuffer_reg_index(ctx);
                 while (get_reserved_buffer(ctx, 0, index))
                     ++index;
+
+                if (index > max_index)
+                    hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Too many buffers allocated, target's maximum is %u.", max_index);
 
                 buffer->reg.space = 0;
                 buffer->reg.index = index;
