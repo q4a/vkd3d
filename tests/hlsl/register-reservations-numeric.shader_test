@@ -377,7 +377,7 @@ probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 % Weird FXC behavior.
 % SM4 accepts anything for 'b' reservations and discards it silently for global numeric variables.
 
-[pixel shader fail(sm<4 | sm>=6) todo(sm>=4)]
+[pixel shader fail(sm<4 | sm>=6)]
 float a : register(banana);
 
 float4 main() : sv_target
@@ -387,7 +387,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 1.0
-todo(glsl | sm>=4 | sm<6) draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
 
 % Testing other reservation types. This is a parse failure, i.e "X3530: register sa not valid"
@@ -451,7 +451,7 @@ float4 main() : sv_target
 
 % DXC fails during parsing.
 
-[pixel shader fail]
+[pixel shader fail todo]
 cbuffer buf : register(banana)
 {
     float a;

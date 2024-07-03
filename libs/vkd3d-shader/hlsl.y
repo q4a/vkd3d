@@ -1235,8 +1235,20 @@ static bool parse_reservation_index(struct hlsl_ctx *ctx, const char *string, un
 
     reservation->reg_index = strtoul(string + 1, &endptr, 10) + bracket_offset;
 
-    if (endptr == string + 1)
-        return false;
+    if (*endptr)
+    {
+        /* fxc for SM >= 4 treats all parse failures for 'b' types as successes,
+         * setting index to -1. It will later fail while validating slot limits. */
+        if (reservation->reg_type == 'b' && hlsl_version_ge(ctx, 4, 0))
+        {
+            reservation->reg_index = -1;
+            return true;
+        }
+
+        /* All other types tolerate leftover characters. */
+        if (endptr == string + 1)
+            return false;
+    }
 
     return true;
 }
