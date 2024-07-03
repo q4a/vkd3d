@@ -277,3 +277,223 @@ float4 main() : sv_target
         f += i;
     return f;
 }
+
+% Expressions as offsets.
+[require]
+% All shader models.
+
+[pixel shader]
+// no offset at all, implicitly c0.
+float a : register (c);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 1.0
+todo(glsl) draw quad
+probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
+
+[pixel shader todo]
+// Numeric expr, no offset in the identifier. DXC ignores this.
+float a : register (c[1 + 1 * 2 * 0]);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 1.0
+uniform 4 float 2.0
+todo(glsl|sm<6) draw quad
+if(sm<6) probe (0, 0) rgba (2.0, 2.0, 2.0, 2.0)
+if(sm>=6) probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
+
+[pixel shader todo]
+// Numeric expr. DXC also ignores this.
+float a : register (c0[1 + 1 * 2 * 0]);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 0.0
+uniform 4 float 1.0
+todo(glsl|sm<6) draw quad
+if(sm<6) probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
+if(sm>=6) probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader todo]
+// Float offsets truncate.
+float a : register (c0[0.6 + 0.6]);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 0.0
+uniform 4 float 1.0
+todo(glsl|sm<6) draw quad
+if(sm<6) probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
+if(sm>=6) probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader todo]
+// Booleans are interpreted as integers in the usual way.
+float a : register (c0[true + false * true]);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 0.0
+uniform 4 float 1.0
+todo(glsl|sm<6) draw quad
+if(sm<6) probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
+if(sm>=6) probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader fail(sm>=6) todo]
+// Negative offsets. DXC fails to compile this.
+float a : register (c2[-1]);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 4 float 1.0
+todo draw quad
+probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
+
+% Weird FXC behavior.
+% SM4 accepts anything for 'b' reservations and discards it silently for global numeric variables.
+
+[pixel shader fail(sm<4 | sm>=6) todo(sm>=4)]
+float a : register(banana);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 1.0
+todo(glsl | sm>=4 | sm<6) draw quad
+probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
+
+% Testing other reservation types. This is a parse failure, i.e "X3530: register sa not valid"
+
+[pixel shader fail]
+
+sampler s : register(samply);
+
+float4 main() : sv_target
+{
+    return tex2D(s, float2(0, 0));
+}
+
+% This seems to parse fine, but fails with a different error message: "X3530: sampler requires an 's' or 't' register".
+% Resource types probably have extra validation.
+
+[pixel shader fail]
+
+sampler s : register(banana);
+
+float4 main() : sv_target
+{
+    return tex2D(s, float2(0, 0));
+}
+
+% Trailing characters after the reservation index are okay in SM < 6, except for 'b' reservations
+
+[pixel shader fail(sm>=6)]
+
+float a : register(c1manymanyletters);
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 0.0
+uniform 4 float 2.0
+todo(glsl) draw quad
+probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+
+[require]
+shader model >= 4.0
+
+[pixel shader fail todo]
+
+cbuffer buf : register(b0manymanyletters)
+{
+    float a;
+}
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+% SM4 fails, but not during parsing: it tries to reserve slot 4294967295 (i.e UINT_MAX) for the constant buffer.
+% It'll attempt to reserve the same slot even if an offset is passed in brackets, which suggests it uses -1
+% as a "parsing failure" flag.
+
+% DXC fails during parsing.
+
+[pixel shader fail]
+cbuffer buf : register(banana)
+{
+    float a;
+}
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+% Some versions of fxc's SM5.1 completely ignore bracket exprs for samplers and textures.
+% This was fixed (?) in later versions.
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 1]
+filter point point point
+address clamp clamp clamp
+
+[srv 0]
+size (2d, 1, 2)
+0.0 0.0 0.0 0.0     1.0 1.0 1.0 1.0
+
+[srv 1]
+size (2d, 1, 2)
+1.0 1.0 1.0 1.0     2.0 2.0 2.0 2.0
+
+[require]
+shader model >= 4.0
+
+[pixel shader todo]
+Texture2D tex : register(t[1]);
+sampler sam : register(s[1]);
+
+float4 main() : sv_target
+{
+    return tex.Sample(sam, float2(0, 0.5));
+}
+
+[test]
+todo(sm<6) draw quad
+if(sm<6) probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+if(sm>=6) probe (0, 0) rgba(0.5, 0.5, 0.5, 0.5)
