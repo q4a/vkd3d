@@ -4777,7 +4777,7 @@ static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint3
 
     LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, const struct hlsl_buffer, entry)
     {
-        if (buffer->used_size && buffer->reservation.reg_type == 'b'
+        if (buffer->reservation.reg_type == 'b'
                 && buffer->reservation.reg_space == space && buffer->reservation.reg_index == index)
             return buffer;
     }

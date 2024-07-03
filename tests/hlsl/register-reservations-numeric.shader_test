@@ -717,7 +717,7 @@ float4 main(uniform float param) : sv_target
     return glob * param * a * b * c * d * e * f * g * h * i * j * k * l * m;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 // Unused cbuffers still reserve their slot, and count towards the limit.
 float glob;
 
