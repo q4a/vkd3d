@@ -345,3 +345,156 @@ export float4 main() : sv_target
 [test]
 todo(glsl) draw quad
 probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
+
+% Default parameter values
+
+[pixel shader]
+float func(float a, float b = 2.0f, float c = 3.0f, float d=4.0f)
+{
+    return a + b + c + d;
+}
+
+float4 main() : sv_target
+{
+    return float4(func(1.0), func(1.0, 3.0), func(1.0, 3.0, 5.0), func(1.0, 3.0, 5.0, 7.0));
+}
+
+[test]
+todo(glsl) draw quad
+probe (0, 0) rgba (10.0, 11.0, 13.0, 16.0)
+
+[pixel shader]
+float4 func(float4 a = 1.0, float4 b = float4(1.0, 2.0, 3.0, 4.0))
+{
+    return a + b;
+}
+
+float4 main() : sv_target
+{
+    return func() + func(float4(-3.0, -4.0, -5.0, -6.0), float4(3.0, 4.0, 5.0, 6.0));
+}
+
+[test]
+todo(glsl) draw quad
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
+
+[pixel shader fail(sm>=6)]
+float4 func(float4 a = 1.0, float4 b = {1.0, 2.0, 3.0, 4.0})
+{
+    return a + b;
+}
+
+float4 main() : sv_target
+{
+    return func() + func(float4(-3.0, -4.0, -5.0, -6.0), float4(3.0, 4.0, 5.0, 6.0));
+}
+
+[test]
+todo(glsl) draw quad
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
+
+
+% For parameters, the order of matrix initializers is row-major.
+
+[pixel shader]
+float4 func(float2x2 m = float2x2(1, 2, 3, 4))
+{
+    return float4(m);
+}
+
+float4 main() : sv_target
+{
+    return func();
+}
+
+[test]
+todo(glsl) draw quad
+probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
+
+% Missing default value for parameter c.
+
+[pixel shader fail]
+float func(float a, float b = 1.0f, float c)
+{
+    return a + b + c;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+% Output parameters can't have default values for SM < 6.
+% The default values for output parameters are ignored for SM6.
+
+[pixel shader fail(sm<6)]
+float func(float a, out float b = 1.0)
+{
+    b += a;
+    return b;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm<6)]
+float func(float a, out float b = 1.0)
+{
+    b += a;
+    return b;
+}
+
+float4 main() : sv_target
+{
+    float x = 2.0;
+    float y = func(4.0, x);
+    return float4(x, y, 0, 0);
+}
+
+[test]
+todo(sm>=6 | glsl) draw quad
+probe (0, 0) rgba (4.0, 4.0, 0.0, 0.0)
+
+[pixel shader fail(sm<6)]
+float func(float a, inout float b = 1.0)
+{
+    b += a;
+    return b;
+}
+
+float4 main() : sv_target
+{
+    float x = 2.0;
+    float y = func(4.0, x);
+    return float4(x, y, 0, 0);
+}
+
+[test]
+todo(glsl) draw quad
+probe (0, 0) rgba (6.0, 6.0, 0.0, 0.0)
+
+% Parameters before outputs can't have default values.
+
+[pixel shader fail]
+float func(float a = 1.0f, out float b)
+{
+    return a;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+float func(float a = 1.0f, inout float b)
+{
+    return a;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}

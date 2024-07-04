@@ -34,6 +34,14 @@ struct parse_fields
     size_t count, capacity;
 };
 
+struct parse_initializer
+{
+    struct hlsl_ir_node **args;
+    unsigned int args_count;
+    struct hlsl_block *instrs;
+    bool braces;
+};
+
 struct parse_parameter
 {
     struct hlsl_type *type;
@@ -41,20 +49,13 @@ struct parse_parameter
     struct hlsl_semantic semantic;
     struct hlsl_reg_reservation reg_reservation;
     uint32_t modifiers;
+    struct parse_initializer initializer;
 };
 
 struct parse_colon_attribute
 {
     struct hlsl_semantic semantic;
     struct hlsl_reg_reservation reg_reservation;
-};
-
-struct parse_initializer
-{
-    struct hlsl_ir_node **args;
-    unsigned int args_count;
-    struct hlsl_block *instrs;
-    bool braces;
 };
 
 struct parse_array_sizes
@@ -1189,6 +1190,9 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type,
     return true;
 }
 
+static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
+        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src);
+
 static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters *parameters,
         struct parse_parameter *param, const struct vkd3d_shader_location *loc)
 {
@@ -1205,10 +1209,51 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                 "packoffset() is not allowed on function parameters.");
 
+    if (parameters->count && parameters->vars[parameters->count - 1]->default_values
+                && !param->initializer.args_count)
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
+                "Missing default value for parameter '%s'.", param->name);
+
+    if (param->initializer.args_count && (param->modifiers & HLSL_STORAGE_OUT))
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                "Output parameter '%s' has a default value.", param->name);
+
     if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers,
             &param->reg_reservation)))
         return false;
     var->is_param = 1;
+
+    if (param->initializer.args_count)
+    {
+        unsigned int component_count = hlsl_type_component_count(param->type);
+        unsigned int store_index = 0;
+        unsigned int size, i;
+
+        if (!(var->default_values = hlsl_calloc(ctx, component_count, sizeof(*var->default_values))))
+            return false;
+
+        if (!param->initializer.braces)
+        {
+            if (!(add_implicit_conversion(ctx, param->initializer.instrs, param->initializer.args[0], param->type, loc)))
+                return false;
+
+            param->initializer.args[0] = node_from_block(param->initializer.instrs);
+        }
+
+        size = initializer_size(&param->initializer);
+        if (component_count != size)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Expected %u components in initializer, but got %u.", component_count, size);
+        }
+
+        for (i = 0; i < param->initializer.args_count; ++i)
+        {
+            initialize_var_components(ctx, param->initializer.instrs, var, &store_index, param->initializer.args[i]);
+        }
+
+        free_parse_initializer(&param->initializer);
+    }
 
     if (!hlsl_add_var(ctx, var, false))
     {
@@ -2227,7 +2272,9 @@ static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool d
 /* For some reason, for matrices, values from default value initializers end up in different
  * components than from regular initializers. Default value initializers fill the matrix in
  * vertical reading order (left-to-right top-to-bottom) instead of regular reading order
- * (top-to-bottom left-to-right), so they have to be adjusted. */
+ * (top-to-bottom left-to-right), so they have to be adjusted.
+ * An exception is that the order of matrix initializers for function parameters are row-major
+ * (top-to-bottom left-to-right). */
 static unsigned int get_component_index_from_default_initializer_index(struct hlsl_ctx *ctx,
         struct hlsl_type *type, unsigned int index)
 {
@@ -2300,7 +2347,11 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
                 return;
             default_value.value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
 
-            dst_index = get_component_index_from_default_initializer_index(ctx, dst->data_type, *store_index);
+            if (dst->is_param)
+                dst_index = *store_index;
+            else
+                dst_index = get_component_index_from_default_initializer_index(ctx, dst->data_type, *store_index);
+
             dst->default_values[dst_index] = default_value;
 
             hlsl_block_cleanup(&block);
@@ -2751,14 +2802,18 @@ static bool func_is_compatible_match(struct hlsl_ctx *ctx,
 {
     unsigned int i;
 
-    if (decl->parameters.count != args->args_count)
+    if (decl->parameters.count < args->args_count)
         return false;
 
-    for (i = 0; i < decl->parameters.count; ++i)
+    for (i = 0; i < args->args_count; ++i)
     {
         if (!implicit_compatible_data_types(ctx, args->args[i]->data_type, decl->parameters.vars[i]->data_type))
             return false;
     }
+
+    if (args->args_count < decl->parameters.count && !decl->parameters.vars[args->args_count]->default_values)
+        return false;
+
     return true;
 }
 
@@ -2801,11 +2856,11 @@ static bool add_user_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fu
         const struct parse_initializer *args, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *call;
-    unsigned int i;
+    unsigned int i, j;
 
-    assert(args->args_count == func->parameters.count);
+    assert(args->args_count <= func->parameters.count);
 
-    for (i = 0; i < func->parameters.count; ++i)
+    for (i = 0; i < args->args_count; ++i)
     {
         struct hlsl_ir_var *param = func->parameters.vars[i];
         struct hlsl_ir_node *arg = args->args[i];
@@ -2830,11 +2885,40 @@ static bool add_user_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fu
         }
     }
 
+    /* Add default values for the remaining parameters. */
+    for (i = args->args_count; i < func->parameters.count; ++i)
+    {
+        struct hlsl_ir_var *param = func->parameters.vars[i];
+        unsigned int comp_count = hlsl_type_component_count(param->data_type);
+        struct hlsl_deref param_deref;
+
+        assert(param->default_values);
+
+        hlsl_init_simple_deref_from_var(&param_deref, param);
+
+        for (j = 0; j < comp_count; ++j)
+        {
+            struct hlsl_type *type = hlsl_type_get_component_type(ctx, param->data_type, j);
+            struct hlsl_constant_value value;
+            struct hlsl_ir_node *comp;
+            struct hlsl_block store_block;
+
+            value.u[0] = param->default_values[j].value;
+            if (!(comp = hlsl_new_constant(ctx, type, &value, loc)))
+                return false;
+            hlsl_block_add_instr(args->instrs, comp);
+
+            if (!hlsl_new_store_component(ctx, &store_block, &param_deref, j, comp))
+                return false;
+            hlsl_block_add_block(args->instrs, &store_block);
+        }
+    }
+
     if (!(call = hlsl_new_call(ctx, func, loc)))
         return false;
     hlsl_block_add_instr(args->instrs, call);
 
-    for (i = 0; i < func->parameters.count; ++i)
+    for (i = 0; i < args->args_count; ++i)
     {
         struct hlsl_ir_var *param = func->parameters.vars[i];
         struct hlsl_ir_node *arg = args->args[i];
@@ -6076,6 +6160,7 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %type <name> name_opt
 
 %type <parameter> parameter
+%type <parameter> parameter_decl
 
 %type <parameters> param_list
 %type <parameters> parameters
@@ -6911,6 +6996,14 @@ param_list:
         }
 
 parameter:
+      parameter_decl
+    | parameter_decl '=' complex_initializer
+        {
+            $$ = $1;
+            $$.initializer = $3;
+        }
+
+parameter_decl:
       var_modifiers type_no_void any_identifier arrays colon_attribute
         {
             uint32_t modifiers = $1;
@@ -6943,6 +7036,8 @@ parameter:
             $$.name = $3;
             $$.semantic = $5.semantic;
             $$.reg_reservation = $5.reg_reservation;
+
+            memset(&$$.initializer, 0, sizeof($$.initializer));
         }
 
 texture_type:
