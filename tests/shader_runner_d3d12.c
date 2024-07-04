@@ -85,12 +85,13 @@ static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, cons
     if (runner->r.minimum_shader_model >= SHADER_MODEL_6_0)
     {
         assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->r.compile_options, source, &blob, &errors);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->r.compile_options, source, &blob);
     }
     else
     {
         sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->r.minimum_shader_model]);
-        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, runner->r.compile_options, 0, &blob, &errors);
+        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main",
+                profile, runner->r.compile_options, 0, &blob, &errors);
     }
     ok(FAILED(hr) == !blob, "Got unexpected hr %#x, blob %p.\n", hr, blob);
     if (errors)

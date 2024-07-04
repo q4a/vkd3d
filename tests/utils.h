@@ -44,6 +44,9 @@
 #include <stdlib.h>
 #include "vkd3d_test.h"
 #include "vkd3d_d3d12.h"
+#include "vkd3d_d3dcompiler.h"
+#include "vkd3d_shader.h"
+#include "dxcompiler.h"
 
 struct vec2
 {
@@ -452,5 +455,130 @@ static inline void parse_args(int argc, char **argv)
             test_options.filename = argv[i];
     }
 }
+
+static inline HRESULT vkd3d_shader_code_from_dxc_blob(IDxcBlob *blob, struct vkd3d_shader_code *blob_out)
+{
+    size_t size;
+
+    size = IDxcBlob_GetBufferSize(blob);
+    if (!(blob_out->code = malloc(size)))
+    {
+        trace("Failed to allocate shader code.\n");
+        return E_OUTOFMEMORY;
+    }
+
+    memcpy((void *)blob_out->code, IDxcBlob_GetBufferPointer(blob), size);
+    blob_out->size = size;
+
+    return S_OK;
+}
+
+static inline HRESULT dxc_compile(void *dxc_compiler, const WCHAR *profile,
+        unsigned int compile_options, const char *hlsl, struct vkd3d_shader_code *blob_out)
+{
+    DxcBuffer src_buf = {hlsl, strlen(hlsl), 65001};
+    IDxcCompiler3 *compiler = dxc_compiler;
+    IDxcBlobUtf8 *errors;
+    IDxcResult *result;
+    HRESULT compile_hr;
+    size_t arg_count;
+    IDxcBlob *blob;
+    int hr;
+
+    const WCHAR *args[] =
+    {
+        L"/T",
+        profile,
+        L"/Qstrip_reflect",
+        L"/Qstrip_debug",
+        L"/flegacy-macro-expansion",
+        L"/flegacy-resource-reservation",
+        NULL,
+        NULL,
+        NULL,
+    };
+
+    memset(blob_out, 0, sizeof(*blob_out));
+
+    arg_count = ARRAY_SIZE(args) - 3;
+    if (compile_options & D3DCOMPILE_PACK_MATRIX_ROW_MAJOR)
+        args[arg_count++] = L"/Zpr";
+    if (compile_options & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
+        args[arg_count++] = L"/Zpc";
+    if (compile_options & D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY)
+        args[arg_count++] = L"/Gec";
+
+    if (FAILED(hr = IDxcCompiler3_Compile(compiler, &src_buf, args,
+            arg_count, NULL, &IID_IDxcResult, (void **)&result)))
+        return hr;
+
+    if (IDxcResult_HasOutput(result, DXC_OUT_ERRORS)
+            && SUCCEEDED(hr = IDxcResult_GetOutput(result, DXC_OUT_ERRORS, &IID_IDxcBlobUtf8, (void **)&errors, NULL)))
+    {
+        if (IDxcBlobUtf8_GetStringLength(errors) && vkd3d_test_state.debug_level)
+            trace("%s\n", (char *)IDxcBlobUtf8_GetStringPointer(errors));
+        IDxcBlobUtf8_Release(errors);
+    }
+
+    if (FAILED(hr = IDxcResult_GetStatus(result, &compile_hr)) || FAILED((hr = compile_hr)))
+    {
+        if (hr == DXC_E_LLVM_CAST_ERROR)
+            hr = E_FAIL;
+        goto result_release;
+    }
+
+    if (FAILED(hr = IDxcResult_GetOutput(result, DXC_OUT_OBJECT, &IID_IDxcBlob, (void **)&blob, NULL)))
+        goto result_release;
+
+    IDxcResult_Release(result);
+
+    hr = vkd3d_shader_code_from_dxc_blob(blob, blob_out);
+    IDxcBlob_Release(blob);
+    return hr;
+
+result_release:
+    IDxcResult_Release(result);
+    return hr;
+}
+
+#if (defined(SONAME_LIBDXCOMPILER) || defined(VKD3D_CROSSTEST))
+static inline IDxcCompiler3 *dxcompiler_create(void)
+{
+    DxcCreateInstanceProc create_instance;
+    IDxcCompiler3 *compiler;
+    const char *skip_dxc;
+    void *dll;
+    int hr;
+
+    if ((skip_dxc = getenv("VKD3D_TEST_SKIP_DXC")) && strcmp(skip_dxc, "") != 0)
+        return NULL;
+
+# ifdef VKD3D_CROSSTEST
+    dll = vkd3d_dlopen("dxcompiler.dll");
+# else
+    dll = vkd3d_dlopen(SONAME_LIBDXCOMPILER);
+# endif
+    ok(dll, "Failed to load dxcompiler library, %s.\n", vkd3d_dlerror());
+    if (!dll)
+        return NULL;
+
+    create_instance = (DxcCreateInstanceProc)vkd3d_dlsym(dll, "DxcCreateInstance");
+    ok(create_instance, "Failed to get DxcCreateInstance() pointer.\n");
+    if (!create_instance)
+        return NULL;
+
+    hr = create_instance(&CLSID_DxcCompiler, &IID_IDxcCompiler3, (void **)&compiler);
+    ok(SUCCEEDED(hr), "Failed to create instance, hr %#x.\n", hr);
+    if (FAILED(hr))
+        return NULL;
+
+    return compiler;
+}
+#else
+static inline IDxcCompiler3 *dxcompiler_create(void)
+{
+    return NULL;
+}
+#endif
 
 #endif

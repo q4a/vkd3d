@@ -457,15 +457,20 @@ LDADD = libvkd3d.la libvkd3d-shader.la libvkd3d-utils.la
 AM_DEFAULT_SOURCE_EXT = .c
 
 TEST_EXTENSIONS = .shader_test
+TEST_CPPFLAGS = -I$(builddir)/tests
 
 if BUILD_TESTS
 check_PROGRAMS = $(vkd3d_tests) $(vkd3d_cross_tests) tests/shader_runner
 dist_check_SCRIPTS = tests/test-driver.sh
 TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
+tests_d3d12_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @DL_LIBS@
+tests_d3d12_invalid_usage_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @DL_LIBS@
+tests_hlsl_d3d12_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_hlsl_d3d12_LDADD = $(LDADD) @DL_LIBS@
-tests_shader_runner_CFLAGS = $(AM_CFLAGS) -I$(builddir)/tests @OPENGL_CFLAGS@
+tests_shader_runner_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
+tests_shader_runner_CFLAGS = $(AM_CFLAGS) @OPENGL_CFLAGS@
 tests_shader_runner_LDADD = $(LDADD) @OPENGL_LIBS@ @DL_LIBS@
 tests_shader_runner_SOURCES = \
 	tests/shader_runner.c \
@@ -474,7 +479,9 @@ tests_shader_runner_SOURCES = \
 	tests/shader_runner_d3d12.c \
 	tests/shader_runner_gl.c \
 	tests/shader_runner_vulkan.c
+tests_vkd3d_api_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
+tests_vkd3d_shader_api_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_vkd3d_shader_api_CFLAGS = $(AM_CFLAGS) @OPENGL_CFLAGS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la @OPENGL_LIBS@
 SHADER_TEST_LOG_COMPILER = tests/shader_runner

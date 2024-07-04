@@ -62,7 +62,6 @@ typedef int HRESULT;
 #include "vkd3d_d3dcompiler.h"
 #include "vkd3d_test.h"
 #include "shader_runner.h"
-#include "dxcompiler.h"
 
 struct test_options test_options = {0};
 
@@ -1391,55 +1390,28 @@ const char *shader_type_string(enum shader_type type)
     return shader_types[type];
 }
 
-/* Avoid issues with calling convention mismatch and different methods for string
- * retrieval by copying all IDxcBlob objects to a new ID3D10Blob. */
-
-static void d3d10_blob_from_dxc_blob_utf8(IDxcBlobUtf8 *blob, ID3D10Blob **blob_out)
+static HRESULT d3d10_blob_from_vkd3d_shader_code(const struct vkd3d_shader_code *blob, ID3D10Blob **blob_out)
 {
     ID3D10Blob *d3d_blob;
-    size_t size;
     HRESULT hr;
 
-    size = IDxcBlobUtf8_GetStringLength(blob) + 1;
-    if (FAILED(hr = D3DCreateBlob(size, (ID3DBlob **)&d3d_blob)))
-    {
-        trace("Failed to create blob, hr %#x.\n", hr);
-        return;
-    }
-
-    memcpy(ID3D10Blob_GetBufferPointer(d3d_blob), IDxcBlobUtf8_GetStringPointer(blob), size);
-    *blob_out = d3d_blob;
-}
-
-static HRESULT d3d10_blob_from_dxc_blob(IDxcBlob *blob, ID3D10Blob **blob_out)
-{
-    ID3D10Blob *d3d_blob;
-    size_t size;
-    HRESULT hr;
-
-    size = IDxcBlob_GetBufferSize(blob);
-    if (FAILED(hr = D3DCreateBlob(size, (ID3DBlob **)&d3d_blob)))
+    if (FAILED(hr = D3DCreateBlob(blob->size, (ID3DBlob **)&d3d_blob)))
     {
         trace("Failed to create blob, hr %#x.\n", hr);
         return hr;
     }
 
-    memcpy(ID3D10Blob_GetBufferPointer(d3d_blob), IDxcBlob_GetBufferPointer(blob), size);
+    memcpy(ID3D10Blob_GetBufferPointer(d3d_blob), blob->code, blob->size);
     *blob_out = d3d_blob;
 
     return S_OK;
 }
 
-HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, unsigned int compile_options,
-        const char *hlsl, ID3D10Blob **blob_out, ID3D10Blob **errors_out)
+HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type,
+        unsigned int compile_options, const char *hlsl, ID3D10Blob **blob_out)
 {
-    DxcBuffer src_buf = {hlsl, strlen(hlsl), 65001};
-    IDxcCompiler3 *compiler = dxc_compiler;
-    HRESULT hr, compile_hr;
-    IDxcBlobUtf8 *errors;
-    IDxcResult *result;
-    size_t arg_count;
-    IDxcBlob *blob;
+    struct vkd3d_shader_code blob;
+    HRESULT hr;
 
     static const WCHAR *const shader_profiles[] =
     {
@@ -1450,62 +1422,15 @@ HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, u
         [SHADER_TYPE_DS] = L"ds_6_0",
         [SHADER_TYPE_GS] = L"gs_6_0",
     };
-    const WCHAR *args[] =
-    {
-        L"/T",
-        shader_profiles[type],
-        L"/Qstrip_reflect",
-        L"/Qstrip_debug",
-        L"/flegacy-macro-expansion",
-        L"/flegacy-resource-reservation",
-        NULL,
-        NULL,
-        NULL,
-    };
 
     *blob_out = NULL;
-    *errors_out = NULL;
 
-    arg_count = ARRAY_SIZE(args) - 3;
-    if (compile_options & D3DCOMPILE_PACK_MATRIX_ROW_MAJOR)
-        args[arg_count++] = L"/Zpr";
-    if (compile_options & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
-        args[arg_count++] = L"/Zpc";
-    if (compile_options & D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY)
-        args[arg_count++] = L"/Gec";
-
-    if (FAILED(hr = IDxcCompiler3_Compile(compiler, &src_buf, args, arg_count, NULL, &IID_IDxcResult, (void **)&result)))
-    {
-        trace("Failed to compile shader, hr %#x.\n", hr);
+    if (FAILED(hr = dxc_compile(dxc_compiler, shader_profiles[type], compile_options, hlsl, &blob)))
         return hr;
-    }
 
-    if (IDxcResult_HasOutput(result, DXC_OUT_ERRORS)
-            && SUCCEEDED(hr = IDxcResult_GetOutput(result, DXC_OUT_ERRORS, &IID_IDxcBlobUtf8, (void **)&errors, NULL)))
-    {
-        if (IDxcBlobUtf8_GetStringLength(errors))
-            d3d10_blob_from_dxc_blob_utf8(errors, errors_out);
-        IDxcBlobUtf8_Release(errors);
-    }
+    hr = d3d10_blob_from_vkd3d_shader_code(&blob, blob_out);
+    free((void *)blob.code);
 
-    if (FAILED(hr = IDxcResult_GetStatus(result, &compile_hr)) || FAILED((hr = compile_hr)))
-    {
-        if (hr == DXC_E_LLVM_CAST_ERROR)
-            hr = E_FAIL;
-        goto result_release;
-    }
-
-    if (FAILED(hr = IDxcResult_GetOutput(result, DXC_OUT_OBJECT, &IID_IDxcBlob, (void **)&blob, NULL)))
-        goto result_release;
-
-    IDxcResult_Release(result);
-
-    hr = d3d10_blob_from_dxc_blob(blob, blob_out);
-    IDxcBlob_Release(blob);
-    return hr;
-
-result_release:
-    IDxcResult_Release(result);
     return hr;
 }
 
@@ -1539,7 +1464,7 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
     if (use_dxcompiler)
     {
         assert(dxc_compiler);
-        hr = dxc_compiler_compile_shader(dxc_compiler, type, runner->compile_options, source, &blob, &errors);
+        hr = dxc_compiler_compile_shader(dxc_compiler, type, runner->compile_options, source, &blob);
     }
     else
     {
@@ -1558,7 +1483,8 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
     else
     {
         assert_that(!blob, "Expected no compiled shader blob.\n");
-        assert_that(!!errors, "Expected non-NULL error blob.\n");
+        if (!use_dxcompiler)
+            assert_that(!!errors, "Expected non-NULL error blob.\n");
     }
     if (errors)
     {
@@ -2296,46 +2222,6 @@ static void print_dll_version(const char *file_name)
 out:
     if (!done)
         trace("%s version: unknown\n", file_name);
-}
-#endif
-
-#if (defined(SONAME_LIBDXCOMPILER) || defined(VKD3D_CROSSTEST))
-static IDxcCompiler3 *dxcompiler_create(void)
-{
-    DxcCreateInstanceProc create_instance;
-    IDxcCompiler3 *compiler;
-    const char *skip_dxc;
-    HRESULT hr;
-    void *dll;
-
-    if ((skip_dxc = getenv("VKD3D_TEST_SKIP_DXC")) && strcmp(skip_dxc, "") != 0)
-        return NULL;
-
-#ifdef VKD3D_CROSSTEST
-    dll = vkd3d_dlopen("dxcompiler.dll");
-#else
-    dll = vkd3d_dlopen(SONAME_LIBDXCOMPILER);
-#endif
-    ok(dll, "Failed to load dxcompiler library, %s.\n", vkd3d_dlerror());
-    if (!dll)
-        return NULL;
-
-    create_instance = (DxcCreateInstanceProc)vkd3d_dlsym(dll, "DxcCreateInstance");
-    ok(create_instance, "Failed to get DxcCreateInstance() pointer.\n");
-    if (!create_instance)
-        return NULL;
-
-    hr = create_instance(&CLSID_DxcCompiler, &IID_IDxcCompiler3, (void **)&compiler);
-    ok(SUCCEEDED(hr), "Failed to create instance, hr %#x.\n", hr);
-    if (FAILED(hr))
-        return NULL;
-
-    return compiler;
-}
-#else
-static IDxcCompiler3 *dxcompiler_create(void)
-{
-    return NULL;
 }
 #endif
 
