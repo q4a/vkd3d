@@ -5289,11 +5289,13 @@ static void d3d12_command_list_clear_uav(struct d3d12_command_list *list,
         struct d3d12_resource *resource, struct vkd3d_view *descriptor, const VkClearColorValue *clear_colour,
         unsigned int rect_count, const D3D12_RECT *rects)
 {
+    const VkPhysicalDeviceLimits *device_limits = &list->device->vk_info.device_limits;
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
     unsigned int i, miplevel_idx, layer_count;
     struct vkd3d_uav_clear_pipeline pipeline;
     struct vkd3d_uav_clear_args clear_args;
     const struct vkd3d_resource_view *view;
+    uint32_t count_x, count_y, count_z;
     VkDescriptorImageInfo image_info;
     D3D12_RECT full_rect, curr_rect;
     VkWriteDescriptorSet write_set;
@@ -5384,18 +5386,32 @@ static void d3d12_command_list_clear_uav(struct d3d12_command_list *list,
         if (curr_rect.left >= curr_rect.right || curr_rect.top >= curr_rect.bottom)
             continue;
 
-        clear_args.offset.x = curr_rect.left;
         clear_args.offset.y = curr_rect.top;
-        clear_args.extent.width = curr_rect.right - curr_rect.left;
         clear_args.extent.height = curr_rect.bottom - curr_rect.top;
 
-        VK_CALL(vkCmdPushConstants(list->vk_command_buffer, pipeline.vk_pipeline_layout,
-                VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(clear_args), &clear_args));
+        count_y = vkd3d_compute_workgroup_count(clear_args.extent.height, pipeline.group_size.height);
+        count_z = vkd3d_compute_workgroup_count(layer_count, pipeline.group_size.depth);
+        if (count_y > device_limits->maxComputeWorkGroupCount[1])
+            FIXME("Group Y count %u exceeds max %u.\n", count_y, device_limits->maxComputeWorkGroupCount[1]);
+        if (count_z > device_limits->maxComputeWorkGroupCount[2])
+            FIXME("Group Z count %u exceeds max %u.\n", count_z, device_limits->maxComputeWorkGroupCount[2]);
 
-        VK_CALL(vkCmdDispatch(list->vk_command_buffer,
-                vkd3d_compute_workgroup_count(clear_args.extent.width, pipeline.group_size.width),
-                vkd3d_compute_workgroup_count(clear_args.extent.height, pipeline.group_size.height),
-                vkd3d_compute_workgroup_count(layer_count, pipeline.group_size.depth)));
+        do
+        {
+            clear_args.offset.x = curr_rect.left;
+            clear_args.extent.width = curr_rect.right - curr_rect.left;
+
+            count_x = vkd3d_compute_workgroup_count(clear_args.extent.width, pipeline.group_size.width);
+            count_x = min(count_x, device_limits->maxComputeWorkGroupCount[0]);
+
+            VK_CALL(vkCmdPushConstants(list->vk_command_buffer, pipeline.vk_pipeline_layout,
+                    VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(clear_args), &clear_args));
+
+            VK_CALL(vkCmdDispatch(list->vk_command_buffer, count_x, count_y, count_z));
+
+            curr_rect.left += count_x * pipeline.group_size.width;
+        }
+        while (curr_rect.right > curr_rect.left);
     }
 }
 
