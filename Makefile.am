@@ -62,6 +62,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/array-size-expr.shader_test \
 	tests/hlsl/asfloat.shader_test \
 	tests/hlsl/asuint.shader_test \
+	tests/hlsl/asint.shader_test \
 	tests/hlsl/attributes.shader_test \
 	tests/hlsl/bitwise.shader_test \
 	tests/hlsl/bool-cast.shader_test \
