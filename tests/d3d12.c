@@ -5728,6 +5728,66 @@ static void test_clear_unordered_access_view_buffer(void)
 #undef BUFFER_SIZE
 }
 
+static void test_clear_unordered_access_view_large_buffer(void)
+{
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
+    ID3D12DescriptorHeap *cpu_heap, *gpu_heap;
+    ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
+    struct test_context_desc desc;
+    struct test_context context;
+    ID3D12CommandQueue *queue;
+    ID3D12Resource *buffer;
+    ID3D12Device *device;
+    D3D12_BOX box;
+
+    static const UINT clear_value[4] = {0xcafef00d, 0, 0, 0};
+    static const size_t buffer_size = 64 * 1024 * 1024;
+
+    memset(&desc, 0, sizeof(desc));
+    desc.no_render_target = true;
+    if (!init_test_context(&context, &desc))
+        return;
+    device = context.device;
+    command_list = context.list;
+    queue = context.queue;
+
+    cpu_heap = create_cpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    gpu_heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+
+    buffer = create_default_buffer(device, buffer_size,
+            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    memset(&uav_desc, 0, sizeof(uav_desc));
+    uav_desc.Format = DXGI_FORMAT_R32_UINT;
+    uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+    uav_desc.Buffer.NumElements = buffer_size / sizeof(uint32_t);
+    ID3D12Device_CreateUnorderedAccessView(device, buffer, NULL, &uav_desc,
+            get_cpu_descriptor_handle(&context, cpu_heap, 0));
+    ID3D12Device_CreateUnorderedAccessView(device, buffer, NULL, &uav_desc,
+            get_cpu_descriptor_handle(&context, gpu_heap, 0));
+
+    ID3D12GraphicsCommandList_ClearUnorderedAccessViewUint(command_list,
+            get_gpu_descriptor_handle(&context, gpu_heap, 0),
+            get_cpu_descriptor_handle(&context, cpu_heap, 0),
+            buffer, clear_value, 0, NULL);
+
+    uav_barrier(command_list, buffer);
+
+    transition_resource_state(command_list, buffer,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
+    /* Check only the end to save test run time. */
+    set_box(&box, uav_desc.Buffer.NumElements - 1024 * 1024, 0, 0, uav_desc.Buffer.NumElements, 1, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xcafef00d, 0);
+    release_resource_readback(&rb);
+
+    ID3D12Resource_Release(buffer);
+    ID3D12DescriptorHeap_Release(cpu_heap);
+    ID3D12DescriptorHeap_Release(gpu_heap);
+    destroy_test_context(&context);
+}
+
 static void test_clear_unordered_access_view_image(void)
 {
     unsigned int image_size, image_depth, texel_size;
@@ -38899,6 +38959,7 @@ START_TEST(d3d12)
     run_test(test_clear_depth_stencil_view);
     run_test(test_clear_render_target_view);
     run_test(test_clear_unordered_access_view_buffer);
+    run_test(test_clear_unordered_access_view_large_buffer);
     run_test(test_clear_unordered_access_view_image);
     run_test(test_set_render_targets);
     run_test(test_draw_instanced);
