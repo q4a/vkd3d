@@ -5155,6 +5155,12 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_EXP, &expr->node, arg1, 0);
             break;
 
+        case HLSL_OP1_F16TOF32:
+            assert(type_is_float(dst_type));
+            assert(hlsl_version_ge(tpf->ctx, 5, 0));
+            write_sm4_unary_op(tpf, VKD3D_SM5_OP_F16TOF32, &expr->node, arg1, 0);
+            break;
+
         case HLSL_OP1_FLOOR:
             assert(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_NI, &expr->node, arg1, 0);

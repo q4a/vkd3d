@@ -6249,6 +6249,90 @@ static void transform_unroll_loops(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     }
 }
 
+static bool lower_f16tof32(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *call, *rhs, *store;
+    struct hlsl_ir_function_decl *func;
+    unsigned int component_count;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_var *lhs;
+    char *body;
+
+    static const char template[] =
+    "typedef uint%u uintX;\n"
+    "float%u soft_f16tof32(uintX x)\n"
+    "{\n"
+    "    uintX mantissa = x & 0x3ff;\n"
+    "    uintX high2 = mantissa >> 8;\n"
+    "    uintX high2_check = high2 ? high2 : mantissa;\n"
+    "    uintX high6 = high2_check >> 4;\n"
+    "    uintX high6_check = high6 ? high6 : high2_check;\n"
+    "\n"
+    "    uintX high8 = high6_check >> 2;\n"
+    "    uintX high8_check = (high8 ? high8 : high6_check) >> 1;\n"
+    "    uintX shift = high6 ? (high2 ? 12 : 4) : (high2 ? 8 : 0);\n"
+    "    shift = high8 ? shift + 2 : shift;\n"
+    "    shift = high8_check ? shift + 1 : shift;\n"
+    "    shift = -shift + 10;\n"
+    "    shift = mantissa ? shift : 11;\n"
+    "    uintX subnormal_mantissa = ((mantissa << shift) << 23) & 0x7fe000;\n"
+    "    uintX subnormal_exp = -(shift << 23) + 0x38800000;\n"
+    "    uintX subnormal_val = subnormal_exp + subnormal_mantissa;\n"
+    "    uintX subnormal_or_zero = mantissa ? subnormal_val : 0;\n"
+    "\n"
+    "    uintX exponent = (((x >> 10) << 23) & 0xf800000) + 0x38000000;\n"
+    "\n"
+    "    uintX low_3 = (x << 13) & 0x7fe000;\n"
+    "    uintX normalized_val = exponent + low_3;\n"
+    "    uintX inf_nan_val = low_3 + 0x7f800000;\n"
+    "\n"
+    "    uintX exp_mask = 0x7c00;\n"
+    "    uintX is_inf_nan = (x & exp_mask) == exp_mask;\n"
+    "    uintX is_normalized = x & exp_mask;\n"
+    "\n"
+    "    uintX check = is_inf_nan ? inf_nan_val : normalized_val;\n"
+    "    uintX exp_mantissa = (is_normalized ? check : subnormal_or_zero) & 0x7fffe000;\n"
+    "    uintX sign_bit = (x << 16) & 0x80000000;\n"
+    "\n"
+    "    return asfloat(exp_mantissa + sign_bit);\n"
+    "}\n";
+
+
+    if (node->type != HLSL_IR_EXPR)
+        return false;
+
+    expr = hlsl_ir_expr(node);
+
+    if (expr->op != HLSL_OP1_F16TOF32)
+        return false;
+
+    rhs = expr->operands[0].node;
+    component_count = hlsl_type_component_count(rhs->data_type);
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template, component_count, component_count)))
+        return false;
+
+    if (!(func = hlsl_compile_internal_function(ctx, "soft_f16tof32", body)))
+        return false;
+
+    lhs = func->parameters.vars[0];
+
+    if (!(store = hlsl_new_simple_store(ctx, lhs, rhs)))
+        return false;
+    hlsl_block_add_instr(block, store);
+
+    if (!(call = hlsl_new_call(ctx, func, &node->loc)))
+        return false;
+    hlsl_block_add_instr(block, call);
+
+    if (!(load = hlsl_new_var_load(ctx, func->return_var, &node->loc)))
+        return false;
+    hlsl_block_add_instr(block, &load->node);
+
+    return true;
+}
+
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
@@ -6268,6 +6352,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
      * lower_return() recurses into inferior calls. */
     if (ctx->result)
         return ctx->result;
+
+    if (hlsl_version_ge(ctx, 4, 0) && hlsl_version_lt(ctx, 5, 0))
+        lower_ir(ctx, lower_f16tof32, body);
 
     lower_return(ctx, entry_func, body, false);
 
