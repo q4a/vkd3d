@@ -51,12 +51,8 @@ static struct vulkan_resource *vulkan_resource(struct resource *r)
 
 DECLARE_VK_PFN(vkGetInstanceProcAddr)
 
-struct vulkan_shader_runner
+struct vulkan_test_context
 {
-    struct shader_runner r;
-    struct shader_runner_caps caps;
-    bool demote_to_helper_invocation;
-
     VkInstance instance;
     VkPhysicalDevice phys_device;
     VkDevice device;
@@ -65,6 +61,21 @@ struct vulkan_shader_runner
     VkCommandBuffer cmd_buffer;
     VkDescriptorPool descriptor_pool;
 
+    DECLARE_VK_PFN(vkCreateInstance);
+    DECLARE_VK_PFN(vkEnumerateInstanceExtensionProperties);
+#define VK_INSTANCE_PFN   DECLARE_VK_PFN
+#define VK_DEVICE_PFN     DECLARE_VK_PFN
+#include "vulkan_procs.h"
+};
+
+struct vulkan_shader_runner
+{
+    struct shader_runner r;
+    struct shader_runner_caps caps;
+    bool demote_to_helper_invocation;
+
+    struct vulkan_test_context context;
+
     struct vkd3d_shader_scan_signature_info vs_signatures;
 
     struct vulkan_sampler
@@ -72,12 +83,6 @@ struct vulkan_shader_runner
         VkSampler vk_sampler;
         uint32_t binding;
     } samplers[MAX_SAMPLERS];
-
-    DECLARE_VK_PFN(vkCreateInstance);
-    DECLARE_VK_PFN(vkEnumerateInstanceExtensionProperties);
-#define VK_INSTANCE_PFN   DECLARE_VK_PFN
-#define VK_DEVICE_PFN     DECLARE_VK_PFN
-#include "vulkan_procs.h"
 };
 
 struct extension_list
@@ -98,28 +103,28 @@ static struct vulkan_shader_runner *vulkan_shader_runner(struct shader_runner *r
     return CONTAINING_RECORD(r, struct vulkan_shader_runner, r);
 }
 
-#define VK_CALL(f) (runner->f)
+#define VK_CALL(f) (context->f)
 
-static void begin_command_buffer(struct vulkan_shader_runner *runner)
+static void begin_command_buffer(const struct vulkan_test_context *context)
 {
     VkCommandBufferBeginInfo buffer_begin_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
 
-    VK_CALL(vkBeginCommandBuffer(runner->cmd_buffer, &buffer_begin_desc));
+    VK_CALL(vkBeginCommandBuffer(context->cmd_buffer, &buffer_begin_desc));
 }
 
-static void end_command_buffer(struct vulkan_shader_runner *runner)
+static void end_command_buffer(const struct vulkan_test_context *context)
 {
     VkSubmitInfo submit_desc = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
 
-    VK_CALL(vkEndCommandBuffer(runner->cmd_buffer));
+    VK_CALL(vkEndCommandBuffer(context->cmd_buffer));
 
     submit_desc.commandBufferCount = 1;
-    submit_desc.pCommandBuffers = &runner->cmd_buffer;
-    VK_CALL(vkQueueSubmit(runner->queue, 1, &submit_desc, VK_NULL_HANDLE));
-    VK_CALL(vkQueueWaitIdle(runner->queue));
+    submit_desc.pCommandBuffers = &context->cmd_buffer;
+    VK_CALL(vkQueueSubmit(context->queue, 1, &submit_desc, VK_NULL_HANDLE));
+    VK_CALL(vkQueueWaitIdle(context->queue));
 }
 
-static void transition_image_layout(struct vulkan_shader_runner *runner,
+static void transition_image_layout(const struct vulkan_test_context *context,
         VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout src_layout, VkImageLayout dst_layout)
 {
     VkImageMemoryBarrier barrier = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
@@ -137,17 +142,17 @@ static void transition_image_layout(struct vulkan_shader_runner *runner,
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
-    VK_CALL(vkCmdPipelineBarrier(runner->cmd_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+    VK_CALL(vkCmdPipelineBarrier(context->cmd_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &barrier));
 }
 
-static unsigned int select_vulkan_memory_type(const struct vulkan_shader_runner *runner,
+static unsigned int select_vulkan_memory_type(const struct vulkan_test_context *context,
         uint32_t memory_type_mask, VkMemoryPropertyFlags required_flags)
 {
     VkPhysicalDeviceMemoryProperties memory_info;
     unsigned int i;
 
-    VK_CALL(vkGetPhysicalDeviceMemoryProperties(runner->phys_device, &memory_info));
+    VK_CALL(vkGetPhysicalDeviceMemoryProperties(context->phys_device, &memory_info));
 
     for (i = 0; i < memory_info.memoryTypeCount; ++i)
     {
@@ -161,7 +166,7 @@ static unsigned int select_vulkan_memory_type(const struct vulkan_shader_runner 
             memory_type_mask, required_flags);
 }
 
-static VkDeviceMemory allocate_memory(const struct vulkan_shader_runner *runner,
+static VkDeviceMemory allocate_memory(const struct vulkan_test_context *context,
         const VkMemoryRequirements *memory_reqs, VkMemoryPropertyFlags flags)
 {
     VkMemoryAllocateInfo alloc_info = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
@@ -169,15 +174,15 @@ static VkDeviceMemory allocate_memory(const struct vulkan_shader_runner *runner,
     VkResult vr;
 
     alloc_info.allocationSize = memory_reqs->size;
-    alloc_info.memoryTypeIndex = select_vulkan_memory_type(runner,
+    alloc_info.memoryTypeIndex = select_vulkan_memory_type(context,
             memory_reqs->memoryTypeBits, flags);
-    vr = VK_CALL(vkAllocateMemory(runner->device, &alloc_info, NULL, &vk_memory));
+    vr = VK_CALL(vkAllocateMemory(context->device, &alloc_info, NULL, &vk_memory));
     ok(vr == VK_SUCCESS, "Got unexpected VkResult %d.\n", vr);
 
     return vk_memory;
 }
 
-static VkBuffer create_buffer(const struct vulkan_shader_runner *runner, VkDeviceSize size,
+static VkBuffer create_buffer(const struct vulkan_test_context *context, VkDeviceSize size,
         VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags, VkDeviceMemory *memory)
 {
     VkBufferCreateInfo buffer_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -188,15 +193,15 @@ static VkBuffer create_buffer(const struct vulkan_shader_runner *runner, VkDevic
     buffer_info.usage = usage;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VK_CALL(vkCreateBuffer(runner->device, &buffer_info, NULL, &buffer));
-    VK_CALL(vkGetBufferMemoryRequirements(runner->device, buffer, &memory_reqs));
-    *memory = allocate_memory(runner, &memory_reqs, memory_flags);
-    VK_CALL(vkBindBufferMemory(runner->device, buffer, *memory, 0));
+    VK_CALL(vkCreateBuffer(context->device, &buffer_info, NULL, &buffer));
+    VK_CALL(vkGetBufferMemoryRequirements(context->device, buffer, &memory_reqs));
+    *memory = allocate_memory(context, &memory_reqs, memory_flags);
+    VK_CALL(vkBindBufferMemory(context->device, buffer, *memory, 0));
 
     return buffer;
 }
 
-static VkBufferView create_buffer_view(const struct vulkan_shader_runner *runner, VkBuffer buffer,
+static VkBufferView create_buffer_view(const struct vulkan_test_context *context, VkBuffer buffer,
         VkFormat format)
 {
     VkBufferViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO};
@@ -206,13 +211,14 @@ static VkBufferView create_buffer_view(const struct vulkan_shader_runner *runner
     view_info.format = format;
     view_info.range = VK_WHOLE_SIZE;
 
-    VK_CALL(vkCreateBufferView(runner->device, &view_info, NULL, &view));
+    VK_CALL(vkCreateBufferView(context->device, &view_info, NULL, &view));
 
     return view;
 }
 
-static VkImage create_2d_image(const struct vulkan_shader_runner *runner,
-        const struct resource_desc *desc, VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
+static VkImage create_2d_image(const struct vulkan_test_context *context, uint32_t width, uint32_t height,
+        uint32_t level_count, uint32_t sample_count, VkImageUsageFlags usage, VkFormat format,
+        VkDeviceMemory *memory)
 {
     VkImageCreateInfo image_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     VkMemoryRequirements memory_reqs;
@@ -220,27 +226,27 @@ static VkImage create_2d_image(const struct vulkan_shader_runner *runner,
 
     image_info.imageType = VK_IMAGE_TYPE_2D;
     image_info.format = format;
-    image_info.extent.width = desc->width;
-    image_info.extent.height = desc->height;
+    image_info.extent.width = width;
+    image_info.extent.height = height;
     image_info.extent.depth = 1;
-    image_info.mipLevels = desc->level_count;
+    image_info.mipLevels = level_count;
     image_info.arrayLayers = 1;
-    image_info.samples = max(desc->sample_count, 1);
+    image_info.samples = max(sample_count, 1);
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.usage = usage;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    VK_CALL(vkCreateImage(runner->device, &image_info, NULL, &image));
+    VK_CALL(vkCreateImage(context->device, &image_info, NULL, &image));
 
-    VK_CALL(vkGetImageMemoryRequirements(runner->device, image, &memory_reqs));
-    *memory = allocate_memory(runner, &memory_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    VK_CALL(vkBindImageMemory(runner->device, image, *memory, 0));
+    VK_CALL(vkGetImageMemoryRequirements(context->device, image, &memory_reqs));
+    *memory = allocate_memory(context, &memory_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VK_CALL(vkBindImageMemory(context->device, image, *memory, 0));
 
     return image;
 }
 
-static VkImageView create_2d_image_view(const struct vulkan_shader_runner *runner, VkImage image, VkFormat format,
+static VkImageView create_2d_image_view(const struct vulkan_test_context *context, VkImage image, VkFormat format,
         VkImageAspectFlags aspect_mask)
 {
     VkImageViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -259,7 +265,7 @@ static VkImageView create_2d_image_view(const struct vulkan_shader_runner *runne
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
-    VK_CALL(vkCreateImageView(runner->device, &view_info, NULL, &view));
+    VK_CALL(vkCreateImageView(context->device, &view_info, NULL, &view));
     return view;
 }
 
@@ -268,8 +274,10 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
 {
     VkImageUsageFlagBits usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    const struct vulkan_test_context *context = &runner->context;
     VkFormat format = vkd3d_get_vk_format(params->desc.format);
-    VkDevice device = runner->device;
+    const struct resource_desc *desc = &params->desc;
+    VkDevice device = context->device;
     unsigned int buffer_offset = 0;
     VkDeviceMemory staging_memory;
     VkBuffer staging_buffer;
@@ -281,27 +289,28 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
         usage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
 
-    resource->image = create_2d_image(runner, &params->desc, usage, format, &resource->memory);
-    resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+    resource->image = create_2d_image(context, desc->width, desc->height, desc->level_count, desc->sample_count,
+            usage, format, &resource->memory);
+    resource->image_view = create_2d_image_view(context, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
     if (!params->data)
     {
-        begin_command_buffer(runner);
-        transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
+        begin_command_buffer(context);
+        transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
                 VK_IMAGE_LAYOUT_UNDEFINED, layout);
-        end_command_buffer(runner);
+        end_command_buffer(context);
         return;
     }
 
-    staging_buffer = create_buffer(runner, params->data_size,
+    staging_buffer = create_buffer(context, params->data_size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &staging_memory);
     VK_CALL(vkMapMemory(device, staging_memory, 0, VK_WHOLE_SIZE, 0, &data));
     memcpy(data, params->data, params->data_size);
     VK_CALL(vkUnmapMemory(device, staging_memory));
 
-    begin_command_buffer(runner);
+    begin_command_buffer(context);
 
-    transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
+    transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     for (unsigned int level = 0; level < params->desc.level_count; ++level)
@@ -317,15 +326,15 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
         region.imageExtent.width = level_width;
         region.imageExtent.height = level_height;
         region.imageExtent.depth = 1;
-        VK_CALL(vkCmdCopyBufferToImage(runner->cmd_buffer, staging_buffer, resource->image,
+        VK_CALL(vkCmdCopyBufferToImage(context->cmd_buffer, staging_buffer, resource->image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 
         buffer_offset += level_width * level_height * params->desc.texel_size;
     }
 
-    transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout);
+    transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout);
 
-    end_command_buffer(runner);
+    end_command_buffer(context);
 
     VK_CALL(vkFreeMemory(device, staging_memory, NULL));
     VK_CALL(vkDestroyBuffer(device, staging_buffer, NULL));
@@ -334,8 +343,9 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
 static void resource_init_buffer(struct vulkan_shader_runner *runner, struct vulkan_resource *resource,
         const struct resource_params *params)
 {
+    const struct vulkan_test_context *context = &runner->context;
     VkFormat format = vkd3d_get_vk_format(params->desc.format);
-    VkDevice device = runner->device;
+    VkDevice device = context->device;
     VkBufferUsageFlagBits usage;
     void *data;
 
@@ -348,9 +358,9 @@ static void resource_init_buffer(struct vulkan_shader_runner *runner, struct vul
     if (format == VK_FORMAT_UNDEFINED && params->stride)
         format = VK_FORMAT_R32_UINT;
 
-    resource->buffer = create_buffer(runner, params->data_size, usage,
+    resource->buffer = create_buffer(context, params->data_size, usage,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
-    resource->buffer_view = create_buffer_view(runner, resource->buffer, format);
+    resource->buffer_view = create_buffer_view(context, resource->buffer, format);
 
     VK_CALL(vkMapMemory(device, resource->memory, 0, VK_WHOLE_SIZE, 0, &data));
     memcpy(data, params->data, params->data_size);
@@ -360,8 +370,10 @@ static void resource_init_buffer(struct vulkan_shader_runner *runner, struct vul
 static struct resource *vulkan_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+    const struct vulkan_test_context *context = &runner->context;
+    const struct resource_desc *desc = &params->desc;
+    VkDevice device = context->device;
     struct vulkan_resource *resource;
-    VkDevice device = runner->device;
     VkFormat format;
     void *data;
 
@@ -373,28 +385,28 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
         case RESOURCE_TYPE_RENDER_TARGET:
             format = vkd3d_get_vk_format(params->desc.format);
 
-            resource->image = create_2d_image(runner, &params->desc,
+            resource->image = create_2d_image(context, desc->width, desc->height, desc->level_count, desc->sample_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
-            resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+            resource->image_view = create_2d_image_view(context, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
-            begin_command_buffer(runner);
-            transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
+            begin_command_buffer(context);
+            transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            end_command_buffer(runner);
+            end_command_buffer(context);
             break;
 
         case RESOURCE_TYPE_DEPTH_STENCIL:
             format = vkd3d_get_vk_format(params->desc.format);
 
-            resource->image = create_2d_image(runner, &params->desc,
+            resource->image = create_2d_image(context, desc->width, desc->height, desc->level_count, desc->sample_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, format,
                     &resource->memory);
-            resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT);
+            resource->image_view = create_2d_image_view(context, resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-            begin_command_buffer(runner);
-            transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_DEPTH_BIT,
+            begin_command_buffer(context);
+            transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_DEPTH_BIT,
                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-            end_command_buffer(runner);
+            end_command_buffer(context);
             break;
 
         case RESOURCE_TYPE_TEXTURE:
@@ -406,7 +418,7 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
-            resource->buffer = create_buffer(runner, params->data_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            resource->buffer = create_buffer(context, params->data_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
 
             VK_CALL(vkMapMemory(device, resource->memory, 0, VK_WHOLE_SIZE, 0, &data));
@@ -421,8 +433,9 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 static void vulkan_runner_destroy_resource(struct shader_runner *r, struct resource *res)
 {
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+    const struct vulkan_test_context *context = &runner->context;
     struct vulkan_resource *resource = vulkan_resource(res);
-    VkDevice device = runner->device;
+    VkDevice device = context->device;
 
     if (resource->memory)
         VK_CALL(vkFreeMemory(device, resource->memory, NULL));
@@ -660,6 +673,7 @@ static bool create_shader_stage(struct vulkan_shader_runner *runner,
         const char *source, struct vkd3d_shader_code *dxbc_ptr)
 {
     VkShaderModuleCreateInfo module_info = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    const struct vulkan_test_context *context = &runner->context;
     struct vkd3d_shader_code spirv, dxbc;
 
     if (!dxbc_ptr)
@@ -679,7 +693,7 @@ static bool create_shader_stage(struct vulkan_shader_runner *runner,
     module_info.codeSize = spirv.size;
     module_info.pCode = spirv.code;
 
-    VK_CALL(vkCreateShaderModule(runner->device, &module_info, NULL, &stage_info->module));
+    VK_CALL(vkCreateShaderModule(context->device, &module_info, NULL, &stage_info->module));
     vkd3d_shader_free_shader_code(&spirv);
     return true;
 }
@@ -702,6 +716,7 @@ static VkPipelineLayout create_pipeline_layout(const struct vulkan_shader_runner
         VkDescriptorSetLayout set_layout)
 {
     VkPipelineLayoutCreateInfo layout_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    const struct vulkan_test_context *context = &runner->context;
     VkPushConstantRange push_constant_range;
     VkPipelineLayout pipeline_layout;
 
@@ -718,7 +733,7 @@ static VkPipelineLayout create_pipeline_layout(const struct vulkan_shader_runner
         push_constant_range.size = runner->r.uniform_count * sizeof(*runner->r.uniforms);
     }
 
-    VK_CALL(vkCreatePipelineLayout(runner->device, &layout_desc, NULL, &pipeline_layout));
+    VK_CALL(vkCreatePipelineLayout(context->device, &layout_desc, NULL, &pipeline_layout));
 
     return pipeline_layout;
 }
@@ -762,13 +777,14 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
     VkGraphicsPipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
     VkPipelineColorBlendAttachmentState attachment_desc[MAX_RESOURCES] = {0};
+    const struct vulkan_test_context *context = &runner->context;
     VkPipelineTessellationStateCreateInfo tessellation_info;
     VkVertexInputAttributeDescription input_attributes[32];
     VkPipelineDepthStencilStateCreateInfo ds_desc = {0};
     VkVertexInputBindingDescription input_bindings[32];
     VkPipelineShaderStageCreateInfo stage_desc[5];
+    VkDevice device = context->device;
     struct vkd3d_shader_code vs_dxbc;
-    VkDevice device = runner->device;
     unsigned int stage_count = 0;
     VkPipeline pipeline;
     unsigned int i, j;
@@ -919,7 +935,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
         pipeline_desc.pTessellationState = &tessellation_info;
     }
 
-    vr = VK_CALL(vkCreateGraphicsPipelines(runner->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
+    vr = VK_CALL(vkCreateGraphicsPipelines(context->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
     ok(vr == VK_SUCCESS, "Failed to create graphics pipeline, vr %d.\n", vr);
 
     for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
@@ -933,6 +949,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
 static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, VkPipelineLayout pipeline_layout)
 {
     VkComputePipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    const struct vulkan_test_context *context = &runner->context;
     VkPipeline pipeline;
     bool ret;
 
@@ -944,9 +961,9 @@ static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, V
 
     pipeline_desc.layout = pipeline_layout;
 
-    VK_CALL(vkCreateComputePipelines(runner->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
+    VK_CALL(vkCreateComputePipelines(context->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
 
-    VK_CALL(vkDestroyShaderModule(runner->device, pipeline_desc.stage.module, NULL));
+    VK_CALL(vkDestroyShaderModule(context->device, pipeline_desc.stage.module, NULL));
 
     return pipeline;
 }
@@ -973,6 +990,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
 {
     VkDescriptorSetLayoutCreateInfo set_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     VkDescriptorSetLayoutBinding bindings[MAX_RESOURCES + MAX_SAMPLERS];
+    const struct vulkan_test_context *context = &runner->context;
     VkDescriptorSetLayoutBinding *binding;
     VkDescriptorSetLayout set_layout;
     uint32_t binding_index = 0;
@@ -1038,7 +1056,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
         sampler_desc.compareOp = sampler->func ? vk_compare_op_from_d3d12(sampler->func) : 0;
         sampler_desc.maxLod = FLT_MAX;
 
-        VK_CALL(vkCreateSampler(runner->device, &sampler_desc, NULL, &vulkan_sampler->vk_sampler));
+        VK_CALL(vkCreateSampler(context->device, &sampler_desc, NULL, &vulkan_sampler->vk_sampler));
         vulkan_sampler->binding = binding_index++;
 
         binding = &bindings[set_desc.bindingCount++];
@@ -1050,7 +1068,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
         binding->pImmutableSamplers = &vulkan_sampler->vk_sampler;
     }
 
-    VK_CALL(vkCreateDescriptorSetLayout(runner->device, &set_desc, NULL, &set_layout));
+    VK_CALL(vkCreateDescriptorSetLayout(context->device, &set_desc, NULL, &set_layout));
 
     return set_layout;
 }
@@ -1059,15 +1077,16 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
         VkDescriptorSetLayout set_layout, VkPipelineLayout pipeline_layout)
 {
     VkDescriptorSetAllocateInfo set_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    VkCommandBuffer cmd_buffer = runner->cmd_buffer;
+    const struct vulkan_test_context *context = &runner->context;
+    VkCommandBuffer cmd_buffer = context->cmd_buffer;
     VkDescriptorSet descriptor_set;
     unsigned int i;
 
-    set_desc.descriptorPool = runner->descriptor_pool;
+    set_desc.descriptorPool = context->descriptor_pool;
     set_desc.descriptorSetCount = 1;
     set_desc.pSetLayouts = &set_layout;
 
-    VK_CALL(vkAllocateDescriptorSets(runner->device, &set_desc, &descriptor_set));
+    VK_CALL(vkAllocateDescriptorSets(context->device, &set_desc, &descriptor_set));
 
     for (i = 0; i < runner->r.resource_count; ++i)
     {
@@ -1092,7 +1111,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                     if (resource->r.desc.type == RESOURCE_TYPE_UAV)
                         write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
 
-                    VK_CALL(vkUpdateDescriptorSets(runner->device, 1, &write, 0, NULL));
+                    VK_CALL(vkUpdateDescriptorSets(context->device, 1, &write, 0, NULL));
                 }
                 else
                 {
@@ -1112,7 +1131,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                         write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                     }
 
-                    VK_CALL(vkUpdateDescriptorSets(runner->device, 1, &write, 0, NULL));
+                    VK_CALL(vkUpdateDescriptorSets(context->device, 1, &write, 0, NULL));
                 }
                 break;
 
@@ -1143,6 +1162,7 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
     VkFramebufferCreateInfo fb_desc = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
     VkAttachmentReference ds_ref = {0}, color_refs[MAX_RESOURCES] = {0};
     VkAttachmentDescription attachment_descs[MAX_RESOURCES] = {0};
+    const struct vulkan_test_context *context = &runner->context;
     unsigned int i, color_ref_count = 0, view_count = 0;
     VkSubpassDescription subpass_desc = {0};
     VkImageView views[MAX_RESOURCES];
@@ -1195,7 +1215,7 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
     render_pass_desc.subpassCount = 1;
     render_pass_desc.pSubpasses = &subpass_desc;
 
-    VK_CALL(vkCreateRenderPass(runner->device, &render_pass_desc, NULL, render_pass));
+    VK_CALL(vkCreateRenderPass(context->device, &render_pass_desc, NULL, render_pass));
 
     fb_desc.renderPass = *render_pass;
     fb_desc.attachmentCount = view_count;
@@ -1204,17 +1224,17 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
     fb_desc.height = RENDER_TARGET_HEIGHT;
     fb_desc.layers = 1;
 
-    VK_CALL(vkCreateFramebuffer(runner->device, &fb_desc, NULL, fb));
+    VK_CALL(vkCreateFramebuffer(context->device, &fb_desc, NULL, fb));
 }
 
 static bool vulkan_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
 {
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
-
-    VkCommandBuffer cmd_buffer = runner->cmd_buffer;
+    const struct vulkan_test_context *context = &runner->context;
+    VkCommandBuffer cmd_buffer = context->cmd_buffer;
+    VkDevice device = context->device;
     VkDescriptorSetLayout set_layout;
     VkPipelineLayout pipeline_layout;
-    VkDevice device = runner->device;
     VkPipeline pipeline;
     bool ret = false;
     unsigned int i;
@@ -1226,7 +1246,7 @@ static bool vulkan_runner_dispatch(struct shader_runner *r, unsigned int x, unsi
     if (!(pipeline = create_compute_pipeline(runner, pipeline_layout)))
         goto out;
 
-    begin_command_buffer(runner);
+    begin_command_buffer(context);
 
     VK_CALL(vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline));
 
@@ -1234,10 +1254,10 @@ static bool vulkan_runner_dispatch(struct shader_runner *r, unsigned int x, unsi
 
     VK_CALL(vkCmdDispatch(cmd_buffer, x, y, z));
 
-    end_command_buffer(runner);
+    end_command_buffer(context);
 
     VK_CALL(vkDestroyPipeline(device, pipeline, NULL));
-    VK_CALL(vkResetDescriptorPool(device, runner->descriptor_pool, 0));
+    VK_CALL(vkResetDescriptorPool(device, context->descriptor_pool, 0));
 
     ret = true;
 out:
@@ -1256,11 +1276,12 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
     struct vulkan_resource *resource = vulkan_resource(res);
 
     size_t width = resource->r.desc.width, height = resource->r.desc.height;
+    const struct vulkan_test_context *context = &runner->context;
     VkSubpassDescription sub_pass_desc = {0};
     VkAttachmentDescription attachment_desc;
     VkRenderPassCreateInfo pass_desc = {0};
     VkAttachmentReference attachment_ref;
-    VkDevice device = runner->device;
+    VkDevice device = context->device;
     VkRenderPassBeginInfo begin_desc;
     VkFramebufferCreateInfo fb_desc;
     VkClearValue vk_clear_value;
@@ -1303,7 +1324,7 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
     attachment_ref.attachment = 0;
     attachment_ref.layout = attachment_desc.initialLayout;
 
-    begin_command_buffer(runner);
+    begin_command_buffer(context);
 
     pass_desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     pass_desc.attachmentCount = 1;
@@ -1333,10 +1354,10 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
     begin_desc.renderArea.offset.y = 0;
     begin_desc.renderArea.extent.width = width;
     begin_desc.renderArea.extent.height = height;
-    VK_CALL(vkCmdBeginRenderPass(runner->cmd_buffer, &begin_desc, VK_SUBPASS_CONTENTS_INLINE));
-    VK_CALL(vkCmdEndRenderPass(runner->cmd_buffer));
+    VK_CALL(vkCmdBeginRenderPass(context->cmd_buffer, &begin_desc, VK_SUBPASS_CONTENTS_INLINE));
+    VK_CALL(vkCmdEndRenderPass(context->cmd_buffer));
 
-    end_command_buffer(runner);
+    end_command_buffer(context);
 
     VK_CALL(vkDestroyRenderPass(device, render_pass, NULL));
     VK_CALL(vkDestroyFramebuffer(device, fb, NULL));
@@ -1345,19 +1366,20 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
 static bool vulkan_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count, unsigned int instance_count)
 {
-    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
-
-    static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
     VkRenderPassBeginInfo pass_begin_desc = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-    VkCommandBuffer cmd_buffer = runner->cmd_buffer;
+    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+    const struct vulkan_test_context *context = &runner->context;
+    VkCommandBuffer cmd_buffer = context->cmd_buffer;
+    VkDevice device = context->device;
     VkDescriptorSetLayout set_layout;
     VkPipelineLayout pipeline_layout;
-    VkDevice device = runner->device;
     VkRenderPass render_pass;
     VkPipeline pipeline;
     VkFramebuffer fb;
     bool ret = false;
     unsigned int i;
+
+    static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
 
     create_render_pass_and_framebuffer(runner, &render_pass, &fb);
 
@@ -1368,7 +1390,7 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     if (!(pipeline = create_graphics_pipeline(runner, render_pass, pipeline_layout, primitive_topology)))
         goto out;
 
-    begin_command_buffer(runner);
+    begin_command_buffer(context);
 
     pass_begin_desc.renderPass = render_pass;
     pass_begin_desc.framebuffer = fb;
@@ -1383,10 +1405,10 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     VK_CALL(vkCmdDraw(cmd_buffer, vertex_count, instance_count, 0, 0));
 
     VK_CALL(vkCmdEndRenderPass(cmd_buffer));
-    end_command_buffer(runner);
+    end_command_buffer(context);
 
     VK_CALL(vkDestroyPipeline(device, pipeline, NULL));
-    VK_CALL(vkResetDescriptorPool(device, runner->descriptor_pool, 0));
+    VK_CALL(vkResetDescriptorPool(device, context->descriptor_pool, 0));
 
     ret = true;
 out:
@@ -1411,9 +1433,10 @@ struct vulkan_resource_readback
 static struct resource_readback *vulkan_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+    const struct vulkan_test_context *context = &runner->context;
     struct vulkan_resource_readback *rb = malloc(sizeof(*rb));
     struct vulkan_resource *resource = vulkan_resource(res);
-    VkDevice device = runner->device;
+    VkDevice device = context->device;
     VkImageAspectFlags aspect_mask;
     VkBufferImageCopy region = {0};
     VkImageLayout layout;
@@ -1424,7 +1447,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
 
     rb->rb.row_pitch = rb->rb.width * resource->r.desc.texel_size;
 
-    rb->buffer = create_buffer(runner, rb->rb.row_pitch * rb->rb.height,
+    rb->buffer = create_buffer(context, rb->rb.row_pitch * rb->rb.height,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &rb->memory);
 
     if (resource->r.desc.type == RESOURCE_TYPE_UAV && resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
@@ -1452,9 +1475,9 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
         else
             layout = VK_IMAGE_LAYOUT_GENERAL;
 
-        begin_command_buffer(runner);
+        begin_command_buffer(context);
 
-        transition_image_layout(runner, resource->image, aspect_mask, layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        transition_image_layout(context, resource->image, aspect_mask, layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
         region.imageSubresource.aspectMask = aspect_mask;
         region.imageSubresource.layerCount = 1;
@@ -1475,28 +1498,29 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
             resolve_region.extent.depth = 1;
 
             resolved_desc.sample_count = 1;
-            resolved_image = create_2d_image(runner, &resolved_desc,
+            resolved_image = create_2d_image(context, resolved_desc.width, resolved_desc.height,
+                    resolved_desc.level_count, resolved_desc.sample_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                     vkd3d_get_vk_format(resource->r.desc.format), &resolved_memory);
-            transition_image_layout(runner, resolved_image, VK_IMAGE_ASPECT_COLOR_BIT,
+            transition_image_layout(context, resolved_image, VK_IMAGE_ASPECT_COLOR_BIT,
                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-            VK_CALL(vkCmdResolveImage(runner->cmd_buffer, resource->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_CALL(vkCmdResolveImage(context->cmd_buffer, resource->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     resolved_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &resolve_region));
-            transition_image_layout(runner, resolved_image, VK_IMAGE_ASPECT_COLOR_BIT,
+            transition_image_layout(context, resolved_image, VK_IMAGE_ASPECT_COLOR_BIT,
                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-            VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resolved_image,
+            VK_CALL(vkCmdCopyImageToBuffer(context->cmd_buffer, resolved_image,
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
         }
         else
         {
-            VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resource->image,
+            VK_CALL(vkCmdCopyImageToBuffer(context->cmd_buffer, resource->image,
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
         }
 
-        transition_image_layout(runner, resource->image, aspect_mask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout);
+        transition_image_layout(context, resource->image, aspect_mask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout);
 
-        end_command_buffer(runner);
+        end_command_buffer(context);
 
         if (resource->r.desc.sample_count > 1)
         {
@@ -1514,7 +1538,8 @@ static void vulkan_runner_release_readback(struct shader_runner *r, struct resou
 {
     struct vulkan_resource_readback *vulkan_rb = CONTAINING_RECORD(rb, struct vulkan_resource_readback, rb);
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
-    VkDevice device = runner->device;
+    const struct vulkan_test_context *context = &runner->context;
+    VkDevice device = context->device;
 
     VK_CALL(vkUnmapMemory(device, vulkan_rb->memory));
 
@@ -1534,15 +1559,15 @@ static const struct shader_runner_ops vulkan_runner_ops =
     .release_readback = vulkan_runner_release_readback,
 };
 
-static bool get_graphics_queue_index(const struct vulkan_shader_runner *runner, uint32_t *index)
+static bool get_graphics_queue_index(const struct vulkan_test_context *context, uint32_t *index)
 {
     VkQueueFamilyProperties *queue_properties;
     uint32_t count, i;
 
     count = 0;
-    VK_CALL(vkGetPhysicalDeviceQueueFamilyProperties(runner->phys_device, &count, NULL));
+    VK_CALL(vkGetPhysicalDeviceQueueFamilyProperties(context->phys_device, &count, NULL));
     queue_properties = malloc(count * sizeof(*queue_properties));
-    VK_CALL(vkGetPhysicalDeviceQueueFamilyProperties(runner->phys_device, &count, queue_properties));
+    VK_CALL(vkGetPhysicalDeviceQueueFamilyProperties(context->phys_device, &count, queue_properties));
 
     for (i = 0; i < count; ++i)
     {
@@ -1570,24 +1595,21 @@ static bool has_extension(const VkExtensionProperties *extensions, uint32_t coun
     return false;
 }
 
-static void check_instance_extensions(struct vulkan_shader_runner *runner, struct extension_list *enabled_extensions)
+static void check_instance_extensions(const struct vulkan_test_context *context,
+        const char **instance_extensions, size_t instance_extension_count,
+        struct extension_list *enabled_extensions)
 {
     VkExtensionProperties *extensions;
     uint32_t count, i;
 
-    static const char *instance_extensions[] =
-    {
-        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-    };
-
-    enabled_extensions->names = calloc(ARRAY_SIZE(instance_extensions), sizeof(*enabled_extensions->names));
+    enabled_extensions->names = calloc(instance_extension_count, sizeof(*enabled_extensions->names));
     enabled_extensions->count = 0;
 
     VK_CALL(vkEnumerateInstanceExtensionProperties(NULL, &count, NULL));
     extensions = calloc(count, sizeof(*extensions));
     VK_CALL(vkEnumerateInstanceExtensionProperties(NULL, &count, extensions));
 
-    for (i = 0; i < ARRAY_SIZE(instance_extensions); ++i)
+    for (i = 0; i < instance_extension_count; ++i)
     {
         const char *name = instance_extensions[i];
 
@@ -1600,7 +1622,8 @@ static void check_instance_extensions(struct vulkan_shader_runner *runner, struc
 
 static bool check_device_extensions(struct vulkan_shader_runner *runner, struct extension_list *enabled_extensions)
 {
-    VkPhysicalDevice phys_device = runner->phys_device;
+    const struct vulkan_test_context *context = &runner->context;
+    VkPhysicalDevice phys_device = context->phys_device;
     VkExtensionProperties *extensions;
     uint32_t i, count;
 
@@ -1653,6 +1676,7 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner, struct 
 
 static void get_physical_device_info(struct vulkan_shader_runner *runner, struct physical_device_info *info)
 {
+    const struct vulkan_test_context *context = &runner->context;
     memset(info, 0, sizeof(*info));
 
     info->features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -1671,46 +1695,170 @@ static void get_physical_device_info(struct vulkan_shader_runner *runner, struct
         info->demote_to_helper_invocation_features.pNext = list;
     }
 
-    if (runner->vkGetPhysicalDeviceFeatures2KHR)
-        VK_CALL(vkGetPhysicalDeviceFeatures2KHR(runner->phys_device, &info->features2));
+    if (context->vkGetPhysicalDeviceFeatures2KHR)
+        VK_CALL(vkGetPhysicalDeviceFeatures2KHR(context->phys_device, &info->features2));
     else
-        VK_CALL(vkGetPhysicalDeviceFeatures(runner->phys_device, &info->features2.features));
+        VK_CALL(vkGetPhysicalDeviceFeatures(context->phys_device, &info->features2.features));
 }
 
-static uint32_t get_format_support(const struct vulkan_shader_runner *runner, enum DXGI_FORMAT format)
+static uint32_t get_format_support(const struct vulkan_test_context *context, enum DXGI_FORMAT format)
 {
     VkFormatProperties properties;
     uint32_t ret = 0;
 
-    VK_CALL(vkGetPhysicalDeviceFormatProperties(runner->phys_device, vkd3d_get_vk_format(format), &properties));
+    VK_CALL(vkGetPhysicalDeviceFormatProperties(context->phys_device, vkd3d_get_vk_format(format), &properties));
     if ((properties.linearTilingFeatures | properties.optimalTilingFeatures) & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)
         ret |= FORMAT_CAP_UAV_LOAD;
 
     return ret;
 }
 
-static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
+static bool vulkan_test_context_init_instance(struct vulkan_test_context *context,
+        const char **instance_extensions, size_t instance_extension_count)
+{
+    VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+    struct extension_list enabled_extensions;
+    void *libvulkan;
+    uint32_t count;
+    VkResult vr;
+
+    memset(context, 0, sizeof(*context));
+
+    if (!(libvulkan = vkd3d_dlopen(SONAME_LIBVULKAN)))
+    {
+        skip("Failed to load %s: %s.\n", SONAME_LIBVULKAN, vkd3d_dlerror());
+        return false;
+    }
+    vkGetInstanceProcAddr = vkd3d_dlsym(libvulkan, "vkGetInstanceProcAddr");
+
+    context->vkCreateInstance = (void *)vkGetInstanceProcAddr(NULL, "vkCreateInstance");
+    context->vkEnumerateInstanceExtensionProperties = (void *)vkGetInstanceProcAddr(NULL,
+            "vkEnumerateInstanceExtensionProperties");
+
+    check_instance_extensions(context, instance_extensions, instance_extension_count, &enabled_extensions);
+    instance_desc.ppEnabledExtensionNames = enabled_extensions.names;
+    instance_desc.enabledExtensionCount = enabled_extensions.count;
+    vr = VK_CALL(vkCreateInstance(&instance_desc, NULL, &context->instance));
+    free(enabled_extensions.names);
+    if (vr < 0)
+    {
+        skip("Failed to create a Vulkan instance, vr %d.\n", vr);
+        return false;
+    }
+
+#define VK_INSTANCE_PFN(name) context->name = (void *)vkGetInstanceProcAddr(context->instance, #name);
+#include "vulkan_procs.h"
+
+    count = 1;
+    if ((vr = VK_CALL(vkEnumeratePhysicalDevices(context->instance, &count, &context->phys_device))) < 0)
+    {
+        skip("Failed to enumerate physical devices, vr %d.\n", vr);
+        goto out_destroy_instance;
+    }
+
+    if (!count)
+    {
+        skip("No Vulkan devices are available.\n");
+        goto out_destroy_instance;
+    }
+
+    return true;
+
+out_destroy_instance:
+    VK_CALL(vkDestroyInstance(context->instance, NULL));
+    return false;
+}
+
+static bool vulkan_test_context_init_device(struct vulkan_test_context *context,
+        const VkDeviceCreateInfo *device_desc, uint32_t queue_index, uint32_t max_resource_count,
+        uint32_t max_sampler_count)
 {
     VkDescriptorPoolCreateInfo descriptor_pool_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     VkCommandBufferAllocateInfo cmd_buffer_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     VkCommandPoolCreateInfo command_pool_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    VkDescriptorPoolSize descriptor_pool_sizes[6];
+    VkDevice device;
+    VkResult vr;
+
+    vr = VK_CALL(vkCreateDevice(context->phys_device, device_desc, NULL, &device));
+    if (vr)
+    {
+        skip("Failed to create device, vr %d.\n", vr);
+        return false;
+    }
+    context->device = device;
+
+#define VK_DEVICE_PFN(name) context->name = (void *)VK_CALL(vkGetDeviceProcAddr(device, #name));
+#include "vulkan_procs.h"
+
+    VK_CALL(vkGetDeviceQueue(device, queue_index, 0, &context->queue));
+
+    command_pool_desc.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    command_pool_desc.queueFamilyIndex = queue_index;
+
+    VK_CALL(vkCreateCommandPool(device, &command_pool_desc, NULL, &context->command_pool));
+
+    cmd_buffer_desc.commandPool = context->command_pool;
+    cmd_buffer_desc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmd_buffer_desc.commandBufferCount = 1;
+
+    VK_CALL(vkAllocateCommandBuffers(device, &cmd_buffer_desc, &context->cmd_buffer));
+
+    assert(max_resource_count);
+
+    descriptor_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    descriptor_pool_sizes[0].descriptorCount = max_resource_count;
+    descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_pool_sizes[1].descriptorCount = max_resource_count;
+    descriptor_pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descriptor_pool_sizes[2].descriptorCount = max_resource_count;
+    descriptor_pool_sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+    descriptor_pool_sizes[3].descriptorCount = max_resource_count;
+    descriptor_pool_sizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+    descriptor_pool_sizes[4].descriptorCount = max_resource_count;
+    descriptor_pool_sizes[5].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    descriptor_pool_sizes[5].descriptorCount = max_sampler_count;
+
+    descriptor_pool_desc.maxSets = 1;
+    descriptor_pool_desc.poolSizeCount = ARRAY_SIZE(descriptor_pool_sizes) - !max_sampler_count;
+    descriptor_pool_desc.pPoolSizes = descriptor_pool_sizes;
+
+    VK_CALL(vkCreateDescriptorPool(device, &descriptor_pool_desc, NULL, &context->descriptor_pool));
+
+    return true;
+}
+
+static void vulkan_test_context_destroy(const struct vulkan_test_context *context)
+{
+    VkDevice device = context->device;
+
+    VK_CALL(vkDestroyDescriptorPool(device, context->descriptor_pool, NULL));
+    VK_CALL(vkFreeCommandBuffers(device, context->command_pool, 1, &context->cmd_buffer));
+    VK_CALL(vkDestroyCommandPool(device, context->command_pool, NULL));
+    VK_CALL(vkDestroyDevice(device, NULL));
+    VK_CALL(vkDestroyInstance(context->instance, NULL));
+}
+
+static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
+{
     VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT demote_to_helper_invocation_features;
     VkDeviceQueueCreateInfo queue_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-    VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     VkDeviceCreateInfo device_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT interlock_features;
-    VkDescriptorPoolSize descriptor_pool_sizes[5];
+    struct vulkan_test_context *context = &runner->context;
     const VkPhysicalDeviceFeatures *ret_features;
     struct extension_list enabled_extensions;
     static const float queue_priority = 1.0f;
     struct physical_device_info device_info;
     VkPhysicalDeviceFeatures features;
     VkFormatProperties format_props;
-    uint32_t count, graphics_index;
-    VkDevice device;
-    void *libvulkan;
-    VkResult vr;
+    uint32_t graphics_index;
+    bool b;
 
+    static const char *instance_extensions[] =
+    {
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+    };
     static const enum DXGI_FORMAT formats[] =
     {
         DXGI_FORMAT_R32_FLOAT,
@@ -1733,48 +1881,13 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
         DXGI_FORMAT_R8_SINT,
     };
 
-    if (!(libvulkan = vkd3d_dlopen(SONAME_LIBVULKAN)))
-    {
-        skip("Failed to load %s: %s.\n", SONAME_LIBVULKAN, vkd3d_dlerror());
+    if (!vulkan_test_context_init_instance(context, instance_extensions, ARRAY_SIZE(instance_extensions)))
         return false;
-    }
-    vkGetInstanceProcAddr = vkd3d_dlsym(libvulkan, "vkGetInstanceProcAddr");
 
-    runner->vkCreateInstance = (void *)vkGetInstanceProcAddr(NULL, "vkCreateInstance");
-    runner->vkEnumerateInstanceExtensionProperties = (void *)vkGetInstanceProcAddr(NULL,
-            "vkEnumerateInstanceExtensionProperties");
-
-    check_instance_extensions(runner, &enabled_extensions);
-    instance_desc.ppEnabledExtensionNames = enabled_extensions.names;
-    instance_desc.enabledExtensionCount = enabled_extensions.count;
-    vr = VK_CALL(vkCreateInstance(&instance_desc, NULL, &runner->instance));
-    free(enabled_extensions.names);
-    if (vr < 0)
-    {
-        skip("Failed to create a Vulkan instance, vr %d.\n", vr);
-        return false;
-    }
-
-#define VK_INSTANCE_PFN(name) runner->name = (void *)vkGetInstanceProcAddr(runner->instance, #name);
-#include "vulkan_procs.h"
-
-    count = 1;
-    if ((vr = VK_CALL(vkEnumeratePhysicalDevices(runner->instance, &count, &runner->phys_device))) < 0)
-    {
-        skip("Failed to enumerate physical devices, vr %d.\n", vr);
-        goto out_destroy_instance;
-    }
-
-    if (!count)
-    {
-        skip("No Vulkan devices are available.\n");
-        goto out_destroy_instance;
-    }
-
-    if (!get_graphics_queue_index(runner, &graphics_index))
+    if (!get_graphics_queue_index(context, &graphics_index))
     {
         skip("The selected Vulkan device does not support graphics operations.\n");
-        goto out_destroy_instance;
+        goto out_destroy_context;
     }
 
     device_desc.pQueueCreateInfos = &queue_desc;
@@ -1785,15 +1898,15 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     queue_desc.pQueuePriorities = &queue_priority;
 
     if (!check_device_extensions(runner, &enabled_extensions))
-        goto out_destroy_instance;
+        goto out_destroy_context;
     device_desc.ppEnabledExtensionNames = enabled_extensions.names;
     device_desc.enabledExtensionCount = enabled_extensions.count;
 
-    VK_CALL(vkGetPhysicalDeviceFormatProperties(runner->phys_device, VK_FORMAT_R32G32B32A32_SFLOAT, &format_props));
+    VK_CALL(vkGetPhysicalDeviceFormatProperties(context->phys_device, VK_FORMAT_R32G32B32A32_SFLOAT, &format_props));
     if (!(format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT))
     {
         skip("The selected Vulkan device does not support R32G32B32A32_SFLOAT render targets.\n");
-        goto out_destroy_instance;
+        goto out_destroy_context;
     }
 
     runner->caps.runner = "Vulkan";
@@ -1811,7 +1924,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     if (!ret_features->x) \
     { \
         skip("The selected Vulkan device does not support " #x ".\n"); \
-        goto out_destroy_instance; \
+        goto out_destroy_context; \
     } \
     features.x = VK_TRUE
 
@@ -1872,68 +1985,19 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
         runner->caps.format_caps[DXGI_FORMAT_UNKNOWN] |= FORMAT_CAP_UAV_LOAD;
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
     {
-        runner->caps.format_caps[formats[i]] = get_format_support(runner, formats[i]);
+        runner->caps.format_caps[formats[i]] = get_format_support(context, formats[i]);
     }
 
-    vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device));
+    b = vulkan_test_context_init_device(context, &device_desc, graphics_index, MAX_RESOURCES, MAX_SAMPLERS);
     free(enabled_extensions.names);
-    if (vr)
-    {
-        skip("Failed to create device, vr %d.\n", vr);
-        goto out_destroy_instance;
-    }
-    runner->device = device;
 
-#define VK_DEVICE_PFN(name) runner->name = (void *)VK_CALL(vkGetDeviceProcAddr(device, #name));
-#include "vulkan_procs.h"
+    if (b)
+        return true;
 
-    VK_CALL(vkGetDeviceQueue(device, graphics_index, 0, &runner->queue));
-
-    command_pool_desc.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    command_pool_desc.queueFamilyIndex = graphics_index;
-
-    VK_CALL(vkCreateCommandPool(device, &command_pool_desc, NULL, &runner->command_pool));
-
-    cmd_buffer_desc.commandPool = runner->command_pool;
-    cmd_buffer_desc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmd_buffer_desc.commandBufferCount = 1;
-
-    VK_CALL(vkAllocateCommandBuffers(device, &cmd_buffer_desc, &runner->cmd_buffer));
-
-    descriptor_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    descriptor_pool_sizes[0].descriptorCount = MAX_RESOURCES;
-    descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLER;
-    descriptor_pool_sizes[1].descriptorCount = MAX_SAMPLERS;
-    descriptor_pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor_pool_sizes[2].descriptorCount = MAX_RESOURCES;
-    descriptor_pool_sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-    descriptor_pool_sizes[3].descriptorCount = MAX_RESOURCES;
-    descriptor_pool_sizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-    descriptor_pool_sizes[4].descriptorCount = MAX_RESOURCES;
-
-    descriptor_pool_desc.maxSets = 1;
-    descriptor_pool_desc.poolSizeCount = ARRAY_SIZE(descriptor_pool_sizes);
-    descriptor_pool_desc.pPoolSizes = descriptor_pool_sizes;
-
-    VK_CALL(vkCreateDescriptorPool(device, &descriptor_pool_desc, NULL, &runner->descriptor_pool));
-
-    return true;
-
-out_destroy_instance:
-    VK_CALL(vkDestroyInstance(runner->instance, NULL));
+out_destroy_context:
+    vulkan_test_context_destroy(context);
     return false;
 };
-
-static void cleanup_vulkan_runner(struct vulkan_shader_runner *runner)
-{
-    VkDevice device = runner->device;
-
-    VK_CALL(vkDestroyDescriptorPool(device, runner->descriptor_pool, NULL));
-    VK_CALL(vkFreeCommandBuffers(device, runner->command_pool, 1, &runner->cmd_buffer));
-    VK_CALL(vkDestroyCommandPool(device, runner->command_pool, NULL));
-    VK_CALL(vkDestroyDevice(device, NULL));
-    VK_CALL(vkDestroyInstance(runner->instance, NULL));
-}
 
 void run_shader_tests_vulkan(void)
 {
@@ -1950,7 +2014,7 @@ void run_shader_tests_vulkan(void)
     runner.caps.maximum_shader_model = SHADER_MODEL_5_1;
     run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
 
-    cleanup_vulkan_runner(&runner);
+    vulkan_test_context_destroy(&runner.context);
 }
 
 #endif
