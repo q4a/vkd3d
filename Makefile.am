@@ -284,7 +284,8 @@ vkd3d_test_headers = \
 	tests/dxcompiler.h \
 	tests/shader_runner.h \
 	tests/utils.h \
-	tests/vulkan_procs.h
+	tests/vulkan_procs.h \
+	tests/vulkan_utils.h
 
 vkd3d_demos = \
 	demos/vkd3d-gears \
