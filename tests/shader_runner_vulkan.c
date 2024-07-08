@@ -76,170 +76,6 @@ static struct vulkan_shader_runner *vulkan_shader_runner(struct shader_runner *r
     return CONTAINING_RECORD(r, struct vulkan_shader_runner, r);
 }
 
-static void begin_command_buffer(const struct vulkan_test_context *context)
-{
-    VkCommandBufferBeginInfo buffer_begin_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-
-    VK_CALL(vkBeginCommandBuffer(context->cmd_buffer, &buffer_begin_desc));
-}
-
-static void end_command_buffer(const struct vulkan_test_context *context)
-{
-    VkSubmitInfo submit_desc = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
-
-    VK_CALL(vkEndCommandBuffer(context->cmd_buffer));
-
-    submit_desc.commandBufferCount = 1;
-    submit_desc.pCommandBuffers = &context->cmd_buffer;
-    VK_CALL(vkQueueSubmit(context->queue, 1, &submit_desc, VK_NULL_HANDLE));
-    VK_CALL(vkQueueWaitIdle(context->queue));
-}
-
-static void transition_image_layout(const struct vulkan_test_context *context,
-        VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout src_layout, VkImageLayout dst_layout)
-{
-    VkImageMemoryBarrier barrier = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-
-    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    barrier.oldLayout = src_layout;
-    barrier.newLayout = dst_layout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange.aspectMask = aspect_mask;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-
-    VK_CALL(vkCmdPipelineBarrier(context->cmd_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &barrier));
-}
-
-static unsigned int select_vulkan_memory_type(const struct vulkan_test_context *context,
-        uint32_t memory_type_mask, VkMemoryPropertyFlags required_flags)
-{
-    VkPhysicalDeviceMemoryProperties memory_info;
-    unsigned int i;
-
-    VK_CALL(vkGetPhysicalDeviceMemoryProperties(context->phys_device, &memory_info));
-
-    for (i = 0; i < memory_info.memoryTypeCount; ++i)
-    {
-        if (!(memory_type_mask & (1u << i)))
-            continue;
-        if ((memory_info.memoryTypes[i].propertyFlags & required_flags) == required_flags)
-            return i;
-    }
-
-    fatal_error("No valid memory types found matching mask %#x, property flags %#x.\n",
-            memory_type_mask, required_flags);
-}
-
-static VkDeviceMemory allocate_memory(const struct vulkan_test_context *context,
-        const VkMemoryRequirements *memory_reqs, VkMemoryPropertyFlags flags)
-{
-    VkMemoryAllocateInfo alloc_info = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    VkDeviceMemory vk_memory;
-    VkResult vr;
-
-    alloc_info.allocationSize = memory_reqs->size;
-    alloc_info.memoryTypeIndex = select_vulkan_memory_type(context,
-            memory_reqs->memoryTypeBits, flags);
-    vr = VK_CALL(vkAllocateMemory(context->device, &alloc_info, NULL, &vk_memory));
-    ok(vr == VK_SUCCESS, "Got unexpected VkResult %d.\n", vr);
-
-    return vk_memory;
-}
-
-static VkBuffer create_buffer(const struct vulkan_test_context *context, VkDeviceSize size,
-        VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags, VkDeviceMemory *memory)
-{
-    VkBufferCreateInfo buffer_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    VkMemoryRequirements memory_reqs;
-    VkBuffer buffer;
-
-    buffer_info.size = size;
-    buffer_info.usage = usage;
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VK_CALL(vkCreateBuffer(context->device, &buffer_info, NULL, &buffer));
-    VK_CALL(vkGetBufferMemoryRequirements(context->device, buffer, &memory_reqs));
-    *memory = allocate_memory(context, &memory_reqs, memory_flags);
-    VK_CALL(vkBindBufferMemory(context->device, buffer, *memory, 0));
-
-    return buffer;
-}
-
-static VkBufferView create_buffer_view(const struct vulkan_test_context *context, VkBuffer buffer,
-        VkFormat format)
-{
-    VkBufferViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO};
-    VkBufferView view;
-
-    view_info.buffer = buffer;
-    view_info.format = format;
-    view_info.range = VK_WHOLE_SIZE;
-
-    VK_CALL(vkCreateBufferView(context->device, &view_info, NULL, &view));
-
-    return view;
-}
-
-static VkImage create_2d_image(const struct vulkan_test_context *context, uint32_t width, uint32_t height,
-        uint32_t level_count, uint32_t sample_count, VkImageUsageFlags usage, VkFormat format,
-        VkDeviceMemory *memory)
-{
-    VkImageCreateInfo image_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-    VkMemoryRequirements memory_reqs;
-    VkImage image;
-
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.format = format;
-    image_info.extent.width = width;
-    image_info.extent.height = height;
-    image_info.extent.depth = 1;
-    image_info.mipLevels = level_count;
-    image_info.arrayLayers = 1;
-    image_info.samples = max(sample_count, 1);
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.usage = usage;
-    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    VK_CALL(vkCreateImage(context->device, &image_info, NULL, &image));
-
-    VK_CALL(vkGetImageMemoryRequirements(context->device, image, &memory_reqs));
-    *memory = allocate_memory(context, &memory_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    VK_CALL(vkBindImageMemory(context->device, image, *memory, 0));
-
-    return image;
-}
-
-static VkImageView create_2d_image_view(const struct vulkan_test_context *context, VkImage image, VkFormat format,
-        VkImageAspectFlags aspect_mask)
-{
-    VkImageViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    VkImageView view;
-
-    view_info.image = image;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = format;
-    view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = aspect_mask;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
-
-    VK_CALL(vkCreateImageView(context->device, &view_info, NULL, &view));
-    return view;
-}
-
 static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_resource *resource,
         const struct resource_params *params)
 {
@@ -260,9 +96,9 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
         usage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
 
-    resource->image = create_2d_image(context, desc->width, desc->height, desc->level_count, desc->sample_count,
+    resource->image = create_vulkan_2d_image(context, desc->width, desc->height, desc->level_count, desc->sample_count,
             usage, format, &resource->memory);
-    resource->image_view = create_2d_image_view(context, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+    resource->image_view = create_vulkan_2d_image_view(context, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
     if (!params->data)
     {
@@ -273,7 +109,7 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
         return;
     }
 
-    staging_buffer = create_buffer(context, params->data_size,
+    staging_buffer = create_vulkan_buffer(context, params->data_size,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &staging_memory);
     VK_CALL(vkMapMemory(device, staging_memory, 0, VK_WHOLE_SIZE, 0, &data));
     memcpy(data, params->data, params->data_size);
@@ -329,9 +165,9 @@ static void resource_init_buffer(struct vulkan_shader_runner *runner, struct vul
     if (format == VK_FORMAT_UNDEFINED && params->stride)
         format = VK_FORMAT_R32_UINT;
 
-    resource->buffer = create_buffer(context, params->data_size, usage,
+    resource->buffer = create_vulkan_buffer(context, params->data_size, usage,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
-    resource->buffer_view = create_buffer_view(context, resource->buffer, format);
+    resource->buffer_view = create_vulkan_buffer_view(context, resource->buffer, format, 0);
 
     VK_CALL(vkMapMemory(device, resource->memory, 0, VK_WHOLE_SIZE, 0, &data));
     memcpy(data, params->data, params->data_size);
@@ -356,9 +192,11 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
         case RESOURCE_TYPE_RENDER_TARGET:
             format = vkd3d_get_vk_format(params->desc.format);
 
-            resource->image = create_2d_image(context, desc->width, desc->height, desc->level_count, desc->sample_count,
-                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
-            resource->image_view = create_2d_image_view(context, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+            resource->image = create_vulkan_2d_image(context, desc->width, desc->height, desc->level_count,
+                    desc->sample_count, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                    format, &resource->memory);
+            resource->image_view = create_vulkan_2d_image_view(context,
+                    resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
             begin_command_buffer(context);
             transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -369,10 +207,11 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
         case RESOURCE_TYPE_DEPTH_STENCIL:
             format = vkd3d_get_vk_format(params->desc.format);
 
-            resource->image = create_2d_image(context, desc->width, desc->height, desc->level_count, desc->sample_count,
-                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, format,
-                    &resource->memory);
-            resource->image_view = create_2d_image_view(context, resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT);
+            resource->image = create_vulkan_2d_image(context, desc->width, desc->height, desc->level_count,
+                    desc->sample_count, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                    format, &resource->memory);
+            resource->image_view = create_vulkan_2d_image_view(context,
+                    resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT);
 
             begin_command_buffer(context);
             transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -389,8 +228,8 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
-            resource->buffer = create_buffer(context, params->data_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
+            resource->buffer = create_vulkan_buffer(context, params->data_size,
+                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
 
             VK_CALL(vkMapMemory(device, resource->memory, 0, VK_WHOLE_SIZE, 0, &data));
             memcpy(data, params->data, params->data_size);
@@ -1418,7 +1257,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
 
     rb->rb.row_pitch = rb->rb.width * resource->r.desc.texel_size;
 
-    rb->buffer = create_buffer(context, rb->rb.row_pitch * rb->rb.height,
+    rb->buffer = create_vulkan_buffer(context, rb->rb.row_pitch * rb->rb.height,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &rb->memory);
 
     if (resource->r.desc.type == RESOURCE_TYPE_UAV && resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
@@ -1469,7 +1308,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
             resolve_region.extent.depth = 1;
 
             resolved_desc.sample_count = 1;
-            resolved_image = create_2d_image(context, resolved_desc.width, resolved_desc.height,
+            resolved_image = create_vulkan_2d_image(context, resolved_desc.width, resolved_desc.height,
                     resolved_desc.level_count, resolved_desc.sample_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                     vkd3d_get_vk_format(resource->r.desc.format), &resolved_memory);
