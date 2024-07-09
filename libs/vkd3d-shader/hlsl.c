@@ -1885,9 +1885,7 @@ static struct hlsl_ir_node *map_instr(const struct clone_instr_map *map, struct 
             return map->instrs[i].dst;
     }
 
-    /* The block passed to hlsl_clone_block() should have been free of external
-     * references. */
-    vkd3d_unreachable();
+    return src;
 }
 
 static bool clone_deref(struct hlsl_ctx *ctx, struct clone_instr_map *map,
