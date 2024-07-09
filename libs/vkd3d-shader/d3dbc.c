@@ -2670,11 +2670,11 @@ static void d3dbc_write_resource_load(struct d3dbc_compiler *d3dbc, const struct
         case HLSL_RESOURCE_SAMPLE_GRAD:
             sm1_instr.opcode = D3DSIO_TEXLDD;
 
-            sm1_instr.srcs[2].type = D3DSPR_TEMP;
+            sm1_instr.srcs[2].type = VKD3DSPR_TEMP;
             sm1_instr.srcs[2].reg = ddx->reg.id;
             sm1_instr.srcs[2].swizzle = hlsl_swizzle_from_writemask(ddx->reg.writemask);
 
-            sm1_instr.srcs[3].type = D3DSPR_TEMP;
+            sm1_instr.srcs[3].type = VKD3DSPR_TEMP;
             sm1_instr.srcs[3].reg = ddy->reg.id;
             sm1_instr.srcs[3].swizzle = hlsl_swizzle_from_writemask(ddy->reg.writemask);
 
