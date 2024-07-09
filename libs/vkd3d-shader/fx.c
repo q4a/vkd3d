@@ -1005,38 +1005,74 @@ static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_contex
     set_u32(buffer, count_offset, count);
 }
 
-static uint32_t get_fx_2_type_size(const struct hlsl_type *type)
+static uint32_t write_fx_2_default_value(struct hlsl_type *value_type, struct hlsl_default_value *value,
+            struct fx_write_context *fx)
 {
-    uint32_t size = 0, elements_count;
-    size_t i;
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(value_type);
+    uint32_t elements_count = hlsl_get_multiarray_size(value_type), i, j;
+    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
+    struct hlsl_ctx *ctx = fx->ctx;
+    uint32_t offset = buffer->size;
+    unsigned int comp_count;
 
-    if (type->class == HLSL_CLASS_ARRAY)
+    if (!value)
+        return 0;
+
+    comp_count = hlsl_type_component_count(type);
+
+    for (i = 0; i < elements_count; ++i)
     {
-        elements_count = hlsl_get_multiarray_size(type);
-        type = hlsl_get_multiarray_element_type(type);
-        return get_fx_2_type_size(type) * elements_count;
-    }
-    else if (type->class == HLSL_CLASS_STRUCT)
-    {
-        for (i = 0; i < type->e.record.field_count; ++i)
+        switch (type->class)
         {
-            const struct hlsl_struct_field *field = &type->e.record.fields[i];
-            size += get_fx_2_type_size(field->type);
-        }
+            case HLSL_CLASS_SCALAR:
+            case HLSL_CLASS_VECTOR:
+            case HLSL_CLASS_MATRIX:
+            {
+                switch (type->e.numeric.type)
+                {
+                    case HLSL_TYPE_FLOAT:
+                    case HLSL_TYPE_HALF:
+                    case HLSL_TYPE_INT:
+                    case HLSL_TYPE_UINT:
+                    case HLSL_TYPE_BOOL:
 
-        return size;
+                        for (j = 0; j < comp_count; ++j)
+                        {
+                            put_u32(buffer, value->number.u);
+                            value++;
+                        }
+                        break;
+                    default:
+                        hlsl_fixme(ctx, &ctx->location, "Writing default values for numeric type %u is not implemented.",
+                                type->e.numeric.type);
+                }
+
+                break;
+            }
+            case HLSL_CLASS_STRUCT:
+            {
+                struct hlsl_struct_field *fields = type->e.record.fields;
+
+                for (j = 0; j < type->e.record.field_count; ++j)
+                {
+                    write_fx_2_default_value(fields[i].type, value, fx);
+                    value += hlsl_type_component_count(fields[i].type);
+                }
+                break;
+            }
+            default:
+                hlsl_fixme(ctx, &ctx->location, "Writing default values for class %u is not implemented.", type->class);
+        }
     }
 
-    return type->dimx * type->dimy * sizeof(float);
+    return offset;
 }
 
 static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     const struct hlsl_type *type = var->data_type;
-    uint32_t offset, size, elements_count = 1;
-
-    size = get_fx_2_type_size(type);
+    uint32_t offset, elements_count = 1;
 
     if (type->class == HLSL_CLASS_ARRAY)
     {
@@ -1052,14 +1088,7 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_MATRIX:
         case HLSL_CLASS_STRUCT:
-            /* FIXME: write actual initial value */
-            if (var->default_values)
-                hlsl_fixme(fx->ctx, &var->loc, "Write default values.\n");
-
-            offset = put_u32(buffer, 0);
-
-            for (uint32_t i = 1; i < size / sizeof(uint32_t); ++i)
-                put_u32(buffer, 0);
+            offset = write_fx_2_default_value(var->data_type, var->default_values, fx);
             break;
 
         default:
