@@ -52,6 +52,19 @@ technique10 < int a = 1, b = 2; > {}
 // Majority modifier
 technique10 < row_major float3x2 m = {1, 2, 3, 4, 5, 6}; > {}
 
+[effect]
+float4 var : SEMANTIC < int a = 123; > = 123;
+technique10 {}
+
+[effect]
+float4 main() : sv_target
+{
+    float var < > = 0;
+    return 0;
+}
+
+technique10 {}
+
 [effect fail]
 // Without closing semicolon
 technique10 t1 < int a = 1 > {}
@@ -88,3 +101,12 @@ technique10 < int a = 1, b = a; > {}
 
 [effect fail]
 technique10 < int a = 1; int b = a; > {}
+
+[effect fail]
+float4 main() : sv_target
+{
+    float var < int a = 1; > = 0;
+    return 0;
+}
+
+technique10 {}

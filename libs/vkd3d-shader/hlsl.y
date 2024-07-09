@@ -73,6 +73,7 @@ struct parse_variable_def
     struct hlsl_semantic semantic;
     struct hlsl_reg_reservation reg_reservation;
     struct parse_initializer initializer;
+    struct hlsl_scope *annotations;
 
     struct hlsl_type *basic_type;
     uint32_t modifiers;
@@ -2498,6 +2499,8 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
         return;
     }
 
+    var->annotations = v->annotations;
+
     if (constant_buffer && ctx->cur_scope == ctx->globals)
     {
         if (!(var_name = vkd3d_strdup(v->name)))
@@ -2566,6 +2569,12 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
         {
             hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
                 "Const variable \"%s\" is missing an initializer.", var->name);
+        }
+
+        if (var->annotations)
+        {
+            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                    "Annotations are only allowed for objects in the global scope.");
         }
     }
 
@@ -7370,7 +7379,7 @@ variables_def_typed:
         }
 
 variable_decl:
-      any_identifier arrays colon_attribute
+      any_identifier arrays colon_attribute annotations_opt
         {
             $$ = hlsl_alloc(ctx, sizeof(*$$));
             $$->loc = @1;
@@ -7378,6 +7387,7 @@ variable_decl:
             $$->arrays = $2;
             $$->semantic = $3.semantic;
             $$->reg_reservation = $3.reg_reservation;
+            $$->annotations = $4;
         }
 
 state_block_start:
