@@ -645,7 +645,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_CAST,
     HLSL_OP1_CEIL,
     HLSL_OP1_COS,
-    HLSL_OP1_COS_REDUCED,    /* Reduced range [-pi, pi] */
+    HLSL_OP1_COS_REDUCED,    /* Reduced range [-pi, pi], writes to .x */
     HLSL_OP1_DSX,
     HLSL_OP1_DSX_COARSE,
     HLSL_OP1_DSX_FINE,
@@ -666,7 +666,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_SAT,
     HLSL_OP1_SIGN,
     HLSL_OP1_SIN,
-    HLSL_OP1_SIN_REDUCED,    /* Reduced range [-pi, pi] */
+    HLSL_OP1_SIN_REDUCED,    /* Reduced range [-pi, pi], writes to .y */
     HLSL_OP1_SQRT,
     HLSL_OP1_TRUNC,
 

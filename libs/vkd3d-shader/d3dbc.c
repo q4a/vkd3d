@@ -2371,6 +2371,17 @@ static void d3dbc_write_per_component_unary_op(struct d3dbc_compiler *d3dbc,
     }
 }
 
+static void d3dbc_write_sincos(struct d3dbc_compiler *d3dbc, enum hlsl_ir_expr_op op,
+        const struct hlsl_reg *dst, const struct hlsl_reg *src)
+{
+    if (op == HLSL_OP1_COS_REDUCED)
+        assert(dst->writemask == VKD3DSP_WRITEMASK_0);
+    else /* HLSL_OP1_SIN_REDUCED */
+        assert(dst->writemask == VKD3DSP_WRITEMASK_1);
+
+    d3dbc_write_unary_op(d3dbc, D3DSIO_SINCOS, dst, src, 0, 0);
+}
+
 static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
     const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
@@ -2437,6 +2448,11 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
 
         case HLSL_OP1_RSQ:
             d3dbc_write_per_component_unary_op(d3dbc, instr, D3DSIO_RSQ);
+            break;
+
+        case HLSL_OP1_COS_REDUCED:
+        case HLSL_OP1_SIN_REDUCED:
+            d3dbc_write_sincos(d3dbc, expr->op, &instr->reg, &arg1->reg);
             break;
 
         case HLSL_OP2_ADD:
