@@ -377,6 +377,58 @@ static enum vkd3d_result vsir_program_lower_precise_mad(struct vsir_program *pro
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *program,
+        struct vkd3d_shader_instruction *sincos)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    size_t pos = sincos - instructions->elements;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int s;
+
+    if (sincos->dst_count != 1)
+        return VKD3D_OK;
+
+    if (!shader_instruction_array_insert_at(instructions, pos + 1, 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    ins = &instructions->elements[pos + 1];
+
+    if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VKD3DSIH_SINCOS, 2, 1)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    ins->flags = sincos->flags;
+
+    *ins->src = *sincos->src;
+    /* Set the source swizzle to replicate the first component. */
+    s = vsir_swizzle_get_component(sincos->src->swizzle, 0);
+    ins->src->swizzle = vkd3d_shader_create_swizzle(s, s, s, s);
+
+    if (sincos->dst->write_mask & VKD3DSP_WRITEMASK_1)
+    {
+        ins->dst[0] = *sincos->dst;
+        ins->dst[0].write_mask = VKD3DSP_WRITEMASK_1;
+    }
+    else
+    {
+        vsir_dst_param_init(&ins->dst[0], VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+    }
+
+    if (sincos->dst->write_mask & VKD3DSP_WRITEMASK_0)
+    {
+        ins->dst[1] = *sincos->dst;
+        ins->dst[1].write_mask = VKD3DSP_WRITEMASK_0;
+    }
+    else
+    {
+        vsir_dst_param_init(&ins->dst[1], VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+    }
+
+    /* Make the original instruction no-op */
+    vkd3d_shader_instruction_make_nop(sincos);
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context)
 {
@@ -408,6 +460,11 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_DCL_CONSTANT_BUFFER:
             case VKD3DSIH_DCL_TEMPS:
                 vkd3d_shader_instruction_make_nop(ins);
+                break;
+
+            case VKD3DSIH_SINCOS:
+                if ((ret = vsir_program_lower_sm1_sincos(program, ins)) < 0)
+                    return ret;
                 break;
 
             default:
