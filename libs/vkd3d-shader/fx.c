@@ -830,7 +830,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
     }
 
     name_offset = write_string(name, fx);
-    semantic_offset = write_string(semantic->raw_name, fx);
+    semantic_offset = semantic->raw_name ? write_string(semantic->raw_name, fx) : 0;
 
     offset = put_u32(buffer, hlsl_sm1_base_type(type));
     put_u32(buffer, hlsl_sm1_class(type));
