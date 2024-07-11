@@ -200,6 +200,7 @@ struct shader_runner
 
     enum vkd3d_shader_comparison_func alpha_test_func;
     float alpha_test_ref;
+    bool flat_shading;
 };
 
 struct shader_runner_ops

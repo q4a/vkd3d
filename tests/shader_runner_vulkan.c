@@ -451,7 +451,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     enum vkd3d_shader_spirv_extension spirv_extensions[2];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_compile_option options[3];
-    struct vkd3d_shader_parameter1 parameters[3];
+    struct vkd3d_shader_parameter1 parameters[4];
     struct vkd3d_shader_compile_option *option;
     unsigned int i, compile_options;
     char profile[7];
@@ -615,6 +615,11 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     parameters[2].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
     parameters[2].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32;
     parameters[2].u.immediate_constant.u.f32 = runner->r.alpha_test_ref;
+
+    parameters[3].name = VKD3D_SHADER_PARAMETER_NAME_FLAT_INTERPOLATION;
+    parameters[3].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[3].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
+    parameters[3].u.immediate_constant.u.u32 = runner->r.flat_shading;
 
     parameter_info.parameter_count = ARRAY_SIZE(parameters);
     parameter_info.parameters = parameters;

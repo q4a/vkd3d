@@ -196,6 +196,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/sampler-offset.shader_test \
 	tests/hlsl/sampler.shader_test \
 	tests/hlsl/saturate.shader_test \
+	tests/hlsl/shade-mode.shader_test \
 	tests/hlsl/shader-interstage-interface.shader_test \
 	tests/hlsl/shape.shader_test \
 	tests/hlsl/side-effects.shader_test \

@@ -465,6 +465,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     hr = IDirect3DDevice9_SetRenderState(device, D3DRS_ALPHAREF, runner->r.alpha_test_ref * 255.0);
     ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
 
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_SHADEMODE,
+            runner->r.flat_shading ? D3DSHADE_FLAT : D3DSHADE_GOURAUD);
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+
     hr = IDirect3DDevice9_CreateVertexDeclaration(device, decl_elements, &vertex_declaration);
     ok(hr == D3D_OK, "Failed to create vertex declaration, hr %#lx.\n", hr);
     hr = IDirect3DDevice9_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code), &vs);

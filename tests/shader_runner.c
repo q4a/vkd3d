@@ -1255,6 +1255,13 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         runner->alpha_test_ref = strtof(line, &rest);
         line = rest;
     }
+    else if (match_string(line, "shade mode", &line))
+    {
+        if (match_string(line, "flat", &line))
+            runner->flat_shading = true;
+        else
+            runner->flat_shading = false;
+    }
     else
     {
         fatal_error("Unknown test directive '%s'.\n", line);
