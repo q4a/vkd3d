@@ -699,6 +699,7 @@ enum hlsl_ir_expr_op
      * CMP(a, b, c) returns 'b' if 'a' >= 0, and 'c' otherwise. It's used only for SM1-SM3 targets. */
     HLSL_OP3_CMP,
     HLSL_OP3_TERNARY,
+    HLSL_OP3_MAD,
 };
 
 #define HLSL_MAX_OPERANDS 3

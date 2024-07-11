@@ -20,6 +20,7 @@
 
 #include "hlsl.h"
 #include <stdio.h>
+#include <math.h>
 
 /* TODO: remove when no longer needed, only used for new_offset_instr_from_deref() */
 static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -3012,6 +3013,108 @@ static bool lower_floor(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct
     if (!(sum = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, neg, arg)))
         return false;
     hlsl_block_add_instr(block, sum);
+
+    return true;
+}
+
+/* Lower SIN/COS to SINCOS for SM1.  */
+static bool lower_trig(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *arg, *half, *two_pi, *reciprocal_two_pi, *neg_pi;
+    struct hlsl_constant_value half_value, two_pi_value, reciprocal_two_pi_value, neg_pi_value;
+    struct hlsl_ir_node *mad, *frc, *reduced;
+    struct hlsl_type *type;
+    struct hlsl_ir_expr *expr;
+    enum hlsl_ir_expr_op op;
+    struct hlsl_ir_node *sincos;
+    int i;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+
+    if (expr->op == HLSL_OP1_SIN)
+        op = HLSL_OP1_SIN_REDUCED;
+    else if (expr->op == HLSL_OP1_COS)
+        op = HLSL_OP1_COS_REDUCED;
+    else
+        return false;
+
+    arg = expr->operands[0].node;
+    type = arg->data_type;
+
+    /* Reduce the range of the input angles to [-pi, pi]. */
+    for (i = 0; i < type->dimx; ++i)
+    {
+        half_value.u[i].f = 0.5;
+        two_pi_value.u[i].f = 2.0 * M_PI;
+        reciprocal_two_pi_value.u[i].f = 1.0 / (2.0 * M_PI);
+        neg_pi_value.u[i].f = -M_PI;
+    }
+
+    if (!(half = hlsl_new_constant(ctx, type, &half_value, &instr->loc))
+            || !(two_pi = hlsl_new_constant(ctx, type, &two_pi_value, &instr->loc))
+            || !(reciprocal_two_pi = hlsl_new_constant(ctx, type, &reciprocal_two_pi_value, &instr->loc))
+            || !(neg_pi = hlsl_new_constant(ctx, type, &neg_pi_value, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, half);
+    hlsl_block_add_instr(block, two_pi);
+    hlsl_block_add_instr(block, reciprocal_two_pi);
+    hlsl_block_add_instr(block, neg_pi);
+
+    if (!(mad = hlsl_new_ternary_expr(ctx, HLSL_OP3_MAD, arg, reciprocal_two_pi, half)))
+        return false;
+    hlsl_block_add_instr(block, mad);
+    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, mad, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, frc);
+    if (!(reduced = hlsl_new_ternary_expr(ctx, HLSL_OP3_MAD, frc, two_pi, neg_pi)))
+        return false;
+    hlsl_block_add_instr(block, reduced);
+
+    if (type->dimx == 1)
+    {
+        if (!(sincos = hlsl_new_unary_expr(ctx, op, reduced, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, sincos);
+    }
+    else
+    {
+        struct hlsl_ir_node *comps[4] = {0};
+        struct hlsl_ir_var *var;
+        struct hlsl_deref var_deref;
+        struct hlsl_ir_load *var_load;
+
+        for (i = 0; i < type->dimx; ++i)
+        {
+            uint32_t s = hlsl_swizzle_from_writemask(1 << i);
+
+            if (!(comps[i] = hlsl_new_swizzle(ctx, s, 1, reduced, &instr->loc)))
+                return false;
+            hlsl_block_add_instr(block, comps[i]);
+        }
+
+        if (!(var = hlsl_new_synthetic_var(ctx, "sincos", type, &instr->loc)))
+            return false;
+        hlsl_init_simple_deref_from_var(&var_deref, var);
+
+        for (i = 0; i < type->dimx; ++i)
+        {
+            struct hlsl_block store_block;
+
+            if (!(sincos = hlsl_new_unary_expr(ctx, op, comps[i], &instr->loc)))
+                return false;
+            hlsl_block_add_instr(block, sincos);
+
+            if (!hlsl_new_store_component(ctx, &store_block, &var_deref, i, sincos))
+                return false;
+            hlsl_block_add_block(block, &store_block);
+        }
+
+        if (!(var_load = hlsl_new_load_index(ctx, &var_deref, NULL, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, &var_load->node);
+    }
 
     return true;
 }
@@ -6050,6 +6153,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         lower_ir(ctx, lower_round, body);
         lower_ir(ctx, lower_ceil, body);
         lower_ir(ctx, lower_floor, body);
+        lower_ir(ctx, lower_trig, body);
         lower_ir(ctx, lower_comparison_operators, body);
         lower_ir(ctx, lower_logic_not, body);
         if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
