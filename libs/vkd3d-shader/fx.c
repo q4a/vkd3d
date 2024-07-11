@@ -145,6 +145,7 @@ struct fx_write_context
     unsigned int max_technique_version;
 
     uint32_t technique_count;
+    uint32_t pass_count;
     uint32_t group_count;
     uint32_t buffer_count;
     uint32_t shared_buffer_count;
@@ -193,6 +194,7 @@ static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
         hlsl_fixme(fx->ctx, &var->loc, "Write pass assignments.");
 
     fx->ops->write_pass(var, fx);
+    ++fx->pass_count;
 }
 
 static uint32_t write_annotations(struct hlsl_scope *scope, struct fx_write_context *fx)
@@ -1063,7 +1065,7 @@ static const struct fx_write_context_ops fx_2_ops =
 
 static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
-    uint32_t offset, size, technique_count, parameter_count, object_count;
+    uint32_t offset, size, technique_count, pass_count, parameter_count, object_count;
     struct vkd3d_bytecode_buffer buffer = { 0 };
     struct vkd3d_bytecode_buffer *structured;
     struct fx_write_context fx;
@@ -1080,7 +1082,7 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
     parameter_count = put_u32(structured, 0); /* Parameter count */
     technique_count = put_u32(structured, 0);
-    put_u32(structured, 0); /* Unknown */
+    pass_count = put_u32(structured, 0);
     object_count = put_u32(structured, 0);
 
     write_fx_2_parameters(&fx);
@@ -1089,6 +1091,7 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
     write_techniques(ctx->globals, &fx);
     set_u32(structured, technique_count, fx.technique_count);
+    set_u32(structured, pass_count, fx.pass_count);
 
     put_u32(structured, 0); /* String count */
     put_u32(structured, 0); /* Resource count */
