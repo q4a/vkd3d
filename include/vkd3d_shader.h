@@ -553,6 +553,30 @@ enum vkd3d_shader_parameter_name
      * \since 1.13
      */
     VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF,
+    /**
+     * Whether to use flat interpolation for fragment shader colour inputs.
+     * If the value is nonzero, inputs whose semantic usage is COLOR will use
+     * flat interpolation instead of linear.
+     * This parameter is ignored if the shader model is 4 or greater, since only
+     * shader model 3 and below do not specify the interpolation mode in the
+     * shader bytecode.
+     *
+     * This parameter can be used to implement fixed function shade mode, as
+     * present in Direct3D versions up to 9, if the target environment does not
+     * support shade mode as part of its own fixed-function API (as Vulkan and
+     * core OpenGL).
+     *
+     * The data type for this parameter must be
+     * VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32.
+     *
+     * The default value is zero, i.e. use linear interpolation.
+     *
+     * Only VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT is supported in this
+     * version of vkd3d-shader.
+     *
+     * \since 1.13
+     */
+    VKD3D_SHADER_PARAMETER_NAME_FLAT_INTERPOLATION,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_NAME),
 };
