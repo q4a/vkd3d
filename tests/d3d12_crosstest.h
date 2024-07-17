@@ -268,7 +268,7 @@ static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12Comm
         VKD3D_EXPORT const char *D3D12SDKPath = VKD3D_EXPAND_AND_STRINGIFY(VKD3D_AGILITY_SDK_PATH);
 # else
 #  define VKD3D_AGILITY_SDK_EXPORT_PATH \
-        VKD3D_EXPORT const char *D3D12SDKPath = ".";
+        VKD3D_EXPORT const char *D3D12SDKPath = "./";
 # endif
 # define VKD3D_AGILITY_SDK_EXPORTS \
         VKD3D_AGILITY_SDK_EXPORT_VERSION \

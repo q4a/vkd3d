@@ -153,4 +153,4 @@ these steps:
  * It's also possible to use '-DVKD3D_AGILITY_SDK_PATH=/path/to/sdk/' to
    specify the directory to load the Agility SDK DLLs from at runtime.
    If relative, the path is intended to be relative to the executable
-   path. If unspecified the path defaults to '.'.
+   path. If unspecified the path defaults to './'.
