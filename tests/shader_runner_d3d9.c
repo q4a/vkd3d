@@ -152,6 +152,7 @@ static bool init_test_context(struct d3d9_shader_runner *runner)
     runner->caps.runner = "d3d9.dll";
     runner->caps.minimum_shader_model = SHADER_MODEL_2_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_3_0;
+    runner->caps.clip_planes = true;
 
     return true;
 }
@@ -468,6 +469,16 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     hr = IDirect3DDevice9_SetRenderState(device, D3DRS_SHADEMODE,
             runner->r.flat_shading ? D3DSHADE_FLAT : D3DSHADE_GOURAUD);
     ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_CLIPPING, TRUE);
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_CLIPPLANEENABLE, runner->r.clip_plane_mask);
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+    for (unsigned int i = 0; i < 8; ++i)
+    {
+        hr = IDirect3DDevice9_SetClipPlane(device, i, &runner->r.clip_planes[i].x);
+        ok(hr == D3D_OK, "Failed to set clip plane, hr %#lx.\n", hr);
+    }
 
     hr = IDirect3DDevice9_CreateVertexDeclaration(device, decl_elements, &vertex_declaration);
     ok(hr == D3D_OK, "Failed to create vertex declaration, hr %#lx.\n", hr);

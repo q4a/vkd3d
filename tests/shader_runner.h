@@ -147,6 +147,7 @@ struct shader_runner_caps
     bool rov;
     bool wave_ops;
     bool depth_bounds;
+    bool clip_planes;
 
     uint32_t format_caps[DXGI_FORMAT_COUNT];
 };
@@ -184,6 +185,7 @@ struct shader_runner
     bool require_rov;
     bool require_wave_ops;
     bool require_depth_bounds;
+    bool require_clip_planes;
     uint32_t require_format_caps[DXGI_FORMAT_COUNT];
 
     bool last_render_failed;
@@ -215,6 +217,8 @@ struct shader_runner
     enum vkd3d_shader_comparison_func alpha_test_func;
     float alpha_test_ref;
     bool flat_shading;
+    uint8_t clip_plane_mask;
+    struct vec4 clip_planes[8];
 };
 
 struct shader_runner_ops

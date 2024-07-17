@@ -407,6 +407,10 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     {
         runner->require_depth_bounds = true;
     }
+    else if (match_string(line, "clip-planes", &line))
+    {
+        runner->require_clip_planes = true;
+    }
     else
     {
         fatal_error("Unknown require directive '%s'.\n", line);
@@ -1295,6 +1299,27 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         else
             runner->flat_shading = false;
     }
+    else if (match_string(line, "clip-plane", &line))
+    {
+        unsigned int index;
+        struct vec4 *v;
+
+        index = strtoul(line, (char **)&rest, 10);
+        if (rest == line || index >= 8)
+            fatal_error("Malformed clip plane directive '%s'.\n", line);
+        line = rest;
+
+        v = &runner->clip_planes[index];
+
+        if (match_string(line, "disable", &line))
+            runner->clip_plane_mask &= ~(1u << index);
+        else
+        {
+            if (sscanf(line, "%f %f %f %f", &v->x, &v->y, &v->z, &v->w) < 4)
+                fatal_error("Malformed float4 constant '%s'.\n", line);
+            runner->clip_plane_mask |= (1u << index);
+        }
+    }
     else
     {
         fatal_error("Unknown test directive '%s'.\n", line);
@@ -1609,6 +1634,8 @@ static bool check_capabilities(const struct shader_runner *runner, const struct 
     if (runner->require_wave_ops && !caps->wave_ops)
         return false;
     if (runner->require_depth_bounds && !caps->depth_bounds)
+        return false;
+    if (runner->require_clip_planes && !caps->clip_planes)
         return false;
 
     for (i = 0; i < ARRAY_SIZE(runner->require_format_caps); ++i)
@@ -1989,6 +2016,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 runner->require_rov = false;
                 runner->require_wave_ops = false;
                 runner->require_depth_bounds = false;
+                runner->require_clip_planes = false;
                 memset(runner->require_format_caps, 0, sizeof(runner->require_format_caps));
                 runner->compile_options = 0;
                 test_action = TEST_ACTION_RUN;

@@ -451,7 +451,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     enum vkd3d_shader_spirv_extension spirv_extensions[2];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_compile_option options[3];
-    struct vkd3d_shader_parameter1 parameters[4];
+    struct vkd3d_shader_parameter1 parameters[13];
     struct vkd3d_shader_compile_option *option;
     unsigned int i, compile_options;
     char profile[7];
@@ -620,6 +620,19 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     parameters[3].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
     parameters[3].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
     parameters[3].u.immediate_constant.u.u32 = runner->r.flat_shading;
+
+    parameters[4].name = VKD3D_SHADER_PARAMETER_NAME_CLIP_PLANE_MASK;
+    parameters[4].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[4].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32;
+    parameters[4].u.immediate_constant.u.u32 = runner->r.clip_plane_mask;
+
+    for (i = 0; i < 8; ++i)
+    {
+        parameters[5 + i].name = VKD3D_SHADER_PARAMETER_NAME_CLIP_PLANE_0 + i;
+        parameters[5 + i].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+        parameters[5 + i].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32_VEC4;
+        memcpy(parameters[5 + i].u.immediate_constant.u.f32_vec4, &runner->r.clip_planes[i], 4 * sizeof(float));
+    }
 
     parameter_info.parameter_count = ARRAY_SIZE(parameters);
     parameter_info.parameters = parameters;
@@ -1787,6 +1800,8 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     get_physical_device_info(runner, &device_info);
     ret_features = &device_info.features2.features;
 
+    runner->caps.clip_planes = true;
+
     device_desc.pEnabledFeatures = &features;
     memset(&features, 0, sizeof(features));
 
@@ -1803,6 +1818,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     ENABLE_FEATURE(fragmentStoresAndAtomics);
     /* For SV_PrimitiveID/SpvBuiltInPrimitiveId in fragment shaders. */
     ENABLE_FEATURE(geometryShader);
+    ENABLE_FEATURE(shaderClipDistance);
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
 
