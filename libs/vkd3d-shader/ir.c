@@ -5509,10 +5509,8 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
     }
 
     dst_param_init_ssa_bool(&ins->dst[0], program->ssa_count);
-    ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
-    ins->src[0].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
-    ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
-    ins->src[1].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
+    ins->src[opcodes[compare_func].swap ? 1 : 0].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->src[opcodes[compare_func].swap ? 1 : 0].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
 
     ++ins;
     vsir_instruction_init_with_params(program, ins, &ret->location, VKD3DSIH_DISCARD, 0, 1);
