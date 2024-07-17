@@ -2536,13 +2536,10 @@ static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *p
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, uint64_t config_flags)
 {
-    const struct shader_signature *patch_constant_signature = &program->patch_constant_signature;
-    const struct shader_signature *output_signature = &program->output_signature;
     const struct vkd3d_shader_interface_info *shader_interface;
     const struct vkd3d_shader_descriptor_offset_info *offset_info;
     const struct vkd3d_shader_spirv_target_info *target_info;
     struct spirv_compiler *compiler;
-    unsigned int max_element_count;
     unsigned int i;
 
     if (!(compiler = vkd3d_malloc(sizeof(*compiler))))
@@ -2568,13 +2565,6 @@ static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *p
         }
 
         compiler->spirv_target_info = target_info;
-    }
-
-    max_element_count = max(output_signature->element_count, patch_constant_signature->element_count);
-    if (!(compiler->output_info = vkd3d_calloc(max_element_count, sizeof(*compiler->output_info))))
-    {
-        vkd3d_free(compiler);
-        return NULL;
     }
 
     vkd3d_spirv_builder_init(&compiler->spirv_builder, spirv_compiler_get_entry_point_name(compiler));
@@ -10597,11 +10587,15 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
     struct vkd3d_shader_instruction_array instructions;
     enum vkd3d_shader_spirv_environment environment;
     enum vkd3d_result result = VKD3D_OK;
-    unsigned int i;
+    unsigned int i, max_element_count;
 
     if ((result = vsir_program_normalise(program, compiler->config_flags,
             compile_info, compiler->message_context)) < 0)
         return result;
+
+    max_element_count = max(program->output_signature.element_count, program->patch_constant_signature.element_count);
+    if (!(compiler->output_info = vkd3d_calloc(max_element_count, sizeof(*compiler->output_info))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
 
     if (program->temp_count)
         spirv_compiler_emit_temps(compiler, program->temp_count);
