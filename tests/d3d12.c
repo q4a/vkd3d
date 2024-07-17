@@ -17720,6 +17720,8 @@ static void test_update_compute_descriptor_tables(void)
     {
         struct uvec4 srv_size[2];
         struct uvec4 uav_size[2];
+        /* Constant buffers need to be padded to 256 bytes. */
+        char pad[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 2 * sizeof(struct uvec4[2])];
     };
 
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
