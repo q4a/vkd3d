@@ -49,3 +49,52 @@ float4 main() : sv_target
 {
     return 0;
 }
+
+
+% Escape sequences are hanlded differently in DXC.
+% Octal, hexadecimal, and unicode escape sequences that are out of range are considered errors.
+[pixel shader todo fail(sm>=6)]
+string a = "\nAAA\tBBB\rCCC\fDDD\vEEE\sFFF";
+string b = "\\AAA\"BBB\'CCC\?DDD\aEEE\bFFF\sGGG";
+string c = "\52 AAA\052 BBB\0521 CCC\52a DDD\241 EEE\441 FFF\02 GGG\0 HHH";
+string d = "\x AAA\x8 BBB\x2A CCC\x2A1 DDD\241 EEE";
+string e = "AAA\x21111111111111121 BBB\x2ah CCC\xFFFF2a GGG\X0";
+string f = "\e[41m AAA\e41 \u002a \U002a BBB\80CCC ";
+
+float4 main() : sv_target { return 0; }
+
+
+[require]
+shader model >= 5.0
+shader model < 6.0
+
+[effect todo]
+float4 f
+<
+    string a = "\nAAA\tBBB\rCCC\fDDD\vEEE\sFFF";
+    string b = "\\AAA\"BBB\'CCC\?DDD\aEEE\bFFF\sGGG";
+    string c = "\52 AAA\052 BBB\0521 CCC\52a DDD\241 EEE\441 FFF\02 GGG\0 HHH";
+    string d = "\x AAA\x8 BBB\x2A CCC\x2A1 DDD\241 EEE";
+    string e = "AAA\x21111111111111121 BBB\x2ah CCC\xFFFF2a GGG\X0";
+    string f = "\e[41m AAA\e41 \u002a \U002a BBB\80CCC ";
+>;
+
+float4 main() : sv_target { return 0; }
+
+// Native compiler's output is:
+//
+//    cbuffer $Globals
+//    {
+//        float4  f
+//        <
+//            String a = "
+//    CCC     BBB
+//       DDD
+//          EEEsFFF";
+//            String b = "\AAA"BBB'CCC?DDDEEFFFsGGG";
+//            String c = "* AAA* BBB*1 CCC*a DDD¡ EEE! FFF GGG";
+//            String d = "x AA BBB* CCC¡ DDD¡ EEE";
+//            String e = "AAA! BBB*h CCC* GGGX0";
+//            String f = "e[41m AAAe41 u002a U002a BBB80CCC ";
+//        >;                                  // Offset:    0, size:   16
+//    }
