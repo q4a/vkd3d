@@ -134,6 +134,10 @@ these steps:
 
  [1] https://devblogs.microsoft.com/directx/directx12agility/
 
+ * You also need to enable the "Graphics Tools" optional feature in Windows.
+   Open the "Settings" applications, then look for "Apps", "Optional features",
+   "View features" and install "Graphics Tools".
+
  * Configure vkd3d with something like:
    'CROSSCC64="x86_64-w64-mingw32-gcc -DVKD3D_AGILITY_SDK_VERSION=<version>"',
    as well as the equivalent CROSSCC32 variable for the 32-bit
