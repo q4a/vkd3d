@@ -7309,6 +7309,10 @@ type_no_void:
             validate_uav_type(ctx, $1, $3, &@3);
             $$ = hlsl_new_uav_type(ctx, $1, $3, true);
         }
+    | KW_STRING
+        {
+            $$ = ctx->builtin_types.string;
+        }
     | TYPE_IDENTIFIER
         {
             $$ = hlsl_get_type(ctx->cur_scope, $1, true, true);

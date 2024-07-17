@@ -1638,6 +1638,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RASTERIZER_STATE:
         case HLSL_CLASS_SAMPLER:
+        case HLSL_CLASS_STRING:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VERTEX_SHADER:
@@ -1658,7 +1659,6 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
-        case HLSL_CLASS_STRING:
         case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VOID:
             vkd3d_unreachable();
