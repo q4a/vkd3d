@@ -128,11 +128,13 @@ VKD3D_NORETURN static inline void vkd3d_unreachable_(const char *filename, unsig
 
 #ifdef VKD3D_NO_ERROR_MESSAGES
 #define ERR(args...) do { } while (0)
+#define MESSAGE(args...) do { } while (0)
 #endif
 
 enum vkd3d_dbg_level
 {
     VKD3D_DBG_LEVEL_NONE,
+    VKD3D_DBG_LEVEL_MESSAGE,
     VKD3D_DBG_LEVEL_ERR,
     VKD3D_DBG_LEVEL_FIXME,
     VKD3D_DBG_LEVEL_WARN,
@@ -167,19 +169,23 @@ const char *debugstr_w(const WCHAR *wstr, size_t wchar_size);
         vkd3d_dbg_printf(vkd3d_dbg_level, __FUNCTION__, __VA_ARGS__); } while (0)
 
 #ifndef TRACE
-#define TRACE VKD3D_DBG_LOG(TRACE)
+#define TRACE   VKD3D_DBG_LOG(TRACE)
 #endif
 
 #ifndef WARN
-#define WARN  VKD3D_DBG_LOG(WARN)
+#define WARN    VKD3D_DBG_LOG(WARN)
 #endif
 
 #ifndef FIXME
-#define FIXME VKD3D_DBG_LOG(FIXME)
+#define FIXME   VKD3D_DBG_LOG(FIXME)
 #endif
 
 #ifndef ERR
-#define ERR   VKD3D_DBG_LOG(ERR)
+#define ERR     VKD3D_DBG_LOG(ERR)
+#endif
+
+#ifndef MESSAGE
+#define MESSAGE VKD3D_DBG_LOG(MESSAGE)
 #endif
 
 #ifndef TRACE_ON
