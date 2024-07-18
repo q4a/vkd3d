@@ -831,6 +831,54 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceFeatures2 features2;
 };
 
+static void vkd3d_chain_physical_device_info_structures(struct vkd3d_physical_device_info *info,
+        struct d3d12_device *device)
+{
+    struct vkd3d_vulkan_info *vulkan_info = &device->vk_info;
+
+    info->features2.pNext = NULL;
+
+    if (vulkan_info->EXT_conditional_rendering)
+        vk_prepend_struct(&info->features2, &info->conditional_rendering_features);
+    if (vulkan_info->EXT_depth_clip_enable)
+        vk_prepend_struct(&info->features2, &info->depth_clip_features);
+    if (vulkan_info->EXT_descriptor_indexing)
+        vk_prepend_struct(&info->features2, &info->descriptor_indexing_features);
+    if (vulkan_info->EXT_fragment_shader_interlock)
+        vk_prepend_struct(&info->features2, &info->fragment_shader_interlock_features);
+    if (vulkan_info->EXT_robustness2)
+        vk_prepend_struct(&info->features2, &info->robustness2_features);
+    if (vulkan_info->EXT_shader_demote_to_helper_invocation)
+        vk_prepend_struct(&info->features2, &info->demote_features);
+    if (vulkan_info->EXT_texel_buffer_alignment)
+        vk_prepend_struct(&info->features2, &info->texel_buffer_alignment_features);
+    if (vulkan_info->EXT_transform_feedback)
+        vk_prepend_struct(&info->features2, &info->xfb_features);
+    if (vulkan_info->EXT_vertex_attribute_divisor)
+        vk_prepend_struct(&info->features2, &info->vertex_divisor_features);
+    if (vulkan_info->KHR_timeline_semaphore)
+        vk_prepend_struct(&info->features2, &info->timeline_semaphore_features);
+    if (vulkan_info->EXT_mutable_descriptor_type)
+        vk_prepend_struct(&info->features2, &info->mutable_features);
+    if (vulkan_info->EXT_4444_formats)
+        vk_prepend_struct(&info->features2, &info->formats4444_features);
+
+    info->properties2.pNext = NULL;
+
+    if (vulkan_info->KHR_maintenance3)
+        vk_prepend_struct(&info->properties2, &info->maintenance3_properties);
+    if (vulkan_info->EXT_descriptor_indexing)
+        vk_prepend_struct(&info->properties2, &info->descriptor_indexing_properties);
+    if (vulkan_info->EXT_texel_buffer_alignment)
+        vk_prepend_struct(&info->properties2, &info->texel_buffer_alignment_properties);
+    if (vulkan_info->EXT_transform_feedback)
+        vk_prepend_struct(&info->properties2, &info->xfb_properties);
+    if (vulkan_info->EXT_vertex_attribute_divisor)
+        vk_prepend_struct(&info->properties2, &info->vertex_divisor_properties);
+    if (d3d12_device_environment_is_vulkan_min_1_1(device))
+        vk_prepend_struct(&info->properties2, &info->subgroup_properties);
+}
+
 static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *info, struct d3d12_device *device)
 {
     const struct vkd3d_vk_instance_procs *vk_procs = &device->vkd3d_instance->vk_procs;
@@ -875,44 +923,22 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     xfb_properties = &info->xfb_properties;
     subgroup_properties = &info->subgroup_properties;
 
+    vkd3d_chain_physical_device_info_structures(info, device);
+
     info->features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
     conditional_rendering_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONDITIONAL_RENDERING_FEATURES_EXT;
-    if (vulkan_info->EXT_conditional_rendering)
-        vk_prepend_struct(&info->features2, conditional_rendering_features);
     depth_clip_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT;
-    if (vulkan_info->EXT_depth_clip_enable)
-        vk_prepend_struct(&info->features2, depth_clip_features);
     descriptor_indexing_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
-    if (vulkan_info->EXT_descriptor_indexing)
-        vk_prepend_struct(&info->features2, descriptor_indexing_features);
     fragment_shader_interlock_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
-    if (vulkan_info->EXT_fragment_shader_interlock)
-        vk_prepend_struct(&info->features2, fragment_shader_interlock_features);
     robustness2_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
-    if (vulkan_info->EXT_robustness2)
-        vk_prepend_struct(&info->features2, robustness2_features);
     demote_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
-    if (vulkan_info->EXT_shader_demote_to_helper_invocation)
-        vk_prepend_struct(&info->features2, demote_features);
     buffer_alignment_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT;
-    if (vulkan_info->EXT_texel_buffer_alignment)
-        vk_prepend_struct(&info->features2, buffer_alignment_features);
     xfb_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT;
-    if (vulkan_info->EXT_transform_feedback)
-        vk_prepend_struct(&info->features2, xfb_features);
     vertex_divisor_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_EXT;
-    if (vulkan_info->EXT_vertex_attribute_divisor)
-        vk_prepend_struct(&info->features2, vertex_divisor_features);
     timeline_semaphore_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR;
-    if (vulkan_info->KHR_timeline_semaphore)
-        vk_prepend_struct(&info->features2, timeline_semaphore_features);
     mutable_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT;
-    if (vulkan_info->EXT_mutable_descriptor_type)
-        vk_prepend_struct(&info->features2, mutable_features);
     formats4444_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT;
-    if (vulkan_info->EXT_4444_formats)
-        vk_prepend_struct(&info->features2, formats4444_features);
 
     if (vulkan_info->KHR_get_physical_device_properties2)
         VK_CALL(vkGetPhysicalDeviceFeatures2KHR(physical_device, &info->features2));
@@ -922,23 +948,11 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     info->properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 
     maintenance3_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES;
-    if (vulkan_info->KHR_maintenance3)
-        vk_prepend_struct(&info->properties2, maintenance3_properties);
     descriptor_indexing_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT;
-    if (vulkan_info->EXT_descriptor_indexing)
-        vk_prepend_struct(&info->properties2, descriptor_indexing_properties);
     buffer_alignment_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES_EXT;
-    if (vulkan_info->EXT_texel_buffer_alignment)
-        vk_prepend_struct(&info->properties2, buffer_alignment_properties);
     xfb_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_PROPERTIES_EXT;
-    if (vulkan_info->EXT_transform_feedback)
-        vk_prepend_struct(&info->properties2, xfb_properties);
     vertex_divisor_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES_EXT;
-    if (vulkan_info->EXT_vertex_attribute_divisor)
-        vk_prepend_struct(&info->properties2, vertex_divisor_properties);
     subgroup_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-    if (d3d12_device_environment_is_vulkan_min_1_1(device))
-        vk_prepend_struct(&info->properties2, subgroup_properties);
 
     if (vulkan_info->KHR_get_physical_device_properties2)
         VK_CALL(vkGetPhysicalDeviceProperties2KHR(physical_device, &info->properties2));
@@ -1839,6 +1853,8 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     else
         vkd3d_device_descriptor_limits_init(&vulkan_info->descriptor_limits,
                 &physical_device_info->properties2.properties.limits);
+
+    vkd3d_chain_physical_device_info_structures(physical_device_info, device);
 
     return S_OK;
 }
