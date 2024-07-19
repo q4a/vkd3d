@@ -105,6 +105,18 @@ void vsir_program_cleanup(struct vsir_program *program)
     shader_signature_cleanup(&program->patch_constant_signature);
 }
 
+const struct vkd3d_shader_parameter1 *vsir_program_get_parameter(
+        const struct vsir_program *program, enum vkd3d_shader_parameter_name name)
+{
+    for (unsigned int i = 0; i < program->parameter_count; ++i)
+    {
+        if (program->parameters[i].name == name)
+            return &program->parameters[i];
+    }
+
+    return NULL;
+}
+
 static inline bool shader_register_is_phase_instance_id(const struct vkd3d_shader_register *reg)
 {
     return reg->type == VKD3DSPR_FORKINSTID || reg->type == VKD3DSPR_JOININSTID;
@@ -5541,17 +5553,8 @@ static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *pro
             || !(program->output_signature.elements[colour_signature_idx].mask & VKD3DSP_WRITEMASK_3))
         return VKD3D_OK;
 
-    for (unsigned int i = 0; i < program->parameter_count; ++i)
-    {
-        const struct vkd3d_shader_parameter1 *parameter = &program->parameters[i];
-
-        if (parameter->name == VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_FUNC)
-            func = parameter;
-        else if (parameter->name == VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF)
-            ref = parameter;
-    }
-
-    if (!func || !ref)
+    if (!(func = vsir_program_get_parameter(program, VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_FUNC))
+            || !(ref = vsir_program_get_parameter(program, VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF)))
         return VKD3D_OK;
 
     if (func->type != VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)

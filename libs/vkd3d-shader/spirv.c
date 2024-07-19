@@ -2393,6 +2393,7 @@ struct ssa_register_info
 struct spirv_compiler
 {
     struct vkd3d_spirv_builder spirv_builder;
+    const struct vsir_program *program;
 
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_location location;
@@ -2418,8 +2419,6 @@ struct spirv_compiler
     uint32_t *descriptor_offset_ids;
     struct vkd3d_push_constant_buffer_binding *push_constants;
     const struct vkd3d_shader_spirv_target_info *spirv_target_info;
-    const struct vkd3d_shader_parameter1 *parameters;
-    unsigned int parameter_count;
 
     struct
     {
@@ -3287,20 +3286,6 @@ static uint32_t spirv_compiler_emit_array_variable(struct spirv_compiler *compil
     return vkd3d_spirv_build_op_variable(builder, stream, ptr_type_id, storage_class, 0);
 }
 
-static const struct vkd3d_shader_parameter1 *spirv_compiler_get_shader_parameter(
-        struct spirv_compiler *compiler, enum vkd3d_shader_parameter_name name)
-{
-    unsigned int i;
-
-    for (i = 0; i < compiler->parameter_count; ++i)
-    {
-        if (compiler->parameters[i].name == name)
-            return &compiler->parameters[i];
-    }
-
-    return NULL;
-}
-
 static const struct vkd3d_spec_constant_info
 {
     enum vkd3d_shader_parameter_name name;
@@ -3394,7 +3379,7 @@ static uint32_t spirv_compiler_get_buffer_parameter(struct spirv_compiler *compi
         const struct vkd3d_shader_parameter1 *parameter, enum vkd3d_data_type type)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    unsigned int index = parameter - compiler->parameters;
+    unsigned int index = parameter - compiler->program->parameters;
     uint32_t type_id, ptr_id, ptr_type_id;
 
     type_id = vkd3d_spirv_get_type_id(builder, vkd3d_component_type_from_data_type(type), 1);
@@ -3411,7 +3396,7 @@ static uint32_t spirv_compiler_emit_shader_parameter(struct spirv_compiler *comp
     const struct vkd3d_shader_parameter1 *parameter;
     enum vkd3d_data_type type = VKD3D_DATA_UINT;
 
-    if (!(parameter = spirv_compiler_get_shader_parameter(compiler, name)))
+    if (!(parameter = vsir_program_get_parameter(compiler->program, name)))
     {
         WARN("Unresolved shader parameter %#x.\n", name);
         goto default_parameter;
@@ -10604,12 +10589,10 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
 
     spirv_compiler_emit_descriptor_declarations(compiler);
 
-    compiler->parameter_count = program->parameter_count;
-    compiler->parameters = program->parameters;
-    compiler->spirv_parameter_info = vkd3d_calloc(compiler->parameter_count, sizeof(*compiler->spirv_parameter_info));
-    for (i = 0; i < compiler->parameter_count; ++i)
+    compiler->spirv_parameter_info = vkd3d_calloc(program->parameter_count, sizeof(*compiler->spirv_parameter_info));
+    for (i = 0; i < program->parameter_count; ++i)
     {
-        const struct vkd3d_shader_parameter1 *parameter = &compiler->parameters[i];
+        const struct vkd3d_shader_parameter1 *parameter = &program->parameters[i];
 
         if (parameter->type == VKD3D_SHADER_PARAMETER_TYPE_BUFFER)
         {
@@ -10635,6 +10618,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
 
     if (program->block_count && !spirv_compiler_init_blocks(compiler, program->block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    compiler->program = program;
 
     instructions = program->instructions;
     memset(&program->instructions, 0, sizeof(program->instructions));
