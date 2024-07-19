@@ -3316,12 +3316,11 @@ static uint32_t spirv_compiler_alloc_spec_constant_id(struct spirv_compiler *com
 {
     if (!compiler->current_spec_constant_id)
     {
-        const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
         unsigned int i, id = 0;
 
-        for (i = 0; info && i < info->parameter_count; ++i)
+        for (i = 0; i < compiler->program->parameter_count; ++i)
         {
-            const struct vkd3d_shader_parameter *current = &info->parameters[i];
+            const struct vkd3d_shader_parameter1 *current = &compiler->program->parameters[i];
 
             if (current->type == VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT)
                 id = max(current->u.specialization_constant.id + 1, id);
