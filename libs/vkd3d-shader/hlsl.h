@@ -802,6 +802,8 @@ struct hlsl_ir_swizzle
 {
     struct hlsl_ir_node node;
     struct hlsl_src val;
+    /* For vectors, a swizzle described by hlsl_swizzle_get_component().
+     * For matrices, a swizzle described by hlsl_matrix_swizzle_get_component(). */
     uint32_t swizzle;
 };
 
