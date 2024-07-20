@@ -815,7 +815,7 @@ static void shader_print_dcl_usage(struct vkd3d_d3d_asm_compiler *compiler,
             usage = "tessfactor";
             break;
         case VKD3D_DECL_USAGE_POSITIONT:
-            usage = "positionT";
+            usage = "positiont";
             indexed = true;
             break;
         case VKD3D_DECL_USAGE_FOG:
