@@ -1192,6 +1192,7 @@ static void remove_unread_output_components(const struct shader_signature *signa
     switch (dst->reg.type)
     {
         case VKD3DSPR_OUTPUT:
+        case VKD3DSPR_TEXCRDOUT:
             e = vsir_signature_find_element_for_reg(signature, dst->reg.idx[0].offset, 0);
             break;
 
@@ -2177,6 +2178,7 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
             signature = normaliser->patch_constant_signature;
             break;
 
+        case VKD3DSPR_TEXCRDOUT:
         case VKD3DSPR_COLOROUT:
             reg_idx = reg->idx[0].offset;
             signature = normaliser->output_signature;

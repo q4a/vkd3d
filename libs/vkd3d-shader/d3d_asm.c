@@ -387,6 +387,7 @@ static const char * const shader_register_names[] =
     [VKD3DSPR_NULL              ] = "null",
     [VKD3DSPR_OUTCONTROLPOINT   ] = "vocp",
     [VKD3DSPR_OUTPOINTID        ] = "vOutputControlPointID",
+    [VKD3DSPR_OUTPUT            ] = "o",
     [VKD3DSPR_OUTSTENCILREF     ] = "oStencilRef",
     [VKD3DSPR_PARAMETER         ] = "parameter",
     [VKD3DSPR_PATCHCONST        ] = "vpc",
@@ -401,6 +402,7 @@ static const char * const shader_register_names[] =
     [VKD3DSPR_STREAM            ] = "m",
     [VKD3DSPR_TEMP              ] = "r",
     [VKD3DSPR_TESSCOORD         ] = "vDomainLocation",
+    [VKD3DSPR_TEXCRDOUT         ] = "oT",
     [VKD3DSPR_TEXTURE           ] = "t",
     [VKD3DSPR_THREADGROUPID     ] = "vThreadGroupID",
     [VKD3DSPR_THREADID          ] = "vThreadID",
@@ -1008,15 +1010,6 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
     {
         case VKD3DSPR_RASTOUT:
             vkd3d_string_buffer_printf(buffer, "%s", rastout_reg_names[offset]);
-            break;
-
-        case VKD3DSPR_TEXCRDOUT:
-            /* Vertex shaders >= 3.0 use general purpose output registers
-             * (VKD3DSPR_OUTPUT), which can include an address token. */
-            if (vkd3d_shader_ver_ge(&compiler->shader_version, 3, 0))
-                vkd3d_string_buffer_printf(buffer, "o");
-            else
-                vkd3d_string_buffer_printf(buffer, "oT");
             break;
 
         case VKD3DSPR_MISCTYPE:

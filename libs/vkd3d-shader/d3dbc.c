@@ -428,6 +428,7 @@ register_types[] =
     {VKD3D_SM1_REG_TEXTURE,     VKD3DSPR_TEXTURE},
     {VKD3D_SM1_REG_RASTOUT,     VKD3DSPR_RASTOUT},
     {VKD3D_SM1_REG_ATTROUT,     VKD3DSPR_ATTROUT},
+    {VKD3D_SM1_REG_OUTPUT,      VKD3DSPR_OUTPUT},
     {VKD3D_SM1_REG_TEXCRDOUT,   VKD3DSPR_TEXCRDOUT},
     {VKD3D_SM1_REG_CONSTINT,    VKD3DSPR_CONSTINT},
     {VKD3D_SM1_REG_COLOROUT,    VKD3DSPR_COLOROUT},
@@ -542,6 +543,8 @@ static enum vkd3d_shader_register_type parse_register_type(
 
     if (d3dbc_type == VKD3D_SM1_REG_ADDR)
         return sm1->p.program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL ? VKD3DSPR_TEXTURE : VKD3DSPR_ADDR;
+    if (d3dbc_type == VKD3D_SM1_REG_TEXCRDOUT)
+        return vkd3d_shader_ver_ge(&sm1->p.program->shader_version, 3, 0) ? VKD3DSPR_OUTPUT : VKD3DSPR_TEXCRDOUT;
 
     for (unsigned int i = 0; i < ARRAY_SIZE(register_types); ++i)
     {
@@ -783,20 +786,15 @@ static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *
             return add_signature_element(sm1, false, "TEXCOORD", register_index,
                     VKD3D_SHADER_SV_NONE, register_index, is_dcl, mask);
 
+        case VKD3DSPR_TEXCRDOUT:
+            return add_signature_element(sm1, true, "TEXCOORD", register_index,
+                    VKD3D_SHADER_SV_NONE, register_index, is_dcl, mask);
+
         case VKD3DSPR_OUTPUT:
             if (version->type == VKD3D_SHADER_TYPE_VERTEX)
             {
-                /* For sm < 2 vertex shaders, this is TEXCRDOUT.
-                 *
-                 * For sm3 vertex shaders, this is OUTPUT, but we already
-                 * should have had a DCL instruction. */
-                if (version->major == 3)
-                {
-                    add_signature_mask(sm1, true, register_index, mask);
-                    return true;
-                }
-                return add_signature_element(sm1, true, "TEXCOORD", register_index,
-                        VKD3D_SHADER_SV_NONE, register_index, is_dcl, mask);
+                add_signature_mask(sm1, true, register_index, mask);
+                return true;
             }
             /* fall through */
 
