@@ -909,8 +909,7 @@ static struct hlsl_ir_node *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_nod
 
             if (s >= value->data_type->dimx)
                 return NULL;
-            swiz |= s << component * 2;
-            component++;
+            hlsl_swizzle_set_component(&swiz, component++, s);
         }
         if (valid)
             return hlsl_new_swizzle(ctx, swiz, component, value, loc);
@@ -2087,8 +2086,8 @@ static bool invert_swizzle(uint32_t *swizzle, unsigned int *writemask, unsigned 
     {
         if (*writemask & (1 << i))
         {
-            unsigned int s = (*swizzle >> (i * 2)) & 3;
-            new_swizzle |= s << (bit++ * 2);
+            unsigned int s = hlsl_swizzle_get_component(*swizzle, i);
+            hlsl_swizzle_set_component(&new_swizzle, bit++, s);
             if (new_writemask & (1 << s))
                 return false;
             new_writemask |= 1 << s;
@@ -2102,9 +2101,9 @@ static bool invert_swizzle(uint32_t *swizzle, unsigned int *writemask, unsigned 
     {
         for (j = 0; j < width; ++j)
         {
-            unsigned int s = (new_swizzle >> (j * 2)) & 3;
+            unsigned int s = hlsl_swizzle_get_component(new_swizzle, j);
             if (s == i)
-                inverted |= j << (bit++ * 2);
+                hlsl_swizzle_set_component(&inverted, bit++, j);
         }
     }
 
@@ -2148,7 +2147,7 @@ static bool invert_swizzle_matrix(const struct hlsl_matrix_swizzle *swizzle,
             unsigned int y = new_swizzle.components[j].y;
             unsigned int idx = x + y * 4;
             if (idx == i)
-                inverted |= j << (bit++ * 2);
+                hlsl_swizzle_set_component(&inverted, bit++, j);
         }
     }
 

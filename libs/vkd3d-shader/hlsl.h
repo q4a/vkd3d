@@ -77,6 +77,12 @@ static inline uint32_t vsir_swizzle_from_hlsl(uint32_t swizzle)
             hlsl_swizzle_get_component(swizzle, 3));
 }
 
+static inline void hlsl_swizzle_set_component(uint32_t *swizzle, unsigned int idx, unsigned int component)
+{
+    *swizzle &= ~(HLSL_SWIZZLE_MASK << HLSL_SWIZZLE_SHIFT(idx));
+    *swizzle |= component << HLSL_SWIZZLE_SHIFT(idx);
+}
+
 enum hlsl_type_class
 {
     HLSL_CLASS_SCALAR,

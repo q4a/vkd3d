@@ -1631,7 +1631,7 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
                     var->name, start, start + count, debug_hlsl_swizzle(swizzle, instr_component_count));
             return false;
         }
-        ret_swizzle |= value->component << HLSL_SWIZZLE_SHIFT(i);
+        hlsl_swizzle_set_component(&ret_swizzle, i, value->component);
     }
 
     TRACE("Load from %s[%u-%u]%s propagated as instruction %p%s.\n",

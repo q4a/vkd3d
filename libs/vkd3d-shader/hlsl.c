@@ -4007,8 +4007,8 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
 
 uint32_t hlsl_map_swizzle(uint32_t swizzle, unsigned int writemask)
 {
+    unsigned int src_component = 0;
     uint32_t ret = 0;
-    unsigned int i;
 
     /* Leave replicate swizzles alone; some instructions need them. */
     if (swizzle == HLSL_SWIZZLE(X, X, X, X)
@@ -4017,13 +4017,10 @@ uint32_t hlsl_map_swizzle(uint32_t swizzle, unsigned int writemask)
             || swizzle == HLSL_SWIZZLE(W, W, W, W))
         return swizzle;
 
-    for (i = 0; i < 4; ++i)
+    for (unsigned int dst_component = 0; dst_component < 4; ++dst_component)
     {
-        if (writemask & (1 << i))
-        {
-            ret |= (swizzle & 3) << (i * 2);
-            swizzle >>= 2;
-        }
+        if (writemask & (1 << dst_component))
+            hlsl_swizzle_set_component(&ret, dst_component, hlsl_swizzle_get_component(swizzle, src_component++));
     }
     return ret;
 }
@@ -4076,7 +4073,7 @@ uint32_t hlsl_combine_swizzles(uint32_t first, uint32_t second, unsigned int dim
     for (i = 0; i < dim; ++i)
     {
         unsigned int s = hlsl_swizzle_get_component(second, i);
-        ret |= hlsl_swizzle_get_component(first, s) << HLSL_SWIZZLE_SHIFT(i);
+        hlsl_swizzle_set_component(&ret, i, hlsl_swizzle_get_component(first, s));
     }
     return ret;
 }
