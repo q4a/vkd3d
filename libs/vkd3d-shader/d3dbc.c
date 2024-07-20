@@ -555,28 +555,34 @@ static enum vkd3d_shader_register_type parse_register_type(
     return VKD3DSPR_INVALID;
 }
 
-static void shader_sm1_parse_src_param(struct vkd3d_shader_sm1_parser *sm1, uint32_t param,
-        struct vkd3d_shader_src_param *rel_addr, struct vkd3d_shader_src_param *src)
+static void d3dbc_parse_register(struct vkd3d_shader_sm1_parser *d3dbc,
+        struct vkd3d_shader_register *reg, uint32_t param, struct vkd3d_shader_src_param *rel_addr)
 {
     enum vkd3d_shader_register_type reg_type;
     unsigned int index_offset, idx_count;
 
-    reg_type = parse_register_type(sm1, param, &index_offset);
+    reg_type = parse_register_type(d3dbc, param, &index_offset);
     idx_count = idx_count_from_reg_type(reg_type);
-    vsir_register_init(&src->reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
-    src->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
-    src->reg.non_uniform = false;
+    vsir_register_init(reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
+    reg->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
+    reg->non_uniform = false;
     if (idx_count == 1)
     {
-        src->reg.idx[0].offset = index_offset + (param & VKD3D_SM1_REGISTER_NUMBER_MASK);
-        src->reg.idx[0].rel_addr = rel_addr;
+        reg->idx[0].offset = index_offset + (param & VKD3D_SM1_REGISTER_NUMBER_MASK);
+        reg->idx[0].rel_addr = rel_addr;
     }
-    if (src->reg.type == VKD3DSPR_SAMPLER)
-        src->reg.dimension = VSIR_DIMENSION_NONE;
-    else if (src->reg.type == VKD3DSPR_DEPTHOUT)
-        src->reg.dimension = VSIR_DIMENSION_SCALAR;
+    if (reg->type == VKD3DSPR_SAMPLER)
+        reg->dimension = VSIR_DIMENSION_NONE;
+    else if (reg->type == VKD3DSPR_DEPTHOUT)
+        reg->dimension = VSIR_DIMENSION_SCALAR;
     else
-        src->reg.dimension = VSIR_DIMENSION_VEC4;
+        reg->dimension = VSIR_DIMENSION_VEC4;
+}
+
+static void shader_sm1_parse_src_param(struct vkd3d_shader_sm1_parser *sm1, uint32_t param,
+        struct vkd3d_shader_src_param *rel_addr, struct vkd3d_shader_src_param *src)
+{
+    d3dbc_parse_register(sm1, &src->reg, param, rel_addr);
     src->swizzle = swizzle_from_sm1((param & VKD3D_SM1_SWIZZLE_MASK) >> VKD3D_SM1_SWIZZLE_SHIFT);
     src->modifiers = (param & VKD3D_SM1_SRC_MODIFIER_MASK) >> VKD3D_SM1_SRC_MODIFIER_SHIFT;
 }
@@ -584,25 +590,7 @@ static void shader_sm1_parse_src_param(struct vkd3d_shader_sm1_parser *sm1, uint
 static void shader_sm1_parse_dst_param(struct vkd3d_shader_sm1_parser *sm1, uint32_t param,
         struct vkd3d_shader_src_param *rel_addr, struct vkd3d_shader_dst_param *dst)
 {
-    enum vkd3d_shader_register_type reg_type;
-    unsigned int index_offset, idx_count;
-
-    reg_type = parse_register_type(sm1, param, &index_offset);
-    idx_count = idx_count_from_reg_type(reg_type);
-    vsir_register_init(&dst->reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
-    dst->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
-    dst->reg.non_uniform = false;
-    if (idx_count == 1)
-    {
-        dst->reg.idx[0].offset = index_offset + (param & VKD3D_SM1_REGISTER_NUMBER_MASK);
-        dst->reg.idx[0].rel_addr = rel_addr;
-    }
-    if (dst->reg.type == VKD3DSPR_SAMPLER)
-        dst->reg.dimension = VSIR_DIMENSION_NONE;
-    else if (dst->reg.type == VKD3DSPR_DEPTHOUT)
-        dst->reg.dimension = VSIR_DIMENSION_SCALAR;
-    else
-        dst->reg.dimension = VSIR_DIMENSION_VEC4;
+    d3dbc_parse_register(sm1, &dst->reg, param, rel_addr);
     dst->modifiers = (param & VKD3D_SM1_DST_MODIFIER_MASK) >> VKD3D_SM1_DST_MODIFIER_SHIFT;
     dst->shift = (param & VKD3D_SM1_DSTSHIFT_MASK) >> VKD3D_SM1_DSTSHIFT_SHIFT;
 
