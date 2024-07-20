@@ -56,34 +56,77 @@ static void string_storage_destroy(struct rb_entry *entry, void *context)
     vkd3d_free(string_entry);
 }
 
-struct state_block_function_info
+struct function_component
+{
+    const char *name;
+    bool lhs_has_index;
+    unsigned int lhs_index;
+};
+
+static const struct state_block_function_info
 {
     const char *name;
     unsigned int min_args, max_args;
+    const struct function_component components[3];
+}
+function_info[] =
+{
+    {"SetBlendState",        3, 3, { { "AB_BlendFactor" }, { "AB_SampleMask" }, { "BlendState" } } },
+    {"SetDepthStencilState", 2, 2, { { "DS_StencilRef" }, { "DepthStencilState" } } },
+    {"SetRasterizerState",   1, 1, { { "RasterizerState" } } },
+    {"SetVertexShader",      1, 1, { { "VertexShader" } } },
+    {"SetDomainShader",      1, 1, { { "DomainShader" } } },
+    {"SetHullShader",        1, 1, { { "HullShader" } } },
+    {"SetGeometryShader",    1, 1, { { "GeometryShader" } } },
+    {"SetPixelShader",       1, 1, { { "PixelShader" } } },
+    {"SetComputeShader",     1, 1, { { "ComputeShader" } } },
+    {"OMSetRenderTargets",   2, 9 },
 };
 
 static const struct state_block_function_info *get_state_block_function_info(const char *name)
 {
-    static const struct state_block_function_info valid_functions[] =
+    for (unsigned int i = 0; i < ARRAY_SIZE(function_info); ++i)
     {
-        {"SetBlendState",        3, 3},
-        {"SetDepthStencilState", 2, 2},
-        {"SetRasterizerState",   1, 1},
-        {"SetVertexShader",      1, 1},
-        {"SetDomainShader",      1, 1},
-        {"SetHullShader",        1, 1},
-        {"SetGeometryShader",    1, 1},
-        {"SetPixelShader",       1, 1},
-        {"SetComputeShader",     1, 1},
-        {"OMSetRenderTargets",   2, 9},
-    };
-
-    for (unsigned int i = 0; i < ARRAY_SIZE(valid_functions); ++i)
-    {
-        if (!strcmp(name, valid_functions[i].name))
-            return &valid_functions[i];
+        if (!strcmp(name, function_info[i].name))
+            return &function_info[i];
     }
     return NULL;
+}
+
+static void add_function_component(struct function_component **components, const char *name,
+        bool lhs_has_index, unsigned int lhs_index)
+{
+    struct function_component *comp = *components;
+
+    comp->name = name;
+    comp->lhs_has_index = lhs_has_index;
+    comp->lhs_index = lhs_index;
+
+    *components = *components + 1;
+}
+
+static void get_state_block_function_components(const struct state_block_function_info *info,
+        struct function_component *components, unsigned int comp_count)
+{
+    unsigned int i;
+
+    assert(comp_count >= info->max_args);
+
+    if (info->min_args == info->max_args)
+    {
+        const struct function_component *c = info->components;
+        for (i = 0; i < comp_count; ++i, ++c)
+            add_function_component(&components, c->name, c->lhs_has_index, c->lhs_index);
+        return;
+    }
+
+    if (!strcmp(info->name, "OMSetRenderTargets"))
+    {
+        for (i = 0; i < comp_count - 2; ++i)
+            add_function_component(&components, "RenderTargetView", true, i + 1);
+        add_function_component(&components, "DepthStencilView", true, 0);
+        add_function_component(&components, "RenderTargetView", true, 0);
+    }
 }
 
 bool hlsl_validate_state_block_entry(struct hlsl_ctx *ctx, struct hlsl_state_block_entry *entry,
@@ -189,9 +232,6 @@ static uint32_t write_string(const char *string, struct fx_write_context *fx)
 
 static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
-    if (var->state_block_count && var->state_blocks[0]->count)
-        hlsl_fixme(fx->ctx, &var->loc, "Write pass assignments.");
-
     fx->ops->write_pass(var, fx);
 }
 
@@ -230,6 +270,8 @@ static void write_fx_4_annotations(struct hlsl_scope *scope, struct fx_write_con
 static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx);
 static const char * get_fx_4_type_name(const struct hlsl_type *type);
 static void write_fx_4_annotation(struct hlsl_ir_var *var, struct fx_write_context *fx);
+static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
+        uint32_t count_offset, struct fx_write_context *fx);
 
 static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
@@ -374,15 +416,14 @@ static uint32_t write_fx_4_string(const char *string, struct fx_write_context *f
 static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t name_offset;
+    uint32_t name_offset, count_offset;
 
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
-    put_u32(buffer, 0); /* Assignment count. */
+    count_offset = put_u32(buffer, 0);
 
     write_fx_4_annotations(var->annotations, fx);
-
-    /* TODO: assignments */
+    write_fx_4_state_block(var, 0, count_offset, fx);
 }
 
 static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -397,6 +438,9 @@ static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx
 
     /* TODO: annotations */
     /* TODO: assignments */
+
+    if (var->state_block_count && var->state_blocks[0]->count)
+        hlsl_fixme(fx->ctx, &var->loc, "Write pass assignments.");
 
     /* For some reason every pass adds to the total shader object count. */
     fx->shader_count++;
@@ -1348,6 +1392,17 @@ static void write_fx_4_state_assignment(const struct hlsl_ir_var *var, struct hl
             assignment_type = 1;
             break;
         }
+        case HLSL_IR_LOAD:
+        {
+            struct hlsl_ir_load *l = hlsl_ir_load(value);
+
+            if (l->src.path_len)
+                hlsl_fixme(ctx, &var->loc, "Indexed access in RHS values is not implemented.");
+
+            value_offset = write_fx_4_string(l->src.var->name, fx);
+            assignment_type = 2;
+            break;
+        }
         default:
             hlsl_fixme(ctx, &var->loc, "Unsupported assignment type for state %s.", entry->name);
     }
@@ -1424,7 +1479,30 @@ enum state_property_component_type
     FX_FLOAT,
     FX_UINT,
     FX_UINT8,
+    FX_DS_STATE,
 };
+
+static inline bool is_object_fx_type(enum state_property_component_type type)
+{
+    switch (type)
+    {
+        case FX_DS_STATE:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_property_component_type type)
+{
+    switch (type)
+    {
+        case FX_DS_STATE:
+            return HLSL_CLASS_DEPTH_STENCIL_STATE;
+        default:
+            vkd3d_unreachable();
+    }
+}
 
 static inline enum hlsl_base_type hlsl_type_from_fx_type(enum state_property_component_type type)
 {
@@ -1551,6 +1629,9 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
     states[] =
     {
+        { "DepthStencilState",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DS_STATE, 1, 1 },
+        { "DS_StencilRef",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT, 1, 9 },
+
         { "FillMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 12, fill_values },
         { "CullMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 13, cull_values },
         { "FrontCounterClockwise", HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 14 },
@@ -1596,6 +1677,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     const struct state *state = NULL;
     struct hlsl_ctx *ctx = fx->ctx;
     enum hlsl_base_type base_type;
+    struct hlsl_ir_load *load;
     unsigned int i;
 
     for (i = 0; i < ARRAY_SIZE(states); ++i)
@@ -1631,6 +1713,32 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     fold_state_value(ctx, entry);
 
     /* Now cast and run folding again. */
+
+    if (is_object_fx_type(state->type))
+    {
+        node = entry->args->node;
+
+        switch (node->type)
+        {
+            case HLSL_IR_LOAD:
+                load = hlsl_ir_load(node);
+
+                if (load->src.path_len)
+                    hlsl_fixme(ctx, &ctx->location, "Arrays are not supported for RHS.");
+
+                if (load->src.var->data_type->class != hlsl_type_class_from_fx_type(state->type))
+                {
+                    hlsl_error(ctx, &ctx->location, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Type mismatch for the %s state value",
+                            entry->name);
+                }
+
+                break;
+            default:
+                hlsl_fixme(ctx, &ctx->location, "Unhandled node type for object-typed field.");
+        }
+
+        return;
+    }
 
     base_type = hlsl_type_from_fx_type(state->type);
     switch (state->class)
@@ -1676,40 +1784,99 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
 }
 
+static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct hlsl_state_block *block,
+        unsigned int entry_index, struct fx_write_context *fx)
+{
+    struct hlsl_state_block_entry *entry = block->entries[entry_index];
+    const struct state_block_function_info *info;
+    struct function_component components[9];
+    struct hlsl_ctx *ctx = fx->ctx;
+    unsigned int i;
+
+    if (!entry->is_function_call)
+        return 1;
+
+    if (!(info = get_state_block_function_info(entry->name)))
+        return 1;
+
+    /* For single argument case simply replace the name. */
+    if (info->min_args == info->max_args && info->min_args == 1)
+    {
+        vkd3d_free(entry->name);
+        entry->name = hlsl_strdup(ctx, info->components[0].name);
+        return 1;
+    }
+
+    if (!vkd3d_array_reserve((void **)&block->entries, &block->capacity, block->count + entry->args_count - 1,
+            sizeof(*block->entries)))
+        return 1;
+    if (entry_index != block->count - 1)
+    {
+        memmove(&block->entries[entry_index + entry->args_count], &block->entries[entry_index + 1],
+                (entry->args_count - 1) * sizeof(*block->entries));
+    }
+    block->count += entry->args_count - 1;
+
+    get_state_block_function_components(info, components, entry->args_count);
+
+    for (i = 0; i < entry->args_count; ++i)
+    {
+        const struct function_component *comp = &components[i];
+        unsigned int arg_index = (i + 1) % entry->args_count;
+        block->entries[entry_index + i] = clone_stateblock_entry(ctx, entry, comp->name,
+                comp->lhs_has_index, comp->lhs_index, arg_index);
+    }
+    hlsl_free_state_block_entry(entry);
+
+    return entry->args_count - 1;
+}
+
+static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
+        uint32_t count_offset, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    struct hlsl_state_block *block;
+    uint32_t i, count = 0;
+
+    if (var->state_blocks)
+    {
+        block = var->state_blocks[block_index];
+
+        for (i = 0; i < block->count;)
+        {
+            i += decompose_fx_4_state_block(var, block, i, fx);
+        }
+
+        for (i = 0; i < block->count; ++i)
+        {
+            struct hlsl_state_block_entry *entry = block->entries[i];
+
+            /* Skip if property is reassigned later. This will use the last assignment. */
+            if (state_block_contains_state(entry->name, i + 1, block))
+                continue;
+
+            /* Resolve special constant names and property names. */
+            resolve_fx_4_state_block_values(var, entry, fx);
+
+            write_fx_4_state_assignment(var, entry, fx);
+            ++count;
+        }
+    }
+
+    set_u32(buffer, count_offset, count);
+}
+
 static void write_fx_4_state_object_initializer(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
-    uint32_t elements_count = hlsl_get_multiarray_size(var->data_type), i, j;
+    uint32_t elements_count = hlsl_get_multiarray_size(var->data_type), i;
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t count_offset, count;
+    uint32_t count_offset;
 
     for (i = 0; i < elements_count; ++i)
     {
-        struct hlsl_state_block *block;
-
         count_offset = put_u32(buffer, 0);
 
-        count = 0;
-        if (var->state_blocks)
-        {
-            block = var->state_blocks[i];
-
-            for (j = 0; j < block->count; ++j)
-            {
-                struct hlsl_state_block_entry *entry = block->entries[j];
-
-                /* Skip if property is reassigned later. This will use the last assignment. */
-                if (state_block_contains_state(entry->name, j + 1, block))
-                    continue;
-
-                /* Resolve special constant names and property names. */
-                resolve_fx_4_state_block_values(var, entry, fx);
-
-                write_fx_4_state_assignment(var, entry, fx);
-                ++count;
-            }
-        }
-
-        set_u32(buffer, count_offset, count);
+        write_fx_4_state_block(var, i, count_offset, fx);
     }
 }
 

@@ -134,7 +134,7 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
     return hlsl_get_var(scope->upper, name);
 }
 
-static void free_state_block_entry(struct hlsl_state_block_entry *entry)
+void hlsl_free_state_block_entry(struct hlsl_state_block_entry *entry)
 {
     unsigned int i;
 
@@ -153,7 +153,7 @@ void hlsl_free_state_block(struct hlsl_state_block *state_block)
 
     VKD3D_ASSERT(state_block);
     for (k = 0; k < state_block->count; ++k)
-        free_state_block_entry(state_block->entries[k]);
+        hlsl_free_state_block_entry(state_block->entries[k]);
     vkd3d_free(state_block->entries);
     vkd3d_free(state_block);
 }
@@ -2079,6 +2079,43 @@ static struct hlsl_ir_node *clone_stateblock_constant(struct hlsl_ctx *ctx,
         struct clone_instr_map *map, struct hlsl_ir_stateblock_constant *constant)
 {
     return hlsl_new_stateblock_constant(ctx, constant->name, &constant->node.loc);
+}
+
+struct hlsl_state_block_entry *clone_stateblock_entry(struct hlsl_ctx *ctx,
+        struct hlsl_state_block_entry *src, const char *name, bool lhs_has_index,
+        unsigned int lhs_index, unsigned int arg_index)
+{
+    struct hlsl_state_block_entry *entry;
+    struct clone_instr_map map = { 0 };
+
+    if (!(entry = hlsl_alloc(ctx, sizeof(*entry))))
+        return NULL;
+    entry->name = hlsl_strdup(ctx, name);
+    entry->lhs_has_index = lhs_has_index;
+    entry->lhs_index = lhs_index;
+    if (!(entry->instrs = hlsl_alloc(ctx, sizeof(*entry->instrs))))
+    {
+        hlsl_free_state_block_entry(entry);
+        return NULL;
+    }
+
+    entry->args_count = 1;
+    if (!(entry->args = hlsl_alloc(ctx, sizeof(*entry->args) * entry->args_count)))
+    {
+        hlsl_free_state_block_entry(entry);
+        return NULL;
+    }
+
+    hlsl_block_init(entry->instrs);
+    if (!clone_block(ctx, entry->instrs, src->instrs, &map))
+    {
+        hlsl_free_state_block_entry(entry);
+        return NULL;
+    }
+    clone_src(&map, entry->args, &src->args[arg_index]);
+    vkd3d_free(map.instrs);
+
+    return entry;
 }
 
 void hlsl_free_ir_switch_case(struct hlsl_ir_switch_case *c)

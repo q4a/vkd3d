@@ -1,0 +1,14 @@
+[require]
+shader model >= 5.0
+shader model < 6.0
+
+[effect]
+DepthStencilState ds;
+
+technique11
+{
+    pass
+    {
+        SetDepthStencilState(ds, 123);
+    }
+}
