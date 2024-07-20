@@ -425,6 +425,7 @@ register_types[] =
     {VKD3D_SM1_REG_INPUT,       VKD3DSPR_INPUT},
     {VKD3D_SM1_REG_CONST,       VKD3DSPR_CONST},
     {VKD3D_SM1_REG_ADDR,        VKD3DSPR_ADDR},
+    {VKD3D_SM1_REG_TEXTURE,     VKD3DSPR_TEXTURE},
     {VKD3D_SM1_REG_RASTOUT,     VKD3DSPR_RASTOUT},
     {VKD3D_SM1_REG_ATTROUT,     VKD3DSPR_ATTROUT},
     {VKD3D_SM1_REG_TEXCRDOUT,   VKD3DSPR_TEXCRDOUT},
@@ -505,6 +506,7 @@ static unsigned int idx_count_from_reg_type(enum vkd3d_shader_register_type reg_
     switch (reg_type)
     {
         case VKD3DSPR_DEPTHOUT:
+        case VKD3DSPR_ADDR:
             return 0;
 
         default:
@@ -512,7 +514,8 @@ static unsigned int idx_count_from_reg_type(enum vkd3d_shader_register_type reg_
     }
 }
 
-static enum vkd3d_shader_register_type parse_register_type(uint32_t param, unsigned int *index_offset)
+static enum vkd3d_shader_register_type parse_register_type(
+        struct vkd3d_shader_sm1_parser *sm1, uint32_t param, unsigned int *index_offset)
 {
     enum vkd3d_sm1_register_type d3dbc_type = ((param & VKD3D_SM1_REGISTER_TYPE_MASK) >> VKD3D_SM1_REGISTER_TYPE_SHIFT)
             | ((param & VKD3D_SM1_REGISTER_TYPE_MASK2) >> VKD3D_SM1_REGISTER_TYPE_SHIFT2);
@@ -537,6 +540,9 @@ static enum vkd3d_shader_register_type parse_register_type(uint32_t param, unsig
         return VKD3DSPR_CONST;
     }
 
+    if (d3dbc_type == VKD3D_SM1_REG_ADDR)
+        return sm1->p.program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL ? VKD3DSPR_TEXTURE : VKD3DSPR_ADDR;
+
     for (unsigned int i = 0; i < ARRAY_SIZE(register_types); ++i)
     {
         if (register_types[i].d3dbc_type == d3dbc_type)
@@ -546,13 +552,13 @@ static enum vkd3d_shader_register_type parse_register_type(uint32_t param, unsig
     return VKD3DSPR_INVALID;
 }
 
-static void shader_sm1_parse_src_param(uint32_t param, struct vkd3d_shader_src_param *rel_addr,
-        struct vkd3d_shader_src_param *src)
+static void shader_sm1_parse_src_param(struct vkd3d_shader_sm1_parser *sm1, uint32_t param,
+        struct vkd3d_shader_src_param *rel_addr, struct vkd3d_shader_src_param *src)
 {
     enum vkd3d_shader_register_type reg_type;
     unsigned int index_offset, idx_count;
 
-    reg_type = parse_register_type(param, &index_offset);
+    reg_type = parse_register_type(sm1, param, &index_offset);
     idx_count = idx_count_from_reg_type(reg_type);
     vsir_register_init(&src->reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
     src->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
@@ -572,13 +578,13 @@ static void shader_sm1_parse_src_param(uint32_t param, struct vkd3d_shader_src_p
     src->modifiers = (param & VKD3D_SM1_SRC_MODIFIER_MASK) >> VKD3D_SM1_SRC_MODIFIER_SHIFT;
 }
 
-static void shader_sm1_parse_dst_param(uint32_t param, struct vkd3d_shader_src_param *rel_addr,
-        struct vkd3d_shader_dst_param *dst)
+static void shader_sm1_parse_dst_param(struct vkd3d_shader_sm1_parser *sm1, uint32_t param,
+        struct vkd3d_shader_src_param *rel_addr, struct vkd3d_shader_dst_param *dst)
 {
     enum vkd3d_shader_register_type reg_type;
     unsigned int index_offset, idx_count;
 
-    reg_type = parse_register_type(param, &index_offset);
+    reg_type = parse_register_type(sm1, param, &index_offset);
     idx_count = idx_count_from_reg_type(reg_type);
     vsir_register_init(&dst->reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
     dst->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
@@ -774,9 +780,6 @@ static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *
                     VKD3D_SHADER_SV_NONE, SM1_COLOR_REGISTER_OFFSET + register_index, is_dcl, mask);
 
         case VKD3DSPR_TEXTURE:
-            /* For vertex shaders, this is ADDR. */
-            if (version->type == VKD3D_SHADER_TYPE_VERTEX)
-                return true;
             return add_signature_element(sm1, false, "TEXCOORD", register_index,
                     VKD3D_SHADER_SV_NONE, register_index, is_dcl, mask);
 
@@ -1037,9 +1040,9 @@ static void shader_sm1_read_src_param(struct vkd3d_shader_sm1_parser *sm1, const
             sm1->abort = true;
             return;
         }
-        shader_sm1_parse_src_param(addr_token, NULL, src_rel_addr);
+        shader_sm1_parse_src_param(sm1, addr_token, NULL, src_rel_addr);
     }
-    shader_sm1_parse_src_param(token, src_rel_addr, src_param);
+    shader_sm1_parse_src_param(sm1, token, src_rel_addr, src_param);
 }
 
 static void shader_sm1_read_dst_param(struct vkd3d_shader_sm1_parser *sm1, const uint32_t **ptr,
@@ -1058,9 +1061,9 @@ static void shader_sm1_read_dst_param(struct vkd3d_shader_sm1_parser *sm1, const
             sm1->abort = true;
             return;
         }
-        shader_sm1_parse_src_param(addr_token, NULL, dst_rel_addr);
+        shader_sm1_parse_src_param(sm1, addr_token, NULL, dst_rel_addr);
     }
-    shader_sm1_parse_dst_param(token, dst_rel_addr, dst_param);
+    shader_sm1_parse_dst_param(sm1, token, dst_rel_addr, dst_param);
 
     if (dst_param->reg.type == VKD3DSPR_RASTOUT && dst_param->reg.idx[0].offset == VSIR_RASTOUT_POINT_SIZE)
         sm1->p.program->has_point_size = true;
@@ -1103,7 +1106,7 @@ static void shader_sm1_read_semantic(struct vkd3d_shader_sm1_parser *sm1,
     semantic->resource_data_type[1] = VKD3D_DATA_FLOAT;
     semantic->resource_data_type[2] = VKD3D_DATA_FLOAT;
     semantic->resource_data_type[3] = VKD3D_DATA_FLOAT;
-    shader_sm1_parse_dst_param(dst_token, NULL, &semantic->resource.reg);
+    shader_sm1_parse_dst_param(sm1, dst_token, NULL, &semantic->resource.reg);
     range = &semantic->resource.range;
     range->space = 0;
     range->first = range->last = semantic->resource.reg.reg.idx[0].offset;

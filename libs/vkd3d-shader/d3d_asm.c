@@ -356,6 +356,7 @@ static const char * const shader_opcode_names[] =
 
 static const char * const shader_register_names[] =
 {
+    [VKD3DSPR_ADDR              ] = "a",
     [VKD3DSPR_ATTROUT           ] = "oD",
     [VKD3DSPR_COLOROUT          ] = "oC",
     [VKD3DSPR_COMBINED_SAMPLER  ] = "s",
@@ -400,6 +401,7 @@ static const char * const shader_register_names[] =
     [VKD3DSPR_STREAM            ] = "m",
     [VKD3DSPR_TEMP              ] = "r",
     [VKD3DSPR_TESSCOORD         ] = "vDomainLocation",
+    [VKD3DSPR_TEXTURE           ] = "t",
     [VKD3DSPR_THREADGROUPID     ] = "vThreadGroupID",
     [VKD3DSPR_THREADID          ] = "vThreadID",
     [VKD3DSPR_UAV               ] = "u",
@@ -1004,11 +1006,6 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
             reg->type == VKD3DSPR_LABEL ? compiler->colours.label : compiler->colours.reg);
     switch (reg->type)
     {
-        case VKD3DSPR_TEXTURE: /* vs: case VKD3DSPR_ADDR */
-            vkd3d_string_buffer_printf(buffer, "%c",
-                    compiler->shader_version.type == VKD3D_SHADER_TYPE_PIXEL ? 't' : 'a');
-            break;
-
         case VKD3DSPR_RASTOUT:
             vkd3d_string_buffer_printf(buffer, "%s", rastout_reg_names[offset]);
             break;

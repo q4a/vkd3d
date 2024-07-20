@@ -2280,8 +2280,6 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
             break;
 
         case VKD3DSPR_TEXTURE:
-            if (normaliser->shader_type != VKD3D_SHADER_TYPE_PIXEL)
-                return;
             reg->type = VKD3DSPR_INPUT;
             reg_idx = reg->idx[0].offset;
             signature = normaliser->input_signature;
