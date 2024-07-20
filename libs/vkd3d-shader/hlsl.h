@@ -802,9 +802,17 @@ struct hlsl_ir_swizzle
 {
     struct hlsl_ir_node node;
     struct hlsl_src val;
-    /* For vectors, a swizzle described by hlsl_swizzle_get_component().
-     * For matrices, a swizzle described by hlsl_matrix_swizzle_get_component(). */
-    uint32_t swizzle;
+    union
+    {
+        uint32_t vector;
+        struct hlsl_matrix_swizzle
+        {
+            struct
+            {
+                uint8_t x, y;
+            } components[4];
+        } matrix;
+    } u;
 };
 
 struct hlsl_ir_index
@@ -1564,6 +1572,8 @@ struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *v
 struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx, struct hlsl_block *iter,
         struct hlsl_block *block, enum hlsl_loop_unroll_type unroll_type,
         unsigned int unroll_limit, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_new_matrix_swizzle(struct hlsl_ctx *ctx, struct hlsl_matrix_swizzle s,
+        unsigned int width, struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,

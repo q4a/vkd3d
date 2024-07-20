@@ -845,6 +845,7 @@ static struct hlsl_ir_node *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_nod
     if (value->data_type->class == HLSL_CLASS_MATRIX)
     {
         /* Matrix swizzle */
+        struct hlsl_matrix_swizzle s;
         bool m_swizzle;
         unsigned int inc, x, y;
 
@@ -875,10 +876,11 @@ static struct hlsl_ir_node *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_nod
 
             if (x >= value->data_type->dimx || y >= value->data_type->dimy)
                 return NULL;
-            swiz |= (y << 4 | x) << component * 8;
+            s.components[component].x = x;
+            s.components[component].y = y;
             component++;
         }
-        return hlsl_new_swizzle(ctx, swiz, component, value, loc);
+        return hlsl_new_matrix_swizzle(ctx, s, component, value, loc);
     }
 
     /* Vector swizzle */
@@ -2112,22 +2114,22 @@ static bool invert_swizzle(uint32_t *swizzle, unsigned int *writemask, unsigned 
     return true;
 }
 
-static bool invert_swizzle_matrix(uint32_t *swizzle, unsigned int *writemask, unsigned int *ret_width)
+static bool invert_swizzle_matrix(const struct hlsl_matrix_swizzle *swizzle,
+        uint32_t *ret_inverted, unsigned int *writemask, unsigned int *ret_width)
 {
-    /* swizzle is 8 bits per component, each component is (from LSB) 4 bits X, then 4 bits Y.
-     * components are indexed by their sources. i.e. the first component comes from the first
-     * component of the rhs. */
-    unsigned int i, j, bit = 0, inverted = 0, width, new_writemask = 0, new_swizzle = 0;
+    unsigned int i, j, bit = 0, inverted = 0, width, new_writemask = 0;
+    struct hlsl_matrix_swizzle new_swizzle = {0};
 
     /* First, we filter the swizzle to remove components that aren't enabled by writemask. */
     for (i = 0; i < 4; ++i)
     {
         if (*writemask & (1 << i))
         {
-            unsigned int s = (*swizzle >> (i * 8)) & 0xff;
-            unsigned int x = s & 0xf, y = (s >> 4) & 0xf;
+            unsigned int x = swizzle->components[i].x;
+            unsigned int y = swizzle->components[i].y;
             unsigned int idx = x + y * 4;
-            new_swizzle |= s << (bit++ * 8);
+
+            new_swizzle.components[bit++] = swizzle->components[i];
             if (new_writemask & (1 << idx))
                 return false;
             new_writemask |= 1 << idx;
@@ -2135,22 +2137,22 @@ static bool invert_swizzle_matrix(uint32_t *swizzle, unsigned int *writemask, un
     }
     width = bit;
 
-    /* Then we invert the swizzle. The resulting swizzle has 2 bits per component, because it's for the
-     * incoming vector. */
+    /* Then we invert the swizzle. The resulting swizzle uses a uint32_t
+     * vector format, because it's for the incoming vector. */
     bit = 0;
     for (i = 0; i < 16; ++i)
     {
         for (j = 0; j < width; ++j)
         {
-            unsigned int s = (new_swizzle >> (j * 8)) & 0xff;
-            unsigned int x = s & 0xf, y = (s >> 4) & 0xf;
+            unsigned int x = new_swizzle.components[j].x;
+            unsigned int y = new_swizzle.components[j].y;
             unsigned int idx = x + y * 4;
             if (idx == i)
                 inverted |= j << (bit++ * 2);
         }
     }
 
-    *swizzle = inverted;
+    *ret_inverted = inverted;
     *writemask = new_writemask;
     *ret_width = width;
     return true;
@@ -2204,28 +2206,34 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         {
             struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs);
             struct hlsl_ir_node *new_swizzle;
-            uint32_t s = swizzle->swizzle;
+            uint32_t s;
 
             VKD3D_ASSERT(!matrix_writemask);
 
             if (swizzle->val.node->data_type->class == HLSL_CLASS_MATRIX)
             {
+                struct hlsl_matrix_swizzle ms = swizzle->u.matrix;
+
                 if (swizzle->val.node->type != HLSL_IR_LOAD && swizzle->val.node->type != HLSL_IR_INDEX)
                 {
                     hlsl_fixme(ctx, &lhs->loc, "Unhandled source of matrix swizzle.");
                     return false;
                 }
-                if (!invert_swizzle_matrix(&s, &writemask, &width))
+                if (!invert_swizzle_matrix(&ms, &s, &writemask, &width))
                 {
                     hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask for matrix.");
                     return false;
                 }
                 matrix_writemask = true;
             }
-            else if (!invert_swizzle(&s, &writemask, &width))
+            else
             {
-                hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
-                return false;
+                s = swizzle->u.vector;
+                if (!invert_swizzle(&s, &writemask, &width))
+                {
+                    hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
+                    return false;
+                }
             }
 
             if (!(new_swizzle = hlsl_new_swizzle(ctx, s, width, rhs, &swizzle->node.loc)))

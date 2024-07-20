@@ -1705,7 +1705,7 @@ bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     src = hlsl_ir_constant(swizzle->val.node);
 
     for (i = 0; i < swizzle->node.data_type->dimx; ++i)
-        value.u[i] = src->value.u[hlsl_swizzle_get_component(swizzle->swizzle, i)];
+        value.u[i] = src->value.u[hlsl_swizzle_get_component(swizzle->u.vector, i)];
 
     if (!(dst = hlsl_new_constant(ctx, instr->data_type, &value, &instr->loc)))
         return false;

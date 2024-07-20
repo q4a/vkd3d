@@ -1076,7 +1076,7 @@ static bool lower_matrix_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     struct hlsl_deref var_deref;
     struct hlsl_type *matrix_type;
     struct hlsl_ir_var *var;
-    unsigned int x, y, k, i;
+    unsigned int k, i;
 
     if (instr->type != HLSL_IR_SWIZZLE)
         return false;
@@ -1094,9 +1094,7 @@ static bool lower_matrix_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
         struct hlsl_block store_block;
         struct hlsl_ir_node *load;
 
-        y = (swizzle->swizzle >> (8 * i + 4)) & 0xf;
-        x = (swizzle->swizzle >> 8 * i) & 0xf;
-        k = y * matrix_type->dimx + x;
+        k = swizzle->u.matrix.components[i].y * matrix_type->dimx + swizzle->u.matrix.components[i].x;
 
         if (!(load = hlsl_add_load_component(ctx, block, swizzle->val.node, k, &instr->loc)))
             return false;
@@ -1757,10 +1755,10 @@ static bool copy_propagation_transform_swizzle(struct hlsl_ctx *ctx,
         return false;
     load = hlsl_ir_load(swizzle->val.node);
 
-    if (copy_propagation_replace_with_constant_vector(ctx, state, load, swizzle->swizzle, &swizzle->node))
+    if (copy_propagation_replace_with_constant_vector(ctx, state, load, swizzle->u.vector, &swizzle->node))
         return true;
 
-    if (copy_propagation_replace_with_single_instr(ctx, state, load, swizzle->swizzle, &swizzle->node))
+    if (copy_propagation_replace_with_single_instr(ctx, state, load, swizzle->u.vector, &swizzle->node))
         return true;
 
     return false;
@@ -2442,8 +2440,8 @@ static bool fold_swizzle_chains(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         struct hlsl_ir_node *new_swizzle;
         uint32_t combined_swizzle;
 
-        combined_swizzle = hlsl_combine_swizzles(hlsl_ir_swizzle(next_instr)->swizzle,
-                swizzle->swizzle, instr->data_type->dimx);
+        combined_swizzle = hlsl_combine_swizzles(hlsl_ir_swizzle(next_instr)->u.vector,
+                swizzle->u.vector, instr->data_type->dimx);
         next_instr = hlsl_ir_swizzle(next_instr)->val.node;
 
         if (!(new_swizzle = hlsl_new_swizzle(ctx, combined_swizzle, instr->data_type->dimx, next_instr, &instr->loc)))
@@ -2470,7 +2468,7 @@ static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *i
         return false;
 
     for (i = 0; i < instr->data_type->dimx; ++i)
-        if (hlsl_swizzle_get_component(swizzle->swizzle, i) != i)
+        if (hlsl_swizzle_get_component(swizzle->u.vector, i) != i)
             return false;
 
     hlsl_replace_node(instr, swizzle->val.node);
@@ -7895,7 +7893,7 @@ static void generate_vsir_instr_swizzle(struct hlsl_ctx *ctx,
     dst_param->write_mask = instr->reg.writemask;
 
     swizzle = hlsl_swizzle_from_writemask(val->reg.writemask);
-    swizzle = hlsl_combine_swizzles(swizzle, swizzle_instr->swizzle, instr->data_type->dimx);
+    swizzle = hlsl_combine_swizzles(swizzle, swizzle_instr->u.vector, instr->data_type->dimx);
     swizzle = hlsl_map_swizzle(swizzle, ins->dst[0].write_mask);
     swizzle = vsir_swizzle_from_hlsl(swizzle);
 

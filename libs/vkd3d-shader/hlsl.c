@@ -1854,22 +1854,45 @@ struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct 
     return &store->node;
 }
 
-struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned int components,
+struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned int component_count,
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_swizzle *swizzle;
     struct hlsl_type *type;
 
+    VKD3D_ASSERT(val->data_type->class <= HLSL_CLASS_VECTOR);
+
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
         return NULL;
-    VKD3D_ASSERT(hlsl_is_numeric_type(val->data_type));
-    if (components == 1)
-        type = hlsl_get_scalar_type(ctx, val->data_type->e.numeric.type);
+    if (component_count > 1)
+        type = hlsl_get_vector_type(ctx, val->data_type->e.numeric.type, component_count);
     else
-        type = hlsl_get_vector_type(ctx, val->data_type->e.numeric.type, components);
+        type = hlsl_get_scalar_type(ctx, val->data_type->e.numeric.type);
     init_node(&swizzle->node, HLSL_IR_SWIZZLE, type, loc);
     hlsl_src_from_node(&swizzle->val, val);
-    swizzle->swizzle = s;
+    swizzle->u.vector = s;
+
+    return &swizzle->node;
+}
+
+struct hlsl_ir_node *hlsl_new_matrix_swizzle(struct hlsl_ctx *ctx, struct hlsl_matrix_swizzle s,
+        unsigned int component_count, struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_swizzle *swizzle;
+    struct hlsl_type *type;
+
+    VKD3D_ASSERT(val->data_type->class == HLSL_CLASS_MATRIX);
+
+    if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
+        return NULL;
+    if (component_count > 1)
+        type = hlsl_get_vector_type(ctx, val->data_type->e.numeric.type, component_count);
+    else
+        type = hlsl_get_scalar_type(ctx, val->data_type->e.numeric.type);
+    init_node(&swizzle->node, HLSL_IR_SWIZZLE, type, loc);
+    hlsl_src_from_node(&swizzle->val, val);
+    swizzle->u.matrix = s;
+
     return &swizzle->node;
 }
 
@@ -2331,8 +2354,12 @@ static struct hlsl_ir_node *clone_store(struct hlsl_ctx *ctx, struct clone_instr
 static struct hlsl_ir_node *clone_swizzle(struct hlsl_ctx *ctx,
         struct clone_instr_map *map, struct hlsl_ir_swizzle *src)
 {
-    return hlsl_new_swizzle(ctx, src->swizzle, src->node.data_type->dimx,
-            map_instr(map, src->val.node), &src->node.loc);
+    if (src->val.node->data_type->class == HLSL_CLASS_MATRIX)
+        return hlsl_new_matrix_swizzle(ctx, src->u.matrix, src->node.data_type->dimx,
+                map_instr(map, src->val.node), &src->node.loc);
+    else
+        return hlsl_new_swizzle(ctx, src->u.vector, src->node.data_type->dimx,
+                map_instr(map, src->val.node), &src->node.loc);
 }
 
 static struct hlsl_ir_node *clone_index(struct hlsl_ctx *ctx, struct clone_instr_map *map,
@@ -3412,11 +3439,12 @@ static void dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const struct hls
     {
         vkd3d_string_buffer_printf(buffer, ".");
         for (i = 0; i < swizzle->node.data_type->dimx; ++i)
-            vkd3d_string_buffer_printf(buffer, "_m%u%u", (swizzle->swizzle >> i * 8) & 0xf, (swizzle->swizzle >> (i * 8 + 4)) & 0xf);
+            vkd3d_string_buffer_printf(buffer, "_m%u%u",
+                    swizzle->u.matrix.components[i].y, swizzle->u.matrix.components[i].x);
     }
     else
     {
-        vkd3d_string_buffer_printf(buffer, "%s", debug_hlsl_swizzle(swizzle->swizzle, swizzle->node.data_type->dimx));
+        vkd3d_string_buffer_printf(buffer, "%s", debug_hlsl_swizzle(swizzle->u.vector, swizzle->node.data_type->dimx));
     }
 }
 
