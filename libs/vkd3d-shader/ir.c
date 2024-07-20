@@ -2413,16 +2413,12 @@ static bool get_flat_constant_register_type(const struct vkd3d_shader_register *
     {
         enum vkd3d_shader_register_type type;
         enum vkd3d_shader_d3dbc_constant_register set;
-        uint32_t offset;
     }
     regs[] =
     {
-        {VKD3DSPR_CONST, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 0},
-        {VKD3DSPR_CONST2, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 2048},
-        {VKD3DSPR_CONST3, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 4096},
-        {VKD3DSPR_CONST4, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 6144},
-        {VKD3DSPR_CONSTINT, VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER, 0},
-        {VKD3DSPR_CONSTBOOL, VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER, 0},
+        {VKD3DSPR_CONST, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER},
+        {VKD3DSPR_CONSTINT, VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER},
+        {VKD3DSPR_CONSTBOOL, VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER},
     };
 
     unsigned int i;
@@ -2438,7 +2434,7 @@ static bool get_flat_constant_register_type(const struct vkd3d_shader_register *
             }
 
             *set = regs[i].set;
-            *index = regs[i].offset + reg->idx[0].offset;
+            *index = reg->idx[0].offset;
             return true;
         }
     }

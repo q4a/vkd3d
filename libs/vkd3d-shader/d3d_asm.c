@@ -377,22 +377,6 @@ struct vkd3d_d3d_asm_compiler
     const struct vkd3d_shader_instruction *current;
 };
 
-/* Convert floating point offset relative to a register file to an absolute
- * offset for float constants. */
-static unsigned int shader_get_float_offset(enum vkd3d_shader_register_type register_type, UINT register_idx)
-{
-    switch (register_type)
-    {
-        case VKD3DSPR_CONST: return register_idx;
-        case VKD3DSPR_CONST2: return 2048 + register_idx;
-        case VKD3DSPR_CONST3: return 4096 + register_idx;
-        case VKD3DSPR_CONST4: return 6144 + register_idx;
-        default:
-            FIXME("Unsupported register type: %u.\n", register_type);
-            return register_idx;
-    }
-}
-
 static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler, enum vsir_global_flags global_flags)
 {
     unsigned int i;
@@ -975,11 +959,7 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
             break;
 
         case VKD3DSPR_CONST:
-        case VKD3DSPR_CONST2:
-        case VKD3DSPR_CONST3:
-        case VKD3DSPR_CONST4:
             vkd3d_string_buffer_printf(buffer, "c");
-            offset = shader_get_float_offset(reg->type, offset);
             break;
 
         case VKD3DSPR_TEXTURE: /* vs: case VKD3DSPR_ADDR */
@@ -2132,8 +2112,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
 
         case VKD3DSIH_DEF:
             vkd3d_string_buffer_printf(buffer, " %sc%u%s", compiler->colours.reg,
-                    shader_get_float_offset(ins->dst[0].reg.type, ins->dst[0].reg.idx[0].offset),
-                    compiler->colours.reset);
+                    ins->dst[0].reg.idx[0].offset, compiler->colours.reset);
             shader_print_float_literal(compiler, " = ", ins->src[0].reg.u.immconst_f32[0], "");
             shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_f32[1], "");
             shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_f32[2], "");

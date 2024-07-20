@@ -432,9 +432,6 @@ register_types[] =
     {VKD3D_SM1_REG_COLOROUT,    VKD3DSPR_COLOROUT},
     {VKD3D_SM1_REG_DEPTHOUT,    VKD3DSPR_DEPTHOUT},
     {VKD3D_SM1_REG_SAMPLER,     VKD3DSPR_COMBINED_SAMPLER},
-    {VKD3D_SM1_REG_CONST2,      VKD3DSPR_CONST2},
-    {VKD3D_SM1_REG_CONST3,      VKD3DSPR_CONST3},
-    {VKD3D_SM1_REG_CONST4,      VKD3DSPR_CONST4},
     {VKD3D_SM1_REG_CONSTBOOL,   VKD3DSPR_CONSTBOOL},
     {VKD3D_SM1_REG_LOOP,        VKD3DSPR_LOOP},
     {VKD3D_SM1_REG_TEMPFLOAT16, VKD3DSPR_TEMPFLOAT16},
@@ -515,10 +512,30 @@ static unsigned int idx_count_from_reg_type(enum vkd3d_shader_register_type reg_
     }
 }
 
-static enum vkd3d_shader_register_type parse_register_type(uint32_t param)
+static enum vkd3d_shader_register_type parse_register_type(uint32_t param, unsigned int *index_offset)
 {
     enum vkd3d_sm1_register_type d3dbc_type = ((param & VKD3D_SM1_REGISTER_TYPE_MASK) >> VKD3D_SM1_REGISTER_TYPE_SHIFT)
             | ((param & VKD3D_SM1_REGISTER_TYPE_MASK2) >> VKD3D_SM1_REGISTER_TYPE_SHIFT2);
+
+    *index_offset = 0;
+
+    if (d3dbc_type == VKD3D_SM1_REG_CONST2)
+    {
+        *index_offset = 2048;
+        return VKD3DSPR_CONST;
+    }
+
+    if (d3dbc_type == VKD3D_SM1_REG_CONST3)
+    {
+        *index_offset = 4096;
+        return VKD3DSPR_CONST;
+    }
+
+    if (d3dbc_type == VKD3D_SM1_REG_CONST4)
+    {
+        *index_offset = 6144;
+        return VKD3DSPR_CONST;
+    }
 
     for (unsigned int i = 0; i < ARRAY_SIZE(register_types); ++i)
     {
@@ -532,15 +549,17 @@ static enum vkd3d_shader_register_type parse_register_type(uint32_t param)
 static void shader_sm1_parse_src_param(uint32_t param, struct vkd3d_shader_src_param *rel_addr,
         struct vkd3d_shader_src_param *src)
 {
-    enum vkd3d_shader_register_type reg_type = parse_register_type(param);
-    unsigned int idx_count = idx_count_from_reg_type(reg_type);
+    enum vkd3d_shader_register_type reg_type;
+    unsigned int index_offset, idx_count;
 
+    reg_type = parse_register_type(param, &index_offset);
+    idx_count = idx_count_from_reg_type(reg_type);
     vsir_register_init(&src->reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
     src->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     src->reg.non_uniform = false;
     if (idx_count == 1)
     {
-        src->reg.idx[0].offset = param & VKD3D_SM1_REGISTER_NUMBER_MASK;
+        src->reg.idx[0].offset = index_offset + (param & VKD3D_SM1_REGISTER_NUMBER_MASK);
         src->reg.idx[0].rel_addr = rel_addr;
     }
     if (src->reg.type == VKD3DSPR_SAMPLER)
@@ -556,15 +575,17 @@ static void shader_sm1_parse_src_param(uint32_t param, struct vkd3d_shader_src_p
 static void shader_sm1_parse_dst_param(uint32_t param, struct vkd3d_shader_src_param *rel_addr,
         struct vkd3d_shader_dst_param *dst)
 {
-    enum vkd3d_shader_register_type reg_type = parse_register_type(param);
-    unsigned int idx_count = idx_count_from_reg_type(reg_type);
+    enum vkd3d_shader_register_type reg_type;
+    unsigned int index_offset, idx_count;
 
+    reg_type = parse_register_type(param, &index_offset);
+    idx_count = idx_count_from_reg_type(reg_type);
     vsir_register_init(&dst->reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
     dst->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     dst->reg.non_uniform = false;
     if (idx_count == 1)
     {
-        dst->reg.idx[0].offset = param & VKD3D_SM1_REGISTER_NUMBER_MASK;
+        dst->reg.idx[0].offset = index_offset + (param & VKD3D_SM1_REGISTER_NUMBER_MASK);
         dst->reg.idx[0].rel_addr = rel_addr;
     }
     if (dst->reg.type == VKD3DSPR_SAMPLER)
@@ -907,18 +928,6 @@ static void shader_sm1_scan_register(struct vkd3d_shader_sm1_parser *sm1,
 
         case VKD3DSPR_CONST:
             record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, register_index, from_def);
-            break;
-
-        case VKD3DSPR_CONST2:
-            record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 2048 + register_index, from_def);
-            break;
-
-        case VKD3DSPR_CONST3:
-            record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 4096 + register_index, from_def);
-            break;
-
-        case VKD3DSPR_CONST4:
-            record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 6144 + register_index, from_def);
             break;
 
         case VKD3DSPR_CONSTINT:
@@ -1688,20 +1697,30 @@ static void d3dbc_write_comment(struct d3dbc_compiler *d3dbc,
     set_u32(buffer, offset, vkd3d_make_u32(VKD3D_SM1_OP_COMMENT, (end - start) / sizeof(uint32_t)));
 }
 
-static enum vkd3d_sm1_register_type d3dbc_register_type_from_vsir(enum vkd3d_shader_register_type type)
+static enum vkd3d_sm1_register_type d3dbc_register_type_from_vsir(const struct vkd3d_shader_register *reg)
 {
+    if (reg->type == VKD3DSPR_CONST)
+    {
+        if (reg->idx[0].offset >= 6144)
+            return VKD3D_SM1_REG_CONST4;
+        if (reg->idx[0].offset >= 4096)
+            return VKD3D_SM1_REG_CONST3;
+        if (reg->idx[0].offset >= 2048)
+            return VKD3D_SM1_REG_CONST2;
+    }
+
     for (unsigned int i = 0; i < ARRAY_SIZE(register_types); ++i)
     {
-        if (register_types[i].vsir_type == type)
+        if (register_types[i].vsir_type == reg->type)
             return register_types[i].d3dbc_type;
     }
 
     vkd3d_unreachable();
 }
 
-static uint32_t sm1_encode_register_type(enum vkd3d_shader_register_type type)
+static uint32_t sm1_encode_register_type(const struct vkd3d_shader_register *reg)
 {
-    enum vkd3d_sm1_register_type sm1_type = d3dbc_register_type_from_vsir(type);
+    enum vkd3d_sm1_register_type sm1_type = d3dbc_register_type_from_vsir(reg);
 
     return ((sm1_type << VKD3D_SM1_REGISTER_TYPE_SHIFT) & VKD3D_SM1_REGISTER_TYPE_MASK)
             | ((sm1_type << VKD3D_SM1_REGISTER_TYPE_SHIFT2) & VKD3D_SM1_REGISTER_TYPE_MASK2);
@@ -1753,17 +1772,19 @@ static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const s
 {
     VKD3D_ASSERT(reg->write_mask);
     put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
-            | sm1_encode_register_type(reg->reg.type)
+            | sm1_encode_register_type(&reg->reg)
             | (reg->modifiers << VKD3D_SM1_DST_MODIFIER_SHIFT)
-            | (reg->write_mask << VKD3D_SM1_WRITEMASK_SHIFT) | reg->reg.idx[0].offset);
+            | (reg->write_mask << VKD3D_SM1_WRITEMASK_SHIFT)
+            | (reg->reg.idx[0].offset & VKD3D_SM1_REGISTER_NUMBER_MASK));
 }
 
 static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer, const struct vkd3d_shader_src_param *reg)
 {
     put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
-            | sm1_encode_register_type(reg->reg.type)
+            | sm1_encode_register_type(&reg->reg)
             | (reg->modifiers << VKD3D_SM1_SRC_MODIFIER_SHIFT)
-            | (swizzle_from_vsir(reg->swizzle) << VKD3D_SM1_SWIZZLE_SHIFT) | reg->reg.idx[0].offset);
+            | (swizzle_from_vsir(reg->swizzle) << VKD3D_SM1_SWIZZLE_SHIFT)
+            | (reg->reg.idx[0].offset & VKD3D_SM1_REGISTER_NUMBER_MASK));
 }
 
 static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
