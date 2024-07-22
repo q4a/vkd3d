@@ -4259,6 +4259,7 @@ struct hlsl_ir_function_decl *hlsl_compile_internal_function(struct hlsl_ctx *ct
     /* Save and restore everything that matters.
      * Note that saving the scope stack is hard, and shouldn't be necessary. */
 
+    hlsl_push_scope(ctx);
     ctx->scanner = NULL;
     ctx->internal_func_name = internal_name->buffer;
     ctx->cur_function = NULL;
@@ -4266,6 +4267,7 @@ struct hlsl_ir_function_decl *hlsl_compile_internal_function(struct hlsl_ctx *ct
     ctx->scanner = saved_scanner;
     ctx->internal_func_name = saved_internal_func_name;
     ctx->cur_function = saved_cur_function;
+    hlsl_pop_scope(ctx);
     if (ret)
     {
         ERR("Failed to compile intrinsic, error %u.\n", ret);
