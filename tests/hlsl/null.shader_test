@@ -34,7 +34,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader todo]
+[pixel shader]
 SamplerState s
 {
     UnknownField = NULL;
@@ -52,7 +52,7 @@ float4 main() : sv_target
 [require]
 shader model >= 4.0
 
-[pixel shader fail(sm>=6) todo]
+[pixel shader fail(sm>=6)]
 Texture2DMS<float4> t = NULL;
 
 RWTexture1D<float4> u1 = NULL;
@@ -72,7 +72,7 @@ float4 main() : sv_target
 [require]
 shader model >= 5.0
 
-[pixel shader fail(sm>=6) todo]
+[pixel shader fail(sm>=6)]
 RasterizerOrderedTexture2D<uint4> t1 = NULL;
 
 float4 main() : sv_target

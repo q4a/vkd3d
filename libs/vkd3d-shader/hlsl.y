@@ -304,6 +304,26 @@ static bool implicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_typ
         }
     }
 
+    if (src->class == HLSL_CLASS_NULL)
+    {
+        switch (dst->class)
+        {
+            case HLSL_CLASS_DEPTH_STENCIL_STATE:
+            case HLSL_CLASS_DEPTH_STENCIL_VIEW:
+            case HLSL_CLASS_PIXEL_SHADER:
+            case HLSL_CLASS_RASTERIZER_STATE:
+            case HLSL_CLASS_RENDER_TARGET_VIEW:
+            case HLSL_CLASS_SAMPLER:
+            case HLSL_CLASS_STRING:
+            case HLSL_CLASS_TEXTURE:
+            case HLSL_CLASS_UAV:
+            case HLSL_CLASS_VERTEX_SHADER:
+                return true;
+            default:
+                break;
+        }
+    }
+
     return hlsl_types_are_componentwise_equal(ctx, src, dst);
 }
 
@@ -329,6 +349,9 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct hlsl_block *bl
     struct hlsl_ir_node *cast;
 
     if (hlsl_types_are_equal(src_type, dst_type))
+        return node;
+
+    if (src_type->class == HLSL_CLASS_NULL)
         return node;
 
     if (src_type->class > HLSL_CLASS_VECTOR || dst_type->class > HLSL_CLASS_VECTOR)
@@ -6050,6 +6073,7 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %token KW_NAMESPACE
 %token KW_NOINTERPOLATION
 %token KW_NOPERSPECTIVE
+%token KW_NULL
 %token KW_OUT
 %token KW_PACKOFFSET
 %token KW_PASS
@@ -8315,6 +8339,18 @@ primary_expr:
             }
             vkd3d_free($1);
 
+            if (!($$ = make_block(ctx, c)))
+            {
+                hlsl_free_instr(c);
+                YYABORT;
+            }
+        }
+    | KW_NULL
+        {
+            struct hlsl_ir_node *c;
+
+            if (!(c = hlsl_new_null_constant(ctx, &@1)))
+                YYABORT;
             if (!($$ = make_block(ctx, c)))
             {
                 hlsl_free_instr(c);
