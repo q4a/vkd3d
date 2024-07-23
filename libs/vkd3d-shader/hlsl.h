@@ -1001,6 +1001,8 @@ struct hlsl_ctx
         } *regs;
         size_t count, size;
     } constant_defs;
+    /* 'c' registers where the constants expected by SM2 sincos are stored. */
+    struct hlsl_reg d3dsincosconst1, d3dsincosconst2;
     /* Number of temp. registers required for the shader to run, i.e. the largest temp register
      *   index that will be used in the output bytecode (+1). */
     uint32_t temp_count;

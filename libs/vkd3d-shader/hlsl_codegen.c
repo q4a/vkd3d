@@ -4845,6 +4845,43 @@ static void sort_uniforms_by_numeric_bind_count(struct hlsl_ctx *ctx)
     list_move_tail(&ctx->extern_vars, &sorted);
 }
 
+/* In SM2, 'sincos' expects specific constants as src1 and src2 arguments.
+ * These have to be referenced directly, i.e. as 'c' not 'r'. */
+static void allocate_sincos_const_registers(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct register_allocator *allocator)
+{
+    const struct hlsl_ir_node *instr;
+    struct hlsl_type *type;
+
+    if (ctx->profile->major_version >= 3)
+        return;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_EXPR && (hlsl_ir_expr(instr)->op == HLSL_OP1_SIN_REDUCED
+                || hlsl_ir_expr(instr)->op == HLSL_OP1_COS_REDUCED))
+        {
+            type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
+
+            ctx->d3dsincosconst1 = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
+            TRACE("Allocated D3DSINCOSCONST1 to %s.\n", debug_register('c', ctx->d3dsincosconst1, type));
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 0, -1.55009923e-06f);
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 1, -2.17013894e-05f);
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 2,  2.60416674e-03f);
+            record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 3,  2.60416680e-04f);
+
+            ctx->d3dsincosconst2 = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
+            TRACE("Allocated D3DSINCOSCONST2 to %s.\n", debug_register('c', ctx->d3dsincosconst2, type));
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 0, -2.08333340e-02f);
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 1, -1.25000000e-01f);
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 2,  1.00000000e+00f);
+            record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 3,  5.00000000e-01f);
+
+            return;
+        }
+    }
+}
+
 static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct register_allocator allocator_used = {0};
@@ -4908,6 +4945,8 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     }
 
     allocate_const_registers_recurse(ctx, &entry_func->body, &allocator);
+
+    allocate_sincos_const_registers(ctx, &entry_func->body, &allocator);
 
     vkd3d_free(allocator.allocations);
 }
