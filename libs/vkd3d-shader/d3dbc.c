@@ -2326,6 +2326,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_MIN:
         case VKD3DSIH_MOV:
         case VKD3DSIH_MUL:
+        case VKD3DSIH_SINCOS:
         case VKD3DSIH_SLT:
             d3dbc_write_vsir_simple_instruction(d3dbc, ins);
             break;
@@ -2420,45 +2421,6 @@ static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
     }
 }
 
-static void d3dbc_write_sincos(struct d3dbc_compiler *d3dbc, enum hlsl_ir_expr_op op,
-        const struct hlsl_reg *dst, const struct hlsl_reg *src)
-{
-    struct sm1_instruction instr =
-    {
-        .opcode = VKD3D_SM1_OP_SINCOS,
-
-        .dst.type = VKD3DSPR_TEMP,
-        .dst.writemask = dst->writemask,
-        .dst.reg = dst->id,
-        .has_dst = 1,
-
-        .srcs[0].type = VKD3DSPR_TEMP,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(src->writemask),
-        .srcs[0].reg = src->id,
-        .src_count = 1,
-    };
-
-    if (op == HLSL_OP1_COS_REDUCED)
-        VKD3D_ASSERT(dst->writemask == VKD3DSP_WRITEMASK_0);
-    else /* HLSL_OP1_SIN_REDUCED */
-        VKD3D_ASSERT(dst->writemask == VKD3DSP_WRITEMASK_1);
-
-    if (d3dbc->ctx->profile->major_version < 3)
-    {
-        instr.src_count = 3;
-
-        instr.srcs[1].type = VKD3DSPR_CONST;
-        instr.srcs[1].swizzle = hlsl_swizzle_from_writemask(VKD3DSP_WRITEMASK_ALL);
-        instr.srcs[1].reg = d3dbc->ctx->d3dsincosconst1.id;
-
-        instr.srcs[2].type = VKD3DSPR_CONST;
-        instr.srcs[2].swizzle = hlsl_swizzle_from_writemask(VKD3DSP_WRITEMASK_ALL);
-        instr.srcs[2].reg = d3dbc->ctx->d3dsincosconst2.id;
-    }
-
-    d3dbc_write_instruction(d3dbc, &instr);
-}
-
 static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_node *instr)
 {
     struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
@@ -2490,11 +2452,6 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP1_COS_REDUCED:
-        case HLSL_OP1_SIN_REDUCED:
-            d3dbc_write_sincos(d3dbc, expr->op, &instr->reg, &arg1->reg);
-            break;
-
         case HLSL_OP3_DP2ADD:
             d3dbc_write_dp2add(d3dbc, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
             break;
