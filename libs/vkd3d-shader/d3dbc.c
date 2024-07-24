@@ -2767,12 +2767,6 @@ static void d3dbc_write_store(struct d3dbc_compiler *d3dbc, const struct hlsl_ir
         .src_count = 1,
     };
 
-    if (store->lhs.var->data_type->class == HLSL_CLASS_MATRIX)
-    {
-        hlsl_fixme(ctx, &instr->loc, "Lower matrix writemasks.");
-        return;
-    }
-
     if (store->lhs.var->is_output_semantic)
     {
         if (version->type == VKD3D_SHADER_TYPE_PIXEL && version->major == 1)
