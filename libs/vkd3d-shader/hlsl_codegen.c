@@ -2633,8 +2633,9 @@ static bool validate_nonconstant_vector_store_derefs(struct hlsl_ctx *ctx, struc
     return false;
 }
 
-/* This pass flattens array loads that include the indexing of a non-constant index into multiple
- * constant loads, where the value of only one of them ends up in the resulting node.
+/* This pass flattens array (and row_major matrix) loads that include the indexing of a non-constant
+ * index into multiple constant loads, where the value of only one of them ends up in the resulting
+ * node.
  * This is achieved through a synthetic variable. The non-constant index is compared for equality
  * with every possible value it can have within the array bounds, and the ternary operator is used
  * to update the value of the synthetic var when the equality check passes. */
@@ -2643,11 +2644,12 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
 {
     struct hlsl_constant_value zero_value = {0};
     struct hlsl_ir_node *cut_index, *zero, *store;
+    unsigned int i, i_cut, element_count;
     const struct hlsl_deref *deref;
     struct hlsl_type *cut_type;
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
-    unsigned int i, i_cut;
+    bool row_major;
 
     if (instr->type != HLSL_IR_LOAD)
         return false;
@@ -2674,13 +2676,10 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
     for (i = 0; i < i_cut; ++i)
         cut_type = hlsl_get_element_type_from_path_index(ctx, cut_type, deref->path[i].node);
 
-    if (cut_type->class != HLSL_CLASS_ARRAY)
-    {
-        VKD3D_ASSERT(hlsl_type_is_row_major(cut_type));
-        return false;
-    }
+    row_major = hlsl_type_is_row_major(cut_type);
+    VKD3D_ASSERT(cut_type->class == HLSL_CLASS_ARRAY || row_major);
 
-    if (!(var = hlsl_new_synthetic_var(ctx, "array_load", instr->data_type, &instr->loc)))
+    if (!(var = hlsl_new_synthetic_var(ctx, row_major ? "row_major-load" : "array-load", instr->data_type, &instr->loc)))
         return false;
 
     if (!(zero = hlsl_new_constant(ctx, instr->data_type, &zero_value, &instr->loc)))
@@ -2691,8 +2690,10 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
         return false;
     hlsl_block_add_instr(block, store);
 
-    TRACE("Lowering non-constant array load on variable '%s'.\n", deref->var->name);
-    for (i = 0; i < cut_type->e.array.elements_count; ++i)
+    TRACE("Lowering non-constant %s load on variable '%s'.\n", row_major ? "row_major" : "array", deref->var->name);
+
+    element_count = hlsl_type_element_count(cut_type);
+    for (i = 0; i < element_count; ++i)
     {
         struct hlsl_type *btype = hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL);
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
