@@ -2736,6 +2736,7 @@ static void test_create_root_signature(void)
 {
     ID3D12RootSignature *root_signature, *root_signature2;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    D3D12_STATIC_SAMPLER_DESC static_samplers[1];
     D3D12_DESCRIPTOR_RANGE descriptor_ranges[2];
     D3D12_RESOURCE_BINDING_TIER binding_tier;
     D3D12_ROOT_PARAMETER root_parameters[3];
@@ -2955,6 +2956,86 @@ static void test_create_root_signature(void)
     ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
     refcount = ID3D12RootSignature_Release(root_signature);
     ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
+
+    /* Register conflicts. */
+
+    /* Between two ranges in the same root table. */
+    descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptor_ranges[0].NumDescriptors = 1;
+    descriptor_ranges[0].BaseShaderRegister = 0;
+    descriptor_ranges[0].RegisterSpace = 0;
+    descriptor_ranges[0].OffsetInDescriptorsFromTableStart = 0;
+    descriptor_ranges[1] = descriptor_ranges[0];
+    root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    root_parameters[0].DescriptorTable.NumDescriptorRanges = 2;
+    root_parameters[0].DescriptorTable.pDescriptorRanges = descriptor_ranges;
+    root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    root_signature_desc.NumParameters = 1;
+    root_signature_desc.pParameters = root_parameters;
+    root_signature_desc.NumStaticSamplers = 0;
+    root_signature_desc.pStaticSamplers = NULL;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    /* Between two different root tables. */
+    root_parameters[0].DescriptorTable.NumDescriptorRanges = 1;
+    root_parameters[1] = root_parameters[0];
+    root_parameters[1].DescriptorTable.pDescriptorRanges = &descriptor_ranges[1];
+    root_signature_desc.NumParameters = 2;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
+
+    /* Between a root table and a root descriptor. */
+    root_parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    root_parameters[1].Descriptor.RegisterSpace = 0;
+    root_parameters[1].Descriptor.ShaderRegister = 0;
+    root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
+
+    /* Between a root table and a root constant. */
+    descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+    root_parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    root_parameters[1].Constants.RegisterSpace = 0;
+    root_parameters[1].Constants.ShaderRegister = 0;
+    root_parameters[1].Constants.Num32BitValues = 1;
+    root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
+
+    /* Between a root table and a static sampler. */
+    descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    static_samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    static_samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    static_samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    static_samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    static_samplers[0].MipLODBias = 0.0f;
+    static_samplers[0].MaxAnisotropy = 1;
+    static_samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    static_samplers[0].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK;
+    static_samplers[0].MinLOD = 0.0f;
+    static_samplers[0].MaxLOD = 10.0f;
+    static_samplers[0].ShaderRegister = 0;
+    static_samplers[0].RegisterSpace = 0;
+    static_samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    root_signature_desc.NumParameters = 1;
+    root_signature_desc.NumStaticSamplers = 1;
+    root_signature_desc.pStaticSamplers = static_samplers;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
 
     /* Unbounded descriptor ranges. */
 
