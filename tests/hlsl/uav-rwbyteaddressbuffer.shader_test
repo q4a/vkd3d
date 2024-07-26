@@ -24,6 +24,10 @@ if(sm<6) probe uav 1 (1) ri (11)
 if(sm>=6) probe uav 1 (1) r (11.1)
 
 
+[require]
+shader model >= 5.0
+float64
+
 [pixel shader todo]
 RWByteAddressBuffer u : register(u1);
 
@@ -42,6 +46,7 @@ if(sm>=6) probe uav 1 (0) rd (12.2)
 % SM 6 add support for templated Store<>().
 [require]
 shader model >= 6.0
+float64
 
 [pixel shader]
 RWByteAddressBuffer u : register(u1);
