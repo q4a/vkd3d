@@ -122,6 +122,7 @@ VKD3D_NORETURN static inline void vkd3d_unreachable_(const char *filename, unsig
 #ifdef VKD3D_NO_DEBUG_MESSAGES
 #define WARN(args...) do { } while (0)
 #define FIXME(args...) do { } while (0)
+#define WARN_ON() (false)
 #endif
 
 enum vkd3d_dbg_level
