@@ -123,6 +123,7 @@ VKD3D_NORETURN static inline void vkd3d_unreachable_(const char *filename, unsig
 #define WARN(args...) do { } while (0)
 #define FIXME(args...) do { } while (0)
 #define WARN_ON() (false)
+#define FIXME_ONCE(args...) do { } while (0)
 #endif
 
 enum vkd3d_dbg_level
@@ -183,7 +184,9 @@ const char *debugstr_w(const WCHAR *wstr, size_t wchar_size);
 #define WARN_ON() (vkd3d_dbg_get_level() >= VKD3D_DBG_LEVEL_WARN)
 #endif
 
+#ifndef FIXME_ONCE
 #define FIXME_ONCE VKD3D_DBG_LOG_ONCE(FIXME, WARN)
+#endif
 
 #define VKD3D_DEBUG_ENV_NAME(name) const char *const vkd3d_dbg_env_name = name
 
