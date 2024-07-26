@@ -3078,7 +3078,7 @@ done:
     vkd3d_free(vk_descriptor_writes);
 }
 
-static void d3d12_command_list_update_descriptors(struct d3d12_command_list *list,
+static void d3d12_command_list_update_virtual_descriptors(struct d3d12_command_list *list,
         enum vkd3d_pipeline_bind_point bind_point)
 {
     struct vkd3d_pipeline_bindings *bindings = &list->pipeline_bindings[bind_point];
@@ -3296,6 +3296,15 @@ static void d3d12_command_list_update_heap_descriptors(struct d3d12_command_list
     d3d12_command_list_bind_descriptor_heap(list, bind_point, sampler_heap);
 }
 
+static void d3d12_command_list_update_descriptors(struct d3d12_command_list *list,
+        enum vkd3d_pipeline_bind_point bind_point)
+{
+    if (list->device->use_vk_heaps)
+        d3d12_command_list_update_heap_descriptors(list, bind_point);
+    else
+        d3d12_command_list_update_virtual_descriptors(list, bind_point);
+}
+
 static bool d3d12_command_list_update_compute_state(struct d3d12_command_list *list)
 {
     d3d12_command_list_end_current_render_pass(list);
@@ -3303,7 +3312,7 @@ static bool d3d12_command_list_update_compute_state(struct d3d12_command_list *l
     if (!d3d12_command_list_update_compute_pipeline(list))
         return false;
 
-    list->update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE);
+    d3d12_command_list_update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE);
 
     return true;
 }
@@ -3320,7 +3329,7 @@ static bool d3d12_command_list_begin_render_pass(struct d3d12_command_list *list
     if (!d3d12_command_list_update_current_framebuffer(list))
         return false;
 
-    list->update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS);
+    d3d12_command_list_update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS);
 
     if (list->current_render_pass != VK_NULL_HANDLE)
         return true;
@@ -6189,8 +6198,6 @@ static HRESULT d3d12_command_list_init(struct d3d12_command_list *list, struct d
 
     list->allocator = allocator;
 
-    list->update_descriptors = device->use_vk_heaps ? d3d12_command_list_update_heap_descriptors
-            : d3d12_command_list_update_descriptors;
     list->descriptor_heap_count = 0;
 
     if (SUCCEEDED(hr = d3d12_command_allocator_allocate_command_buffer(allocator, list)))
