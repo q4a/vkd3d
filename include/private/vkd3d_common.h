@@ -108,17 +108,11 @@ static inline uint64_t align(uint64_t addr, size_t alignment)
 # define VKD3D_UNREACHABLE (void)0
 #endif  /* __GNUC__ */
 
-VKD3D_NORETURN static inline void vkd3d_unreachable_(const char *filename, unsigned int line)
-{
-    fprintf(stderr, "%s:%u: Aborting, reached unreachable code.\n", filename, line);
-    abort();
-}
-
-#ifdef NDEBUG
-#define vkd3d_unreachable() VKD3D_UNREACHABLE
-#else
-#define vkd3d_unreachable() vkd3d_unreachable_(__FILE__, __LINE__)
-#endif
+#define vkd3d_unreachable() \
+        do { \
+            ERR("%s:%u: Unreachable code reached.\n", __FILE__, __LINE__); \
+            VKD3D_UNREACHABLE; \
+        } while (0)
 
 #ifdef VKD3D_NO_TRACE_MESSAGES
 #define TRACE(args...) do { } while (0)
@@ -186,6 +180,12 @@ const char *debugstr_w(const WCHAR *wstr, size_t wchar_size);
         } while (0)
 #else
 #define VKD3D_DBG_PRINTF_ERR(...) VKD3D_DBG_PRINTF(__VA_ARGS__)
+#endif
+
+/* Used by vkd3d_unreachable(). */
+#ifdef VKD3D_CROSSTEST
+#undef ERR
+#define ERR(...) do { fprintf(stderr, __VA_ARGS__); abort(); } while (0)
 #endif
 
 #ifndef TRACE
