@@ -105,8 +105,6 @@ void vkd3d_dbg_printf(enum vkd3d_dbg_level level, const char *function, const ch
     if (vkd3d_dbg_get_level() < level)
         return;
 
-    assert(level < ARRAY_SIZE(debug_level_names));
-
 #ifdef _WIN32
     vkd3d_dbg_output("vkd3d:%04lx:%s:%s ", GetCurrentThreadId(), debug_level_names[level], function);
 #elif HAVE_GETTID
