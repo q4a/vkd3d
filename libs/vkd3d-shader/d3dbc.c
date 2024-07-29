@@ -757,7 +757,7 @@ static void record_constant_register(struct vkd3d_shader_sm1_parser *sm1,
     {
         /* d3d shaders have a maximum of 8192 constants; we should not overrun
          * this array. */
-        assert((index / 32) <= ARRAY_SIZE(sm1->constants[set].def_mask));
+        VKD3D_ASSERT((index / 32) <= ARRAY_SIZE(sm1->constants[set].def_mask));
         bitmap_set(sm1->constants[set].def_mask, index);
     }
 }
@@ -1492,7 +1492,7 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
         case HLSL_CLASS_ARRAY:
             return hlsl_sm1_class(type->e.array.type);
         case HLSL_CLASS_MATRIX:
-            assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
+            VKD3D_ASSERT(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
             if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
                 return D3DXPC_MATRIX_COLUMNS;
             else
@@ -1910,7 +1910,7 @@ static bool is_inconsequential_instr(const struct sm1_instruction *instr)
 
 static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const struct sm1_dst_register *reg)
 {
-    assert(reg->writemask);
+    VKD3D_ASSERT(reg->writemask);
     put_u32(buffer, (1u << 31) | sm1_encode_register_type(reg->type) | reg->mod | (reg->writemask << 16) | reg->reg);
 }
 
@@ -2090,7 +2090,7 @@ static void d3dbc_write_cast(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
     struct hlsl_ctx *ctx = d3dbc->ctx;
 
     /* Narrowing casts were already lowered. */
-    assert(src_type->dimx == dst_type->dimx);
+    VKD3D_ASSERT(src_type->dimx == dst_type->dimx);
 
     switch (dst_type->e.numeric.type)
     {
@@ -2204,7 +2204,7 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
     else
     {
         ret = hlsl_sm1_usage_from_semantic(element->semantic_name, element->semantic_index, &usage, &usage_idx);
-        assert(ret);
+        VKD3D_ASSERT(ret);
         reg.type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
         reg.reg = element->register_index;
     }
@@ -2348,8 +2348,8 @@ static void d3dbc_write_constant(struct d3dbc_compiler *d3dbc, const struct hlsl
         .src_count = 1,
     };
 
-    assert(instr->reg.allocated);
-    assert(constant->reg.allocated);
+    VKD3D_ASSERT(instr->reg.allocated);
+    VKD3D_ASSERT(constant->reg.allocated);
     sm1_map_src_swizzle(&sm1_instr.srcs[0], sm1_instr.dst.writemask);
     d3dbc_write_instruction(d3dbc, &sm1_instr);
 }
@@ -2375,9 +2375,9 @@ static void d3dbc_write_sincos(struct d3dbc_compiler *d3dbc, enum hlsl_ir_expr_o
         const struct hlsl_reg *dst, const struct hlsl_reg *src)
 {
     if (op == HLSL_OP1_COS_REDUCED)
-        assert(dst->writemask == VKD3DSP_WRITEMASK_0);
+        VKD3D_ASSERT(dst->writemask == VKD3DSP_WRITEMASK_0);
     else /* HLSL_OP1_SIN_REDUCED */
-        assert(dst->writemask == VKD3DSP_WRITEMASK_1);
+        VKD3D_ASSERT(dst->writemask == VKD3DSP_WRITEMASK_1);
 
     d3dbc_write_unary_op(d3dbc, D3DSIO_SINCOS, dst, src, 0, 0);
 }
@@ -2391,7 +2391,7 @@ static void d3dbc_write_expr(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
     struct hlsl_ir_node *arg3 = expr->operands[2].node;
     struct hlsl_ctx *ctx = d3dbc->ctx;
 
-    assert(instr->reg.allocated);
+    VKD3D_ASSERT(instr->reg.allocated);
 
     if (expr->op == HLSL_OP1_REINTERPRET)
     {
@@ -2534,7 +2534,7 @@ static void d3dbc_write_if(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_no
     struct sm1_instruction sm1_ifc, sm1_else, sm1_endif;
 
     condition = iff->condition.node;
-    assert(condition->data_type->dimx == 1 && condition->data_type->dimy == 1);
+    VKD3D_ASSERT(condition->data_type->dimx == 1 && condition->data_type->dimy == 1);
 
     sm1_ifc = (struct sm1_instruction)
     {
@@ -2616,11 +2616,11 @@ static void d3dbc_write_load(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
         .src_count = 1,
     };
 
-    assert(instr->reg.allocated);
+    VKD3D_ASSERT(instr->reg.allocated);
 
     if (load->src.var->is_uniform)
     {
-        assert(reg.allocated);
+        VKD3D_ASSERT(reg.allocated);
         sm1_instr.srcs[0].type = VKD3DSPR_CONST;
     }
     else if (load->src.var->is_input_semantic)
@@ -2628,7 +2628,7 @@ static void d3dbc_write_load(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_
         if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, load->src.var->semantic.name,
                 load->src.var->semantic.index, false, &sm1_instr.srcs[0].type, &sm1_instr.srcs[0].reg))
         {
-            assert(reg.allocated);
+            VKD3D_ASSERT(reg.allocated);
             sm1_instr.srcs[0].type = VKD3DSPR_INPUT;
             sm1_instr.srcs[0].reg = reg.id;
         }
@@ -2706,7 +2706,7 @@ static void d3dbc_write_resource_load(struct d3dbc_compiler *d3dbc, const struct
             return;
     }
 
-    assert(instr->reg.allocated);
+    VKD3D_ASSERT(instr->reg.allocated);
 
     d3dbc_write_instruction(d3dbc, &sm1_instr);
 }
@@ -2749,7 +2749,7 @@ static void d3dbc_write_store(struct d3dbc_compiler *d3dbc, const struct hlsl_ir
         else if (!hlsl_sm1_register_from_semantic(&d3dbc->program->shader_version, store->lhs.var->semantic.name,
                 store->lhs.var->semantic.index, true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
         {
-            assert(reg.allocated);
+            VKD3D_ASSERT(reg.allocated);
             sm1_instr.dst.type = VKD3DSPR_OUTPUT;
             sm1_instr.dst.reg = reg.id;
         }
@@ -2757,7 +2757,7 @@ static void d3dbc_write_store(struct d3dbc_compiler *d3dbc, const struct hlsl_ir
             sm1_instr.dst.writemask = (1u << store->lhs.var->data_type->dimx) - 1;
     }
     else
-        assert(reg.allocated);
+        VKD3D_ASSERT(reg.allocated);
 
     sm1_map_src_swizzle(&sm1_instr.srcs[0], sm1_instr.dst.writemask);
     d3dbc_write_instruction(d3dbc, &sm1_instr);
@@ -2783,8 +2783,8 @@ static void d3dbc_write_swizzle(struct d3dbc_compiler *d3dbc, const struct hlsl_
         .src_count = 1,
     };
 
-    assert(instr->reg.allocated);
-    assert(val->reg.allocated);
+    VKD3D_ASSERT(instr->reg.allocated);
+    VKD3D_ASSERT(val->reg.allocated);
     sm1_map_src_swizzle(&sm1_instr.srcs[0], sm1_instr.dst.writemask);
     d3dbc_write_instruction(d3dbc, &sm1_instr);
 }
