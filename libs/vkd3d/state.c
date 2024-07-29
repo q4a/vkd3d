@@ -194,7 +194,7 @@ struct d3d12_root_signature *unsafe_impl_from_ID3D12RootSignature(ID3D12RootSign
 {
     if (!iface)
         return NULL;
-    assert(iface->lpVtbl == &d3d12_root_signature_vtbl);
+    VKD3D_ASSERT(iface->lpVtbl == &d3d12_root_signature_vtbl);
     return impl_from_ID3D12RootSignature(iface);
 }
 
@@ -512,7 +512,7 @@ static HRESULT d3d12_root_signature_init_push_constants(struct d3d12_root_signat
         if (p->ParameterType != D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS)
             continue;
 
-        assert(p->ShaderVisibility <= D3D12_SHADER_VISIBILITY_PIXEL);
+        VKD3D_ASSERT(p->ShaderVisibility <= D3D12_SHADER_VISIBILITY_PIXEL);
         push_constants[p->ShaderVisibility].stageFlags = use_vk_heaps ? VK_SHADER_STAGE_ALL
                 : stage_flags_from_visibility(p->ShaderVisibility);
         push_constants[p->ShaderVisibility].size += align(p->u.Constants.Num32BitValues, 4) * sizeof(uint32_t);
@@ -1226,7 +1226,7 @@ static HRESULT d3d12_root_signature_init_static_samplers(struct d3d12_root_signa
     unsigned int i;
     HRESULT hr;
 
-    assert(root_signature->static_sampler_count == desc->NumStaticSamplers);
+    VKD3D_ASSERT(root_signature->static_sampler_count == desc->NumStaticSamplers);
     for (i = 0; i < desc->NumStaticSamplers; ++i)
     {
         const D3D12_STATIC_SAMPLER_DESC *s = &desc->pStaticSamplers[i];
@@ -1612,7 +1612,7 @@ static HRESULT vkd3d_render_pass_cache_create_pass_locked(struct vkd3d_render_pa
 
     have_depth_stencil = key->depth_enable || key->stencil_enable;
     rt_count = have_depth_stencil ? key->attachment_count - 1 : key->attachment_count;
-    assert(rt_count <= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT);
+    VKD3D_ASSERT(rt_count <= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT);
 
     for (index = 0, attachment_index = 0; index < rt_count; ++index)
     {
@@ -2152,7 +2152,7 @@ struct d3d12_pipeline_state *unsafe_impl_from_ID3D12PipelineState(ID3D12Pipeline
 {
     if (!iface)
         return NULL;
-    assert(iface->lpVtbl == &d3d12_pipeline_state_vtbl);
+    VKD3D_ASSERT(iface->lpVtbl == &d3d12_pipeline_state_vtbl);
     return impl_from_ID3D12PipelineState(iface);
 }
 
@@ -2308,7 +2308,7 @@ static HRESULT d3d12_pipeline_state_init_uav_counters(struct d3d12_pipeline_stat
     unsigned int i, j;
     HRESULT hr;
 
-    assert(vkd3d_popcount(stage_flags) == 1);
+    VKD3D_ASSERT(vkd3d_popcount(stage_flags) == 1);
 
     for (i = 0; i < shader_info->descriptor_count; ++i)
     {
@@ -2923,7 +2923,7 @@ static HRESULT d3d12_graphics_pipeline_state_create_render_pass(
 
     if (dsv_format)
     {
-        assert(graphics->ds_desc.front.writeMask == graphics->ds_desc.back.writeMask);
+        VKD3D_ASSERT(graphics->ds_desc.front.writeMask == graphics->ds_desc.back.writeMask);
         key.depth_enable = graphics->ds_desc.depthTestEnable;
         key.stencil_enable = graphics->ds_desc.stencilTestEnable;
         key.depth_stencil_write = graphics->ds_desc.depthWriteEnable
@@ -2940,7 +2940,7 @@ static HRESULT d3d12_graphics_pipeline_state_create_render_pass(
     if (key.attachment_count != ARRAY_SIZE(key.vk_formats))
         key.vk_formats[ARRAY_SIZE(key.vk_formats) - 1] = VK_FORMAT_UNDEFINED;
     for (i = key.attachment_count; i < ARRAY_SIZE(key.vk_formats); ++i)
-        assert(key.vk_formats[i] == VK_FORMAT_UNDEFINED);
+        VKD3D_ASSERT(key.vk_formats[i] == VK_FORMAT_UNDEFINED);
 
     key.padding = 0;
     key.sample_count = graphics->ms_desc.rasterizationSamples;
@@ -3488,7 +3488,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     graphics->ms_desc.pSampleMask = NULL;
     if (desc->sample_mask != ~0u)
     {
-        assert(DIV_ROUND_UP(sample_count, 32) <= ARRAY_SIZE(graphics->sample_mask));
+        VKD3D_ASSERT(DIV_ROUND_UP(sample_count, 32) <= ARRAY_SIZE(graphics->sample_mask));
         graphics->sample_mask[0] = desc->sample_mask;
         graphics->sample_mask[1] = 0xffffffffu;
         graphics->ms_desc.pSampleMask = graphics->sample_mask;
@@ -3781,7 +3781,7 @@ VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_sta
         .pDynamicStates = dynamic_states,
     };
 
-    assert(d3d12_pipeline_state_is_graphics(state));
+    VKD3D_ASSERT(d3d12_pipeline_state_is_graphics(state));
 
     memset(&pipeline_key, 0, sizeof(pipeline_key));
     pipeline_key.topology = topology;
