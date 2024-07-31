@@ -11483,7 +11483,8 @@ static void test_shader_instructions(void)
 
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        todo_if(uint_tests[i].is_todo || (uint_tests[i].todo_on_nvidia && is_nvidia_device(context.device)))
+        todo_if(uint_tests[i].is_todo ||
+                (uint_tests[i].todo_on_nvidia && is_nvidia_device_lt(context.device, 535, 183, 1)))
         check_sub_resource_uvec4(context.render_target, 0, queue, command_list, &uint_tests[i].output.u);
 
         reset_command_list(command_list, context.allocator);
