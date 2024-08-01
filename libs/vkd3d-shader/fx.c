@@ -238,7 +238,7 @@ static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context
     unsigned int elements_count;
     const char *name;
 
-    assert(fx->ctx->profile->major_version >= 4);
+    VKD3D_ASSERT(fx->ctx->profile->major_version >= 4);
 
     if (type->class == HLSL_CLASS_ARRAY)
     {
@@ -870,7 +870,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
             const struct hlsl_struct_field *field = &type->e.record.fields[i];
 
             /* Validated in check_invalid_object_fields(). */
-            assert(hlsl_is_numeric_type(field->type));
+            VKD3D_ASSERT(hlsl_is_numeric_type(field->type));
             write_fx_2_parameter(field->type, field->name, &field->semantic, fx);
         }
     }
