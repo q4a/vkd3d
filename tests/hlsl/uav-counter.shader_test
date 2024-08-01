@@ -18,7 +18,6 @@ void main()
 todo(sm<6) dispatch 3 1 1
 probe uav 1 (0) rui (12)
 
-
 [uav 1]
 size (counter_buffer, 1)
 0

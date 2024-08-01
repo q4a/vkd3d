@@ -1664,6 +1664,18 @@ static void get_physical_device_info(struct vulkan_shader_runner *runner, struct
         VK_CALL(vkGetPhysicalDeviceFeatures(runner->phys_device, &info->features2.features));
 }
 
+static uint32_t get_format_support(const struct vulkan_shader_runner *runner, enum DXGI_FORMAT format)
+{
+    VkFormatProperties properties;
+    uint32_t ret = 0;
+
+    VK_CALL(vkGetPhysicalDeviceFormatProperties(runner->phys_device, vkd3d_get_vk_format(format), &properties));
+    if ((properties.linearTilingFeatures | properties.optimalTilingFeatures) & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)
+        ret |= FORMAT_CAP_UAV_LOAD;
+
+    return ret;
+}
+
 static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
 {
     VkDescriptorPoolCreateInfo descriptor_pool_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
@@ -1685,6 +1697,28 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkDevice device;
     void *libvulkan;
     VkResult vr;
+
+    static const enum DXGI_FORMAT formats[] =
+    {
+        DXGI_FORMAT_R32_FLOAT,
+        DXGI_FORMAT_R32_UINT,
+        DXGI_FORMAT_R32_SINT,
+        DXGI_FORMAT_R32G32B32A32_FLOAT,
+        DXGI_FORMAT_R32G32B32A32_UINT,
+        DXGI_FORMAT_R32G32B32A32_SINT,
+        DXGI_FORMAT_R16G16B16A16_FLOAT,
+        DXGI_FORMAT_R16G16B16A16_UINT,
+        DXGI_FORMAT_R16G16B16A16_SINT,
+        DXGI_FORMAT_R8G8B8A8_UNORM,
+        DXGI_FORMAT_R8G8B8A8_UINT,
+        DXGI_FORMAT_R8G8B8A8_SINT,
+        DXGI_FORMAT_R16_FLOAT,
+        DXGI_FORMAT_R16_UINT,
+        DXGI_FORMAT_R16_SINT,
+        DXGI_FORMAT_R8_UNORM,
+        DXGI_FORMAT_R8_UINT,
+        DXGI_FORMAT_R8_SINT,
+    };
 
     if (!(libvulkan = vkd3d_dlopen(SONAME_LIBVULKAN)))
     {
@@ -1810,6 +1844,13 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     else
     {
         runner->demote_to_helper_invocation = false;
+    }
+
+    if (device_info.features2.features.shaderStorageImageReadWithoutFormat)
+        runner->caps.format_caps[DXGI_FORMAT_UNKNOWN] |= FORMAT_CAP_UAV_LOAD;
+    for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
+    {
+        runner->caps.format_caps[formats[i]] = get_format_support(runner, formats[i]);
     }
 
     vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device));

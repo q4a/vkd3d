@@ -767,6 +767,22 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .release_readback = d3d12_runner_release_readback,
 };
 
+static uint32_t get_format_support(ID3D12Device *device, enum DXGI_FORMAT format)
+{
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT format_support = {.Format = format};
+    uint32_t ret = 0;
+    HRESULT hr;
+
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_FORMAT_SUPPORT,
+            &format_support, sizeof(format_support));
+    ok(hr == S_OK, "Failed to query format support, hr %#x.\n", hr);
+
+    if (format_support.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD)
+        ret |= FORMAT_CAP_UAV_LOAD;
+
+    return ret;
+}
+
 static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
         enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
 {
@@ -774,6 +790,28 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1;
     D3D12_FEATURE_DATA_D3D12_OPTIONS options;
     HRESULT hr;
+
+    static const enum DXGI_FORMAT formats[] =
+    {
+        DXGI_FORMAT_R32_FLOAT,
+        DXGI_FORMAT_R32_UINT,
+        DXGI_FORMAT_R32_SINT,
+        DXGI_FORMAT_R32G32B32A32_FLOAT,
+        DXGI_FORMAT_R32G32B32A32_UINT,
+        DXGI_FORMAT_R32G32B32A32_SINT,
+        DXGI_FORMAT_R16G16B16A16_FLOAT,
+        DXGI_FORMAT_R16G16B16A16_UINT,
+        DXGI_FORMAT_R16G16B16A16_SINT,
+        DXGI_FORMAT_R8G8B8A8_UNORM,
+        DXGI_FORMAT_R8G8B8A8_UINT,
+        DXGI_FORMAT_R8G8B8A8_SINT,
+        DXGI_FORMAT_R16_FLOAT,
+        DXGI_FORMAT_R16_UINT,
+        DXGI_FORMAT_R16_SINT,
+        DXGI_FORMAT_R8_UNORM,
+        DXGI_FORMAT_R8_UINT,
+        DXGI_FORMAT_R8_SINT,
+    };
 
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options));
     ok(hr == S_OK, "Failed to check feature options support, hr %#x.\n", hr);
@@ -791,6 +829,11 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     runner->caps.int64 = options1.Int64ShaderOps;
     runner->caps.rov = options.ROVsSupported;
     runner->caps.wave_ops = options1.WaveOps;
+
+    for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
+    {
+        runner->caps.format_caps[formats[i]] = get_format_support(device, formats[i]);
+    }
 }
 
 static bool device_supports_shader_model_6_0(ID3D12Device *device)

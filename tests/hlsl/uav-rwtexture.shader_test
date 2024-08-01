@@ -1,6 +1,8 @@
 [require]
 shader model >= 5.0
 shader model < 6.0
+format r32-float uav-load
+format r32g32b32a32-float uav-load
 
 [pixel shader fail]
 RWTexture2D<float4> u;

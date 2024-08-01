@@ -42,6 +42,7 @@ probe (3, 1) rgba (1, 0, 0, 1)
 
 [require]
 shader model >= 5.0
+format r32-float uav-load
 
 [uav 1]
 format r32-float

@@ -302,6 +302,7 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
         {"r32-sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
         {"r32-uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
         {"r32-typeless",        TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_TYPELESS},
+        {"unknown",             TEXTURE_DATA_UINT,   0, DXGI_FORMAT_UNKNOWN},
     };
     unsigned int i;
 
@@ -311,7 +312,8 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
         {
             if (data_type)
                 *data_type = formats[i].data_type;
-            *texel_size = formats[i].texel_size;
+            if (texel_size)
+                *texel_size = formats[i].texel_size;
             if (is_shadow)
                 *is_shadow = formats[i].is_shadow;
             return formats[i].format;
@@ -370,6 +372,18 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
         {
             if (match_string(line, options[i].name, &line))
                 runner->compile_options |= options[i].option;
+        }
+    }
+    else if (match_string(line, "format", &line))
+    {
+        DXGI_FORMAT format = parse_format(line, NULL, NULL, NULL, &line);
+
+        while (line[0] != '\0')
+        {
+            if (match_string(line, "uav-load", &line))
+                runner->require_format_caps[format] |= FORMAT_CAP_UAV_LOAD;
+            else
+                fatal_error("Unknown format cap '%s'.\n", line);
         }
     }
     else if (match_string(line, "float64", &line))
@@ -1571,6 +1585,8 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
 
 static bool check_capabilities(const struct shader_runner *runner, const struct shader_runner_caps *caps)
 {
+    unsigned int i;
+
     if (runner->require_float64 && !caps->float64)
         return false;
     if (runner->require_int64 && !caps->int64)
@@ -1580,6 +1596,11 @@ static bool check_capabilities(const struct shader_runner *runner, const struct 
     if (runner->require_wave_ops && !caps->wave_ops)
         return false;
 
+    for (i = 0; i < ARRAY_SIZE(runner->require_format_caps); ++i)
+    {
+        if (runner->require_format_caps[i] & ~caps->format_caps[i])
+            return false;
+    }
     return true;
 }
 
@@ -1612,6 +1633,44 @@ static void trace_tags(const struct shader_runner_caps *caps)
         rem -= rc;
     }
     trace("%s.\n", tags);
+}
+
+static void trace_format_cap(const struct shader_runner_caps *caps, enum format_cap cap, const char *cap_name)
+{
+    bool show_none = true;
+    char buffer[80], *p;
+    size_t rem;
+    int rc;
+
+    p = buffer;
+    rem = ARRAY_SIZE(buffer);
+    rc = snprintf(p, rem, "%10s:", cap_name);
+    p += rc;
+    rem -= rc;
+
+    for (unsigned int i = 0; i < ARRAY_SIZE(caps->format_caps); ++i)
+    {
+        if (caps->format_caps[i] & cap)
+        {
+            rc = snprintf(p, rem, " 0x%x", i);
+            if (!(rc >= 0 && (size_t)rc < rem))
+            {
+                *p = 0;
+                trace("%s\n", buffer);
+
+                p = buffer;
+                rem = ARRAY_SIZE(buffer);
+                rc = snprintf(p, rem, "           ");
+                --i;
+            }
+            p += rc;
+            rem -= rc;
+            show_none = false;
+        }
+    }
+    if (show_none)
+        snprintf(p, rem, " (none)");
+    trace("%s.\n", buffer);
 }
 
 static void update_line_number_context(const char *testname, unsigned int line_number)
@@ -1651,6 +1710,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     trace("     int64: %u.\n", caps->int64);
     trace("       rov: %u.\n", caps->rov);
     trace("  wave_ops: %u.\n", caps->wave_ops);
+    trace_format_cap(caps, FORMAT_CAP_UAV_LOAD, "uav-load");
 
     if (!test_options.filename)
         fatal_error("No filename specified.\n");
@@ -1909,6 +1969,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 runner->require_int64 = false;
                 runner->require_rov = false;
                 runner->require_wave_ops = false;
+                memset(runner->require_format_caps, 0, sizeof(runner->require_format_caps));
                 runner->compile_options = 0;
                 test_action = TEST_ACTION_RUN;
             }

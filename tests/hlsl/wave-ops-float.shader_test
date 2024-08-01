@@ -1,6 +1,8 @@
 [require]
 shader model >= 6.0
 wave ops
+format r32g32b32a32-float uav-load
+format r32g32b32a32-uint uav-load
 
 [uav 0]
 format r32g32b32a32-float

@@ -253,6 +253,22 @@ static IDXGISwapChain *create_swapchain(ID3D11Device *device, HWND window)
     return swapchain;
 }
 
+static bool get_format_support(ID3D11Device *device, enum DXGI_FORMAT format)
+{
+    D3D11_FEATURE_DATA_FORMAT_SUPPORT2 format_support2 = {.InFormat = format};
+    uint32_t ret = 0;
+    HRESULT hr;
+
+    hr = ID3D11Device_CheckFeatureSupport(device, D3D11_FEATURE_FORMAT_SUPPORT2,
+            &format_support2, sizeof(format_support2));
+    ok(hr == S_OK, "Failed to query format support2, hr %#lx.\n", hr);
+
+    if (format_support2.OutFormatSupport2 & D3D11_FORMAT_SUPPORT2_UAV_TYPED_LOAD)
+        ret |= FORMAT_CAP_UAV_LOAD;
+
+    return ret;
+}
+
 static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
     D3D11_FEATURE_DATA_D3D11_OPTIONS2 options2 = {0};
@@ -262,6 +278,28 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
     D3D11_VIEWPORT vp;
     HRESULT hr;
     RECT rect;
+
+    static const enum DXGI_FORMAT formats[] =
+    {
+        DXGI_FORMAT_R32_FLOAT,
+        DXGI_FORMAT_R32_UINT,
+        DXGI_FORMAT_R32_SINT,
+        DXGI_FORMAT_R32G32B32A32_FLOAT,
+        DXGI_FORMAT_R32G32B32A32_UINT,
+        DXGI_FORMAT_R32G32B32A32_SINT,
+        DXGI_FORMAT_R16G16B16A16_FLOAT,
+        DXGI_FORMAT_R16G16B16A16_UINT,
+        DXGI_FORMAT_R16G16B16A16_SINT,
+        DXGI_FORMAT_R8G8B8A8_UNORM,
+        DXGI_FORMAT_R8G8B8A8_UINT,
+        DXGI_FORMAT_R8G8B8A8_SINT,
+        DXGI_FORMAT_R16_FLOAT,
+        DXGI_FORMAT_R16_UINT,
+        DXGI_FORMAT_R16_SINT,
+        DXGI_FORMAT_R8_UNORM,
+        DXGI_FORMAT_R8_UINT,
+        DXGI_FORMAT_R8_SINT,
+    };
 
     memset(runner, 0, sizeof(*runner));
 
@@ -282,8 +320,13 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
 
     hr = ID3D11Device_CheckFeatureSupport(runner->device,
             D3D11_FEATURE_D3D11_OPTIONS2, &options2, sizeof(options2));
-    ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    ok(hr == S_OK, "Failed to check feature options2 support, hr %#lx.\n", hr);
+
     runner->caps.rov = options2.ROVsSupported;
+    for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
+    {
+        runner->caps.format_caps[formats[i]] = get_format_support(runner->device, formats[i]);
+    }
 
     rt_width = RENDER_TARGET_WIDTH;
     rt_height = RENDER_TARGET_HEIGHT;

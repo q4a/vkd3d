@@ -164,6 +164,10 @@ void func() {}
     [numthreads(1, 1, 1)]
 void main() { func(); }
 
+[require]
+shader model >= 5.0
+format r32-float uav-load
+
 [uav 0]
 format r32-float
 size (2d, 2, 2)

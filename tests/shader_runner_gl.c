@@ -159,15 +159,59 @@ static bool check_egl_client_extension(const char *extension)
     return false;
 }
 
+static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool is_shadow)
+{
+    size_t i;
+
+    static const struct format_info format_info[] =
+    {
+        {DXGI_FORMAT_UNKNOWN,            1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32G32B32A32_FLOAT, 4, false, false, GL_RGBA32F,            GL_RGBA,            GL_FLOAT},
+        {DXGI_FORMAT_R32G32B32A32_UINT,  4, true,  false, GL_RGBA32UI,           GL_RGBA_INTEGER,    GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32G32B32A32_SINT,  4, true,  false, GL_RGBA32I,            GL_RGBA_INTEGER,    GL_INT},
+        {DXGI_FORMAT_R32G32_FLOAT,       2, false, false, GL_RG32F,              GL_RG,              GL_FLOAT},
+        {DXGI_FORMAT_R32G32_UINT,        2, true,  false, GL_RG32UI,             GL_RG_INTEGER,      GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32G32_SINT,        2, true,  false, GL_RG32I,              GL_RG_INTEGER,      GL_INT},
+        {DXGI_FORMAT_R32_FLOAT,          1, false, false, GL_R32F,               GL_RED,             GL_FLOAT},
+        {DXGI_FORMAT_R32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
+        {DXGI_FORMAT_D32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
+        {DXGI_FORMAT_R32_UINT,           1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32_SINT,           1, true,  false, GL_R32I,               GL_RED_INTEGER,     GL_INT},
+        {DXGI_FORMAT_R32_TYPELESS,       1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
+    };
+
+    for (i = 0; i < ARRAY_SIZE(format_info); ++i)
+    {
+        if (format_info[i].f == format && format_info[i].is_shadow == is_shadow)
+            return &format_info[i];
+    }
+
+    fatal_error("Failed to find format info for format %#x.\n", format);
+}
+
+static uint32_t get_format_support(struct gl_runner *runner, enum DXGI_FORMAT format)
+{
+    GLenum gl_format = get_format_info(format, false)->internal_format;
+    uint32_t ret = 0;
+    GLint support;
+
+    /* TODO: Probably check for more targets instead of just GL_TEXTURE_2D. */
+    glGetInternalformativ(GL_TEXTURE_2D, gl_format, GL_SHADER_IMAGE_LOAD, 1, &support);
+    if (support != GL_NONE)
+        ret |= FORMAT_CAP_UAV_LOAD;
+
+    return ret;
+}
+
 static bool gl_runner_init(struct gl_runner *runner, enum shading_language language)
 {
     PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT;
     const char *glsl_version = NULL;
+    EGLint count, extension_count;
     EGLDeviceEXT *devices;
     EGLContext context;
     EGLDisplay display;
     EGLBoolean ret;
-    EGLint count;
     GLuint vao;
 
     static const char *const tags[] =
@@ -182,6 +226,17 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
         EGL_CONTEXT_MAJOR_VERSION, 3,
         EGL_CONTEXT_MINOR_VERSION, 2,
         EGL_NONE,
+    };
+
+    static const enum DXGI_FORMAT formats[] =
+    {
+        DXGI_FORMAT_UNKNOWN,
+        DXGI_FORMAT_R32_FLOAT,
+        DXGI_FORMAT_R32_UINT,
+        DXGI_FORMAT_R32_SINT,
+        DXGI_FORMAT_R32G32B32A32_FLOAT,
+        DXGI_FORMAT_R32G32B32A32_UINT,
+        DXGI_FORMAT_R32G32B32A32_SINT,
     };
 
     memset(runner, 0, sizeof(*runner));
@@ -267,6 +322,15 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
         runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
         runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
 
+        glGetIntegerv(GL_NUM_EXTENSIONS, &extension_count);
+        if (check_gl_extension("GL_ARB_internalformat_query2", extension_count))
+        {
+            for (unsigned int j = 0; j < ARRAY_SIZE(formats); ++j)
+            {
+                runner->caps.format_caps[formats[j]] = get_format_support(runner, formats[j]);
+            }
+        }
+
         trace("Using device %u.\n", i);
         runner->display = display;
         runner->context = context;
@@ -321,36 +385,6 @@ static void gl_runner_cleanup(struct gl_runner *runner)
     ok(ret, "Failed to destroy EGL context.\n");
     ret = eglTerminate(runner->display);
     ok(ret, "Failed to terminate EGL display connection.\n");
-}
-
-static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool is_shadow)
-{
-    size_t i;
-
-    static const struct format_info format_info[] =
-    {
-        {DXGI_FORMAT_UNKNOWN,            1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32G32B32A32_FLOAT, 4, false, false, GL_RGBA32F,            GL_RGBA,            GL_FLOAT},
-        {DXGI_FORMAT_R32G32B32A32_UINT,  4, true,  false, GL_RGBA32UI,           GL_RGBA_INTEGER,    GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32G32B32A32_SINT,  4, true,  false, GL_RGBA32I,            GL_RGBA_INTEGER,    GL_INT},
-        {DXGI_FORMAT_R32G32_FLOAT,       2, false, false, GL_RG32F,              GL_RG,              GL_FLOAT},
-        {DXGI_FORMAT_R32G32_UINT,        2, true,  false, GL_RG32UI,             GL_RG_INTEGER,      GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32G32_SINT,        2, true,  false, GL_RG32I,              GL_RG_INTEGER,      GL_INT},
-        {DXGI_FORMAT_R32_FLOAT,          1, false, false, GL_R32F,               GL_RED,             GL_FLOAT},
-        {DXGI_FORMAT_R32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
-        {DXGI_FORMAT_D32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
-        {DXGI_FORMAT_R32_UINT,           1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32_SINT,           1, true,  false, GL_R32I,               GL_RED_INTEGER,     GL_INT},
-        {DXGI_FORMAT_R32_TYPELESS,       1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
-    };
-
-    for (i = 0; i < ARRAY_SIZE(format_info); ++i)
-    {
-        if (format_info[i].f == format && format_info[i].is_shadow == is_shadow)
-            return &format_info[i];
-    }
-
-    fatal_error("Failed to find format info for format %#x.\n", format);
 }
 
 static bool init_resource_2d(struct gl_resource *resource, const struct resource_params *params)

@@ -128,6 +128,12 @@ struct input_element
 
 #define MAX_RESOURCES 32
 #define MAX_SAMPLERS 32
+#define DXGI_FORMAT_COUNT (DXGI_FORMAT_B4G4R4A4_UNORM + 1)
+
+enum format_cap
+{
+    FORMAT_CAP_UAV_LOAD = 0x00000001,
+};
 
 struct shader_runner_caps
 {
@@ -140,6 +146,8 @@ struct shader_runner_caps
     bool int64;
     bool rov;
     bool wave_ops;
+
+    uint32_t format_caps[DXGI_FORMAT_COUNT];
 };
 
 static inline unsigned int shader_runner_caps_get_feature_flags(const struct shader_runner_caps *caps)
@@ -174,6 +182,7 @@ struct shader_runner
     bool require_int64;
     bool require_rov;
     bool require_wave_ops;
+    uint32_t require_format_caps[DXGI_FORMAT_COUNT];
 
     bool last_render_failed;
 

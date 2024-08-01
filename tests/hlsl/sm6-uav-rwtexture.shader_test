@@ -1,5 +1,6 @@
 [require]
 shader model >= 6.0
+format r32g32b32a32-float uav-load
 
 [uav 0]
 format r32-float
@@ -17,7 +18,8 @@ RWTexture2D<float4> u : register(u1);
 
 float4 main() : sv_target
 {
-    /* Unlike SM < 6.0, all four components are not required to be written in a single statement. */
+    /* Unlike SM < 6.0, all four components are not required to be written in a single statement.
+     * but this requires Typed UAV Load Additional Formats. */
     u[uint2(0, 0)].xy = float2(1, 2);
     u[uint2(0, 0)].zw = float2(3, 4);
     return 0;
