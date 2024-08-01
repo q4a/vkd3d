@@ -104,6 +104,7 @@ struct resource_params
     bool is_shadow;
     bool is_raw;
     bool is_uav_counter;
+    bool explicit_format;
     enum texture_data_type data_type;
     unsigned int stride;
 

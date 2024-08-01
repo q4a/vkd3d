@@ -498,6 +498,8 @@ static void parse_resource_directive(struct resource_params *resource, const cha
     {
         resource->desc.format = parse_format(line, &resource->data_type,
                 &resource->desc.texel_size, &resource->is_shadow, &line);
+        assert_that(!resource->explicit_format, "Resource format already specified.\n");
+        resource->explicit_format = true;
     }
     else if (match_string(line, "stride", &line))
     {
@@ -505,6 +507,8 @@ static void parse_resource_directive(struct resource_params *resource, const cha
             fatal_error("Malformed texture stride '%s'.\n", line);
         resource->desc.texel_size = resource->stride;
         resource->desc.format = DXGI_FORMAT_UNKNOWN;
+        assert_that(!resource->explicit_format, "Resource format already specified.\n");
+        resource->explicit_format = true;
     }
     else if (match_string(line, "size", &line))
     {
@@ -527,6 +531,8 @@ static void parse_resource_directive(struct resource_params *resource, const cha
             resource->stride = sizeof(uint32_t);
             resource->desc.texel_size = resource->stride;
             resource->desc.format = DXGI_FORMAT_UNKNOWN;
+            assert_that(!resource->explicit_format, "Resource format already specified.\n");
+            resource->explicit_format = true;
         }
         else if (sscanf(line, "( 2d , %u , %u ) ", &resource->desc.width, &resource->desc.height) == 2)
         {
@@ -1697,6 +1703,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 case STATE_RESOURCE:
                     if (current_resource.desc.type == RESOURCE_TYPE_VERTEX_BUFFER)
                         current_resource.desc.width = current_resource.data_size;
+
+                    if (current_resource.desc.type == RESOURCE_TYPE_UAV)
+                        assert_that(current_resource.explicit_format, "Format must be specified for UAV resources.\n");
 
                     /* Not every backend supports every resource type
                      * (specifically, D3D9 doesn't support UAVs and
