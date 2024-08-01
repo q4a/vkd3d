@@ -53,7 +53,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
             if (regset == HLSL_REGSET_NUMERIC)
             {
-                assert(size % 4 == 0);
+                VKD3D_ASSERT(size % 4 == 0);
                 size /= 4;
             }
 
@@ -76,7 +76,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
             if (regset == HLSL_REGSET_NUMERIC)
             {
-                assert(*offset_component == 0);
+                VKD3D_ASSERT(*offset_component == 0);
                 *offset_component = field_offset % 4;
                 field_offset /= 4;
             }
@@ -121,7 +121,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
         return NULL;
     hlsl_block_add_instr(block, offset);
 
-    assert(deref->var);
+    VKD3D_ASSERT(deref->var);
     type = deref->var->data_type;
 
     for (i = 0; i < deref->path_len; ++i)
@@ -154,8 +154,8 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
     struct hlsl_block block;
     struct hlsl_type *type;
 
-    assert(deref->var);
-    assert(!hlsl_deref_is_lowered(deref));
+    VKD3D_ASSERT(deref->var);
+    VKD3D_ASSERT(!hlsl_deref_is_lowered(deref));
 
     type = hlsl_deref_get_type(ctx, deref);
 
@@ -222,8 +222,8 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
     if (temp->default_values)
     {
         /* Transfer default values from the temp to the uniform. */
-        assert(!uniform->default_values);
-        assert(hlsl_type_component_count(temp->data_type) == hlsl_type_component_count(uniform->data_type));
+        VKD3D_ASSERT(!uniform->default_values);
+        VKD3D_ASSERT(hlsl_type_component_count(temp->data_type) == hlsl_type_component_count(uniform->data_type));
         uniform->default_values = temp->default_values;
         temp->default_values = NULL;
     }
@@ -399,7 +399,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
         }
         else
         {
-            assert(i == 0);
+            VKD3D_ASSERT(i == 0);
 
             if (!(store = hlsl_new_store_index(ctx, &lhs->src, NULL, cast, 0, &var->loc)))
                 return;
@@ -532,7 +532,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
         }
         else
         {
-            assert(i == 0);
+            VKD3D_ASSERT(i == 0);
 
             if (!(load = hlsl_new_load_index(ctx, &rhs->src, NULL, &var->loc)))
                 return;
@@ -927,7 +927,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
     if (return_instr)
     {
         /* If we're in a loop, we should have used "break" instead. */
-        assert(!in_loop);
+        VKD3D_ASSERT(!in_loop);
 
         /* Iterate in reverse, to avoid use-after-free when unlinking sources from
          * the "uses" list. */
@@ -949,7 +949,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         struct hlsl_ir_load *load;
 
         /* If we're in a loop, we should have used "break" instead. */
-        assert(!in_loop);
+        VKD3D_ASSERT(!in_loop);
 
         if (tail == &cf_instr->entry)
             return has_early_return;
@@ -1008,7 +1008,7 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
     struct hlsl_deref coords_deref;
     struct hlsl_ir_var *coords;
 
-    assert(dim_count < 4);
+    VKD3D_ASSERT(dim_count < 4);
 
     if (!(coords = hlsl_new_synthetic_var(ctx, "coords",
             hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count + 1), loc)))
@@ -1109,9 +1109,9 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         struct hlsl_resource_load_params params = {0};
         struct hlsl_ir_node *resource_load;
 
-        assert(coords->data_type->class == HLSL_CLASS_VECTOR);
-        assert(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
-        assert(coords->data_type->dimx == dim_count);
+        VKD3D_ASSERT(coords->data_type->class == HLSL_CLASS_VECTOR);
+        VKD3D_ASSERT(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
+        VKD3D_ASSERT(coords->data_type->dimx == dim_count);
 
         if (!(coords = add_zero_mipmap_level(ctx, coords, &instr->loc)))
             return false;
@@ -1141,7 +1141,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         struct hlsl_deref row_deref;
         unsigned int i;
 
-        assert(!hlsl_type_is_row_major(mat->data_type));
+        VKD3D_ASSERT(!hlsl_type_is_row_major(mat->data_type));
 
         if (!(var = hlsl_new_synthetic_var(ctx, "row", instr->data_type, &instr->loc)))
             return false;
@@ -1378,7 +1378,7 @@ static struct copy_propagation_value *copy_propagation_get_value(const struct co
             unsigned int component_count = hlsl_type_component_count(var->data_type);
             struct copy_propagation_value *value;
 
-            assert(component < component_count);
+            VKD3D_ASSERT(component < component_count);
             value = copy_propagation_get_value_at_time(&var_def->traces[component], time);
 
             if (!value)
@@ -1411,7 +1411,7 @@ static struct copy_propagation_var_def *copy_propagation_create_var_def(struct h
     var_def->var = var;
 
     res = rb_put(&state->var_defs, var, &var_def->entry);
-    assert(!res);
+    VKD3D_ASSERT(!res);
 
     return var_def;
 }
@@ -1420,7 +1420,7 @@ static void copy_propagation_trace_record_value(struct hlsl_ctx *ctx,
         struct copy_propagation_component_trace *trace, struct hlsl_ir_node *node,
         unsigned int component, unsigned int time)
 {
-    assert(!trace->record_count || trace->records[trace->record_count - 1].timestamp < time);
+    VKD3D_ASSERT(!trace->record_count || trace->records[trace->record_count - 1].timestamp < time);
 
     if (!hlsl_array_reserve(ctx, (void **)&trace->records, &trace->record_capacity,
             trace->record_count + 1, sizeof(trace->records[0])))
@@ -1449,7 +1449,7 @@ static void copy_propagation_invalidate_variable(struct hlsl_ctx *ctx, struct co
             /* Don't add an invalidate record if it is already present. */
             if (trace->record_count && trace->records[trace->record_count - 1].timestamp == time)
             {
-                assert(!trace->records[trace->record_count - 1].node);
+                VKD3D_ASSERT(!trace->records[trace->record_count - 1].node);
                 continue;
             }
 
@@ -1697,11 +1697,11 @@ static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
 
     if (!hlsl_component_index_range_from_deref(ctx, deref, &start, &count))
         return false;
-    assert(count == 1);
+    VKD3D_ASSERT(count == 1);
 
     if (!(value = copy_propagation_get_value(state, deref->var, start, time)))
         return false;
-    assert(value->component == 0);
+    VKD3D_ASSERT(value->component == 0);
 
     /* Only HLSL_IR_LOAD can produce an object. */
     load = hlsl_ir_load(value->node);
@@ -2000,12 +2000,12 @@ static enum validation_result validate_component_index_range_from_deref(struct h
         struct hlsl_ir_node *path_node = deref->path[i].node;
         unsigned int idx = 0;
 
-        assert(path_node);
+        VKD3D_ASSERT(path_node);
         if (path_node->type != HLSL_IR_CONSTANT)
             return DEREF_VALIDATION_NOT_CONSTANT;
 
         /* We should always have generated a cast to UINT. */
-        assert(path_node->data_type->class == HLSL_CLASS_SCALAR
+        VKD3D_ASSERT(path_node->data_type->class == HLSL_CLASS_SCALAR
                 && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
         idx = hlsl_ir_constant(path_node)->value.u[0].u;
@@ -2061,7 +2061,7 @@ static void note_non_static_deref_expressions(struct hlsl_ctx *ctx, const struct
     {
         struct hlsl_ir_node *path_node = deref->path[i].node;
 
-        assert(path_node);
+        VKD3D_ASSERT(path_node);
         if (path_node->type != HLSL_IR_CONSTANT)
             hlsl_note(ctx, &path_node->loc, VKD3D_SHADER_LOG_ERROR,
                     "Expression for %s within \"%s\" cannot be resolved statically.",
@@ -2535,7 +2535,7 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
         return false;
 
     deref = &hlsl_ir_load(instr)->src;
-    assert(deref->var);
+    VKD3D_ASSERT(deref->var);
 
     if (deref->path_len == 0)
         return false;
@@ -2609,7 +2609,7 @@ static bool validate_nonconstant_vector_store_derefs(struct hlsl_ctx *ctx, struc
         return false;
 
     deref = &hlsl_ir_store(instr)->lhs;
-    assert(deref->var);
+    VKD3D_ASSERT(deref->var);
 
     if (deref->path_len == 0)
         return false;
@@ -2672,7 +2672,7 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         return false;
     }
 
-    assert(hlsl_deref_get_regset(ctx, &load->resource) == HLSL_REGSET_SAMPLERS);
+    VKD3D_ASSERT(hlsl_deref_get_regset(ctx, &load->resource) == HLSL_REGSET_SAMPLERS);
 
     if (!(name = hlsl_get_string_buffer(ctx)))
         return false;
@@ -2689,7 +2689,7 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         struct hlsl_type *arr_type = load->resource.var->data_type;
         for (i = 0; i < load->resource.path_len; ++i)
         {
-            assert(arr_type->class == HLSL_CLASS_ARRAY);
+            VKD3D_ASSERT(arr_type->class == HLSL_CLASS_ARRAY);
             texture_array_type = hlsl_new_array_type(ctx, texture_array_type, arr_type->e.array.elements_count);
             arr_type = arr_type->e.array.type;
         }
@@ -2718,8 +2718,8 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
 
     hlsl_copy_deref(ctx, &load->sampler, &load->resource);
     load->resource.var = var;
-    assert(hlsl_deref_get_type(ctx, &load->resource)->class == HLSL_CLASS_TEXTURE);
-    assert(hlsl_deref_get_type(ctx, &load->sampler)->class == HLSL_CLASS_SAMPLER);
+    VKD3D_ASSERT(hlsl_deref_get_type(ctx, &load->resource)->class == HLSL_CLASS_TEXTURE);
+    VKD3D_ASSERT(hlsl_deref_get_type(ctx, &load->sampler)->class == HLSL_CLASS_SAMPLER);
 
     return true;
 }
@@ -3137,7 +3137,7 @@ static bool lower_logic_not(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, st
     float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, arg->data_type->dimx);
 
     /* If this is happens, it means we failed to cast the argument to boolean somewhere. */
-    assert(arg->data_type->e.numeric.type == HLSL_TYPE_BOOL);
+    VKD3D_ASSERT(arg->data_type->e.numeric.type == HLSL_TYPE_BOOL);
 
     if (!(arg_cast = hlsl_new_cast(ctx, arg, float_type, &arg->loc)))
         return false;
@@ -3193,7 +3193,7 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
         return false;
     }
 
-    assert(cond->data_type->e.numeric.type == HLSL_TYPE_BOOL);
+    VKD3D_ASSERT(cond->data_type->e.numeric.type == HLSL_TYPE_BOOL);
 
     type = hlsl_get_numeric_type(ctx, instr->data_type->class, HLSL_TYPE_FLOAT,
             instr->data_type->dimx, instr->data_type->dimy);
@@ -3491,7 +3491,7 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
 
     /* Narrowing casts should have already been lowered. */
-    assert(type->dimx == arg_type->dimx);
+    VKD3D_ASSERT(type->dimx == arg_type->dimx);
 
     zero = hlsl_new_constant(ctx, arg_type, &zero_value, &instr->loc);
     if (!zero)
@@ -3513,7 +3513,7 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_bloc
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS];
     struct hlsl_ir_node *cond;
 
-    assert(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
+    VKD3D_ASSERT(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
 
     if (cond_type->e.numeric.type != HLSL_TYPE_BOOL)
     {
@@ -3712,7 +3712,7 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     {
         arg1 = expr->operands[0].node;
         arg2 = expr->operands[1].node;
-        assert(arg1->data_type->dimx == arg2->data_type->dimx);
+        VKD3D_ASSERT(arg1->data_type->dimx == arg2->data_type->dimx);
         dimx = arg1->data_type->dimx;
         is_bool = type->e.numeric.type == HLSL_TYPE_BOOL;
 
@@ -3987,8 +3987,8 @@ static bool mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
     if (!deref->rel_offset.node)
         return false;
 
-    assert(deref->var);
-    assert(deref->rel_offset.node->type != HLSL_IR_CONSTANT);
+    VKD3D_ASSERT(deref->var);
+    VKD3D_ASSERT(deref->rel_offset.node->type != HLSL_IR_CONSTANT);
     deref->var->indexable = true;
 
     return true;
@@ -4311,7 +4311,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
     unsigned int writemask;
     uint32_t reg_idx;
 
-    assert(component_count <= reg_size);
+    VKD3D_ASSERT(component_count <= reg_size);
 
     for (reg_idx = 0;; ++reg_idx)
     {
@@ -4340,7 +4340,7 @@ static struct hlsl_reg allocate_register_with_masks(struct hlsl_ctx *ctx, struct
     struct hlsl_reg ret = {0};
     uint32_t reg_idx;
 
-    assert((reg_writemask & writemask) == writemask);
+    VKD3D_ASSERT((reg_writemask & writemask) == writemask);
 
     for (reg_idx = 0;; ++reg_idx)
     {
@@ -4450,7 +4450,7 @@ static bool track_object_components_sampler_dim(struct hlsl_ctx *ctx, struct hls
     {
         enum hlsl_sampler_dim dim;
 
-        assert(!load->sampler.var);
+        VKD3D_ASSERT(!load->sampler.var);
 
         dim = var->objects_usage[regset][index].sampler_dim;
         if (dim != load->sampling_dim)
@@ -4732,9 +4732,9 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                 constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
-                assert(hlsl_is_numeric_type(type));
-                assert(type->dimy == 1);
-                assert(constant->reg.writemask);
+                VKD3D_ASSERT(hlsl_is_numeric_type(type));
+                VKD3D_ASSERT(type->dimy == 1);
+                VKD3D_ASSERT(constant->reg.writemask);
 
                 for (x = 0, i = 0; x < 4; ++x)
                 {
@@ -4903,7 +4903,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
             unsigned int reg_idx = var->reg_reservation.reg_index;
             unsigned int i;
 
-            assert(reg_size % 4 == 0);
+            VKD3D_ASSERT(reg_size % 4 == 0);
             for (i = 0; i < reg_size / 4; ++i)
             {
                 if (i < bind_count)
@@ -4997,7 +4997,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     uint32_t reg;
     bool builtin;
 
-    assert(var->semantic.name);
+    VKD3D_ASSERT(var->semantic.name);
 
     if (ctx->profile->major_version < 4)
     {
@@ -5396,7 +5396,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 
             if (var->regs[regset].index < min_index)
             {
-                assert(regset == HLSL_REGSET_UAVS);
+                VKD3D_ASSERT(regset == HLSL_REGSET_UAVS);
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                         "UAV index (%u) must be higher than the maximum render target index (%u).",
                         var->regs[regset].index, min_index - 1);
@@ -5474,12 +5474,12 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
         struct hlsl_ir_node *path_node = deref->path[i].node;
         unsigned int idx = 0;
 
-        assert(path_node);
+        VKD3D_ASSERT(path_node);
         if (path_node->type != HLSL_IR_CONSTANT)
             return false;
 
         /* We should always have generated a cast to UINT. */
-        assert(path_node->data_type->class == HLSL_CLASS_SCALAR
+        VKD3D_ASSERT(path_node->data_type->class == HLSL_CLASS_SCALAR
                 && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
         idx = hlsl_ir_constant(path_node)->value.u[0].u;
@@ -5539,11 +5539,11 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
         struct hlsl_ir_node *path_node = deref->path[i].node;
         unsigned int idx = 0;
 
-        assert(path_node);
+        VKD3D_ASSERT(path_node);
         if (path_node->type == HLSL_IR_CONSTANT)
         {
             /* We should always have generated a cast to UINT. */
-            assert(path_node->data_type->class == HLSL_CLASS_SCALAR
+            VKD3D_ASSERT(path_node->data_type->class == HLSL_CLASS_SCALAR
                     && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
             idx = hlsl_ir_constant(path_node)->value.u[0].u;
@@ -5593,8 +5593,8 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
         type = hlsl_get_element_type_from_path_index(ctx, type, path_node);
     }
 
-    assert(!(regset <= HLSL_REGSET_LAST_OBJECT) || (type->reg_size[regset] == 1));
-    assert(!(regset == HLSL_REGSET_NUMERIC) || type->reg_size[regset] <= 4);
+    VKD3D_ASSERT(!(regset <= HLSL_REGSET_LAST_OBJECT) || (type->reg_size[regset] == 1));
+    VKD3D_ASSERT(!(regset == HLSL_REGSET_NUMERIC) || type->reg_size[regset] <= 4);
     return index_is_constant;
 }
 
@@ -5609,9 +5609,9 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
     if (offset_node)
     {
         /* We should always have generated a cast to UINT. */
-        assert(offset_node->data_type->class == HLSL_CLASS_SCALAR
+        VKD3D_ASSERT(offset_node->data_type->class == HLSL_CLASS_SCALAR
                 && offset_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
-        assert(offset_node->type != HLSL_IR_CONSTANT);
+        VKD3D_ASSERT(offset_node->type != HLSL_IR_CONSTANT);
         return false;
     }
 
@@ -5645,8 +5645,8 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     struct hlsl_reg ret = var->regs[HLSL_REGSET_NUMERIC];
     unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
-    assert(deref->data_type);
-    assert(hlsl_is_numeric_type(deref->data_type));
+    VKD3D_ASSERT(deref->data_type);
+    VKD3D_ASSERT(hlsl_is_numeric_type(deref->data_type));
 
     ret.index += offset / 4;
     ret.id += offset / 4;
@@ -5834,7 +5834,7 @@ static void sm1_generate_vsir_signature_entry(struct hlsl_ctx *ctx,
         register_index = var->regs[HLSL_REGSET_NUMERIC].id;
 
         ret = hlsl_sm1_usage_from_semantic(var->semantic.name, var->semantic.index, &usage, &usage_idx);
-        assert(ret);
+        VKD3D_ASSERT(ret);
         /* With the exception of vertex POSITION output, none of these are
          * system values. Pixel POSITION input is not equivalent to
          * SV_Position; the closer equivalent is VPOS, which is not declared
@@ -6109,7 +6109,7 @@ static void transform_unroll_loops(struct hlsl_ctx *ctx, struct hlsl_block *bloc
             return;
 
         cloned_loop = loop_unrolling_find_unrollable_loop(ctx, &clone, &containing_block);
-        assert(cloned_loop);
+        VKD3D_ASSERT(cloned_loop);
 
         if (!loop_unrolling_unroll_loop(ctx, &clone, containing_block, cloned_loop))
         {
