@@ -278,6 +278,49 @@ static const char *close_parentheses(const char *line)
     return line;
 }
 
+static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_type, unsigned int *texel_size,
+        bool *is_shadow, const char **rest)
+{
+    static const struct
+    {
+        const char *string;
+        enum texture_data_type data_type;
+        unsigned int texel_size;
+        DXGI_FORMAT format;
+        bool is_shadow;
+    }
+    formats[] =
+    {
+        {"r32g32b32a32 float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
+        {"r32g32b32a32 sint",   TEXTURE_DATA_SINT,  16, DXGI_FORMAT_R32G32B32A32_SINT},
+        {"r32g32b32a32 uint",   TEXTURE_DATA_UINT,  16, DXGI_FORMAT_R32G32B32A32_UINT},
+        {"r32g32 float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
+        {"r32g32 int",          TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
+        {"r32g32 uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
+        {"r32 float shadow",    TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT, true},
+        {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
+        {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
+        {"r32 uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
+        {"r32 typeless",        TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_TYPELESS},
+    };
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(formats); ++i)
+    {
+        if (match_string(line, formats[i].string, rest))
+        {
+            if (data_type)
+                *data_type = formats[i].data_type;
+            *texel_size = formats[i].texel_size;
+            if (is_shadow)
+                *is_shadow = formats[i].is_shadow;
+            return formats[i].format;
+        }
+    }
+
+    fatal_error("Unknown format '%s'.\n", line);
+}
+
 static void parse_require_directive(struct shader_runner *runner, const char *line)
 {
     bool less_than = false;
@@ -349,49 +392,6 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     {
         fatal_error("Unknown require directive '%s'.\n", line);
     }
-}
-
-static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_type, unsigned int *texel_size,
-        bool *is_shadow, const char **rest)
-{
-    static const struct
-    {
-        const char *string;
-        enum texture_data_type data_type;
-        unsigned int texel_size;
-        DXGI_FORMAT format;
-        bool is_shadow;
-    }
-    formats[] =
-    {
-        {"r32g32b32a32 float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
-        {"r32g32b32a32 sint",   TEXTURE_DATA_SINT,  16, DXGI_FORMAT_R32G32B32A32_SINT},
-        {"r32g32b32a32 uint",   TEXTURE_DATA_UINT,  16, DXGI_FORMAT_R32G32B32A32_UINT},
-        {"r32g32 float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
-        {"r32g32 int",          TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
-        {"r32g32 uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
-        {"r32 float shadow",    TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT, true},
-        {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
-        {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
-        {"r32 uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
-        {"r32 typeless",        TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_TYPELESS},
-    };
-    unsigned int i;
-
-    for (i = 0; i < ARRAY_SIZE(formats); ++i)
-    {
-        if (match_string(line, formats[i].string, rest))
-        {
-            if (data_type)
-                *data_type = formats[i].data_type;
-            *texel_size = formats[i].texel_size;
-            if (is_shadow)
-                *is_shadow = formats[i].is_shadow;
-            return formats[i].format;
-        }
-    }
-
-    fatal_error("Unknown format '%s'.\n", line);
 }
 
 static D3D12_COMPARISON_FUNC parse_comparison_func(const char *line, const char **rest)
