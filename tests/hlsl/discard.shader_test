@@ -44,7 +44,7 @@ probe (3, 1) rgba (1, 0, 0, 1)
 shader model >= 5.0
 
 [uav 1]
-format r32 float
+format r32-float
 size (2d, 2, 1)
 
 0.0 0.0

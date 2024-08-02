@@ -3,7 +3,7 @@ shader model >= 6.0
 wave ops
 
 [uav 0]
-format r32g32b32a32 sint
+format r32g32b32a32-sint
 size (buffer, 4)
 
 -3 1 -4 2
@@ -12,7 +12,7 @@ size (buffer, 4)
 -1 1 -1 2
 
 [uav 1]
-format r32g32b32a32 sint
+format r32g32b32a32-sint
 size (buffer, 4)
 
 0 0 0 0

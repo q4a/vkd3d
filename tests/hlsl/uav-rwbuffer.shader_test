@@ -7,7 +7,7 @@ shader model >= 5.0
 % This ceases to be true with shader model 5.1.
 
 [rtv 1]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (2d, 640, 480)
 
 [pixel shader]
@@ -165,7 +165,7 @@ float4 main() : sv_target1
 }
 
 [uav 1]
-format r32g32b32a32 sint
+format r32g32b32a32-sint
 size (buffer, 2)
 1 2 3 4 5 6 7 8
 
@@ -185,7 +185,7 @@ probe uav 1 (0) rgbai (11, -12, 13, -14)
 probe uav 1 (1) rgbai (-15, 16, -17, 18)
 
 [uav 2]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (buffer, 1)
 0.1 0.2 0.3 0.4
 

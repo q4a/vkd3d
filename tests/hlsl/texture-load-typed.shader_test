@@ -19,19 +19,19 @@ float4 main() : sv_target
 }
 
 [srv 0]
-format r32 float
+format r32-float
 size (2d, 1, 1)
 
 0.8
 
 [srv 1]
-format r32 sint
+format r32-sint
 size (2d, 1, 1)
 
 -3
 
 [srv 2]
-format r32g32 uint
+format r32g32-uint
 size (2d, 1, 1)
 
 4294967295 123

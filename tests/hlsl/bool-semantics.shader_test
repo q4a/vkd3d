@@ -2,11 +2,11 @@
 shader model >= 4.0
 
 [input layout]
-0 r32g32b32a32 uint apple
-0 r32g32 int sv_position
+0 r32g32b32a32-uint apple
+0 r32g32-sint sv_position
 
 [vb 0]
-format r32 uint
+format r32-uint
 0 1 0x80000000 0xffffffff   -2 -2
 0 1 0x80000000 0xffffffff   -2  2
 0 1 0x80000000 0xffffffff    2 -2

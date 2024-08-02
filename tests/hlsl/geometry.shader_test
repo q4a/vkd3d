@@ -2,8 +2,8 @@
 shader model >= 4.0
 
 [input layout]
-0 r32g32b32a32 float SV_POSITION
-0 r32g32b32a32 float COLOR
+0 r32g32b32a32-float SV_POSITION
+0 r32g32b32a32-float COLOR
 
 [vb 0]
 0.0 0.0 1.0 1.0   0.0 1.0 1.0 1.0

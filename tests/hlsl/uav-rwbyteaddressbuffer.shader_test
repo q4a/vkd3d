@@ -2,7 +2,7 @@
 shader model >= 5.0
 
 [uav 1]
-format r32 typeless
+format r32-typeless
 size (raw_buffer, 4)
 
 1 2 3 4

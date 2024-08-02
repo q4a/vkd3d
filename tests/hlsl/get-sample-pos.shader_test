@@ -3,7 +3,7 @@ shader model >= 4.1
 
 
 [srv 0]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (2dms, 4, 2, 2)
 
 [pixel shader todo]

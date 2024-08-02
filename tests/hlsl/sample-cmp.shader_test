@@ -7,7 +7,7 @@ address clamp clamp clamp
 comparison never
 
 [srv 0]
-format r32 float shadow
+format r32-float-shadow
 size (2d, 2, 2)
 0.5     0.5
 0.5     0.5

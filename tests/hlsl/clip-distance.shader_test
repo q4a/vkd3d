@@ -2,8 +2,8 @@
 shader model >= 4.0
 
 [input layout]
-0 r32g32 float POSITION
-1 r32 float CLIP_DISTANCE
+0 r32g32-float POSITION
+1 r32-float CLIP_DISTANCE
 
 [vb 0]
 -1.0 -1.0
@@ -18,7 +18,7 @@ shader model >= 4.0
 1.0
 
 [rtv 0]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (2d, 640, 480)
 
 [vertex shader todo]

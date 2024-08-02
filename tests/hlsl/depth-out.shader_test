@@ -39,7 +39,7 @@ probe dsv (0,0) r (0.5)
 shader model >= 5.0
 
 [rtv 0]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (2d, 640, 480)
 
 [vertex shader]

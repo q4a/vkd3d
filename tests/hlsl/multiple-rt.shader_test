@@ -1,9 +1,9 @@
 [rtv 0]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (2d, 640, 480)
 
 [rtv 1]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (2d, 640, 480)
 
 [pixel shader]

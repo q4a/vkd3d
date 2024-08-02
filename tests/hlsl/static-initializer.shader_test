@@ -172,7 +172,7 @@ shader model >= 5.0
 
 
 [uav 1]
-format r32 float
+format r32-float
 size (2d, 1, 1)
 
 0.5

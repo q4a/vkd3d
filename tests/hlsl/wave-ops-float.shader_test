@@ -3,7 +3,7 @@ shader model >= 6.0
 wave ops
 
 [uav 0]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (buffer, 4)
 
 3.5 1.0 4.0 2.5
@@ -12,7 +12,7 @@ size (buffer, 4)
 3.5 1.0 4.5 2.5
 
 [uav 1]
-format r32g32b32a32 uint
+format r32g32b32a32-uint
 size (buffer, 8)
 
 0 0 0 0
@@ -86,7 +86,7 @@ probe uav 1 (0) rgbaui (0xb, 0, 0, 0)
 
 
 [uav 1]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (buffer, 8)
 
 0 0 0 0
@@ -231,7 +231,7 @@ probe uav 1 (3) rgba (42.875, 1.5, 64.0, 15.625)
 
 
 [uav 0]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (buffer, 4)
 
 0.25 0.50 0.75 1.00

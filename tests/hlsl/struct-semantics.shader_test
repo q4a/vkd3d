@@ -1,6 +1,6 @@
 [input layout]
-0 r32g32b32a32 float texcoord
-0 r32g32 float position
+0 r32g32b32a32-float texcoord
+0 r32g32-float position
 
 [vb 0]
 0.0 1.0 0.0 1.0   -2.0 -2.0

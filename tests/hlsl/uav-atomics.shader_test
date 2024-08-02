@@ -2,7 +2,7 @@
 shader model >= 5.0
 
 [uav 1]
-format r32 uint
+format r32-uint
 size (buffer, 9)
 
 0xd 5 6 0x10 4 4 7 2 0
@@ -54,7 +54,7 @@ probe uav 1 (8) rui (1)
 
 
 [uav 2]
-format r32 sint
+format r32-sint
 size (buffer, 2)
 
 -3 1
@@ -84,7 +84,7 @@ probe uav 2 (1) ri (-3)
 
 
 [uav 1]
-format r32 uint
+format r32-uint
 size (2d, 9, 1)
 
 0xd 5 6 0x10 4 4 7 2 0

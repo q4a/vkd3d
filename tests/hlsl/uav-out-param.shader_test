@@ -2,7 +2,7 @@
 shader model >= 5.0
 
 [uav 0]
-format r32g32b32a32 float
+format r32g32b32a32-float
 size (2d, 1, 1)
 
 0.1 0.2 0.3 0.4
@@ -30,7 +30,7 @@ todo(glsl) dispatch 1 1 1
 probe uav 0 (0, 0) rgba (0.4, 0.1, 0.2, 0.3)
 
 [uav 0]
-format r32 float
+format r32-float
 size (2d, 1, 1)
 
 0.1

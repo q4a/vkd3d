@@ -291,17 +291,17 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     }
     formats[] =
     {
-        {"r32g32b32a32 float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
-        {"r32g32b32a32 sint",   TEXTURE_DATA_SINT,  16, DXGI_FORMAT_R32G32B32A32_SINT},
-        {"r32g32b32a32 uint",   TEXTURE_DATA_UINT,  16, DXGI_FORMAT_R32G32B32A32_UINT},
-        {"r32g32 float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
-        {"r32g32 int",          TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
-        {"r32g32 uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
-        {"r32 float shadow",    TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT, true},
-        {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
-        {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
-        {"r32 uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
-        {"r32 typeless",        TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_TYPELESS},
+        {"r32g32b32a32-float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
+        {"r32g32b32a32-sint",   TEXTURE_DATA_SINT,  16, DXGI_FORMAT_R32G32B32A32_SINT},
+        {"r32g32b32a32-uint",   TEXTURE_DATA_UINT,  16, DXGI_FORMAT_R32G32B32A32_UINT},
+        {"r32g32-float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
+        {"r32g32-sint",         TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
+        {"r32g32-uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
+        {"r32-float-shadow",    TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT, true},
+        {"r32-float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
+        {"r32-sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
+        {"r32-uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
+        {"r32-typeless",        TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_TYPELESS},
     };
     unsigned int i;
 
