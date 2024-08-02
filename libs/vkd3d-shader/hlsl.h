@@ -1049,85 +1049,85 @@ struct hlsl_resource_load_params
 
 static inline struct hlsl_ir_call *hlsl_ir_call(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_CALL);
+    VKD3D_ASSERT(node->type == HLSL_IR_CALL);
     return CONTAINING_RECORD(node, struct hlsl_ir_call, node);
 }
 
 static inline struct hlsl_ir_constant *hlsl_ir_constant(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_CONSTANT);
+    VKD3D_ASSERT(node->type == HLSL_IR_CONSTANT);
     return CONTAINING_RECORD(node, struct hlsl_ir_constant, node);
 }
 
 static inline struct hlsl_ir_expr *hlsl_ir_expr(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_EXPR);
+    VKD3D_ASSERT(node->type == HLSL_IR_EXPR);
     return CONTAINING_RECORD(node, struct hlsl_ir_expr, node);
 }
 
 static inline struct hlsl_ir_if *hlsl_ir_if(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_IF);
+    VKD3D_ASSERT(node->type == HLSL_IR_IF);
     return CONTAINING_RECORD(node, struct hlsl_ir_if, node);
 }
 
 static inline struct hlsl_ir_jump *hlsl_ir_jump(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_JUMP);
+    VKD3D_ASSERT(node->type == HLSL_IR_JUMP);
     return CONTAINING_RECORD(node, struct hlsl_ir_jump, node);
 }
 
 static inline struct hlsl_ir_load *hlsl_ir_load(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_LOAD);
+    VKD3D_ASSERT(node->type == HLSL_IR_LOAD);
     return CONTAINING_RECORD(node, struct hlsl_ir_load, node);
 }
 
 static inline struct hlsl_ir_loop *hlsl_ir_loop(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_LOOP);
+    VKD3D_ASSERT(node->type == HLSL_IR_LOOP);
     return CONTAINING_RECORD(node, struct hlsl_ir_loop, node);
 }
 
 static inline struct hlsl_ir_resource_load *hlsl_ir_resource_load(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_RESOURCE_LOAD);
+    VKD3D_ASSERT(node->type == HLSL_IR_RESOURCE_LOAD);
     return CONTAINING_RECORD(node, struct hlsl_ir_resource_load, node);
 }
 
 static inline struct hlsl_ir_resource_store *hlsl_ir_resource_store(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_RESOURCE_STORE);
+    VKD3D_ASSERT(node->type == HLSL_IR_RESOURCE_STORE);
     return CONTAINING_RECORD(node, struct hlsl_ir_resource_store, node);
 }
 
 static inline struct hlsl_ir_store *hlsl_ir_store(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_STORE);
+    VKD3D_ASSERT(node->type == HLSL_IR_STORE);
     return CONTAINING_RECORD(node, struct hlsl_ir_store, node);
 }
 
 static inline struct hlsl_ir_swizzle *hlsl_ir_swizzle(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_SWIZZLE);
+    VKD3D_ASSERT(node->type == HLSL_IR_SWIZZLE);
     return CONTAINING_RECORD(node, struct hlsl_ir_swizzle, node);
 }
 
 static inline struct hlsl_ir_index *hlsl_ir_index(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_INDEX);
+    VKD3D_ASSERT(node->type == HLSL_IR_INDEX);
     return CONTAINING_RECORD(node, struct hlsl_ir_index, node);
 }
 
 static inline struct hlsl_ir_switch *hlsl_ir_switch(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_SWITCH);
+    VKD3D_ASSERT(node->type == HLSL_IR_SWITCH);
     return CONTAINING_RECORD(node, struct hlsl_ir_switch, node);
 }
 
 static inline struct hlsl_ir_stateblock_constant *hlsl_ir_stateblock_constant(const struct hlsl_ir_node *node)
 {
-    assert(node->type == HLSL_IR_STATEBLOCK_CONSTANT);
+    VKD3D_ASSERT(node->type == HLSL_IR_STATEBLOCK_CONSTANT);
     return CONTAINING_RECORD(node, struct hlsl_ir_stateblock_constant, node);
 }
 
