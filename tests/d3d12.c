@@ -2913,7 +2913,7 @@ static void test_create_root_signature(void)
     root_signature_desc.pStaticSamplers = NULL;
     root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == E_FAIL || hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(hr == E_FAIL || hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12RootSignature_Release(root_signature);
     root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -2948,7 +2948,7 @@ static void test_create_root_signature(void)
     root_signature_desc.pStaticSamplers = NULL;
     root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == E_FAIL || hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(hr == E_FAIL || hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12RootSignature_Release(root_signature);
     root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
@@ -2984,7 +2984,6 @@ static void test_create_root_signature(void)
     root_parameters[1].DescriptorTable.pDescriptorRanges = &descriptor_ranges[1];
     root_signature_desc.NumParameters = 2;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12RootSignature_Release(root_signature);
@@ -2995,7 +2994,6 @@ static void test_create_root_signature(void)
     root_parameters[1].Descriptor.ShaderRegister = 0;
     root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12RootSignature_Release(root_signature);
@@ -3008,7 +3006,6 @@ static void test_create_root_signature(void)
     root_parameters[1].Constants.Num32BitValues = 1;
     root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12RootSignature_Release(root_signature);
@@ -3032,7 +3029,6 @@ static void test_create_root_signature(void)
     root_signature_desc.NumStaticSamplers = 1;
     root_signature_desc.pStaticSamplers = static_samplers;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12RootSignature_Release(root_signature);
