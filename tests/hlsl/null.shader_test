@@ -64,6 +64,9 @@ RWTexture2DArray<float4> ua2 = NULL;
 
 RWBuffer<float4> b1 = NULL;
 
+DepthStencilView dsv = NULL;
+RenderTargetView rtv = NULL;
+
 float4 main() : sv_target
 {
     return 0;
