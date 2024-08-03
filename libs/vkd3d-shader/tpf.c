@@ -3196,6 +3196,8 @@ struct extern_resource
 
     enum hlsl_regset regset;
     unsigned int id, space, index, bind_count;
+
+    struct vkd3d_shader_location loc;
 };
 
 static int sm4_compare_extern_resources(const void *a, const void *b)
@@ -3298,6 +3300,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                     extern_resources[*count].space = var->regs[regset].space;
                     extern_resources[*count].index = var->regs[regset].index + regset_offset;
                     extern_resources[*count].bind_count = 1;
+                    extern_resources[*count].loc = var->loc;
 
                     ++*count;
                 }
@@ -3345,6 +3348,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                 extern_resources[*count].space = var->regs[r].space;
                 extern_resources[*count].index = var->regs[r].index;
                 extern_resources[*count].bind_count = var->bind_count[r];
+                extern_resources[*count].loc = var->loc;
 
                 ++*count;
             }
@@ -3383,6 +3387,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
         extern_resources[*count].space = buffer->reg.space;
         extern_resources[*count].index = buffer->reg.index;
         extern_resources[*count].bind_count = 1;
+        extern_resources[*count].loc = buffer->loc;
 
         ++*count;
     }
@@ -4318,6 +4323,7 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
     enum hlsl_regset regset = uav ? HLSL_REGSET_UAVS : HLSL_REGSET_TEXTURES;
     struct hlsl_type *component_type;
     struct sm4_instruction instr;
+    bool multisampled;
     unsigned int i;
 
     VKD3D_ASSERT(resource->regset == regset);
@@ -4339,6 +4345,16 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
             .idx[0] = sm4_resource_format(component_type) * 0x1111,
             .idx_count = 1,
         };
+
+        multisampled = component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
+                || component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY;
+
+        if (hlsl_version_lt(tpf->ctx, 4, 1) && multisampled && !component_type->sample_count)
+        {
+            hlsl_error(tpf->ctx, &resource->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Multisampled texture object declaration needs sample count for profile %s.",
+                    tpf->ctx->profile->name);
+        }
 
         if (hlsl_version_ge(tpf->ctx, 5, 1))
         {
@@ -4379,11 +4395,8 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
         }
         instr.extra_bits |= (sm4_resource_dimension(component_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT);
 
-        if (component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
-                || component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
-        {
+        if (multisampled)
             instr.extra_bits |= component_type->sample_count << VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
-        }
 
         write_sm4_instruction(tpf, &instr);
     }

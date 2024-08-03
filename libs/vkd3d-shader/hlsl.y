@@ -7304,12 +7304,6 @@ type_no_void:
         {
             validate_texture_format_type(ctx, $3, &@3);
 
-            if (hlsl_version_lt(ctx, 4, 1))
-            {
-                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Multisampled texture object declaration needs sample count for profile %s.", ctx->profile->name);
-            }
-
             $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
         }
     | texture_ms_type '<' type ',' shift_expr '>'
