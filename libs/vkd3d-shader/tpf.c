@@ -1716,7 +1716,7 @@ static enum vkd3d_sm4_swizzle_type vkd3d_sm4_get_default_swizzle_type(
     const struct vkd3d_sm4_register_type_info *register_type_info =
             get_info_from_vkd3d_register_type(lookup, vkd3d_type);
 
-    assert(register_type_info);
+    VKD3D_ASSERT(register_type_info);
     return register_type_info->default_src_swizzle_type;
 }
 
@@ -2887,7 +2887,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
             continue;
 
         ret = hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
-        assert(ret);
+        VKD3D_ASSERT(ret);
         if (usage == ~0u)
             continue;
         usage_idx = var->semantic.index;
@@ -2898,7 +2898,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
         }
         else
         {
-            assert(var->regs[HLSL_REGSET_NUMERIC].allocated);
+            VKD3D_ASSERT(var->regs[HLSL_REGSET_NUMERIC].allocated);
             reg_idx = var->regs[HLSL_REGSET_NUMERIC].id;
         }
 
@@ -2975,7 +2975,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
     switch (type->class)
     {
         case HLSL_CLASS_MATRIX:
-            assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
+            VKD3D_ASSERT(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
             if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
                 return D3D_SVC_MATRIX_COLUMNS;
             else
@@ -3085,7 +3085,7 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     }
     else
     {
-        assert(array_type->class <= HLSL_CLASS_LAST_NUMERIC);
+        VKD3D_ASSERT(array_type->class <= HLSL_CLASS_LAST_NUMERIC);
         type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm4_class(array_type), sm4_base_type(array_type)));
         put_u32(buffer, vkd3d_make_u32(array_type->dimy, array_type->dimx));
         put_u32(buffer, vkd3d_make_u32(array_size, 0));
@@ -3668,9 +3668,9 @@ static uint32_t sm4_encode_instruction_modifier(const struct sm4_instruction_mod
     switch (imod->type)
     {
         case VKD3D_SM4_MODIFIER_AOFFIMMI:
-            assert(-8 <= imod->u.aoffimmi.u && imod->u.aoffimmi.u <= 7);
-            assert(-8 <= imod->u.aoffimmi.v && imod->u.aoffimmi.v <= 7);
-            assert(-8 <= imod->u.aoffimmi.w && imod->u.aoffimmi.w <= 7);
+            VKD3D_ASSERT(-8 <= imod->u.aoffimmi.u && imod->u.aoffimmi.u <= 7);
+            VKD3D_ASSERT(-8 <= imod->u.aoffimmi.v && imod->u.aoffimmi.v <= 7);
+            VKD3D_ASSERT(-8 <= imod->u.aoffimmi.w && imod->u.aoffimmi.w <= 7);
             word |= ((uint32_t)imod->u.aoffimmi.u & 0xf) << VKD3D_SM4_AOFFIMMI_U_SHIFT;
             word |= ((uint32_t)imod->u.aoffimmi.v & 0xf) << VKD3D_SM4_AOFFIMMI_V_SHIFT;
             word |= ((uint32_t)imod->u.aoffimmi.w & 0xf) << VKD3D_SM4_AOFFIMMI_W_SHIFT;
@@ -3709,7 +3709,7 @@ struct sm4_instruction
 static void sm4_register_from_node(struct vkd3d_shader_register *reg, uint32_t *writemask,
         const struct hlsl_ir_node *instr)
 {
-    assert(instr->reg.allocated);
+    VKD3D_ASSERT(instr->reg.allocated);
     reg->type = VKD3DSPR_TEMP;
     reg->dimension = VSIR_DIMENSION_VEC4;
     reg->idx[0].offset = instr->reg.id;
@@ -3728,7 +3728,7 @@ static void sm4_numeric_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_s
     reg->idx[0].offset = var->regs[HLSL_REGSET_NUMERIC].id;
     reg->dimension = VSIR_DIMENSION_VEC4;
 
-    assert(var->regs[HLSL_REGSET_NUMERIC].allocated);
+    VKD3D_ASSERT(var->regs[HLSL_REGSET_NUMERIC].allocated);
 
     if (!var->indexable)
     {
@@ -3747,13 +3747,13 @@ static void sm4_numeric_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_s
             struct vkd3d_shader_src_param *idx_src;
             unsigned int idx_writemask;
 
-            assert(sm4_instr->idx_src_count < ARRAY_SIZE(sm4_instr->idx_srcs));
+            VKD3D_ASSERT(sm4_instr->idx_src_count < ARRAY_SIZE(sm4_instr->idx_srcs));
             idx_src = &sm4_instr->idx_srcs[sm4_instr->idx_src_count++];
             memset(idx_src, 0, sizeof(*idx_src));
 
             reg->idx[1].rel_addr = idx_src;
             sm4_register_from_node(&idx_src->reg, &idx_writemask, deref->rel_offset.node);
-            assert(idx_writemask != 0);
+            VKD3D_ASSERT(idx_writemask != 0);
             idx_src->swizzle = swizzle_from_sm4(hlsl_swizzle_from_writemask(idx_writemask));
         }
     }
@@ -3789,7 +3789,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
                 reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
                 reg->idx_count = 1;
             }
-            assert(regset == HLSL_REGSET_TEXTURES);
+            VKD3D_ASSERT(regset == HLSL_REGSET_TEXTURES);
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else if (regset == HLSL_REGSET_UAVS)
@@ -3808,7 +3808,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
                 reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
                 reg->idx_count = 1;
             }
-            assert(regset == HLSL_REGSET_UAVS);
+            VKD3D_ASSERT(regset == HLSL_REGSET_UAVS);
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else if (regset == HLSL_REGSET_SAMPLERS)
@@ -3827,14 +3827,14 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
                 reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
                 reg->idx_count = 1;
             }
-            assert(regset == HLSL_REGSET_SAMPLERS);
+            VKD3D_ASSERT(regset == HLSL_REGSET_SAMPLERS);
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref) + var->buffer_offset;
 
-            assert(data_type->class <= HLSL_CLASS_VECTOR);
+            VKD3D_ASSERT(data_type->class <= HLSL_CLASS_VECTOR);
             reg->type = VKD3DSPR_CONSTBUFFER;
             reg->dimension = VSIR_DIMENSION_VEC4;
             if (hlsl_version_ge(ctx, 5, 1))
@@ -3874,7 +3874,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
         {
             struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
 
-            assert(hlsl_reg.allocated);
+            VKD3D_ASSERT(hlsl_reg.allocated);
             reg->type = VKD3DSPR_INPUT;
             reg->dimension = VSIR_DIMENSION_VEC4;
             reg->idx[0].offset = hlsl_reg.id;
@@ -3906,7 +3906,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
         {
             struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
 
-            assert(hlsl_reg.allocated);
+            VKD3D_ASSERT(hlsl_reg.allocated);
             reg->type = VKD3DSPR_OUTPUT;
             reg->dimension = VSIR_DIMENSION_VEC4;
             reg->idx[0].offset = hlsl_reg.id;
@@ -4042,7 +4042,7 @@ static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct v
         switch (sm4_swizzle_type)
         {
             case VKD3D_SM4_SWIZZLE_NONE:
-                assert(sm4_swizzle || register_is_constant(reg));
+                VKD3D_ASSERT(sm4_swizzle || register_is_constant(reg));
                 token |= (sm4_swizzle << VKD3D_SM4_WRITEMASK_SHIFT) & VKD3D_SM4_WRITEMASK_MASK;
                 break;
 
@@ -4074,16 +4074,16 @@ static void sm4_write_register_index(const struct tpf_writer *tpf, const struct 
         const struct vkd3d_shader_src_param *idx_src = reg->idx[j].rel_addr;
         uint32_t idx_src_token;
 
-        assert(idx_src);
-        assert(!idx_src->modifiers);
-        assert(idx_src->reg.type != VKD3DSPR_IMMCONST);
+        VKD3D_ASSERT(idx_src);
+        VKD3D_ASSERT(!idx_src->modifiers);
+        VKD3D_ASSERT(idx_src->reg.type != VKD3DSPR_IMMCONST);
         idx_src_token = sm4_encode_register(tpf, &idx_src->reg, VKD3D_SM4_SWIZZLE_SCALAR, idx_src->swizzle);
 
         put_u32(buffer, idx_src_token);
         for (k = 0; k < idx_src->reg.idx_count; ++k)
         {
             put_u32(buffer, idx_src->reg.idx[k].offset);
-            assert(!idx_src->reg.idx[k].rel_addr);
+            VKD3D_ASSERT(!idx_src->reg.idx[k].rel_addr);
         }
     }
     else
@@ -4283,7 +4283,7 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
     if (component_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
         instr.extra_bits |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
 
-    assert(resource->regset == HLSL_REGSET_SAMPLERS);
+    VKD3D_ASSERT(resource->regset == HLSL_REGSET_SAMPLERS);
 
     for (i = 0; i < resource->bind_count; ++i)
     {
@@ -4292,7 +4292,7 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
 
         if (hlsl_version_ge(tpf->ctx, 5, 1))
         {
-            assert(!i);
+            VKD3D_ASSERT(!i);
             instr.dsts[0].reg.idx[0].offset = resource->id;
             instr.dsts[0].reg.idx[1].offset = resource->index;
             instr.dsts[0].reg.idx[2].offset = resource->index; /* FIXME: array end */
@@ -4318,7 +4318,7 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
     struct sm4_instruction instr;
     unsigned int i;
 
-    assert(resource->regset == regset);
+    VKD3D_ASSERT(resource->regset == regset);
 
     component_type = hlsl_type_get_component_type(tpf->ctx, resource->data_type, 0);
 
@@ -4340,7 +4340,7 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
 
         if (hlsl_version_ge(tpf->ctx, 5, 1))
         {
-            assert(!i);
+            VKD3D_ASSERT(!i);
             instr.dsts[0].reg.idx[0].offset = resource->id;
             instr.dsts[0].reg.idx[1].offset = resource->index;
             instr.dsts[0].reg.idx[2].offset = resource->index; /* FIXME: array end */
@@ -4592,7 +4592,7 @@ static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tp
     memset(&instr, 0, sizeof(instr));
     instr.opcode = opcode;
 
-    assert(dst_idx < ARRAY_SIZE(instr.dsts));
+    VKD3D_ASSERT(dst_idx < ARRAY_SIZE(instr.dsts));
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
     instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
     instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
@@ -4651,7 +4651,7 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *t
     memset(&instr, 0, sizeof(instr));
     instr.opcode = opcode;
 
-    assert(dst_idx < ARRAY_SIZE(instr.dsts));
+    VKD3D_ASSERT(dst_idx < ARRAY_SIZE(instr.dsts));
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
     instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
     instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
@@ -4849,7 +4849,7 @@ static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl
     const struct hlsl_ir_node *dst = &load->node;
     struct sm4_instruction instr;
 
-    assert(dst->data_type->e.numeric.type == HLSL_TYPE_UINT || dst->data_type->e.numeric.type == HLSL_TYPE_FLOAT);
+    VKD3D_ASSERT(dst->data_type->e.numeric.type == HLSL_TYPE_UINT || dst->data_type->e.numeric.type == HLSL_TYPE_FLOAT);
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_SAMPLE_INFO;
@@ -4878,7 +4878,7 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
         return;
     }
 
-    assert(dst->data_type->e.numeric.type == HLSL_TYPE_UINT || dst->data_type->e.numeric.type == HLSL_TYPE_FLOAT);
+    VKD3D_ASSERT(dst->data_type->e.numeric.type == HLSL_TYPE_UINT || dst->data_type->e.numeric.type == HLSL_TYPE_FLOAT);
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_RESINFO;
@@ -4932,7 +4932,7 @@ static void write_sm4_cast(const struct tpf_writer *tpf, const struct hlsl_ir_ex
     const struct hlsl_type *src_type = arg1->data_type;
 
     /* Narrowing casts were already lowered. */
-    assert(src_type->dimx == dst_type->dimx);
+    VKD3D_ASSERT(src_type->dimx == dst_type->dimx);
 
     switch (dst_type->e.numeric.type)
     {
@@ -5074,7 +5074,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
     const struct hlsl_type *dst_type = expr->node.data_type;
     struct vkd3d_string_buffer *dst_type_string;
 
-    assert(expr->node.reg.allocated);
+    VKD3D_ASSERT(expr->node.reg.allocated);
 
     if (!(dst_type_string = hlsl_type_to_string(tpf->ctx, dst_type)))
         return;
@@ -5102,7 +5102,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP1_BIT_NOT:
-            assert(type_is_integer(dst_type));
+            VKD3D_ASSERT(type_is_integer(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
             break;
 
@@ -5111,73 +5111,73 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP1_CEIL:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_PI, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_COS:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
             break;
 
         case HLSL_OP1_DSX:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_DERIV_RTX, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSX_COARSE:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTX_COARSE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSX_FINE:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTX_FINE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSY:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_DERIV_RTY, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSY_COARSE:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTY_COARSE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSY_FINE:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTY_FINE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_EXP2:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_EXP, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_F16TOF32:
-            assert(type_is_float(dst_type));
-            assert(hlsl_version_ge(tpf->ctx, 5, 0));
+            VKD3D_ASSERT(type_is_float(dst_type));
+            VKD3D_ASSERT(hlsl_version_ge(tpf->ctx, 5, 0));
             write_sm4_unary_op(tpf, VKD3D_SM5_OP_F16TOF32, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_FLOOR:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_NI, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_FRACT:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_FRC, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_LOG2:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_LOG, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_LOGIC_NOT:
-            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
             break;
 
@@ -5213,7 +5213,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
                         struct sm4_instruction instr;
                         struct hlsl_constant_value one;
 
-                        assert(type_is_float(dst_type));
+                        VKD3D_ASSERT(type_is_float(dst_type));
 
                         memset(&instr, 0, sizeof(instr));
                         instr.opcode = VKD3D_SM4_OP_DIV;
@@ -5241,34 +5241,34 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP1_ROUND:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_NE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_RSQ:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_RSQ, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_SAT:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV
                     | (VKD3D_SM4_INSTRUCTION_FLAG_SATURATE << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT),
                     &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_SIN:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 0, arg1);
             break;
 
         case HLSL_OP1_SQRT:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_SQRT, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_TRUNC:
-            assert(type_is_float(dst_type));
+            VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_Z, &expr->node, arg1, 0);
             break;
 
@@ -5290,17 +5290,17 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP2_BIT_AND:
-            assert(type_is_integer(dst_type));
+            VKD3D_ASSERT(type_is_integer(dst_type));
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_BIT_OR:
-            assert(type_is_integer(dst_type));
+            VKD3D_ASSERT(type_is_integer(dst_type));
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_BIT_XOR:
-            assert(type_is_integer(dst_type));
+            VKD3D_ASSERT(type_is_integer(dst_type));
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_XOR, &expr->node, arg1, arg2);
             break;
 
@@ -5353,7 +5353,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
             switch (src_type->e.numeric.type)
             {
@@ -5379,7 +5379,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
             switch (src_type->e.numeric.type)
             {
@@ -5408,7 +5408,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
             switch (src_type->e.numeric.type)
             {
@@ -5434,18 +5434,18 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         }
 
         case HLSL_OP2_LOGIC_AND:
-            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_LOGIC_OR:
-            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_LSHIFT:
-            assert(type_is_integer(dst_type));
-            assert(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_ISHL, &expr->node, arg1, arg2);
             break;
 
@@ -5524,7 +5524,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
             switch (src_type->e.numeric.type)
             {
@@ -5547,8 +5547,8 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         }
 
         case HLSL_OP2_RSHIFT:
-            assert(type_is_integer(dst_type));
-            assert(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
+            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, dst_type->e.numeric.type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
                     &expr->node, arg1, arg2);
             break;
@@ -5572,7 +5572,7 @@ static void write_sm4_if(const struct tpf_writer *tpf, const struct hlsl_ir_if *
         .src_count = 1,
     };
 
-    assert(iff->condition.node->data_type->dimx == 1);
+    VKD3D_ASSERT(iff->condition.node->data_type->dimx == 1);
 
     sm4_src_from_node(tpf, &instr.srcs[0], iff->condition.node, VKD3DSP_WRITEMASK_ALL);
     write_sm4_instruction(tpf, &instr);
@@ -5650,7 +5650,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
     sm4_dst_from_node(&instr.dsts[0], &load->node);
     instr.dst_count = 1;
 
-    assert(hlsl_is_numeric_type(type));
+    VKD3D_ASSERT(hlsl_is_numeric_type(type));
     if (type->e.numeric.type == HLSL_TYPE_BOOL && var_is_user_input(tpf->ctx, load->src.var))
     {
         struct hlsl_constant_value value;
@@ -5767,7 +5767,7 @@ static void write_sm4_resource_load(const struct tpf_writer *tpf, const struct h
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
         case HLSL_RESOURCE_SAMPLE_GRAD:
             /* Combined sample expressions were lowered. */
-            assert(load->sampler.var);
+            VKD3D_ASSERT(load->sampler.var);
             write_sm4_sample(tpf, load);
             break;
 
@@ -5920,7 +5920,7 @@ static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_bloc
 
             if (!instr->reg.allocated)
             {
-                assert(instr->type == HLSL_IR_CONSTANT);
+                VKD3D_ASSERT(instr->type == HLSL_IR_CONSTANT);
                 continue;
             }
         }
