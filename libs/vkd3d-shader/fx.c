@@ -1480,6 +1480,7 @@ enum state_property_component_type
     FX_UINT,
     FX_UINT8,
     FX_DS_STATE,
+    FX_RAST_STATE,
 };
 
 static inline bool is_object_fx_type(enum state_property_component_type type)
@@ -1487,6 +1488,7 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
     switch (type)
     {
         case FX_DS_STATE:
+        case FX_RAST_STATE:
             return true;
         default:
             return false;
@@ -1499,6 +1501,8 @@ static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_prope
     {
         case FX_DS_STATE:
             return HLSL_CLASS_DEPTH_STENCIL_STATE;
+        case FX_RAST_STATE:
+            return HLSL_CLASS_RASTERIZER_STATE;
         default:
             vkd3d_unreachable();
     }
@@ -1629,6 +1633,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
     states[] =
     {
+        { "RasterizerState",       HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RAST_STATE, 1, 0 },
         { "DepthStencilState",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DS_STATE, 1, 1 },
         { "DS_StencilRef",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT, 1, 9 },
 

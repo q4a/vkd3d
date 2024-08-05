@@ -4,11 +4,13 @@ shader model < 6.0
 
 [effect]
 DepthStencilState ds;
+RasterizerState rs;
 
 technique11
 {
     pass
     {
         SetDepthStencilState(ds, 123);
+        SetRasterizerState(rs);
     }
 }
