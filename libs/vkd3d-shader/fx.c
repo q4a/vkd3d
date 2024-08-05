@@ -68,19 +68,20 @@ static const struct state_block_function_info
     const char *name;
     unsigned int min_args, max_args;
     const struct function_component components[3];
+    unsigned int min_profile;
 }
 function_info[] =
 {
-    {"SetBlendState",        3, 3, { { "AB_BlendFactor" }, { "AB_SampleMask" }, { "BlendState" } } },
-    {"SetDepthStencilState", 2, 2, { { "DS_StencilRef" }, { "DepthStencilState" } } },
-    {"SetRasterizerState",   1, 1, { { "RasterizerState" } } },
-    {"SetVertexShader",      1, 1, { { "VertexShader" } } },
-    {"SetDomainShader",      1, 1, { { "DomainShader" } } },
-    {"SetHullShader",        1, 1, { { "HullShader" } } },
-    {"SetGeometryShader",    1, 1, { { "GeometryShader" } } },
-    {"SetPixelShader",       1, 1, { { "PixelShader" } } },
-    {"SetComputeShader",     1, 1, { { "ComputeShader" } } },
-    {"OMSetRenderTargets",   2, 9 },
+    {"SetBlendState",        3, 3, { { "AB_BlendFactor" }, { "AB_SampleMask" }, { "BlendState" } }, 4 },
+    {"SetDepthStencilState", 2, 2, { { "DS_StencilRef" }, { "DepthStencilState" } }, 4 },
+    {"SetRasterizerState",   1, 1, { { "RasterizerState" } }, 4 },
+    {"SetVertexShader",      1, 1, { { "VertexShader" } }, 4 },
+    {"SetDomainShader",      1, 1, { { "DomainShader" } }, 5 },
+    {"SetHullShader",        1, 1, { { "HullShader" } }, 5 },
+    {"SetGeometryShader",    1, 1, { { "GeometryShader" } }, 4 },
+    {"SetPixelShader",       1, 1, { { "PixelShader" } }, 4 },
+    {"SetComputeShader",     1, 1, { { "ComputeShader" } }, 4 },
+    {"OMSetRenderTargets",   2, 9, { {0} }, 4 },
 };
 
 static const struct state_block_function_info *get_state_block_function_info(const char *name)
@@ -756,6 +757,18 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         numeric_desc = get_fx_4_numeric_type_description(type, fx);
         put_u32_unaligned(buffer, numeric_desc);
+    }
+    else if (type->class == HLSL_CLASS_COMPUTE_SHADER)
+    {
+        put_u32_unaligned(buffer, 28);
+    }
+    else if (type->class == HLSL_CLASS_HULL_SHADER)
+    {
+        put_u32_unaligned(buffer, 29);
+    }
+    else if (type->class == HLSL_CLASS_DOMAIN_SHADER)
+    {
+        put_u32_unaligned(buffer, 30);
     }
     else
     {
@@ -1487,6 +1500,9 @@ enum state_property_component_type
     FX_UINT8,
     FX_DS_STATE,
     FX_RAST_STATE,
+    FX_DS,
+    FX_HS,
+    FX_CS,
 };
 
 static inline bool is_object_fx_type(enum state_property_component_type type)
@@ -1495,6 +1511,9 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
     {
         case FX_DS_STATE:
         case FX_RAST_STATE:
+        case FX_DS:
+        case FX_HS:
+        case FX_CS:
             return true;
         default:
             return false;
@@ -1509,6 +1528,12 @@ static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_prope
             return HLSL_CLASS_DEPTH_STENCIL_STATE;
         case FX_RAST_STATE:
             return HLSL_CLASS_RASTERIZER_STATE;
+        case FX_DS:
+            return HLSL_CLASS_DOMAIN_SHADER;
+        case FX_HS:
+            return HLSL_CLASS_HULL_SHADER;
+        case FX_CS:
+            return HLSL_CLASS_COMPUTE_SHADER;
         default:
             vkd3d_unreachable();
     }
@@ -1680,6 +1705,10 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { "MinLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 53 },
         { "MaxLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 54 },
         /* TODO: "Texture" field */
+
+        { "HullShader",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_HS, 1, 56 },
+        { "DomainShader",   HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DS, 1, 57 },
+        { "ComputeShader",  HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_CS, 1, 58 },
     };
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
     struct replace_state_context replace_context;
@@ -1810,6 +1839,13 @@ static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct h
     if (!(info = get_state_block_function_info(entry->name)))
         return 1;
 
+    if (info->min_profile > ctx->profile->major_version)
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_STATE_BLOCK_ENTRY,
+                "State %s is not supported for this profile.", entry->name);
+        return 1;
+    }
+
     /* For single argument case simply replace the name. */
     if (info->min_args == info->max_args && info->min_args == 1)
     {
@@ -1891,13 +1927,45 @@ static void write_fx_4_state_object_initializer(struct hlsl_ir_var *var, struct 
     }
 }
 
+static void write_fx_4_shader_initializer(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t elements_count = hlsl_get_multiarray_size(var->data_type);
+    unsigned int i;
+
+    /* FIXME: write shader blobs, once parser support works. */
+    for (i = 0; i < elements_count; ++i)
+        put_u32(buffer, 0);
+}
+
+static void write_fx_5_shader_initializer(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t elements_count = hlsl_get_multiarray_size(var->data_type);
+    unsigned int i;
+
+    /* FIXME: write shader blobs, once parser support works. */
+    for (i = 0; i < elements_count; ++i)
+    {
+        put_u32(buffer, 0); /* Blob offset */
+        put_u32(buffer, 0); /* SODecl[0] offset */
+        put_u32(buffer, 0); /* SODecl[1] offset */
+        put_u32(buffer, 0); /* SODecl[2] offset */
+        put_u32(buffer, 0); /* SODecl[3] offset */
+        put_u32(buffer, 0); /* SODecl count */
+        put_u32(buffer, 0); /* Rasterizer stream */
+        put_u32(buffer, 0); /* Interface bindings count */
+        put_u32(buffer, 0); /* Interface initializer offset */
+    }
+}
+
 static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
     uint32_t elements_count = hlsl_get_multiarray_size(var->data_type);
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t semantic_offset, bind_point = ~0u;
-    uint32_t name_offset, type_offset, i;
+    uint32_t name_offset, type_offset;
     struct hlsl_ctx *ctx = fx->ctx;
 
     if (var->reg_reservation.reg_type)
@@ -1934,9 +2002,14 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
 
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_VERTEX_SHADER:
-            /* FIXME: write shader blobs, once parser support works. */
-            for (i = 0; i < elements_count; ++i)
-                put_u32(buffer, 0);
+            write_fx_4_shader_initializer(var, fx);
+            fx->shader_count += elements_count;
+            break;
+
+        case HLSL_CLASS_HULL_SHADER:
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+            write_fx_5_shader_initializer(var, fx);
             fx->shader_count += elements_count;
             break;
 
@@ -1960,8 +2033,8 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             break;
 
         default:
-            hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.",
-                    type->e.numeric.type);
+            hlsl_fixme(ctx, &ctx->location, "Writing initializer for object class %u is not implemented.",
+                    type->class);
     }
 
     write_fx_4_annotations(var->annotations, fx);
@@ -2060,6 +2133,12 @@ static bool is_supported_object_variable(const struct hlsl_ctx *ctx, const struc
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
+            return true;
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+        case HLSL_CLASS_HULL_SHADER:
+            if (ctx->profile->major_version < 5)
+                return false;
             return true;
         case HLSL_CLASS_UAV:
             if (ctx->profile->major_version < 5)
