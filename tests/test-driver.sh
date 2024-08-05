@@ -1,7 +1,7 @@
 #! /bin/sh
 # test-driver - basic testsuite driver script. Modified for vkd3d tests.
 
-scriptversion=2022-02-20.01; # UTC
+scriptversion=2024-08-05.01; # UTC
 
 # This is a modified version of the test_driver script provided by
 # auto-tools, whose licence is as follows:
@@ -173,6 +173,10 @@ BEGIN {
     print "<fade>" $4 "<reset>" "[XP]"
 }
 
+/: Test skipped:/ {
+    print "<fade>" $4 "<reset>" "[SK]"
+}
+
 /: Assertion .* failed\./ {
     print "#    [AF] <fade>" $0 "<reset>"
 }
@@ -198,10 +202,14 @@ fi
 # Count number of [XF] tags.
 xfcount=$(echo "$details" | awk '/\[XF\]/{count++} END{printf "%d", count}')
 
+# Count number of [SK] tags.
+skcount=$(echo "$details" | awk '/\[SK\]/{count++} END{printf "%d", count}')
+
 details=$(echo "$details" |\
     sed "s/\[F\]/$color_bright_red[F]$color_reset/g" |\
     sed "s/\[XF\]/$color_yellow[XF]$color_reset/g" |\
     sed "s/\[XP\]/$color_dark_red[XP]$color_reset/g" |\
+    sed "s/\[SK\]/$color_blue[SK]$color_reset/g" |\
     sed "s/\[AF\]/$color_bright_purple[AF]$color_reset/g" |\
     sed "s/\[SIGABRT\]/$color_bright_purple[SIGABRT]$color_reset/g" |\
     sed "s/\[SIGSEGV\]/$color_bright_purple[SIGSEGV]$color_reset/g" |\
@@ -211,9 +219,15 @@ details=$(echo "$details" |\
     tr '#' '\n' |\
     awk 'NF != 1' )
 
-# If the test passes but has [XF], we will omit details but report number of [XF]
-if [ "$res" = "PASS" ] && [ "$xfcount" -gt 0 ]; then
-  details="$color_yellow($xfcount XF)$color_reset"
+# If the test passes, we will omit details but report number of [XF] and [SK]
+if [ "$res" = "PASS" ]; then
+  details=""
+  if [ "$xfcount" -gt 0 ]; then
+    details="$details $color_yellow($xfcount XF)$color_reset"
+  fi
+  if [ "$skcount" -gt 0 ]; then
+    details="$details $color_blue($skcount SK)$color_reset"
+  fi
 fi
 
 # Report outcome to console.
