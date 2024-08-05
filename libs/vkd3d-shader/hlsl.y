@@ -7368,6 +7368,18 @@ type_no_void:
         {
             $$ = hlsl_get_type(ctx->cur_scope, "PixelShader", true, true);
         }
+    | KW_COMPUTESHADER
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "ComputeShader", true, true);
+        }
+    | KW_DOMAINSHADER
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "DomainShader", true, true);
+        }
+    | KW_HULLSHADER
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "HullShader", true, true);
+        }
     | KW_CONSTANTBUFFER '<' type '>'
         {
             if ($3->class != HLSL_CLASS_STRUCT)

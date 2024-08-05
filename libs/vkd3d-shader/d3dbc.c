@@ -1519,6 +1519,9 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
         case HLSL_CLASS_CONSTANT_BUFFER:
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+        case HLSL_CLASS_HULL_SHADER:
             break;
     }
 
@@ -1618,6 +1621,9 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
         case HLSL_CLASS_CONSTANT_BUFFER:
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+        case HLSL_CLASS_HULL_SHADER:
             break;
     }
 

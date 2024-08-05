@@ -631,6 +631,9 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VERTEX_SHADER:
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+        case HLSL_CLASS_HULL_SHADER:
             put_u32_unaligned(buffer, 2);
             break;
 
@@ -1057,6 +1060,9 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
         case HLSL_CLASS_RASTERIZER_STATE:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_VOID:
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+        case HLSL_CLASS_HULL_SHADER:
             return false;
 
         case HLSL_CLASS_EFFECT_GROUP:
