@@ -1824,7 +1824,7 @@ static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct h
     if (entry_index != block->count - 1)
     {
         memmove(&block->entries[entry_index + entry->args_count], &block->entries[entry_index + 1],
-                (entry->args_count - 1) * sizeof(*block->entries));
+                (block->count - entry_index - 1) * sizeof(*block->entries));
     }
     block->count += entry->args_count - 1;
 
@@ -1839,7 +1839,7 @@ static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct h
     }
     hlsl_free_state_block_entry(entry);
 
-    return entry->args_count - 1;
+    return entry->args_count;
 }
 
 static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
