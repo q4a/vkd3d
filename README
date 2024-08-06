@@ -78,6 +78,10 @@ commas or semicolons.
  * VKD3D_TEST_DEBUG - enables additional debug messages in tests. Set to 0, 1
    or 2.
 
+ * VKD3D_TEST_DETAILED - enables printing detailed output when running the test
+   suite, reporting specific shader_test lines that trigger XFAIL and SKIP even
+   on tests that overall PASS. Set to 0, or 1.
+
  * VKD3D_TEST_FILTER - a filter string. Only the tests whose names matches the
    filter string will be run, e.g. VKD3D_TEST_FILTER=clear_render_target.
    Useful for debugging or developing new tests.

@@ -219,8 +219,11 @@ details=$(echo "$details" |\
     tr '#' '\n' |\
     awk 'NF != 1' )
 
+# Set VKD3D_TEST_DETAILED to 0 if unset.
+VKD3D_TEST_DETAILED=${VKD3D_TEST_DETAILED:-0}
+
 # If the test passes, we will omit details but report number of [XF] and [SK]
-if [ "$res" = "PASS" ]; then
+if [ "$res" = "PASS" ] && [ "$VKD3D_TEST_DETAILED" != "1" ]; then
   details=""
   if [ "$xfcount" -gt 0 ]; then
     details="$details $color_yellow($xfcount XF)$color_reset"
