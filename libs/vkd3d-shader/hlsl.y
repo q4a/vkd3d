@@ -7418,6 +7418,10 @@ type_no_void:
         {
             $$ = hlsl_get_type(ctx->cur_scope, "HullShader", true, true);
         }
+    | KW_GEOMETRYSHADER
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "GeometryShader", true, true);
+        }
     | KW_CONSTANTBUFFER '<' type '>'
         {
             if ($3->class != HLSL_CLASS_STRUCT)
