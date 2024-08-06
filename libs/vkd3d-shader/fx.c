@@ -1503,6 +1503,7 @@ enum state_property_component_type
     FX_DS,
     FX_HS,
     FX_CS,
+    FX_TEXTURE,
 };
 
 static inline bool is_object_fx_type(enum state_property_component_type type)
@@ -1514,6 +1515,7 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
         case FX_DS:
         case FX_HS:
         case FX_CS:
+        case FX_TEXTURE:
             return true;
         default:
             return false;
@@ -1534,6 +1536,8 @@ static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_prope
             return HLSL_CLASS_HULL_SHADER;
         case FX_CS:
             return HLSL_CLASS_COMPUTE_SHADER;
+        case FX_TEXTURE:
+            return HLSL_CLASS_TEXTURE;
         default:
             vkd3d_unreachable();
     }
@@ -1704,7 +1708,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { "BorderColor",    HLSL_CLASS_SAMPLER, HLSL_CLASS_VECTOR,  FX_FLOAT,   4, 52 },
         { "MinLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 53 },
         { "MaxLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 54 },
-        /* TODO: "Texture" field */
+        { "Texture",        HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_TEXTURE, 1, 55 },
 
         { "HullShader",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_HS, 1, 56 },
         { "DomainShader",   HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DS, 1, 57 },
