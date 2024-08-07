@@ -3123,24 +3123,24 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
     vkd3d_unreachable();
 }
 
-static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type)
+static enum vkd3d_sm4_data_type sm4_data_type(const struct hlsl_type *type)
 {
     switch (type->e.resource.format->e.numeric.type)
     {
         case HLSL_TYPE_DOUBLE:
-            return D3D_RETURN_TYPE_DOUBLE;
+            return VKD3D_SM4_DATA_DOUBLE;
 
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_HALF:
-            return D3D_RETURN_TYPE_FLOAT;
+            return VKD3D_SM4_DATA_FLOAT;
 
         case HLSL_TYPE_INT:
-            return D3D_RETURN_TYPE_SINT;
+            return VKD3D_SM4_DATA_INT;
             break;
 
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_UINT:
-            return D3D_RETURN_TYPE_UINT;
+            return VKD3D_SM4_DATA_UINT;
 
         default:
             vkd3d_unreachable();
@@ -3471,7 +3471,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         {
             unsigned int dimx = resource->component_type->e.resource.format->dimx;
 
-            put_u32(&buffer, sm4_resource_format(resource->component_type));
+            put_u32(&buffer, sm4_data_type(resource->component_type));
             put_u32(&buffer, sm4_rdef_resource_dimension(resource->component_type));
             put_u32(&buffer, ~0u); /* FIXME: multisample count */
             flags |= (dimx - 1) << VKD3D_SM4_SIF_TEXTURE_COMPONENTS_SHIFT;
@@ -4348,7 +4348,7 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
             .dsts[0].reg.idx_count = 1,
             .dst_count = 1,
 
-            .idx[0] = sm4_resource_format(component_type) * 0x1111,
+            .idx[0] = sm4_data_type(component_type) * 0x1111,
             .idx_count = 1,
         };
 
