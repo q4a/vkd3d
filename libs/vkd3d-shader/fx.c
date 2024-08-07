@@ -1498,17 +1498,6 @@ static bool replace_state_block_constant(struct hlsl_ctx *ctx, struct hlsl_ir_no
     return true;
 }
 
-static void fold_state_value(struct hlsl_ctx *ctx, struct hlsl_state_block_entry *entry)
-{
-    bool progress;
-
-    do
-    {
-        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, entry->instrs, NULL);
-        progress |= hlsl_copy_propagation_execute(ctx, entry->instrs);
-    } while (progress);
-}
-
 enum state_property_component_type
 {
     FX_BOOL,
@@ -1805,7 +1794,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
 
     /* Turn named constants to actual constants. */
     hlsl_transform_ir(ctx, replace_state_block_constant, entry->instrs, &replace_context);
-    fold_state_value(ctx, entry);
+    hlsl_run_const_passes(ctx, entry->instrs);
 
     /* Now cast and run folding again. */
 
@@ -1875,7 +1864,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         hlsl_src_remove(entry->args);
         hlsl_src_from_node(entry->args, cast);
 
-        fold_state_value(ctx, entry);
+        hlsl_run_const_passes(ctx, entry->instrs);
     }
 }
 
