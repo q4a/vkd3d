@@ -5152,10 +5152,10 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     }
     else
     {
-        D3D_NAME usage;
+        enum vkd3d_shader_sysval_semantic semantic;
         bool has_idx;
 
-        if (!hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage))
+        if (!sysval_semantic_from_hlsl(&semantic, ctx, &var->semantic, output))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
