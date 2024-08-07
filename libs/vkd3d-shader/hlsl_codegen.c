@@ -1648,6 +1648,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
             break;
 
         case HLSL_CLASS_MATRIX:

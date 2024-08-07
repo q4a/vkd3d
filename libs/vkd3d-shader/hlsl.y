@@ -7433,6 +7433,10 @@ type_no_void:
         {
             $$ = hlsl_get_type(ctx->cur_scope, "RasterizerState", true, true);
         }
+    | KW_BLENDSTATE
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "BlendState", true, true);
+        }
 
 type:
       type_no_void

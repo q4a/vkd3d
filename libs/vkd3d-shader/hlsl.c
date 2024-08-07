@@ -385,6 +385,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         case HLSL_CLASS_DOMAIN_SHADER:
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
             break;
     }
 }
@@ -459,6 +460,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
         case HLSL_CLASS_DOMAIN_SHADER:
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
             return true;
 
         case HLSL_CLASS_VECTOR:
@@ -615,6 +617,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
             case HLSL_CLASS_DOMAIN_SHADER:
             case HLSL_CLASS_HULL_SHADER:
             case HLSL_CLASS_GEOMETRY_SHADER:
+            case HLSL_CLASS_BLEND_STATE:
                 VKD3D_ASSERT(idx == 0);
                 break;
 
@@ -1019,6 +1022,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_DOMAIN_SHADER:
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
             return 1;
 
         case HLSL_CLASS_EFFECT_GROUP:
@@ -1110,6 +1114,7 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         case HLSL_CLASS_DOMAIN_SHADER:
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
             return true;
     }
 
@@ -2562,6 +2567,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
         case HLSL_CLASS_DOMAIN_SHADER:
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
             break;
     }
 
@@ -3937,6 +3943,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DomainShader", HLSL_CLASS_DOMAIN_SHADER));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "HullShader", HLSL_CLASS_HULL_SHADER));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "GeometryShader", HLSL_CLASS_GEOMETRY_SHADER));
+    hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "BlendState", HLSL_CLASS_BLEND_STATE));
 
     for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
     {
