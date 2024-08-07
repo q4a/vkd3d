@@ -8,6 +8,8 @@ RasterizerState rs;
 HullShader hs;
 ComputeShader cs;
 DomainShader doms;
+RenderTargetView rtv1;
+DepthStencilView dsv;
 
 technique11
 {
@@ -18,5 +20,6 @@ technique11
         SetHullShader(hs);
         SetComputeShader(cs);
         SetDomainShader(doms);
+        OMSetRenderTargets(rtv1, dsv);
     }
 }

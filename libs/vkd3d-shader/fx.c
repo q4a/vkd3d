@@ -111,7 +111,7 @@ static void get_state_block_function_components(const struct state_block_functio
 {
     unsigned int i;
 
-    assert(comp_count >= info->max_args);
+    assert(comp_count <= info->max_args);
 
     if (info->min_args == info->max_args)
     {
@@ -125,7 +125,7 @@ static void get_state_block_function_components(const struct state_block_functio
     {
         for (i = 0; i < comp_count - 2; ++i)
             add_function_component(&components, "RenderTargetView", true, i + 1);
-        add_function_component(&components, "DepthStencilView", true, 0);
+        add_function_component(&components, "DepthStencilView", false, 0);
         add_function_component(&components, "RenderTargetView", true, 0);
     }
 }
@@ -1393,11 +1393,8 @@ static void write_fx_4_state_assignment(const struct hlsl_ir_var *var, struct hl
     struct hlsl_ctx *ctx = fx->ctx;
     struct hlsl_ir_node *value = entry->args->node;
 
-    if (entry->lhs_has_index)
-        hlsl_fixme(ctx, &var->loc, "Unsupported assignment to array element.");
-
     put_u32(buffer, entry->name_id);
-    put_u32(buffer, 0); /* TODO: destination index */
+    put_u32(buffer, entry->lhs_index);
     type_offset = put_u32(buffer, 0);
     rhs_offset = put_u32(buffer, 0);
 
@@ -1504,6 +1501,8 @@ enum state_property_component_type
     FX_HULLSHADER,
     FX_COMPUTESHADER,
     FX_TEXTURE,
+    FX_DEPTHSTENCILVIEW,
+    FX_RENDERTARGETVIEW,
 };
 
 static inline bool is_object_fx_type(enum state_property_component_type type)
@@ -1516,6 +1515,8 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
         case FX_HULLSHADER:
         case FX_COMPUTESHADER:
         case FX_TEXTURE:
+        case FX_RENDERTARGETVIEW:
+        case FX_DEPTHSTENCILVIEW:
             return true;
         default:
             return false;
@@ -1538,6 +1539,10 @@ static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_prope
             return HLSL_CLASS_COMPUTE_SHADER;
         case FX_TEXTURE:
             return HLSL_CLASS_TEXTURE;
+        case FX_RENDERTARGETVIEW:
+            return HLSL_CLASS_RENDER_TARGET_VIEW;
+        case FX_DEPTHSTENCILVIEW:
+            return HLSL_CLASS_DEPTH_STENCIL_VIEW;
         default:
             vkd3d_unreachable();
     }
@@ -1671,6 +1676,10 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     {
         { "RasterizerState",       HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RASTERIZER, 1, 1, 0 },
         { "DepthStencilState",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DEPTHSTENCIL, 1, 1, 1 },
+
+        { "RenderTargetView",      HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RENDERTARGETVIEW, 1, 8, 3 },
+        { "DepthStencilView",      HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DEPTHSTENCILVIEW, 1, 1, 4 },
+
         { "DS_StencilRef",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 9 },
 
         { "FillMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 12, fill_values },
@@ -1745,6 +1754,27 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     {
         hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Unrecognized initializer for the state %s.",
                 entry->name);
+        return;
+    }
+
+    if (entry->lhs_has_index && state->array_size == 1)
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Can't use array-style access for non-array state %s.",
+                entry->name);
+        return;
+    }
+
+    if (!entry->lhs_has_index && state->array_size > 1)
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Expected array index for array state %s.",
+                entry->name);
+        return;
+    }
+
+    if (entry->lhs_has_index && (state->array_size <= entry->lhs_index))
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid element index %u for the state %s[%u].",
+                entry->lhs_index, state->name, state->array_size);
         return;
     }
 
