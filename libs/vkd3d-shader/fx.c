@@ -1429,17 +1429,28 @@ static void write_fx_4_state_assignment(const struct hlsl_ir_var *var, struct hl
     set_u32(buffer, rhs_offset, value_offset);
 }
 
-static bool state_block_contains_state(const char *name, unsigned int start, struct hlsl_state_block *block)
+static bool state_block_contains_state(const struct hlsl_state_block_entry *entry, unsigned int start_index,
+        struct hlsl_state_block *block)
 {
     unsigned int i;
 
-    for (i = start; i < block->count; ++i)
+    for (i = start_index; i < block->count; ++i)
     {
-        if (block->entries[i]->is_function_call)
+        const struct hlsl_state_block_entry *cur = block->entries[i];
+
+        if (cur->is_function_call)
             continue;
 
-        if (!ascii_strcasecmp(block->entries[i]->name, name))
-            return true;
+        if (ascii_strcasecmp(cur->name, entry->name))
+            continue;
+
+        if (cur->lhs_has_index != entry->lhs_has_index)
+            continue;
+
+        if (cur->lhs_has_index && cur->lhs_index != entry->lhs_index)
+            continue;
+
+        return true;
     }
 
     return false;
@@ -1936,7 +1947,7 @@ static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_i
             struct hlsl_state_block_entry *entry = block->entries[i];
 
             /* Skip if property is reassigned later. This will use the last assignment. */
-            if (state_block_contains_state(entry->name, i + 1, block))
+            if (state_block_contains_state(entry, i + 1, block))
                 continue;
 
             /* Resolve special constant names and property names. */
