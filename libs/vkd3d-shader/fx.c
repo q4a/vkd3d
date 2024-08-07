@@ -205,6 +205,7 @@ struct fx_write_context
     uint32_t sampler_state_count;
     uint32_t depth_stencil_state_count;
     uint32_t rasterizer_state_count;
+    uint32_t blend_state_count;
     int status;
 
     bool child_effect;
@@ -754,6 +755,10 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     else if (type->class == HLSL_CLASS_DEPTH_STENCIL_STATE)
     {
         put_u32_unaligned(buffer, 3);
+    }
+    else if (type->class == HLSL_CLASS_BLEND_STATE)
+    {
+        put_u32_unaligned(buffer, 2);
     }
     else if (hlsl_is_numeric_type(type))
     {
@@ -2082,6 +2087,11 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             fx->rasterizer_state_count += elements_count;
             break;
 
+        case HLSL_CLASS_BLEND_STATE:
+            write_fx_4_state_object_initializer(var, fx);
+            fx->blend_state_count += elements_count;
+            break;
+
         default:
             hlsl_fixme(ctx, &ctx->location, "Writing initializer for object class %u is not implemented.",
                     type->class);
@@ -2183,6 +2193,7 @@ static bool is_supported_object_variable(const struct hlsl_ctx *ctx, const struc
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_BLEND_STATE:
             return true;
         case HLSL_CLASS_COMPUTE_SHADER:
         case HLSL_CLASS_DOMAIN_SHADER:
@@ -2253,7 +2264,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* String count. */
     put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, fx.depth_stencil_state_count);
-    put_u32(&buffer, 0); /* Blend state count. */
+    put_u32(&buffer, fx.blend_state_count);
     put_u32(&buffer, fx.rasterizer_state_count);
     put_u32(&buffer, fx.sampler_state_count);
     put_u32(&buffer, fx.rtv_count);
@@ -2311,7 +2322,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* String count. */
     put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, fx.depth_stencil_state_count);
-    put_u32(&buffer, 0); /* Blend state count. */
+    put_u32(&buffer, fx.blend_state_count);
     put_u32(&buffer, fx.rasterizer_state_count);
     put_u32(&buffer, fx.sampler_state_count);
     put_u32(&buffer, fx.rtv_count);

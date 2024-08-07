@@ -40,3 +40,6 @@ SamplerState sampler7 { Texture = t7; };
 SamplerState sampler8 { Texture = t8; };
 SamplerState sampler9 { Texture = t9; };
 SamplerState sampler10 { Texture = t10; };
+
+[effect]
+BlendState bs;
