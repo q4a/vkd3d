@@ -22,6 +22,7 @@
  */
 
 #include "hlsl.h"
+#include "vkd3d_shader_private.h"
 
 #define SM4_MAX_SRC_COUNT 6
 #define SM4_MAX_DST_COUNT 2
@@ -3599,6 +3600,13 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
                         struct hlsl_type *comp_type = hlsl_type_get_component_type(ctx, var->data_type, k);
                         unsigned int comp_offset;
                         enum hlsl_regset regset;
+
+                        if (comp_type->class == HLSL_CLASS_STRING)
+                        {
+                            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                    "Cannot write string default value.");
+                            continue;
+                        }
 
                         comp_offset = hlsl_type_get_component_offset(ctx, var->data_type, k, &regset);
                         if (regset == HLSL_REGSET_NUMERIC)
