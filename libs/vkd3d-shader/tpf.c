@@ -2918,16 +2918,16 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                put_u32(&buffer, D3D_REGISTER_COMPONENT_FLOAT32);
+                put_u32(&buffer, VKD3D_SHADER_COMPONENT_FLOAT);
                 break;
 
             case HLSL_TYPE_INT:
-                put_u32(&buffer, D3D_REGISTER_COMPONENT_SINT32);
+                put_u32(&buffer, VKD3D_SHADER_COMPONENT_INT);
                 break;
 
             case HLSL_TYPE_BOOL:
             case HLSL_TYPE_UINT:
-                put_u32(&buffer, D3D_REGISTER_COMPONENT_UINT32);
+                put_u32(&buffer, VKD3D_SHADER_COMPONENT_UINT);
                 break;
 
             default:
@@ -2935,7 +2935,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Invalid data type %s for semantic variable %s.", string->buffer, var->name);
                 hlsl_release_string_buffer(ctx, string);
-                put_u32(&buffer, D3D_REGISTER_COMPONENT_UNKNOWN);
+                put_u32(&buffer, VKD3D_SHADER_COMPONENT_VOID);
         }
         put_u32(&buffer, reg_idx);
         put_u32(&buffer, vkd3d_make_u16(width, use_mask));
