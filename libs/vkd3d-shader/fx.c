@@ -1498,11 +1498,11 @@ enum state_property_component_type
     FX_FLOAT,
     FX_UINT,
     FX_UINT8,
-    FX_DS_STATE,
-    FX_RAST_STATE,
-    FX_DS,
-    FX_HS,
-    FX_CS,
+    FX_DEPTHSTENCIL,
+    FX_RASTERIZER,
+    FX_DOMAINSHADER,
+    FX_HULLSHADER,
+    FX_COMPUTESHADER,
     FX_TEXTURE,
 };
 
@@ -1510,11 +1510,11 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
 {
     switch (type)
     {
-        case FX_DS_STATE:
-        case FX_RAST_STATE:
-        case FX_DS:
-        case FX_HS:
-        case FX_CS:
+        case FX_DEPTHSTENCIL:
+        case FX_RASTERIZER:
+        case FX_DOMAINSHADER:
+        case FX_HULLSHADER:
+        case FX_COMPUTESHADER:
         case FX_TEXTURE:
             return true;
         default:
@@ -1526,15 +1526,15 @@ static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_prope
 {
     switch (type)
     {
-        case FX_DS_STATE:
+        case FX_DEPTHSTENCIL:
             return HLSL_CLASS_DEPTH_STENCIL_STATE;
-        case FX_RAST_STATE:
+        case FX_RASTERIZER:
             return HLSL_CLASS_RASTERIZER_STATE;
-        case FX_DS:
+        case FX_DOMAINSHADER:
             return HLSL_CLASS_DOMAIN_SHADER;
-        case FX_HS:
+        case FX_HULLSHADER:
             return HLSL_CLASS_HULL_SHADER;
-        case FX_CS:
+        case FX_COMPUTESHADER:
             return HLSL_CLASS_COMPUTE_SHADER;
         case FX_TEXTURE:
             return HLSL_CLASS_TEXTURE;
@@ -1668,8 +1668,8 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
     states[] =
     {
-        { "RasterizerState",       HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RAST_STATE, 1, 0 },
-        { "DepthStencilState",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DS_STATE, 1, 1 },
+        { "RasterizerState",       HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RASTERIZER, 1, 0 },
+        { "DepthStencilState",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DEPTHSTENCIL, 1, 1 },
         { "DS_StencilRef",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT, 1, 9 },
 
         { "FillMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 12, fill_values },
@@ -1710,9 +1710,9 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { "MaxLOD",         HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_FLOAT,   1, 54 },
         { "Texture",        HLSL_CLASS_SAMPLER, HLSL_CLASS_SCALAR,  FX_TEXTURE, 1, 55 },
 
-        { "HullShader",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_HS, 1, 56 },
-        { "DomainShader",   HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DS, 1, 57 },
-        { "ComputeShader",  HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_CS, 1, 58 },
+        { "HullShader",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_HULLSHADER, 1, 56 },
+        { "DomainShader",   HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DOMAINSHADER, 1, 57 },
+        { "ComputeShader",  HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_COMPUTESHADER, 1, 58 },
     };
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
     struct replace_state_context replace_context;
