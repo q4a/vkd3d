@@ -42,4 +42,26 @@ SamplerState sampler9 { Texture = t9; };
 SamplerState sampler10 { Texture = t10; };
 
 [effect]
-BlendState bs;
+BlendState bs
+{
+    BlendEnable[7] = true;
+    BlendEnable[6] = false;
+    RenderTargetWriteMask[2] = 0x12;
+    SrcBlend[2] = one;
+    DestBlend[1] = zero;
+    BlendOp[3] = min;
+    SrcBlendAlpha[7] = dest_color;
+    DestBlendAlpha[5] = src1_alpha;
+    BlendOpAlpha[4] = add;
+};
+
+[effect todo]
+BlendState bs
+{
+    SrcBlend = one;
+    DestBlend = zero;
+    BlendOp = min;
+    SrcBlendAlpha = dest_color;
+    DestBlendAlpha = src1_alpha;
+    BlendOpAlpha = add;
+};

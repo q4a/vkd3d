@@ -1670,6 +1670,38 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { NULL }
     };
 
+    static const struct rhs_named_value blend_values[] =
+    {
+        { "ZERO", 1 },
+        { "ONE", 2 },
+        { "SRC_COLOR", 3 },
+        { "INV_SRC_COLOR", 4 },
+        { "SRC_ALPHA", 5 },
+        { "INV_SRC_ALPHA", 6 },
+        { "DEST_ALPHA", 7 },
+        { "INV_DEST_ALPHA", 8 },
+        { "DEST_COLOR", 9 },
+        { "INV_DEST_COLOR", 10 },
+        { "SRC_ALPHA_SAT", 11 },
+        { "BLEND_FACTOR", 14 },
+        { "INV_BLEND_FACTOR", 15 },
+        { "SRC1_COLOR", 16 },
+        { "INV_SRC1_COLOR", 17 },
+        { "SRC1_ALPHA", 18 },
+        { "INV_SRC1_ALPHA", 19 },
+        { NULL }
+    };
+
+    static const struct rhs_named_value blendop_values[] =
+    {
+        { "ADD", 1 },
+        { "SUBTRACT", 2 },
+        { "REV_SUBTRACT", 3 },
+        { "MIN", 4 },
+        { "MAX", 5 },
+        { NULL }
+    };
+
     static const struct state
     {
         const char *name;
@@ -1733,6 +1765,39 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { "DomainShader",   HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DOMAINSHADER,  1, 1, 57 },
         { "ComputeShader",  HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_COMPUTESHADER, 1, 1, 58 },
     };
+
+    static const struct state fx_4_blend_states[] =
+    {
+        { "AlphaToCoverageEnable", HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 1, 36 },
+        { "BlendEnable",           HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 8, 37 },
+        { "SrcBlend",              HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 38, blend_values },
+        { "DestBlend",             HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 39, blend_values },
+        { "BlendOp",               HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 40, blendop_values },
+        { "SrcBlendAlpha",         HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 41, blend_values },
+        { "DestBlendAlpha",        HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 42, blend_values },
+        { "BlendOpAlpha",          HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 43, blendop_values },
+        { "RenderTargetWriteMask", HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT8, 1, 8, 44 },
+    };
+
+    static const struct state fx_5_blend_states[] =
+    {
+        { "AlphaToCoverageEnable", HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 1, 36 },
+        { "BlendEnable",           HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_BOOL,  1, 8, 37 },
+        { "SrcBlend",              HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 8, 38, blend_values },
+        { "DestBlend",             HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 8, 39, blend_values },
+        { "BlendOp",               HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 8, 40, blendop_values },
+        { "SrcBlendAlpha",         HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 8, 41, blend_values },
+        { "DestBlendAlpha",        HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 8, 42, blend_values },
+        { "BlendOpAlpha",          HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 8, 43, blendop_values },
+        { "RenderTargetWriteMask", HLSL_CLASS_BLEND_STATE, HLSL_CLASS_SCALAR, FX_UINT8, 1, 8, 44 },
+    };
+
+    struct state_table
+    {
+        const struct state *ptr;
+        unsigned int count;
+    } table;
+
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
     struct replace_state_context replace_context;
     struct hlsl_type *state_type = NULL;
@@ -1743,12 +1808,31 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     struct hlsl_ir_load *load;
     unsigned int i;
 
-    for (i = 0; i < ARRAY_SIZE(states); ++i)
+    if (type->class == HLSL_CLASS_BLEND_STATE)
     {
-        if (type->class == states[i].container
-                && !ascii_strcasecmp(entry->name, states[i].name))
+        if (ctx->profile->major_version == 4)
         {
-            state = &states[i];
+            table.ptr = fx_4_blend_states;
+            table.count = ARRAY_SIZE(fx_4_blend_states);
+        }
+        else
+        {
+            table.ptr = fx_5_blend_states;
+            table.count = ARRAY_SIZE(fx_5_blend_states);
+        }
+    }
+    else
+    {
+        table.ptr = states;
+        table.count = ARRAY_SIZE(states);
+    }
+
+    for (i = 0; i < table.count; ++i)
+    {
+        if (type->class == table.ptr[i].container
+                && !ascii_strcasecmp(entry->name, table.ptr[i].name))
+        {
+            state = &table.ptr[i];
             break;
         }
     }
