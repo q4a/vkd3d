@@ -50,6 +50,48 @@ float4 main() : sv_target
     return 0;
 }
 
+% This crashes on fxc using ps_5_0
+[pixel shader fail]
+struct
+{
+    float a;
+    string b;
+} apple = {1, "foobar"};
+
+float4 main() : sv_target
+{
+    return apple.a;
+}
+
+[pixel shader fail todo]
+struct apple
+{
+    float a;
+    string b;
+};
+
+float4 main(struct apple ap = {1, "foobar"}) : sv_target
+{
+    return ap.a;
+}
+
+[pixel shader fail todo]
+float4 main(string s = "foobar") : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm>=6) todo]
+string strs[2] = {"foo", "bar"};
+
+float4 main() : sv_target { return 0; }
+
+% Test string concatenation
+[pixel shader todo]
+string str = "foo" "bar"
+        "baz";
+
+float4 main() : sv_target { return 0; }
 
 % Escape sequences are hanlded differently in DXC.
 % Octal, hexadecimal, and unicode escape sequences that are out of range are considered errors.
