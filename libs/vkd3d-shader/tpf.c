@@ -3110,8 +3110,6 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
 {
     switch (type->class)
     {
-        case HLSL_CLASS_ARRAY:
-            return sm4_resource_type(type->e.array.type);
         case HLSL_CLASS_SAMPLER:
             return D3D_SIT_SAMPLER;
         case HLSL_CLASS_TEXTURE:
@@ -3127,9 +3125,6 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
 
 static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type)
 {
-    if (type->class == HLSL_CLASS_ARRAY)
-        return sm4_resource_format(type->e.array.type);
-
     switch (type->e.resource.format->e.numeric.type)
     {
         case HLSL_TYPE_DOUBLE:
@@ -3154,9 +3149,6 @@ static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type
 
 static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *type)
 {
-    if (type->class == HLSL_CLASS_ARRAY)
-        return sm4_rdef_resource_dimension(type->e.array.type);
-
     switch (type->sampler_dim)
     {
         case HLSL_SAMPLER_DIM_1D:
@@ -3193,8 +3185,13 @@ struct extern_resource
     const struct hlsl_buffer *buffer;
 
     char *name;
-    struct hlsl_type *data_type;
     bool is_user_packed;
+
+    /* The data type of a single component of the resource.
+     * This might be different from the data type of the resource itself in 4.0
+     * profiles, where an array (or multi-dimensional array) is handled as a
+     * single resource, unlike in 5.0. */
+    struct hlsl_type *component_type;
 
     enum hlsl_regset regset;
     unsigned int id, space, index, bind_count;
@@ -3294,8 +3291,9 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                     extern_resources[*count].buffer = NULL;
 
                     extern_resources[*count].name = name;
-                    extern_resources[*count].data_type = component_type;
                     extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
+
+                    extern_resources[*count].component_type = component_type;
 
                     extern_resources[*count].regset = regset;
                     extern_resources[*count].id = var->regs[regset].id;
@@ -3339,11 +3337,12 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                 extern_resources[*count].buffer = NULL;
 
                 extern_resources[*count].name = name;
-                extern_resources[*count].data_type = var->data_type;
                 /* For some reason 5.1 resources aren't marked as
                  * user-packed, but cbuffers still are. */
                 extern_resources[*count].is_user_packed = hlsl_version_lt(ctx, 5, 1)
                         && !!var->reg_reservation.reg_type;
+
+                extern_resources[*count].component_type = hlsl_type_get_component_type(ctx, var->data_type, 0);
 
                 extern_resources[*count].regset = r;
                 extern_resources[*count].id = var->regs[r].id;
@@ -3381,8 +3380,9 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
         extern_resources[*count].buffer = buffer;
 
         extern_resources[*count].name = name;
-        extern_resources[*count].data_type = NULL;
         extern_resources[*count].is_user_packed = !!buffer->reservation.reg_type;
+
+        extern_resources[*count].component_type = NULL;
 
         extern_resources[*count].regset = HLSL_REGSET_NUMERIC;
         extern_resources[*count].id = buffer->reg.id;
@@ -3466,13 +3466,13 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         if (resource->buffer)
             put_u32(&buffer, resource->buffer->type == HLSL_BUFFER_CONSTANT ? D3D_SIT_CBUFFER : D3D_SIT_TBUFFER);
         else
-            put_u32(&buffer, sm4_resource_type(resource->data_type));
+            put_u32(&buffer, sm4_resource_type(resource->component_type));
         if (resource->regset == HLSL_REGSET_TEXTURES || resource->regset == HLSL_REGSET_UAVS)
         {
-            unsigned int dimx = hlsl_type_get_component_type(ctx, resource->data_type, 0)->e.resource.format->dimx;
+            unsigned int dimx = resource->component_type->e.resource.format->dimx;
 
-            put_u32(&buffer, sm4_resource_format(resource->data_type));
-            put_u32(&buffer, sm4_rdef_resource_dimension(resource->data_type));
+            put_u32(&buffer, sm4_resource_format(resource->component_type));
+            put_u32(&buffer, sm4_rdef_resource_dimension(resource->component_type));
             put_u32(&buffer, ~0u); /* FIXME: multisample count */
             flags |= (dimx - 1) << VKD3D_SM4_SIF_TEXTURE_COMPONENTS_SHIFT;
         }
@@ -4284,7 +4284,6 @@ static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const st
 
 static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct extern_resource *resource)
 {
-    struct hlsl_type *component_type;
     unsigned int i;
     struct sm4_instruction instr =
     {
@@ -4294,12 +4293,10 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
         .dst_count = 1,
     };
 
-    component_type = hlsl_type_get_component_type(tpf->ctx, resource->data_type, 0);
-
-    if (component_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
-        instr.extra_bits |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
-
     VKD3D_ASSERT(resource->regset == HLSL_REGSET_SAMPLERS);
+
+    if (resource->component_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
+        instr.extra_bits |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
 
     for (i = 0; i < resource->bind_count; ++i)
     {
@@ -4337,7 +4334,7 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
 
     VKD3D_ASSERT(resource->regset == regset);
 
-    component_type = hlsl_type_get_component_type(tpf->ctx, resource->data_type, 0);
+    component_type = resource->component_type;
 
     for (i = 0; i < resource->bind_count; ++i)
     {
@@ -4384,18 +4381,18 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
 
         if (uav)
         {
-            switch (resource->data_type->sampler_dim)
+            switch (component_type->sampler_dim)
             {
-            case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
-                instr.opcode = VKD3D_SM5_OP_DCL_UAV_STRUCTURED;
-                instr.byte_stride = resource->data_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC] * 4;
-                break;
-            default:
-                instr.opcode = VKD3D_SM5_OP_DCL_UAV_TYPED;
-                break;
+                case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
+                    instr.opcode = VKD3D_SM5_OP_DCL_UAV_STRUCTURED;
+                    instr.byte_stride = component_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC] * 4;
+                    break;
+                default:
+                    instr.opcode = VKD3D_SM5_OP_DCL_UAV_TYPED;
+                    break;
             }
 
-            if (resource->data_type->e.resource.rasteriser_ordered)
+            if (component_type->e.resource.rasteriser_ordered)
                 instr.opcode |= VKD3DSUF_RASTERISER_ORDERED_VIEW << VKD3D_SM5_UAV_FLAGS_SHIFT;
         }
         else
@@ -6105,7 +6102,7 @@ static void write_sm4_sfi0(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
     for (unsigned int i = 0; i < extern_resources_count; ++i)
     {
-        if (extern_resources[i].data_type && extern_resources[i].data_type->e.resource.rasteriser_ordered)
+        if (extern_resources[i].component_type && extern_resources[i].component_type->e.resource.rasteriser_ordered)
             *flags |= VKD3D_SM4_REQUIRES_ROVS;
     }
     sm4_free_extern_resources(extern_resources, extern_resources_count);
