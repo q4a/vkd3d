@@ -46,6 +46,7 @@ BlendState bs
 {
     BlendEnable[7] = true;
     BlendEnable[6] = false;
+    BlendEnable[5] = fAlse;
     RenderTargetWriteMask[2] = 0x12;
     SrcBlend = one;
     DestBlend = zero;
