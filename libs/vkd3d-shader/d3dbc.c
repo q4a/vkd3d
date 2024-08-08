@@ -1947,7 +1947,7 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct s
     token |= VKD3D_SM1_INSTRUCTION_FLAGS_MASK & (instr->flags << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT);
 
     if (version->major > 1)
-        token |= (instr->has_dst + instr->src_count) << D3DSI_INSTLENGTH_SHIFT;
+        token |= (instr->has_dst + instr->src_count) << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
     put_u32(buffer, token);
 
     if (instr->has_dst)
@@ -2415,7 +2415,7 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
 
     token = VKD3D_SM1_OP_DCL;
     if (version->major > 1)
-        token |= 2 << D3DSI_INSTLENGTH_SHIFT;
+        token |= 2 << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
     put_u32(buffer, token);
 
     token = (1u << 31);
