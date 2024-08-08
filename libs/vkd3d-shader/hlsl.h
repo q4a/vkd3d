@@ -1528,7 +1528,7 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type);
 bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version, const char *semantic_name,
         unsigned int semantic_index, bool output, enum vkd3d_shader_register_type *type, unsigned int *reg);
 bool hlsl_sm1_usage_from_semantic(const char *semantic_name,
-        uint32_t semantic_index, D3DDECLUSAGE *usage, uint32_t *usage_idx);
+        uint32_t semantic_index, enum vkd3d_decl_usage *usage, uint32_t *usage_idx);
 
 void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer);
 int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,

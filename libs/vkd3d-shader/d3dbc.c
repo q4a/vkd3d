@@ -1423,32 +1423,32 @@ bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
 }
 
 bool hlsl_sm1_usage_from_semantic(const char *semantic_name,
-        uint32_t semantic_index, D3DDECLUSAGE *usage, uint32_t *usage_idx)
+        uint32_t semantic_index, enum vkd3d_decl_usage *usage, uint32_t *usage_idx)
 {
     static const struct
     {
         const char *name;
-        D3DDECLUSAGE usage;
+        enum vkd3d_decl_usage usage;
     }
     semantics[] =
     {
-        {"binormal",        D3DDECLUSAGE_BINORMAL},
-        {"blendindices",    D3DDECLUSAGE_BLENDINDICES},
-        {"blendweight",     D3DDECLUSAGE_BLENDWEIGHT},
-        {"color",           D3DDECLUSAGE_COLOR},
-        {"depth",           D3DDECLUSAGE_DEPTH},
-        {"fog",             D3DDECLUSAGE_FOG},
-        {"normal",          D3DDECLUSAGE_NORMAL},
-        {"position",        D3DDECLUSAGE_POSITION},
-        {"positiont",       D3DDECLUSAGE_POSITIONT},
-        {"psize",           D3DDECLUSAGE_PSIZE},
-        {"sample",          D3DDECLUSAGE_SAMPLE},
-        {"sv_depth",        D3DDECLUSAGE_DEPTH},
-        {"sv_position",     D3DDECLUSAGE_POSITION},
-        {"sv_target",       D3DDECLUSAGE_COLOR},
-        {"tangent",         D3DDECLUSAGE_TANGENT},
-        {"tessfactor",      D3DDECLUSAGE_TESSFACTOR},
-        {"texcoord",        D3DDECLUSAGE_TEXCOORD},
+        {"binormal",        VKD3D_DECL_USAGE_BINORMAL},
+        {"blendindices",    VKD3D_DECL_USAGE_BLEND_INDICES},
+        {"blendweight",     VKD3D_DECL_USAGE_BLEND_WEIGHT},
+        {"color",           VKD3D_DECL_USAGE_COLOR},
+        {"depth",           VKD3D_DECL_USAGE_DEPTH},
+        {"fog",             VKD3D_DECL_USAGE_FOG},
+        {"normal",          VKD3D_DECL_USAGE_NORMAL},
+        {"position",        VKD3D_DECL_USAGE_POSITION},
+        {"positiont",       VKD3D_DECL_USAGE_POSITIONT},
+        {"psize",           VKD3D_DECL_USAGE_PSIZE},
+        {"sample",          VKD3D_DECL_USAGE_SAMPLE},
+        {"sv_depth",        VKD3D_DECL_USAGE_DEPTH},
+        {"sv_position",     VKD3D_DECL_USAGE_POSITION},
+        {"sv_target",       VKD3D_DECL_USAGE_COLOR},
+        {"tangent",         VKD3D_DECL_USAGE_TANGENT},
+        {"tessfactor",      VKD3D_DECL_USAGE_TESS_FACTOR},
+        {"texcoord",        VKD3D_DECL_USAGE_TEXCOORD},
     };
 
     unsigned int i;
@@ -2203,8 +2203,8 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
     const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
     struct sm1_dst_register reg = {0};
+    enum vkd3d_decl_usage usage;
     uint32_t token, usage_idx;
-    D3DDECLUSAGE usage;
     bool ret;
 
     if (hlsl_sm1_register_from_semantic(version, element->semantic_name,
