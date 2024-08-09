@@ -75,6 +75,14 @@ commas or semicolons.
  * VKD3D_DISABLE_EXTENSIONS - a list of Vulkan extensions that libvkd3d should
    not use even if available.
 
+ * VKD3D_CAPS_OVERRIDE - a list of Direct3D 12 capabilities for which the
+   default value detected by vkd3d should be overridden, in the form
+   `capability1=value1,capability2=value2'. This doesn't change the vkd3d
+   behaviour, only the information reported to the application. The following
+   capabilities can currently be overridden:
+    * feature_level (allowed values: 11.0, 11.1, 12.0, 12.1, 12.2)
+    * resource_binding_tier (allowed values: 1, 2, 3)
+
  * VKD3D_SHADER_CONFIG - a list of options that change the behavior of
    libvkd3d-shader.
     * force_validation - Enable (additional) validation of libvkd3d-shader's

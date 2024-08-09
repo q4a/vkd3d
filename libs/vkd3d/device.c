@@ -1573,6 +1573,111 @@ static HRESULT vkd3d_check_device_extensions(struct d3d12_device *device,
     return S_OK;
 }
 
+static void vkd3d_override_caps(struct d3d12_device *device)
+{
+    const char *caps_override, *p;
+
+    static const struct override_value
+    {
+        const char *str;
+        uint32_t value;
+    }
+    feature_level_override_values[] =
+    {
+        {"11.0", D3D_FEATURE_LEVEL_11_0},
+        {"11.1", D3D_FEATURE_LEVEL_11_1},
+        {"12.0", D3D_FEATURE_LEVEL_12_0},
+        {"12.1", D3D_FEATURE_LEVEL_12_1},
+        {"12.2", D3D_FEATURE_LEVEL_12_2},
+    },
+    resource_binding_tier_override_values[] =
+    {
+        {"1", D3D12_RESOURCE_BINDING_TIER_1},
+        {"2", D3D12_RESOURCE_BINDING_TIER_2},
+        {"3", D3D12_RESOURCE_BINDING_TIER_3},
+    };
+    static const struct override_field
+    {
+        const char *name;
+        size_t offset;
+        const struct override_value *values;
+        size_t value_count;
+    }
+    override_fields[] =
+    {
+        {
+            "feature_level",
+            offsetof(struct d3d12_device, vk_info.max_feature_level),
+            feature_level_override_values,
+            ARRAY_SIZE(feature_level_override_values)
+        },
+        {
+            "resource_binding_tier",
+            offsetof(struct d3d12_device, feature_options.ResourceBindingTier),
+            resource_binding_tier_override_values,
+            ARRAY_SIZE(resource_binding_tier_override_values)
+        },
+    };
+
+    if (!(caps_override = getenv("VKD3D_CAPS_OVERRIDE")))
+        return;
+
+    p = caps_override;
+    for (;;)
+    {
+        size_t i;
+
+        for (i = 0; i < ARRAY_SIZE(override_fields); ++i)
+        {
+            const struct override_field *field = &override_fields[i];
+            size_t len = strlen(field->name);
+
+            if (strncmp(p, field->name, len) == 0 && p[len] == '=')
+            {
+                size_t j;
+
+                p += len + 1;
+
+                for (j = 0; j < field->value_count; ++j)
+                {
+                    const struct override_value *value = &field->values[j];
+                    size_t value_len =  strlen(value->str);
+
+                    if (strncmp(p, value->str, value_len) == 0
+                            && (p[value_len] == '\0' || p[value_len] == ','))
+                    {
+                        memcpy(&((uint8_t *)device)[field->offset], (uint8_t *)&value->value, sizeof(value->value));
+
+                        p += value_len;
+                        if (p[0] == '\0')
+                        {
+                            TRACE("Overriding caps with: %s\n", caps_override);
+                            return;
+                        }
+                        p += 1;
+
+                        break;
+                    }
+                }
+
+                if (j == field->value_count)
+                {
+                    WARN("Cannot parse the override caps string: %s\n", caps_override);
+                    return;
+                }
+
+                break;
+            }
+        }
+
+        if (i == ARRAY_SIZE(override_fields))
+        {
+            WARN("Cannot parse the override caps string: %s\n", caps_override);
+            return;
+        }
+    }
+}
+
 static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         const struct vkd3d_device_create_info *create_info,
         struct vkd3d_physical_device_info *physical_device_info,
@@ -1742,6 +1847,9 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
             vulkan_info->EXT_shader_viewport_index_layer;
 
     vkd3d_init_feature_level(vulkan_info, features, &device->feature_options);
+
+    vkd3d_override_caps(device);
+
     if (vulkan_info->max_feature_level < create_info->minimum_feature_level)
     {
         WARN("Feature level %#x is not supported.\n", create_info->minimum_feature_level);
