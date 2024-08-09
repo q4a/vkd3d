@@ -3831,11 +3831,16 @@ static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
             {
                 struct vsir_block *block2 = &cfg->blocks[j];
 
-                if (block2->label == 0)
+                if (block2->label == 0 || !vsir_block_dominates(block, block2))
                     continue;
 
-                if (vsir_block_dominates(block, block2))
-                    vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", block2->label);
+                if (cfg->debug_buffer.content_size > 512)
+                {
+                    TRACE("%s...\n", cfg->debug_buffer.buffer);
+                    vkd3d_string_buffer_clear(&cfg->debug_buffer);
+                    vkd3d_string_buffer_printf(&cfg->debug_buffer, "Block %u dominates: ...", block->label);
+                }
+                vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", block2->label);
             }
             TRACE("%s\n", cfg->debug_buffer.buffer);
             vkd3d_string_buffer_clear(&cfg->debug_buffer);
@@ -3927,7 +3932,16 @@ static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
                 vkd3d_string_buffer_printf(&cfg->debug_buffer, "Back edge %u -> %u with loop:", block->label, header->label);
 
                 for (k = 0; k < loop->count; ++k)
+                {
+                    if (cfg->debug_buffer.content_size > 512)
+                    {
+                        TRACE("%s...\n", cfg->debug_buffer.buffer);
+                        vkd3d_string_buffer_clear(&cfg->debug_buffer);
+                        vkd3d_string_buffer_printf(&cfg->debug_buffer, "Back edge %u -> %u with loop: ...",
+                                block->label, header->label);
+                    }
                     vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", loop->blocks[k]->label);
+                }
 
                 TRACE("%s\n", cfg->debug_buffer.buffer);
                 vkd3d_string_buffer_clear(&cfg->debug_buffer);
@@ -4150,7 +4164,15 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
         vkd3d_string_buffer_printf(&cfg->debug_buffer, "Block order:");
 
         for (i = 0; i < cfg->order.count; ++i)
+        {
+            if (cfg->debug_buffer.content_size > 512)
+            {
+                TRACE("%s...\n", cfg->debug_buffer.buffer);
+                vkd3d_string_buffer_clear(&cfg->debug_buffer);
+                vkd3d_string_buffer_printf(&cfg->debug_buffer, "Block order: ...");
+            }
             vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", cfg->order.blocks[i]->label);
+        }
 
         TRACE("%s\n", cfg->debug_buffer.buffer);
         vkd3d_string_buffer_clear(&cfg->debug_buffer);
