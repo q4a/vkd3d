@@ -234,7 +234,7 @@ if [ "$res" = "PASS" ] && [ "$VKD3D_TEST_DETAILED" != "1" ]; then
 fi
 
 # Report outcome to console.
-echo "${col}${res}${color_reset}: $test_name $details"
+echo "${col}${res}${color_reset}: $test_name""$details"
 
 # Register the test result, and other relevant metadata.
 echo ":test-result: $res" > $trs_file
