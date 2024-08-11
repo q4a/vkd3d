@@ -1959,7 +1959,23 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
 }
 
-static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct hlsl_state_block *block,
+static bool decompose_fx_4_state_add_entries(struct hlsl_state_block *block, unsigned int entry_index,
+        unsigned int count)
+{
+    if (!vkd3d_array_reserve((void **)&block->entries, &block->capacity, block->count + count, sizeof(*block->entries)))
+        return false;
+
+    if (entry_index != block->count - 1)
+    {
+        memmove(&block->entries[entry_index + count + 1], &block->entries[entry_index + 1],
+                (block->count - entry_index - 1) * sizeof(*block->entries));
+    }
+    block->count += count;
+
+    return true;
+}
+
+static unsigned int decompose_fx_4_state_function_call(struct hlsl_ir_var *var, struct hlsl_state_block *block,
         unsigned int entry_index, struct fx_write_context *fx)
 {
     struct hlsl_state_block_entry *entry = block->entries[entry_index];
@@ -1989,15 +2005,8 @@ static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct h
         return 1;
     }
 
-    if (!vkd3d_array_reserve((void **)&block->entries, &block->capacity, block->count + entry->args_count - 1,
-            sizeof(*block->entries)))
+    if (!decompose_fx_4_state_add_entries(block, entry_index, entry->args_count - 1))
         return 1;
-    if (entry_index != block->count - 1)
-    {
-        memmove(&block->entries[entry_index + entry->args_count], &block->entries[entry_index + 1],
-                (block->count - entry_index - 1) * sizeof(*block->entries));
-    }
-    block->count += entry->args_count - 1;
 
     get_state_block_function_components(info, components, entry->args_count);
 
@@ -2011,6 +2020,62 @@ static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct h
     hlsl_free_state_block_entry(entry);
 
     return entry->args_count;
+}
+
+/* For some states assignment sets all of the elements. This behaviour is limited to certain states of BlendState
+   object, and only when fx_5_0 profile is used. */
+static unsigned int decompose_fx_4_state_block_expand_array(struct hlsl_ir_var *var, struct hlsl_state_block *block,
+        unsigned int entry_index, struct fx_write_context *fx)
+{
+    static const char *states[] = { "SrcBlend", "DestBlend", "BlendOp", "SrcBlendAlpha", "DestBlendAlpha", "BlendOpAlpha" };
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
+    struct hlsl_state_block_entry *entry = block->entries[entry_index];
+    static const unsigned int array_size = 8;
+    struct hlsl_ctx *ctx = fx->ctx;
+    bool found = false;
+    unsigned int i;
+
+    if (type->class != HLSL_CLASS_BLEND_STATE)
+        return 1;
+    if (ctx->profile->major_version != 5)
+        return 1;
+    if (entry->lhs_has_index)
+        return 1;
+
+    for (i = 0; i < ARRAY_SIZE(states); ++i)
+    {
+        if (!ascii_strcasecmp(entry->name, states[i]))
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
+        return 1;
+
+    if (!decompose_fx_4_state_add_entries(block, entry_index, array_size - 1))
+        return 1;
+
+    block->entries[entry_index]->lhs_has_index = true;
+    for (i = 1; i < array_size; ++i)
+    {
+        block->entries[entry_index + i] = clone_stateblock_entry(ctx, entry,
+                entry->name, true, i, 0);
+    }
+
+    return array_size;
+}
+
+static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct hlsl_state_block *block,
+        unsigned int entry_index, struct fx_write_context *fx)
+{
+    struct hlsl_state_block_entry *entry = block->entries[entry_index];
+
+    if (entry->is_function_call)
+        return decompose_fx_4_state_function_call(var, block, entry_index, fx);
+
+    return decompose_fx_4_state_block_expand_array(var, block, entry_index, fx);
 }
 
 static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,

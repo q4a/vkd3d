@@ -56,7 +56,7 @@ BlendState bs
     BlendOpAlpha[4] = add;
 };
 
-[effect todo]
+[effect]
 BlendState bs
 {
     SrcBlend = one;
