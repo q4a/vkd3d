@@ -516,7 +516,7 @@ enum loop_type
     LOOP_DO_WHILE
 };
 
-static bool attribute_list_has_duplicates(const struct parse_attribute_list *attrs)
+static void check_attribute_list_for_duplicates(struct hlsl_ctx *ctx, const struct parse_attribute_list *attrs)
 {
     unsigned int i, j;
 
@@ -525,11 +525,10 @@ static bool attribute_list_has_duplicates(const struct parse_attribute_list *att
         for (j = i + 1; j < attrs->count; ++j)
         {
             if (!strcmp(attrs->attrs[i]->name, attrs->attrs[j]->name))
-                 return true;
+                hlsl_error(ctx, &attrs->attrs[j]->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                        "Found duplicate attribute \"%s\".", attrs->attrs[j]->name);
         }
     }
-
-    return false;
 }
 
 static void resolve_loop_continue(struct hlsl_ctx *ctx, struct hlsl_block *block, enum loop_type type,
@@ -700,9 +699,7 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
     unsigned int i, unroll_limit = 0;
     struct hlsl_ir_node *loop;
 
-    if (attribute_list_has_duplicates(attributes))
-        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Found duplicate attribute.");
-
+    check_attribute_list_for_duplicates(ctx, attributes);
     check_loop_attributes(ctx, attributes, loc);
 
     /* Ignore unroll(0) attribute, and any invalid attribute. */
@@ -6980,6 +6977,8 @@ func_prototype:
       func_prototype_no_attrs
     | attribute_list func_prototype_no_attrs
         {
+            check_attribute_list_for_duplicates(ctx, &$1);
+
             if ($2.first)
             {
                 $2.decl->attr_count = $1.count;
@@ -8245,8 +8244,7 @@ selection_statement:
             struct hlsl_ir_node *instr;
             unsigned int i;
 
-            if (attribute_list_has_duplicates(attributes))
-                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Found duplicate attribute.");
+            check_attribute_list_for_duplicates(ctx, attributes);
 
             for (i = 0; i < attributes->count; ++i)
             {
