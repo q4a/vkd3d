@@ -448,17 +448,27 @@ void set_string(struct vkd3d_bytecode_buffer *buffer, size_t offset, const char 
 static void vkd3d_shader_dump_blob(const char *path, const char *profile,
         const char *suffix, const void *data, size_t size)
 {
-    static unsigned int shader_id = 0;
+    static const char hexadecimal_digits[] = "0123456789abcdef";
+    char str_checksum[33];
+    uint8_t checksum[16];
     char filename[1024];
-    unsigned int id;
+    unsigned int i;
     FILE *f;
 
-    id = vkd3d_atomic_increment_u32(&shader_id) - 1;
+    vkd3d_compute_md5(data, size, (uint32_t *)checksum, VKD3D_MD5_STANDARD);
+
+    for (i = 0; i < ARRAY_SIZE(checksum); ++i)
+    {
+        str_checksum[2 * i] = hexadecimal_digits[checksum[i] >> 4];
+        str_checksum[2 * i + 1] = hexadecimal_digits[checksum[i] & 0xf];
+    }
+    str_checksum[32] = '\0';
 
     if (profile)
-        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%u-%s.%s", path, id, profile, suffix);
+        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%s-%s.%s", path, str_checksum, profile, suffix);
     else
-        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%u.%s", path, id, suffix);
+        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%s.%s", path, str_checksum, suffix);
+    TRACE("Dumping shader to \"%s\".\n", filename);
     if ((f = fopen(filename, "wb")))
     {
         if (fwrite(data, 1, size, f) != size)
