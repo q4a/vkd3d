@@ -145,6 +145,7 @@ stateblock              {return KW_STATEBLOCK;          }
 stateblock_state        {return KW_STATEBLOCK_STATE;    }
 static                  {return KW_STATIC;              }
 string                  {return KW_STRING;              }
+String                  {return KW_STRING;              }
 struct                  {return KW_STRUCT;              }
 switch                  {return KW_SWITCH;              }
 tbuffer                 {return KW_TBUFFER;             }
