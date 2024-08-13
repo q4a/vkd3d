@@ -111,7 +111,7 @@ static void get_state_block_function_components(const struct state_block_functio
 {
     unsigned int i;
 
-    assert(comp_count <= info->max_args);
+    VKD3D_ASSERT(comp_count <= info->max_args);
 
     if (info->min_args == info->max_args)
     {

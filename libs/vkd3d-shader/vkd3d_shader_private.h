@@ -51,7 +51,6 @@
 #include "vkd3d_shader.h"
 #include "list.h"
 
-#include <assert.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
