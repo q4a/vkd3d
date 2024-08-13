@@ -1885,7 +1885,7 @@ struct sm1_instruction
     struct sm1_src_register
     {
         enum vkd3d_shader_register_type type;
-        D3DSHADER_PARAM_SRCMOD_TYPE mod;
+        enum vkd3d_shader_src_modifier mod;
         unsigned int swizzle;
         uint32_t reg;
     } srcs[4];
@@ -1904,7 +1904,7 @@ static bool is_inconsequential_instr(const struct sm1_instruction *instr)
         return false;
     if (dst->mod != VKD3DSPDM_NONE)
         return false;
-    if (src->mod != D3DSPSM_NONE)
+    if (src->mod != VKD3DSPSM_NONE)
         return false;
     if (src->type != dst->type)
         return false;
@@ -1932,7 +1932,10 @@ static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const s
 static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer,
         const struct sm1_src_register *reg)
 {
-    put_u32(buffer, (1u << 31) | sm1_encode_register_type(reg->type) | reg->mod | (reg->swizzle << 16) | reg->reg);
+    put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
+            | sm1_encode_register_type(reg->type)
+            | (reg->mod << VKD3D_SM1_SRC_MODIFIER_SHIFT)
+            | (reg->swizzle << VKD3D_SM1_SWIZZLE_SHIFT) | reg->reg);
 }
 
 static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct sm1_instruction *instr)
@@ -1965,7 +1968,7 @@ static void sm1_map_src_swizzle(struct sm1_src_register *src, unsigned int map_w
 
 static void d3dbc_write_unary_op(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
         const struct hlsl_reg *dst, const struct hlsl_reg *src,
-        D3DSHADER_PARAM_SRCMOD_TYPE src_mod, enum vkd3d_shader_dst_modifier dst_mod)
+        enum vkd3d_shader_src_modifier src_mod, enum vkd3d_shader_dst_modifier dst_mod)
 {
     struct sm1_instruction instr =
     {
@@ -2104,7 +2107,7 @@ static uint32_t swizzle_from_vsir(uint32_t swizzle)
 static void sm1_src_reg_from_vsir(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_src_param *param,
         struct sm1_src_register *src, const struct vkd3d_shader_location *loc)
 {
-    src->mod = (uint32_t)param->modifiers << VKD3D_SM1_SRC_MODIFIER_SHIFT;
+    src->mod = param->modifiers;
     src->reg = param->reg.idx[0].offset;
     src->type = param->reg.type;
     src->swizzle = swizzle_from_vsir(param->swizzle);
@@ -2452,7 +2455,7 @@ static void d3dbc_write_if(struct d3dbc_compiler *d3dbc, const struct hlsl_ir_no
         .srcs[1].type = VKD3DSPR_TEMP,
         .srcs[1].swizzle = hlsl_swizzle_from_writemask(condition->reg.writemask),
         .srcs[1].reg = condition->reg.id,
-        .srcs[1].mod = D3DSPSM_NEG,
+        .srcs[1].mod = VKD3DSPSM_NEG,
 
         .src_count = 2,
     };
