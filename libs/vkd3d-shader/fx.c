@@ -206,6 +206,7 @@ struct fx_write_context
     uint32_t depth_stencil_state_count;
     uint32_t rasterizer_state_count;
     uint32_t blend_state_count;
+    uint32_t string_count;
     int status;
 
     bool child_effect;
@@ -566,6 +567,9 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         case HLSL_CLASS_PIXEL_SHADER:
             return "PixelShader";
 
+        case HLSL_CLASS_STRING:
+            return "String";
+
         default:
             return type->name;
     }
@@ -638,6 +642,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
         case HLSL_CLASS_BLEND_STATE:
+        case HLSL_CLASS_STRING:
             put_u32_unaligned(buffer, 2);
             break;
 
@@ -653,7 +658,6 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_NULL:
             vkd3d_unreachable();
 
-        case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             FIXME("Writing type class %u is not implemented.\n", type->class);
             set_status(fx, VKD3D_ERROR_NOT_IMPLEMENTED);
@@ -760,6 +764,10 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     else if (type->class == HLSL_CLASS_BLEND_STATE)
     {
         put_u32_unaligned(buffer, 2);
+    }
+    else if (type->class == HLSL_CLASS_STRING)
+    {
+        put_u32_unaligned(buffer, 1);
     }
     else if (hlsl_is_numeric_type(type))
     {
@@ -1271,6 +1279,27 @@ static uint32_t write_fx_4_default_value(struct hlsl_type *value_type, struct hl
     }
 
     return offset;
+}
+
+static void write_fx_4_string_initializer(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    uint32_t elements_count = hlsl_get_multiarray_size(var->data_type), i;
+    const struct hlsl_default_value *value = var->default_values;
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    struct hlsl_ctx *ctx = fx->ctx;
+    uint32_t offset;
+
+    if (!value)
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "String objects have to be initialized.");
+        return;
+    }
+
+    for (i = 0; i < elements_count; ++i, ++value)
+    {
+        offset = write_fx_4_string(value->string, fx);
+        put_u32(buffer, offset);
+    }
 }
 
 static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, struct fx_write_context *fx)
@@ -2239,6 +2268,11 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             fx->blend_state_count += elements_count;
             break;
 
+        case HLSL_CLASS_STRING:
+            write_fx_4_string_initializer(var, fx);
+            fx->string_count += elements_count;
+            break;
+
         default:
             hlsl_fixme(ctx, &ctx->location, "Writing initializer for object class %u is not implemented.",
                     type->class);
@@ -2341,6 +2375,8 @@ static bool is_supported_object_variable(const struct hlsl_ctx *ctx, const struc
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_BLEND_STATE:
+        case HLSL_CLASS_VERTEX_SHADER:
+        case HLSL_CLASS_STRING:
             return true;
         case HLSL_CLASS_COMPUTE_SHADER:
         case HLSL_CLASS_DOMAIN_SHADER:
@@ -2353,8 +2389,6 @@ static bool is_supported_object_variable(const struct hlsl_ctx *ctx, const struc
                 return false;
             if (type->e.resource.rasteriser_ordered)
                 return false;
-            return true;
-        case HLSL_CLASS_VERTEX_SHADER:
             return true;
 
         default:
@@ -2408,7 +2442,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.shared_object_count);
     put_u32(&buffer, fx.technique_count);
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
-    put_u32(&buffer, 0); /* String count. */
+    put_u32(&buffer, fx.string_count);
     put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, fx.depth_stencil_state_count);
     put_u32(&buffer, fx.blend_state_count);
@@ -2466,7 +2500,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.shared_object_count);
     put_u32(&buffer, fx.technique_count);
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
-    put_u32(&buffer, 0); /* String count. */
+    put_u32(&buffer, fx.string_count);
     put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, fx.depth_stencil_state_count);
     put_u32(&buffer, fx.blend_state_count);
