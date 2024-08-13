@@ -1,4 +1,4 @@
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 String s = "text";
 string s2 = "text2";
 sTring s3 = "text3";

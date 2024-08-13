@@ -935,6 +935,7 @@ static const char * get_case_insensitive_typename(const char *name)
         "texture",
         "vector",
         "vertexshader",
+        "string",
     };
     unsigned int i;
 
@@ -3953,9 +3954,10 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         ctx->builtin_types.sampler[bt] = type;
     }
 
-    ctx->builtin_types.string = hlsl_new_simple_type(ctx, "STRING", HLSL_CLASS_STRING);
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
     ctx->builtin_types.null = hlsl_new_simple_type(ctx, "NULL", HLSL_CLASS_NULL);
+    ctx->builtin_types.string = hlsl_new_simple_type(ctx, "string", HLSL_CLASS_STRING);
+    hlsl_scope_add_type(ctx->globals, ctx->builtin_types.string);
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilView", HLSL_CLASS_DEPTH_STENCIL_VIEW));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilState", HLSL_CLASS_DEPTH_STENCIL_STATE));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "fxgroup", HLSL_CLASS_EFFECT_GROUP));
