@@ -110,7 +110,7 @@ float4 main() : sv_target { return 0; }
 shader model >= 5.0
 shader model < 6.0
 
-[effect todo]
+[effect]
 float4 f
 <
     string a = "\nAAA\tBBB\rCCC\fDDD\vEEE\sFFF";

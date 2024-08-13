@@ -1360,6 +1360,10 @@ static void write_fx_4_annotation(struct hlsl_ir_var *var, struct fx_write_conte
         offset = write_fx_4_default_value(var->data_type, var->default_values, fx);
         put_u32(buffer, offset);
     }
+    else if (type->class == HLSL_CLASS_STRING)
+    {
+        write_fx_4_string_initializer(var, fx);
+    }
     else
     {
         hlsl_fixme(ctx, &var->loc, "Writing annotations for type class %u is not implemented.", type->class);
