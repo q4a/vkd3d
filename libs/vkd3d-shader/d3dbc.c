@@ -1481,10 +1481,8 @@ struct d3dbc_compiler
 
 static uint32_t sm1_version(enum vkd3d_shader_type type, unsigned int major, unsigned int minor)
 {
-    if (type == VKD3D_SHADER_TYPE_VERTEX)
-        return D3DVS_VERSION(major, minor);
-    else
-        return D3DPS_VERSION(major, minor);
+    return vkd3d_make_u32(vkd3d_make_u16(minor, major),
+            type == VKD3D_SHADER_TYPE_VERTEX ? VKD3D_SM1_VS : VKD3D_SM1_PS);
 }
 
 D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
