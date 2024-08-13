@@ -1877,7 +1877,7 @@ struct sm1_instruction
     struct sm1_dst_register
     {
         enum vkd3d_shader_register_type type;
-        D3DSHADER_PARAM_DSTMOD_TYPE mod;
+        enum vkd3d_shader_dst_modifier mod;
         unsigned int writemask;
         uint32_t reg;
     } dst;
@@ -1902,7 +1902,7 @@ static bool is_inconsequential_instr(const struct sm1_instruction *instr)
 
     if (instr->opcode != VKD3D_SM1_OP_MOV)
         return false;
-    if (dst->mod != D3DSPDM_NONE)
+    if (dst->mod != VKD3DSPDM_NONE)
         return false;
     if (src->mod != D3DSPSM_NONE)
         return false;
@@ -1923,7 +1923,10 @@ static bool is_inconsequential_instr(const struct sm1_instruction *instr)
 static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const struct sm1_dst_register *reg)
 {
     VKD3D_ASSERT(reg->writemask);
-    put_u32(buffer, (1u << 31) | sm1_encode_register_type(reg->type) | reg->mod | (reg->writemask << 16) | reg->reg);
+    put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
+            | sm1_encode_register_type(reg->type)
+            | (reg->mod << VKD3D_SM1_DST_MODIFIER_SHIFT)
+            | (reg->writemask << VKD3D_SM1_WRITEMASK_SHIFT) | reg->reg);
 }
 
 static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer,
@@ -1962,7 +1965,7 @@ static void sm1_map_src_swizzle(struct sm1_src_register *src, unsigned int map_w
 
 static void d3dbc_write_unary_op(struct d3dbc_compiler *d3dbc, enum vkd3d_sm1_opcode opcode,
         const struct hlsl_reg *dst, const struct hlsl_reg *src,
-        D3DSHADER_PARAM_SRCMOD_TYPE src_mod, D3DSHADER_PARAM_DSTMOD_TYPE dst_mod)
+        D3DSHADER_PARAM_SRCMOD_TYPE src_mod, enum vkd3d_shader_dst_modifier dst_mod)
 {
     struct sm1_instruction instr =
     {
@@ -2117,7 +2120,7 @@ static void sm1_src_reg_from_vsir(struct d3dbc_compiler *d3dbc, const struct vkd
 static void sm1_dst_reg_from_vsir(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_dst_param *param,
         struct sm1_dst_register *dst, const struct vkd3d_shader_location *loc)
 {
-    dst->mod = (uint32_t)param->modifiers << VKD3D_SM1_DST_MODIFIER_SHIFT;
+    dst->mod = param->modifiers;
     dst->reg = param->reg.idx[0].offset;
     dst->type = param->reg.type;
     dst->writemask = param->write_mask;
