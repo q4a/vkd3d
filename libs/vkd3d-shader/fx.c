@@ -1504,6 +1504,24 @@ struct replace_state_context
     struct hlsl_ir_var *var;
 };
 
+static bool lower_null_constant(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *c;
+
+    if (instr->type != HLSL_IR_CONSTANT)
+        return false;
+    if (instr->data_type->class != HLSL_CLASS_NULL)
+        return false;
+
+    if (!(c = hlsl_new_uint_constant(ctx, 0, &instr->loc)))
+        return false;
+
+    list_add_before(&instr->entry, &c->entry);
+    hlsl_replace_node(instr, c);
+
+    return true;
+}
+
 static bool replace_state_block_constant(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct replace_state_context *replace_context = context;
@@ -1863,7 +1881,6 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     const struct state *state = NULL;
     struct hlsl_ctx *ctx = fx->ctx;
     enum hlsl_base_type base_type;
-    struct hlsl_ir_load *load;
     unsigned int i;
 
     if (type->class == HLSL_CLASS_BLEND_STATE)
@@ -1935,6 +1952,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     replace_context.var = var;
 
     /* Turn named constants to actual constants. */
+    hlsl_transform_ir(ctx, lower_null_constant, entry->instrs, NULL);
     hlsl_transform_ir(ctx, replace_state_block_constant, entry->instrs, &replace_context);
     hlsl_run_const_passes(ctx, entry->instrs);
 
@@ -1947,7 +1965,8 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         switch (node->type)
         {
             case HLSL_IR_LOAD:
-                load = hlsl_ir_load(node);
+            {
+                struct hlsl_ir_load *load = hlsl_ir_load(node);
 
                 if (load->src.path_len)
                     hlsl_fixme(ctx, &ctx->location, "Arrays are not supported for RHS.");
@@ -1959,6 +1978,26 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
                 }
 
                 break;
+            }
+            case HLSL_IR_CONSTANT:
+            {
+                struct hlsl_ir_constant *c = hlsl_ir_constant(node);
+                struct hlsl_type *data_type = c->node.data_type;
+
+                if (data_type->class == HLSL_CLASS_SCALAR && data_type->e.numeric.type == HLSL_TYPE_UINT)
+                {
+                    if (c->value.u[0].u != 0)
+                        hlsl_error(ctx, &ctx->location, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                                "Only 0 integer constants are allowed for object-typed fields.");
+                }
+                else
+                {
+                    hlsl_error(ctx, &ctx->location, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                            "Unexpected constant used for object-typed field.");
+                }
+
+                break;
+            }
             default:
                 hlsl_fixme(ctx, &ctx->location, "Unhandled node type for object-typed field.");
         }
