@@ -10,6 +10,7 @@ ComputeShader cs;
 DomainShader doms;
 RenderTargetView rtv1;
 DepthStencilView dsv;
+BlendState bs;
 
 technique11
 {
@@ -21,5 +22,6 @@ technique11
         SetComputeShader(cs);
         SetDomainShader(doms);
         OMSetRenderTargets(rtv1, dsv);
+        SetBlendState(bs, float4(1, 2, 3, 4), 0xf);
     }
 }

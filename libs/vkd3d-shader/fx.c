@@ -1547,6 +1547,7 @@ enum state_property_component_type
     FX_TEXTURE,
     FX_DEPTHSTENCILVIEW,
     FX_RENDERTARGETVIEW,
+    FX_BLEND,
 };
 
 static inline bool is_object_fx_type(enum state_property_component_type type)
@@ -1561,6 +1562,7 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
         case FX_TEXTURE:
         case FX_RENDERTARGETVIEW:
         case FX_DEPTHSTENCILVIEW:
+        case FX_BLEND:
             return true;
         default:
             return false;
@@ -1587,6 +1589,8 @@ static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_prope
             return HLSL_CLASS_RENDER_TARGET_VIEW;
         case FX_DEPTHSTENCILVIEW:
             return HLSL_CLASS_DEPTH_STENCIL_VIEW;
+        case FX_BLEND:
+            return HLSL_CLASS_BLEND_STATE;
         default:
             vkd3d_unreachable();
     }
@@ -1757,13 +1761,15 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     }
     states[] =
     {
-        { "RasterizerState",       HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RASTERIZER, 1, 1, 0 },
-        { "DepthStencilState",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DEPTHSTENCIL, 1, 1, 1 },
-
+        { "RasterizerState",       HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RASTERIZER,       1, 1, 0 },
+        { "DepthStencilState",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DEPTHSTENCIL,     1, 1, 1 },
+        { "BlendState",            HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_BLEND,            1, 1, 2 },
         { "RenderTargetView",      HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RENDERTARGETVIEW, 1, 8, 3 },
         { "DepthStencilView",      HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DEPTHSTENCILVIEW, 1, 1, 4 },
 
-        { "DS_StencilRef",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 9 },
+        { "DS_StencilRef",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 9 },
+        { "AB_BlendFactor",        HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 10 },
+        { "AB_SampleMask",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 11 },
 
         { "FillMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 12, fill_values },
         { "CullMode",              HLSL_CLASS_RASTERIZER_STATE, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 13, cull_values },
