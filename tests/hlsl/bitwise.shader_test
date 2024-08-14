@@ -129,6 +129,24 @@ float4 main() : SV_TARGET
 todo(glsl) draw quad
 probe (0, 0) rgba (0.0, 0.0, 163840.0, 480.0)
 
+[pixel shader fail]
+% Make sure that bitshifts DON'T work with floats
+float4 main() : SV_TARGET
+{
+    uint u = 5;
+    float f = 15.0;
+
+    return float4(u >> f, 0, 0, 0);
+}
+[pixel shader fail]
+float4 main() : SV_TARGET
+{
+    uint u = 5;
+    float f = 15.0;
+
+    return float4(f >> u, 0, 0, 0);
+}
+
 [pixel shader]
 float4 main() : SV_TARGET
 {

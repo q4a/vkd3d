@@ -1899,6 +1899,41 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct hls
     return add_expr(ctx, instrs, op, args, ret_type, loc);
 }
 
+static struct hlsl_ir_node *add_binary_expr(struct hlsl_ctx *ctx, struct hlsl_block *block, enum hlsl_ir_expr_op op,
+        struct hlsl_ir_node *lhs, struct hlsl_ir_node *rhs, const struct vkd3d_shader_location *loc)
+{
+    switch (op)
+    {
+        case HLSL_OP2_ADD:
+        case HLSL_OP2_DIV:
+        case HLSL_OP2_MOD:
+        case HLSL_OP2_MUL:
+            return add_binary_arithmetic_expr(ctx, block, op, lhs, rhs, loc);
+
+        case HLSL_OP2_BIT_AND:
+        case HLSL_OP2_BIT_OR:
+        case HLSL_OP2_BIT_XOR:
+            return add_binary_bitwise_expr(ctx, block, op, lhs, rhs, loc);
+
+        case HLSL_OP2_LESS:
+        case HLSL_OP2_GEQUAL:
+        case HLSL_OP2_EQUAL:
+        case HLSL_OP2_NEQUAL:
+            return add_binary_comparison_expr(ctx, block, op, lhs, rhs, loc);
+
+        case HLSL_OP2_LOGIC_AND:
+        case HLSL_OP2_LOGIC_OR:
+            return add_binary_logical_expr(ctx, block, op, lhs, rhs, loc);
+
+        case HLSL_OP2_LSHIFT:
+        case HLSL_OP2_RSHIFT:
+            return add_binary_shift_expr(ctx, block, op, lhs, rhs, loc);
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
 static struct hlsl_block *add_binary_expr_merge(struct hlsl_ctx *ctx, struct hlsl_block *block1,
         struct hlsl_block *block2, enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
 {
@@ -1907,41 +1942,8 @@ static struct hlsl_block *add_binary_expr_merge(struct hlsl_ctx *ctx, struct hls
     hlsl_block_add_block(block1, block2);
     destroy_block(block2);
 
-    switch (op)
-    {
-        case HLSL_OP2_ADD:
-        case HLSL_OP2_DIV:
-        case HLSL_OP2_MOD:
-        case HLSL_OP2_MUL:
-            add_binary_arithmetic_expr(ctx, block1, op, arg1, arg2, loc);
-            break;
-
-        case HLSL_OP2_BIT_AND:
-        case HLSL_OP2_BIT_OR:
-        case HLSL_OP2_BIT_XOR:
-            add_binary_bitwise_expr(ctx, block1, op, arg1, arg2, loc);
-            break;
-
-        case HLSL_OP2_LESS:
-        case HLSL_OP2_GEQUAL:
-        case HLSL_OP2_EQUAL:
-        case HLSL_OP2_NEQUAL:
-            add_binary_comparison_expr(ctx, block1, op, arg1, arg2, loc);
-            break;
-
-        case HLSL_OP2_LOGIC_AND:
-        case HLSL_OP2_LOGIC_OR:
-            add_binary_logical_expr(ctx, block1, op, arg1, arg2, loc);
-            break;
-
-        case HLSL_OP2_LSHIFT:
-        case HLSL_OP2_RSHIFT:
-            add_binary_shift_expr(ctx, block1, op, arg1, arg2, loc);
-            break;
-
-        default:
-            vkd3d_unreachable();
-    }
+    if (add_binary_expr(ctx, block1, op, arg1, arg2, loc) == NULL)
+        return NULL;
 
     return block1;
 }
@@ -2065,7 +2067,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
         enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
 
         VKD3D_ASSERT(op);
-        if (!(rhs = add_binary_arithmetic_expr(ctx, block, op, lhs, rhs, &rhs->loc)))
+        if (!(rhs = add_binary_expr(ctx, block, op, lhs, rhs, &rhs->loc)))
             return NULL;
     }
 
