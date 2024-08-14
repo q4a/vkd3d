@@ -2264,8 +2264,8 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
     put_u32(buffer, token);
 
     token = (1u << 31);
-    token |= usage << D3DSP_DCL_USAGE_SHIFT;
-    token |= usage_idx << D3DSP_DCL_USAGEINDEX_SHIFT;
+    token |= usage << VKD3D_SM1_DCL_USAGE_SHIFT;
+    token |= usage_idx << VKD3D_SM1_DCL_USAGE_INDEX_SHIFT;
     put_u32(buffer, token);
 
     reg.writemask = element->mask;
