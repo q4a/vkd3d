@@ -3955,7 +3955,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
 
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
-    ctx->builtin_types.null = hlsl_new_simple_type(ctx, "NULL", HLSL_CLASS_NULL);
+    ctx->builtin_types.null = hlsl_new_type(ctx, "NULL", HLSL_CLASS_NULL, HLSL_TYPE_UINT, 1, 1);
     ctx->builtin_types.string = hlsl_new_simple_type(ctx, "string", HLSL_CLASS_STRING);
     hlsl_scope_add_type(ctx->globals, ctx->builtin_types.string);
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilView", HLSL_CLASS_DEPTH_STENCIL_VIEW));
