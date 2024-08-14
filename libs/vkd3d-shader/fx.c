@@ -1548,6 +1548,8 @@ enum state_property_component_type
     FX_DEPTHSTENCILVIEW,
     FX_RENDERTARGETVIEW,
     FX_BLEND,
+    FX_VERTEXSHADER,
+    FX_PIXELSHADER,
 };
 
 static inline bool is_object_fx_type(enum state_property_component_type type)
@@ -1563,6 +1565,8 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
         case FX_RENDERTARGETVIEW:
         case FX_DEPTHSTENCILVIEW:
         case FX_BLEND:
+        case FX_VERTEXSHADER:
+        case FX_PIXELSHADER:
             return true;
         default:
             return false;
@@ -1591,6 +1595,10 @@ static inline enum hlsl_type_class hlsl_type_class_from_fx_type(enum state_prope
             return HLSL_CLASS_DEPTH_STENCIL_VIEW;
         case FX_BLEND:
             return HLSL_CLASS_BLEND_STATE;
+        case FX_VERTEXSHADER:
+            return HLSL_CLASS_VERTEX_SHADER;
+        case FX_PIXELSHADER:
+            return HLSL_CLASS_PIXEL_SHADER;
         default:
             vkd3d_unreachable();
     }
@@ -1767,6 +1775,8 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
         { "RenderTargetView",      HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_RENDERTARGETVIEW, 1, 8, 3 },
         { "DepthStencilView",      HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_DEPTHSTENCILVIEW, 1, 1, 4 },
 
+        { "VertexShader",          HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_VERTEXSHADER,     1, 1, 6 },
+        { "PixelShader",           HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_PIXELSHADER,      1, 1, 7 },
         { "DS_StencilRef",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 9 },
         { "AB_BlendFactor",        HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 10 },
         { "AB_SampleMask",         HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 11 },

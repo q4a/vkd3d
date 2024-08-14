@@ -11,6 +11,8 @@ DomainShader doms;
 RenderTargetView rtv1;
 DepthStencilView dsv;
 BlendState bs;
+VertexShader vs;
+PixelShader ps;
 
 technique11
 {
@@ -23,5 +25,7 @@ technique11
         SetDomainShader(doms);
         OMSetRenderTargets(rtv1, dsv);
         SetBlendState(bs, float4(1, 2, 3, 4), 0xf);
+        SetVertexShader(vs);
+        SetPixelShader(ps);
     }
 }
