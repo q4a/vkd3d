@@ -3796,6 +3796,50 @@ static bool intrinsic_dot(struct hlsl_ctx *ctx,
     return !!add_binary_dot_expr(ctx, params->instrs, params->args[0], params->args[1], loc);
 }
 
+static bool intrinsic_dst(struct hlsl_ctx *ctx, const struct parse_initializer *params,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_function_decl *func;
+    struct hlsl_type *type, *vec4_type;
+    char *body;
+
+    static const char template[] =
+            "%s dst(%s i0, %s i1)\n"
+            "{\n"
+            /* Scalars and vector-4s are both valid inputs, so promote scalars
+             * if necessary. */
+            "    %s src0 = i0, src1 = i1;\n"
+            "    return %s(1, src0.y * src1.y, src0.z, src1.w);\n"
+            "}";
+
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
+        return false;
+    type = params->args[0]->data_type;
+    if (!(type->class == HLSL_CLASS_SCALAR
+            || (type->class == HLSL_CLASS_VECTOR && type->dimx == 4)))
+    {
+        struct vkd3d_string_buffer *string;
+        if ((string = hlsl_type_to_string(ctx, type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong dimension for dst(): expected scalar or 4-dimensional vector, but got %s.",
+                    string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+    vec4_type = hlsl_get_vector_type(ctx, type->e.numeric.type, 4);
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template,
+            vec4_type->name, type->name, type->name,
+            vec4_type->name,
+            vec4_type->name)))
+        return false;
+    func = hlsl_compile_internal_function(ctx, "dst", body);
+    vkd3d_free(body);
+    if (!func)
+        return false;
+
+    return !!add_user_call(ctx, func, params, false, loc);
+}
+
 static bool intrinsic_exp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -4967,6 +5011,7 @@ intrinsic_functions[] =
     {"determinant",                         1, true,  intrinsic_determinant},
     {"distance",                            2, true,  intrinsic_distance},
     {"dot",                                 2, true,  intrinsic_dot},
+    {"dst",                                 2, true,  intrinsic_dst},
     {"exp",                                 1, true,  intrinsic_exp},
     {"exp2",                                1, true,  intrinsic_exp2},
     {"f16tof32",                            1, true,  intrinsic_f16tof32},
