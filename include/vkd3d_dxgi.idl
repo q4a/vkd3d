@@ -146,7 +146,7 @@ interface IDXGIFactory : IDXGIObject
 ]
 interface IDXGIFactory1 : IDXGIFactory
 {
-    HRESULT EnumAdapters1(UINT adapter_idx, IDXGIAdapter1 **adpter);
+    HRESULT EnumAdapters1(UINT adapter_idx, IDXGIAdapter1 **adapter);
     BOOL IsCurrent();
 }
 

@@ -3260,7 +3260,7 @@ interface ID3D12Device : ID3D12Object
             D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type);
 
     D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo(UINT visible_mask,
-            UINT reource_desc_count, const D3D12_RESOURCE_DESC *resource_descs);
+            UINT resource_desc_count, const D3D12_RESOURCE_DESC *resource_descs);
 
     D3D12_HEAP_PROPERTIES GetCustomHeapProperties(UINT node_mask,
             D3D12_HEAP_TYPE heap_type);
