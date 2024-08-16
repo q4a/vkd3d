@@ -410,7 +410,7 @@ struct hlsl_attribute
 
 /* Reservation of a register and/or an offset for objects inside constant buffers, to be used as a
  *   starting point of their allocation. They are available through the register(·) and the
- *   packoffset(·) syntaxes, respectivelly.
+ *   packoffset(·) syntaxes, respectively.
  * The constant buffer offset is measured register components. */
 struct hlsl_reg_reservation
 {
@@ -456,7 +456,7 @@ struct hlsl_ir_var
      * This pointer is NULL for others. */
     struct hlsl_default_value
     {
-        /* Default value, in case the component is a string, othewise it is NULL. */
+        /* Default value, in case the component is a string, otherwise it is NULL. */
         const char *string;
         /* Default value, in case the component is a numeric value. */
         union hlsl_constant_value_component number;

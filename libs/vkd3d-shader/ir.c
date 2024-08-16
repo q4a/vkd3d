@@ -4226,7 +4226,7 @@ static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_
                 ACTION_EXTEND,
             } action = ACTION_CREATE_NEW;
 
-            /* We've already contructed loop intervals for the back
+            /* We've already constructed loop intervals for the back
              * edges, there's nothing more to do. */
             if (vsir_block_dominates(successor, block))
                 continue;
@@ -4484,7 +4484,7 @@ static enum vkd3d_result vsir_cfg_build_structured_program(struct vsir_cfg *cfg)
                         VKD3D_ASSERT(inner_loop->type == STRUCTURE_TYPE_LOOP);
 
                         /* Otherwise, if one of the branches is
-                         * continueing the inner loop we're inside,
+                         * continue-ing the inner loop we're inside,
                          * make sure it's the false branch (because it
                          * will be optimized out later). */
                         if (action_true.jump_type == JUMP_CONTINUE && action_true.target == inner_loop->u.loop.idx)
@@ -5126,14 +5126,14 @@ static enum vkd3d_result vsir_cfg_structure_list_emit_jump(struct vsir_cfg *cfg,
     struct vsir_cfg_emit_target *target = cfg->target;
     const struct vkd3d_shader_location no_loc = {0};
     /* Encode the jump target as the loop index plus a bit to remember whether
-     * we're breaking or continueing. */
+     * we're breaking or continue-ing. */
     unsigned int jump_target = jump->target << 1;
     enum vkd3d_shader_opcode opcode;
 
     switch (jump->type)
     {
         case JUMP_CONTINUE:
-            /* If we're continueing the loop we're directly inside, then we can emit a
+            /* If we're continue-ing the loop we're directly inside, then we can emit a
              * `continue'. Otherwise we first have to break all the loops between here
              * and the loop to continue, recording our intention to continue
              * in the lowest bit of jump_target. */
