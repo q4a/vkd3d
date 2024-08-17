@@ -224,11 +224,6 @@ static void set_status(struct fx_write_context *fx, int status)
         fx->status = status;
 }
 
-static bool has_annotations(const struct hlsl_ir_var *var)
-{
-    return var->annotations && !list_empty(&var->annotations->vars);
-}
-
 static uint32_t write_string(const char *string, struct fx_write_context *fx)
 {
     return fx->ops->write_string(string, fx);
@@ -435,17 +430,26 @@ static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx
     write_fx_4_state_block(var, 0, count_offset, fx);
 }
 
+static void write_fx_2_annotations(struct hlsl_ir_var *var, uint32_t count_offset, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t count;
+
+    count = write_annotations(var->annotations, fx);
+    set_u32(buffer, count_offset, count);
+}
+
 static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t name_offset;
+    uint32_t name_offset, annotation_count_offset;
 
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
-    put_u32(buffer, 0); /* Annotation count. */
+    annotation_count_offset = put_u32(buffer, 0);
     put_u32(buffer, 0); /* Assignment count. */
 
-    /* TODO: annotations */
+    write_fx_2_annotations(var, annotation_count_offset, fx);
     /* TODO: assignments */
 
     if (var->state_block_count && var->state_blocks[0]->count)
@@ -985,16 +989,16 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
 
 static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
+    uint32_t name_offset, pass_count_offset, annotation_count_offset, count = 0;
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t name_offset, count_offset, count = 0;
     struct hlsl_ir_var *pass;
 
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
-    put_u32(buffer, 0); /* Annotation count. */
-    count_offset = put_u32(buffer, 0); /* Pass count. */
+    annotation_count_offset = put_u32(buffer, 0);
+    pass_count_offset = put_u32(buffer, 0);
 
-    /* FIXME: annotations */
+    write_fx_2_annotations(var, annotation_count_offset, fx);
 
     LIST_FOR_EACH_ENTRY(pass, &var->scope->vars, struct hlsl_ir_var, scope_entry)
     {
@@ -1002,7 +1006,7 @@ static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_contex
         ++count;
     }
 
-    set_u32(buffer, count_offset, count);
+    set_u32(buffer, pass_count_offset, count);
 }
 
 static uint32_t write_fx_2_default_value(struct hlsl_type *value_type, struct hlsl_default_value *value,
@@ -1073,6 +1077,7 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     const struct hlsl_type *type = var->data_type;
     uint32_t offset, elements_count = 1;
+    struct hlsl_ctx *ctx = fx->ctx;
 
     if (type->class == HLSL_CLASS_ARRAY)
     {
@@ -1090,6 +1095,14 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
         case HLSL_CLASS_STRUCT:
             offset = write_fx_2_default_value(var->data_type, var->default_values, fx);
             break;
+
+        case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_PIXEL_SHADER:
+        case HLSL_CLASS_SAMPLER:
+        case HLSL_CLASS_STRING:
+        case HLSL_CLASS_VERTEX_SHADER:
+            hlsl_fixme(ctx, &var->loc, "Write fx 2.0 object initializer.");
+            /* fallthrough */
 
         default:
             /* Objects are given sequential ids. */
@@ -1169,8 +1182,8 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
 
 static void write_fx_2_parameters(struct fx_write_context *fx)
 {
+    uint32_t desc_offset, value_offset, flags, annotation_count_offset;
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t desc_offset, value_offset, flags;
     struct hlsl_ctx *ctx = fx->ctx;
     struct hlsl_ir_var *var;
     enum fx_2_parameter_flags
@@ -1190,16 +1203,27 @@ static void write_fx_2_parameters(struct fx_write_context *fx)
         if (var->storage_modifiers & HLSL_STORAGE_SHARED)
             flags |= IS_SHARED;
 
-        put_u32(buffer, desc_offset); /* Parameter description */
-        put_u32(buffer, value_offset); /* Value */
-        put_u32(buffer, flags); /* Flags */
+        put_u32(buffer, desc_offset);
+        put_u32(buffer, value_offset);
+        put_u32(buffer, flags);
 
-        put_u32(buffer, 0); /* Annotations count */
-        if (has_annotations(var))
-            hlsl_fixme(ctx, &ctx->location, "Writing annotations for parameters is not implemented.");
+        annotation_count_offset = put_u32(buffer, 0);
+        write_fx_2_annotations(var, annotation_count_offset, fx);
 
         ++fx->parameter_count;
     }
+}
+
+static void write_fx_2_annotation(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t desc_offset, value_offset;
+
+    desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
+    value_offset = write_fx_2_initial_value(var, fx);
+
+    put_u32(buffer, desc_offset);
+    put_u32(buffer, value_offset);
 }
 
 static const struct fx_write_context_ops fx_2_ops =
@@ -1207,6 +1231,7 @@ static const struct fx_write_context_ops fx_2_ops =
     .write_string = write_fx_2_string,
     .write_technique = write_fx_2_technique,
     .write_pass = write_fx_2_pass,
+    .write_annotation = write_fx_2_annotation,
 };
 
 static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)

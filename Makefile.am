@@ -50,7 +50,6 @@ vkd3d_shader_tests = \
 	tests/hlsl/all.shader_test \
 	tests/hlsl/alpha-test.shader_test \
 	tests/hlsl/angle-unit.shader_test \
-	tests/hlsl/annotations.shader_test \
 	tests/hlsl/any.shader_test \
 	tests/hlsl/arithmetic-float-uniform.shader_test \
 	tests/hlsl/arithmetic-float.shader_test \
@@ -102,6 +101,8 @@ vkd3d_shader_tests = \
 	tests/hlsl/dot.shader_test \
 	tests/hlsl/duplicate-modifiers.shader_test \
 	tests/hlsl/early-depth-stencil.shader_test \
+	tests/hlsl/effect-annotations-fx_2.shader_test \
+	tests/hlsl/effect-annotations-fx_4.shader_test \
 	tests/hlsl/effect-compile.shader_test \
 	tests/hlsl/effect-initial-values-fx_2.shader_test \
 	tests/hlsl/effect-initial-values-fx_4.shader_test \
