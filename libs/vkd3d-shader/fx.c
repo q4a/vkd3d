@@ -894,6 +894,13 @@ static uint32_t write_fx_2_string(const char *string, struct fx_write_context *f
     return offset;
 }
 
+static uint32_t get_fx_2_type_class(const struct hlsl_type *type)
+{
+    if (type->class == HLSL_CLASS_MATRIX)
+        return D3DXPC_MATRIX_ROWS;
+    return hlsl_sm1_class(type);
+}
+
 static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *name, const struct hlsl_semantic *semantic,
         struct fx_write_context *fx)
 {
@@ -912,7 +919,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
     semantic_offset = semantic->raw_name ? write_string(semantic->raw_name, fx) : 0;
 
     offset = put_u32(buffer, hlsl_sm1_base_type(type));
-    put_u32(buffer, hlsl_sm1_class(type));
+    put_u32(buffer, get_fx_2_type_class(type));
     put_u32(buffer, name_offset);
     put_u32(buffer, semantic_offset);
     put_u32(buffer, elements_count);
