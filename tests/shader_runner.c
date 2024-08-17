@@ -1623,8 +1623,8 @@ static void update_line_number_context(const char *testname, unsigned int line_n
 enum test_action
 {
     TEST_ACTION_RUN,
-    TEST_ACTION_SKIP_SHADER_MODEL,
-    TEST_ACTION_SKIP_CAPS,
+    TEST_ACTION_SKIP_COMPILATION,
+    TEST_ACTION_SKIP_EXECUTION,
 };
 
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
@@ -1690,14 +1690,18 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 case STATE_INPUT_LAYOUT:
                 case STATE_NONE:
                 case STATE_SAMPLER:
+                    break;
+
                 case STATE_TEST:
+                    if (test_action == TEST_ACTION_SKIP_EXECUTION)
+                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     break;
 
                 case STATE_REQUIRE:
                     if (runner->maximum_shader_model < runner->minimum_shader_model)
-                        test_action = TEST_ACTION_SKIP_SHADER_MODEL;
+                        test_action = TEST_ACTION_SKIP_COMPILATION;
                     else if (!check_capabilities(runner, caps))
-                        test_action = TEST_ACTION_SKIP_CAPS;
+                        test_action = TEST_ACTION_SKIP_EXECUTION;
                     break;
 
                 case STATE_RESOURCE:
@@ -1717,14 +1721,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_COMPUTE_TODO:
-                    if (test_action == TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_COMPUTE_TODO)
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_CS,
                                 expect_hr);
                     }
-                    if (test_action == TEST_ACTION_SKIP_CAPS)
-                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     free(runner->cs_source);
                     runner->cs_source = shader_source;
                     shader_source = NULL;
@@ -1734,14 +1736,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER_PIXEL:
                 case STATE_SHADER_PIXEL_TODO:
-                    if (test_action == TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_PIXEL_TODO)
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_PS,
                                 expect_hr);
                     }
-                    if (test_action == TEST_ACTION_SKIP_CAPS)
-                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     free(runner->ps_source);
                     runner->ps_source = shader_source;
                     shader_source = NULL;
@@ -1751,14 +1751,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER_VERTEX:
                 case STATE_SHADER_VERTEX_TODO:
-                    if (test_action == TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_VERTEX_TODO)
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_VS,
                                 expect_hr);
                     }
-                    if (test_action == TEST_ACTION_SKIP_CAPS)
-                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     free(runner->vs_source);
                     runner->vs_source = shader_source;
                     shader_source = NULL;
@@ -1768,14 +1766,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER_EFFECT:
                 case STATE_SHADER_EFFECT_TODO:
-                    if (test_action == TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_EFFECT_TODO)
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_FX,
                                 expect_hr);
                     }
-                    if (test_action == TEST_ACTION_SKIP_CAPS)
-                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     free(runner->fx_source);
                     runner->fx_source = shader_source;
                     shader_source = NULL;
@@ -1785,14 +1781,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER_HULL:
                 case STATE_SHADER_HULL_TODO:
-                    if (test_action == TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_HULL_TODO)
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_HS,
                                 expect_hr);
                     }
-                    if (test_action == TEST_ACTION_SKIP_CAPS)
-                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     free(runner->hs_source);
                     runner->hs_source = shader_source;
                     shader_source = NULL;
@@ -1802,14 +1796,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER_DOMAIN:
                 case STATE_SHADER_DOMAIN_TODO:
-                    if (test_action == TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_DOMAIN_TODO)
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_DS,
                                 expect_hr);
                     }
-                    if (test_action == TEST_ACTION_SKIP_CAPS)
-                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     free(runner->ds_source);
                     runner->ds_source = shader_source;
                     shader_source = NULL;
@@ -1819,14 +1811,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER_GEOMETRY:
                 case STATE_SHADER_GEOMETRY_TODO:
-                    if (test_action == TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_GEOMETRY_TODO)
                         compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_GS,
                                 expect_hr);
                     }
-                    if (test_action == TEST_ACTION_SKIP_CAPS)
-                        vkd3d_test_skip(line_number, "Missing capabilities.\n");
                     free(runner->gs_source);
                     runner->gs_source = shader_source;
                     shader_source = NULL;
