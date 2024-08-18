@@ -182,6 +182,7 @@ struct fx_write_context
 
     struct vkd3d_bytecode_buffer unstructured;
     struct vkd3d_bytecode_buffer structured;
+    struct vkd3d_bytecode_buffer objects;
 
     struct rb_tree strings;
     struct list types;
@@ -1072,18 +1073,62 @@ static uint32_t write_fx_2_default_value(struct hlsl_type *value_type, struct hl
     return offset;
 }
 
+static uint32_t write_fx_2_object_initializer(const struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
+    unsigned int i, elements_count = hlsl_get_multiarray_size(var->data_type);
+    struct vkd3d_bytecode_buffer *buffer = &fx->objects;
+    uint32_t offset = fx->unstructured.size, id, size;
+    struct hlsl_ctx *ctx = fx->ctx;
+    const void *data;
+
+    for (i = 0; i < elements_count; ++i)
+    {
+        if (type->class == HLSL_CLASS_SAMPLER)
+        {
+            hlsl_fixme(ctx, &var->loc, "Writing fx_2_0 sampler objects initializers is not implemented.");
+        }
+        else
+        {
+            switch (type->class)
+            {
+                case HLSL_CLASS_STRING:
+                {
+                    const char *string = var->default_values[i].string ? var->default_values[i].string : "";
+                    size = strlen(string) + 1;
+                    data = string;
+                    break;
+                }
+                case HLSL_CLASS_TEXTURE:
+                    size = 0;
+                    break;
+                case HLSL_CLASS_PIXEL_SHADER:
+                case HLSL_CLASS_VERTEX_SHADER:
+                    size = 0;
+                    hlsl_fixme(ctx, &var->loc, "Writing fx_2_0 shader objects initializers is not implemented.");
+                    break;
+                default:
+                    vkd3d_unreachable();
+            }
+            id = fx->object_variable_count++;
+
+            put_u32(&fx->unstructured, id);
+
+            put_u32(buffer, id);
+            put_u32(buffer, size);
+            if (size)
+                bytecode_put_bytes(buffer, data, size);
+        }
+    }
+
+    return offset;
+}
+
 static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
-    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
-    const struct hlsl_type *type = var->data_type;
-    uint32_t offset, elements_count = 1;
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
     struct hlsl_ctx *ctx = fx->ctx;
-
-    if (type->class == HLSL_CLASS_ARRAY)
-    {
-        elements_count = hlsl_get_multiarray_size(type);
-        type = hlsl_get_multiarray_element_type(type);
-    }
+    uint32_t offset;
 
     /* Note that struct fields must all be numeric;
      * this was validated in check_invalid_object_fields(). */
@@ -1096,19 +1141,17 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
             offset = write_fx_2_default_value(var->data_type, var->default_values, fx);
             break;
 
-        case HLSL_CLASS_TEXTURE:
-        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_SAMPLER:
+        case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_VERTEX_SHADER:
-            hlsl_fixme(ctx, &var->loc, "Write fx 2.0 object initializer.");
-            /* fallthrough */
+            offset = write_fx_2_object_initializer(var, fx);
+            break;
 
         default:
-            /* Objects are given sequential ids. */
-            offset = put_u32(buffer, fx->object_variable_count++);
-            for (uint32_t i = 1; i < elements_count; ++i)
-                put_u32(buffer, fx->object_variable_count++);
+            offset = 0;
+            hlsl_fixme(ctx, &var->loc, "Writing initializer not implemented for parameter class %#x.", type->class);
             break;
     }
 
@@ -1134,6 +1177,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
             return is_type_supported_fx_2(ctx, type->e.array.type, loc);
 
         case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_SAMPLER:
             switch (type->sampler_dim)
             {
                 case HLSL_SAMPLER_DIM_1D:
@@ -1147,9 +1191,10 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
             }
             break;
 
-        case HLSL_CLASS_PIXEL_SHADER:
-        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
+            return true;
+
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_VERTEX_SHADER:
             hlsl_fixme(ctx, loc, "Write fx 2.0 parameter class %#x.", type->class);
             return false;
@@ -1257,18 +1302,17 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     object_count = put_u32(structured, 0);
 
     write_fx_2_parameters(&fx);
-    set_u32(structured, parameter_count, fx.parameter_count);
-    set_u32(structured, object_count, fx.object_variable_count);
-
     write_techniques(ctx->globals, &fx);
-    set_u32(structured, technique_count, fx.technique_count);
-    set_u32(structured, shader_count, fx.shader_count);
-
-    put_u32(structured, 0); /* String count */
+    put_u32(structured, fx.object_variable_count - 1);
     put_u32(structured, 0); /* Resource count */
 
-    /* TODO: strings */
+    bytecode_put_bytes(structured, fx.objects.data, fx.objects.size);
     /* TODO: resources */
+
+    set_u32(structured, parameter_count, fx.parameter_count);
+    set_u32(structured, object_count, fx.object_variable_count);
+    set_u32(structured, technique_count, fx.technique_count);
+    set_u32(structured, shader_count, fx.shader_count);
 
     size = align(fx.unstructured.size, 4);
     set_u32(&buffer, offset, size);
@@ -1278,6 +1322,7 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
     vkd3d_free(fx.unstructured.data);
     vkd3d_free(fx.structured.data);
+    vkd3d_free(fx.objects.data);
 
     if (!fx.technique_count)
         hlsl_error(ctx, &ctx->location, VKD3D_SHADER_ERROR_HLSL_MISSING_TECHNIQUE, "No techniques found.");

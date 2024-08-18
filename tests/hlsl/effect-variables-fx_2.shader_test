@@ -12,7 +12,7 @@ technique
 {
 }
 
-[effect todo]
+[effect]
 Texture tex1;
 texture tex2;
 teXture tex3;

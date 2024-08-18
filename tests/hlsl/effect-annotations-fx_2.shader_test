@@ -64,8 +64,11 @@ float4 main() : sv_target
 
 technique {}
 
-[effect todo]
+[effect]
 technique < string a = "test"; > {}
+
+[effect]
+technique < string a = ""; > {}
 
 [effect fail]
 // Without closing semicolon
