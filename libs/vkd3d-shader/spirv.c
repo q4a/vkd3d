@@ -2156,6 +2156,7 @@ struct vkd3d_symbol_descriptor_array
     unsigned int set;
     unsigned int binding;
     unsigned int push_constant_index;
+    bool write_only;
 };
 
 struct vkd3d_symbol_register_data
@@ -6152,6 +6153,7 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
     symbol.key.descriptor_array.set = binding.set;
     symbol.key.descriptor_array.binding = binding.binding;
     symbol.key.descriptor_array.push_constant_index = binding_address.push_constant_index;
+    symbol.key.descriptor_array.write_only = write_only;
     if ((entry = rb_get(&compiler->symbol_table, &symbol)))
     {
         var_info->array_symbol = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
