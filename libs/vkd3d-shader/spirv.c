@@ -2157,6 +2157,7 @@ struct vkd3d_symbol_descriptor_array
     unsigned int binding;
     unsigned int push_constant_index;
     bool write_only;
+    bool coherent;
 };
 
 struct vkd3d_symbol_register_data
@@ -6113,8 +6114,8 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
     struct vkd3d_shader_descriptor_binding binding;
     const struct vkd3d_shader_descriptor_info1 *d;
     uint32_t array_type_id, ptr_type_id, var_id;
+    bool write_only = false, coherent = false;
     struct vkd3d_symbol symbol;
-    bool write_only = false;
     struct rb_entry *entry;
 
     binding = spirv_compiler_get_descriptor_binding(compiler, reg, range,
@@ -6143,6 +6144,8 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
     {
         d = spirv_compiler_get_descriptor_info(compiler, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
         write_only = !(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ);
+        /* ROVs are implicitly globally coherent. */
+        coherent = d->uav_flags & (VKD3DSUF_GLOBALLY_COHERENT | VKD3DSUF_RASTERISER_ORDERED_VIEW);
     }
 
     /* Declare one array variable per Vulkan binding, and use it for
@@ -6154,6 +6157,7 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
     symbol.key.descriptor_array.binding = binding.binding;
     symbol.key.descriptor_array.push_constant_index = binding_address.push_constant_index;
     symbol.key.descriptor_array.write_only = write_only;
+    symbol.key.descriptor_array.coherent = coherent;
     if ((entry = rb_get(&compiler->symbol_table, &symbol)))
     {
         var_info->array_symbol = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
@@ -6167,6 +6171,8 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
 
     if (write_only)
         vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationNonReadable, NULL, 0);
+    if (coherent)
+        vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationCoherent, NULL, 0);
 
     symbol.id = var_id;
     symbol.descriptor_array = NULL;
@@ -6512,10 +6518,6 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
         const struct vkd3d_shader_descriptor_info1 *d;
 
         d = spirv_compiler_get_descriptor_info(compiler, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
-
-        /* ROVs are implicitly globally coherent. */
-        if (d->uav_flags & (VKD3DSUF_GLOBALLY_COHERENT | VKD3DSUF_RASTERISER_ORDERED_VIEW))
-            vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationCoherent, NULL, 0);
 
         if (d->uav_flags & VKD3DSUF_RASTERISER_ORDERED_VIEW)
         {
