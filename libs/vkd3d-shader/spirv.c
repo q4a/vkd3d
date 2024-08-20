@@ -2514,6 +2514,8 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
     vkd3d_free(compiler->push_constants);
     vkd3d_free(compiler->descriptor_offset_ids);
 
+    vkd3d_free(compiler->spirv_parameter_info);
+
     vkd3d_spirv_builder_free(&compiler->spirv_builder);
 
     rb_destroy(&compiler->symbol_table, vkd3d_symbol_free, NULL);
