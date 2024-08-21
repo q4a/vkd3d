@@ -61,9 +61,10 @@ vkd3d_shader_tests = \
 	tests/hlsl/array-parameters.shader_test \
 	tests/hlsl/array-size-expr.shader_test \
 	tests/hlsl/asfloat.shader_test \
-	tests/hlsl/asuint.shader_test \
 	tests/hlsl/asint.shader_test \
+	tests/hlsl/asuint.shader_test \
 	tests/hlsl/attributes.shader_test \
+	tests/hlsl/bitwise-assignment.shader_test \
 	tests/hlsl/bitwise.shader_test \
 	tests/hlsl/bool-cast.shader_test \
 	tests/hlsl/bool-semantics.shader_test \
@@ -244,10 +245,10 @@ vkd3d_shader_tests = \
 	tests/hlsl/uav-rwstructuredbuffer.shader_test \
 	tests/hlsl/uav-rwtexture.shader_test \
 	tests/hlsl/unbounded-array-5.1.shader_test \
-	tests/hlsl/unsigned.shader_test \
 	tests/hlsl/uniform-parameters.shader_test \
 	tests/hlsl/uniform-semantics.shader_test \
 	tests/hlsl/unroll.shader_test \
+	tests/hlsl/unsigned.shader_test \
 	tests/hlsl/vector-indexing-uniform.shader_test \
 	tests/hlsl/vector-indexing.shader_test \
 	tests/hlsl/vertex-shader-ops.shader_test \
