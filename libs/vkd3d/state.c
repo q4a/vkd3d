@@ -538,7 +538,7 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
             case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
                 if (FAILED(hr = d3d12_root_signature_info_count_descriptors(info,
                         p, use_array)))
-                    return hr;
+                    goto done;
                 ++info->cost;
                 break;
 
@@ -550,7 +550,7 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
                 if (FAILED(hr = d3d12_root_signature_info_add_range(info,
                         VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, p->ShaderVisibility,
                         p->u.Descriptor.RegisterSpace, p->u.Descriptor.ShaderRegister, 1)))
-                    return hr;
+                    goto done;
                 break;
 
             case D3D12_ROOT_PARAMETER_TYPE_SRV:
@@ -561,7 +561,7 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
                 if (FAILED(hr = d3d12_root_signature_info_add_range(info,
                         VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, p->ShaderVisibility,
                         p->u.Descriptor.RegisterSpace, p->u.Descriptor.ShaderRegister, 1)))
-                    return hr;
+                    goto done;
                 break;
 
             case D3D12_ROOT_PARAMETER_TYPE_UAV:
@@ -572,7 +572,7 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
                 if (FAILED(hr = d3d12_root_signature_info_add_range(info,
                         VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, p->ShaderVisibility,
                         p->u.Descriptor.RegisterSpace, p->u.Descriptor.ShaderRegister, 1)))
-                    return hr;
+                    goto done;
                 break;
 
             case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
@@ -581,12 +581,13 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
                 if (FAILED(hr = d3d12_root_signature_info_add_range(info,
                         VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, p->ShaderVisibility,
                         p->u.Constants.RegisterSpace, p->u.Constants.ShaderRegister, 1)))
-                    return hr;
+                    goto done;
                 break;
 
             default:
                 FIXME("Unhandled type %#x for parameter %u.\n", p->ParameterType, i);
-                return E_NOTIMPL;
+                hr = E_NOTIMPL;
+                goto done;
         }
     }
 
@@ -600,7 +601,7 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
         if (FAILED(hr = d3d12_root_signature_info_add_range(info,
                 VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, s->ShaderVisibility,
                 s->RegisterSpace, s->ShaderRegister, 1)))
-            return hr;
+            goto done;
     }
 
     qsort(info->ranges, info->range_count, sizeof(*info->ranges),
@@ -609,15 +610,17 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
     for (i = D3D12_SHADER_VISIBILITY_VERTEX; i <= D3D12_SHADER_VISIBILITY_MESH; ++i)
     {
         if (FAILED(hr = d3d12_root_signature_info_range_validate(info->ranges, info->range_count, i)))
-            return hr;
+            goto done;
     }
 
+    hr = S_OK;
+done:
     vkd3d_free(info->ranges);
     info->ranges = NULL;
     info->range_count = 0;
     info->range_capacity = 0;
 
-    return S_OK;
+    return hr;
 }
 
 static HRESULT d3d12_root_signature_init_push_constants(struct d3d12_root_signature *root_signature,
