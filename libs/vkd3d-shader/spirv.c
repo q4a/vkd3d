@@ -6106,6 +6106,17 @@ struct vkd3d_descriptor_variable_info
     unsigned int binding_base_idx;
 };
 
+static void spirv_compiler_decorate_descriptor(struct spirv_compiler *compiler,
+        uint32_t var_id, bool write_only, bool coherent)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+
+    if (write_only)
+        vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationNonReadable, NULL, 0);
+    if (coherent)
+        vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationCoherent, NULL, 0);
+}
+
 static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *compiler,
         SpvStorageClass storage_class, uint32_t type_id, const struct vkd3d_shader_register *reg,
         const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
@@ -6124,6 +6135,14 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
             resource_type, is_uav_counter, &binding_address);
     var_info->binding_base_idx = binding_address.binding_base_idx;
 
+    if (is_uav)
+    {
+        d = spirv_compiler_get_descriptor_info(compiler, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
+        write_only = !(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ);
+        /* ROVs are implicitly globally coherent. */
+        coherent = d->uav_flags & (VKD3DSUF_GLOBALLY_COHERENT | VKD3DSUF_RASTERISER_ORDERED_VIEW);
+    }
+
     if (binding.count == 1 && range->first == binding_address.binding_base_idx && range->last != ~0u
             && binding_address.push_constant_index == ~0u)
     {
@@ -6133,6 +6152,7 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
 
         spirv_compiler_emit_descriptor_binding(compiler, var_id, &binding);
         spirv_compiler_emit_register_debug_name(builder, var_id, reg);
+        spirv_compiler_decorate_descriptor(compiler, var_id, write_only, coherent);
 
         var_info->array_symbol = NULL;
         return var_id;
@@ -6141,14 +6161,6 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
     vkd3d_spirv_enable_capability(builder, SpvCapabilityRuntimeDescriptorArrayEXT);
     array_type_id = vkd3d_spirv_get_op_type_runtime_array(builder, type_id);
     ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, array_type_id);
-
-    if (is_uav)
-    {
-        d = spirv_compiler_get_descriptor_info(compiler, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
-        write_only = !(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ);
-        /* ROVs are implicitly globally coherent. */
-        coherent = d->uav_flags & (VKD3DSUF_GLOBALLY_COHERENT | VKD3DSUF_RASTERISER_ORDERED_VIEW);
-    }
 
     /* Declare one array variable per Vulkan binding, and use it for
      * all array declarations which map to it. */
@@ -6170,11 +6182,7 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
         ptr_type_id, storage_class, 0);
     spirv_compiler_emit_descriptor_binding(compiler, var_id, &binding);
     spirv_compiler_emit_register_debug_name(builder, var_id, reg);
-
-    if (write_only)
-        vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationNonReadable, NULL, 0);
-    if (coherent)
-        vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationCoherent, NULL, 0);
+    spirv_compiler_decorate_descriptor(compiler, var_id, write_only, coherent);
 
     symbol.id = var_id;
     symbol.descriptor_array = NULL;
