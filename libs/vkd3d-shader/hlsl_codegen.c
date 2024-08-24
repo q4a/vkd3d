@@ -5992,6 +5992,41 @@ static void parse_partitioning_attribute(struct hlsl_ctx *ctx, const struct hlsl
                 "expected \"integer\", \"pow2\", \"fractional_even\", or \"fractional_odd\".", value);
 }
 
+static void parse_patchconstantfunc_attribute(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr)
+{
+    const char *name;
+    struct hlsl_ir_function *func;
+    struct hlsl_ir_function_decl *decl;
+
+    if (attr->args_count != 1)
+    {
+        hlsl_error(ctx, &attr->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Expected 1 parameter for [patchconstantfunc] attribute, but got %u.", attr->args_count);
+        return;
+    }
+
+    if (!(name = get_string_argument_value(ctx, attr, 0)))
+        return;
+
+    ctx->patch_constant_func = NULL;
+    if ((func = hlsl_get_function(ctx, name)))
+    {
+        /* Pick the last overload with a body. */
+        LIST_FOR_EACH_ENTRY_REV(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
+        {
+            if (decl->has_body)
+            {
+                ctx->patch_constant_func = decl;
+                break;
+            }
+        }
+    }
+
+    if (!ctx->patch_constant_func)
+        hlsl_error(ctx, &attr->loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
+                "Patch constant function \"%s\" is not defined.", name);
+}
+
 static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -6012,6 +6047,8 @@ static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct h
             parse_outputtopology_attribute(ctx, attr);
         else if (!strcmp(attr->name, "partitioning") && profile->type == VKD3D_SHADER_TYPE_HULL)
             parse_partitioning_attribute(ctx, attr);
+        else if (!strcmp(attr->name, "patchconstantfunc") && profile->type == VKD3D_SHADER_TYPE_HULL)
+            parse_patchconstantfunc_attribute(ctx, attr);
         else
             hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
                     "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);

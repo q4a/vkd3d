@@ -1077,6 +1077,7 @@ struct hlsl_ctx
     unsigned int output_control_point_count;
     enum vkd3d_shader_tessellator_output_primitive output_primitive;
     enum vkd3d_shader_tessellator_partitioning partitioning;
+    struct hlsl_ir_function_decl *patch_constant_func;
 
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we
