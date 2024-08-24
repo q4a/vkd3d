@@ -7572,8 +7572,7 @@ static bool lower_f16tof32(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
     return true;
 }
 
-int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
-        enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
+static void process_entry_function(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
     struct hlsl_block *const body = &entry_func->body;
@@ -7590,7 +7589,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     /* Avoid going into an infinite loop when processing call instructions.
      * lower_return() recurses into inferior calls. */
     if (ctx->result)
-        return ctx->result;
+        return;
 
     if (hlsl_version_ge(ctx, 4, 0) && hlsl_version_lt(ctx, 5, 0))
         lower_ir(ctx, lower_f16tof32, body);
@@ -7640,16 +7639,6 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
         append_output_var_copy(ctx, body, entry_func->return_var);
     }
-
-    parse_entry_function_attributes(ctx, entry_func);
-    if (ctx->result)
-        return ctx->result;
-
-    if (profile->type == VKD3D_SHADER_TYPE_HULL)
-        validate_hull_shader_attributes(ctx, entry_func);
-    else if (profile->type == VKD3D_SHADER_TYPE_COMPUTE && !ctx->found_numthreads)
-        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
-                "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
 
     if (profile->major_version >= 4)
     {
@@ -7727,9 +7716,6 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     compute_liveness(ctx, entry_func);
 
-    if (TRACE_ON())
-        rb_for_each_entry(&ctx->functions, dump_function, ctx);
-
     transform_derefs(ctx, mark_indexable_vars, body);
 
     calculate_resource_register_counts(ctx);
@@ -7737,6 +7723,28 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     allocate_register_reservations(ctx);
 
     allocate_temp_registers(ctx, entry_func);
+    allocate_semantic_registers(ctx);
+}
+
+int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
+{
+    const struct hlsl_profile_info *profile = ctx->profile;
+
+    parse_entry_function_attributes(ctx, entry_func);
+    if (ctx->result)
+        return ctx->result;
+
+    if (profile->type == VKD3D_SHADER_TYPE_HULL)
+        validate_hull_shader_attributes(ctx, entry_func);
+    else if (profile->type == VKD3D_SHADER_TYPE_COMPUTE && !ctx->found_numthreads)
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
+
+    process_entry_function(ctx, entry_func);
+    if (ctx->result)
+        return ctx->result;
+
     if (profile->major_version < 4)
     {
         allocate_const_registers(ctx, entry_func);
@@ -7747,8 +7755,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         allocate_objects(ctx, HLSL_REGSET_TEXTURES);
         allocate_objects(ctx, HLSL_REGSET_UAVS);
     }
-    allocate_semantic_registers(ctx);
     allocate_objects(ctx, HLSL_REGSET_SAMPLERS);
+
+    if (TRACE_ON())
+        rb_for_each_entry(&ctx->functions, dump_function, ctx);
 
     if (ctx->result)
         return ctx->result;
