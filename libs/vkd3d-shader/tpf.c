@@ -6603,6 +6603,11 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
         tpf_write_dcl_tessellator_partitioning(tpf, ctx->partitioning);
         tpf_write_dcl_tessellator_output_primitive(tpf, ctx->output_primitive);
     }
+    else if (version->type == VKD3D_SHADER_TYPE_DOMAIN)
+    {
+        tpf_write_dcl_input_control_point_count(tpf, 0); /* TODO: Obtain from OutputPatch */
+        tpf_write_dcl_tessellator_domain(tpf, ctx->domain);
+    }
 
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {

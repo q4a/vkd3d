@@ -7898,6 +7898,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     else if (profile->type == VKD3D_SHADER_TYPE_COMPUTE && !ctx->found_numthreads)
         hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
                 "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
+    else if (profile->type == VKD3D_SHADER_TYPE_DOMAIN && ctx->domain == VKD3D_TESSELLATOR_DOMAIN_INVALID)
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [domain] attribute.", entry_func->func->name);
 
     hlsl_block_init(&global_uniform_block);
 
