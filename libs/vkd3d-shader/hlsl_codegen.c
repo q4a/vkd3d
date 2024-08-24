@@ -5936,6 +5936,34 @@ static void parse_outputcontrolpoints_attribute(struct hlsl_ctx *ctx, const stru
     ctx->output_control_point_count = constant->value.u[0].u;
 }
 
+static void parse_outputtopology_attribute(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr)
+{
+    const char *value;
+
+    if (attr->args_count != 1)
+    {
+        hlsl_error(ctx, &attr->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Expected 1 parameter for [outputtopology] attribute, but got %u.", attr->args_count);
+        return;
+    }
+
+    if (!(value = get_string_argument_value(ctx, attr, 0)))
+        return;
+
+    if (!strcmp(value, "point"))
+        ctx->output_primitive = VKD3D_SHADER_TESSELLATOR_OUTPUT_POINT;
+    else if (!strcmp(value, "line"))
+        ctx->output_primitive = VKD3D_SHADER_TESSELLATOR_OUTPUT_LINE;
+    else if (!strcmp(value, "triangle_cw"))
+        ctx->output_primitive = VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CW;
+    else if (!strcmp(value, "triangle_ccw"))
+        ctx->output_primitive = VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CCW;
+    else
+        hlsl_error(ctx, &attr->args[0].node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_OUTPUT_PRIMITIVE,
+                "Invalid tessellator output topology \"%s\": "
+                "expected \"point\", \"line\", \"triangle_cw\", or \"triangle_ccw\".", value);
+}
+
 static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -5952,6 +5980,8 @@ static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct h
             parse_domain_attribute(ctx, attr);
         else if (!strcmp(attr->name, "outputcontrolpoints") && profile->type == VKD3D_SHADER_TYPE_HULL)
             parse_outputcontrolpoints_attribute(ctx, attr);
+        else if (!strcmp(attr->name, "outputtopology") && profile->type == VKD3D_SHADER_TYPE_HULL)
+            parse_outputtopology_attribute(ctx, attr);
         else
             hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
                     "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);

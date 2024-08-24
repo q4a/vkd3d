@@ -4276,6 +4276,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
 
     ctx->domain = VKD3D_TESSELLATOR_DOMAIN_INVALID;
     ctx->output_control_point_count = UINT_MAX;
+    ctx->output_primitive = 0;
 
     return true;
 }
