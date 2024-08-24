@@ -4225,7 +4225,11 @@ static void sm4_register_from_deref(const struct tpf_compiler *tpf, struct vkd3d
             struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
 
             VKD3D_ASSERT(hlsl_reg.allocated);
-            reg->type = VKD3DSPR_INPUT;
+
+            if (version->type == VKD3D_SHADER_TYPE_DOMAIN)
+                reg->type = VKD3DSPR_PATCHCONST;
+            else
+                reg->type = VKD3DSPR_INPUT;
             reg->dimension = VSIR_DIMENSION_VEC4;
             reg->idx[0].offset = hlsl_reg.id;
             reg->idx_count = 1;
@@ -4819,7 +4823,13 @@ static void tpf_write_dcl_semantic(const struct tpf_compiler *tpf,
     }
     else
     {
-        instr.dsts[0].reg.type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
+        if (output)
+            instr.dsts[0].reg.type = VKD3DSPR_OUTPUT;
+        else if (version->type == VKD3D_SHADER_TYPE_DOMAIN)
+            instr.dsts[0].reg.type = VKD3DSPR_PATCHCONST;
+        else
+            instr.dsts[0].reg.type = VKD3DSPR_INPUT;
+
         instr.dsts[0].reg.idx[0].offset = var->regs[HLSL_REGSET_NUMERIC].id;
         instr.dsts[0].reg.idx_count = 1;
         instr.dsts[0].write_mask = var->regs[HLSL_REGSET_NUMERIC].writemask;
