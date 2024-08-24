@@ -5846,6 +5846,23 @@ static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_a
     }
 }
 
+static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func)
+{
+    const struct hlsl_profile_info *profile = ctx->profile;
+    unsigned int i;
+
+    for (i = 0; i < entry_func->attr_count; ++i)
+    {
+        const struct hlsl_attribute *attr = entry_func->attrs[i];
+
+        if (!strcmp(attr->name, "numthreads") && profile->type == VKD3D_SHADER_TYPE_COMPUTE)
+            parse_numthreads_attribute(ctx, attr);
+        else
+            hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
+                    "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);
+    }
+}
+
 static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     struct hlsl_ir_node *instr, *next;
@@ -6861,16 +6878,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         append_output_var_copy(ctx, body, entry_func->return_var);
     }
 
-    for (i = 0; i < entry_func->attr_count; ++i)
-    {
-        const struct hlsl_attribute *attr = entry_func->attrs[i];
-
-        if (!strcmp(attr->name, "numthreads") && profile->type == VKD3D_SHADER_TYPE_COMPUTE)
-            parse_numthreads_attribute(ctx, attr);
-        else
-            hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
-                    "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);
-    }
+    parse_entry_function_attributes(ctx, entry_func);
 
     if (profile->type == VKD3D_SHADER_TYPE_COMPUTE && !ctx->found_numthreads)
         hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
