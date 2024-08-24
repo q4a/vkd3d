@@ -1073,6 +1073,8 @@ struct hlsl_ctx
      *   compute shader profiles. It is set using the numthreads() attribute in the entry point. */
     uint32_t thread_count[3];
 
+    enum vkd3d_tessellator_domain domain;
+
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we
      * are currently parsing, "mangled" with an internal prefix to avoid

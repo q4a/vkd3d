@@ -5798,6 +5798,26 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     return ret;
 }
 
+static const char *get_string_argument_value(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr, unsigned int i)
+{
+    const struct hlsl_ir_node *instr = attr->args[i].node;
+    const struct hlsl_type *type = instr->data_type;
+
+    if (type->class != HLSL_CLASS_STRING)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, type)))
+            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong type for the argument %u of [%s]: expected string, but got %s.",
+                    i, attr->name, string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return NULL;
+    }
+
+    return hlsl_ir_string_constant(instr)->string;
+}
+
 static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr)
 {
     unsigned int i;
@@ -5846,6 +5866,32 @@ static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_a
     }
 }
 
+static void parse_domain_attribute(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr)
+{
+    const char *value;
+
+    if (attr->args_count != 1)
+    {
+        hlsl_error(ctx, &attr->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Expected 1 parameter for [domain] attribute, but got %u.", attr->args_count);
+        return;
+    }
+
+    if (!(value = get_string_argument_value(ctx, attr, 0)))
+        return;
+
+    if (!strcmp(value, "isoline"))
+        ctx->domain = VKD3D_TESSELLATOR_DOMAIN_LINE;
+    else if (!strcmp(value, "tri"))
+        ctx->domain = VKD3D_TESSELLATOR_DOMAIN_TRIANGLE;
+    else if (!strcmp(value, "quad"))
+        ctx->domain = VKD3D_TESSELLATOR_DOMAIN_QUAD;
+    else
+        hlsl_error(ctx, &attr->args[0].node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_DOMAIN,
+                "Invalid tessellator domain \"%s\": expected \"isoline\", \"tri\", or \"quad\".",
+                value);
+}
+
 static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -5857,6 +5903,9 @@ static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct h
 
         if (!strcmp(attr->name, "numthreads") && profile->type == VKD3D_SHADER_TYPE_COMPUTE)
             parse_numthreads_attribute(ctx, attr);
+        else if (!strcmp(attr->name, "domain")
+                    && (profile->type == VKD3D_SHADER_TYPE_HULL || profile->type == VKD3D_SHADER_TYPE_DOMAIN))
+            parse_domain_attribute(ctx, attr);
         else
             hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
                     "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);
