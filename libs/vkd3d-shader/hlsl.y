@@ -437,6 +437,9 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     if (hlsl_types_are_equal(src_type, dst_type))
         return node;
 
+    if (node->type == HLSL_IR_SAMPLER_STATE && dst_type->class == HLSL_CLASS_SAMPLER)
+        return node;
+
     if (!implicit_compatible_data_types(ctx, src_type, dst_type))
     {
         struct vkd3d_string_buffer *src_string, *dst_string;
@@ -613,6 +616,7 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
             case HLSL_IR_COMPILE:
             case HLSL_IR_CONSTANT:
             case HLSL_IR_EXPR:
+            case HLSL_IR_SAMPLER_STATE:
             case HLSL_IR_STRING_CONSTANT:
             case HLSL_IR_SWIZZLE:
             case HLSL_IR_LOAD:
@@ -2352,7 +2356,7 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
 
             if (hlsl_is_numeric_type(dst_comp_type))
             {
-                if (src->type == HLSL_IR_COMPILE)
+                if (src->type == HLSL_IR_COMPILE || src->type == HLSL_IR_SAMPLER_STATE)
                 {
                     /* Default values are discarded if they contain an object
                      * literal expression for a numeric component. */
@@ -2380,12 +2384,41 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
         }
         else
         {
-            if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
-                return;
+            if (src->type == HLSL_IR_SAMPLER_STATE)
+            {
+                /* Sampler states end up in the variable's state_blocks instead of
+                 * being used to initialize its value. */
+                struct hlsl_ir_sampler_state *sampler_state = hlsl_ir_sampler_state(src);
 
-            if (!hlsl_new_store_component(ctx, &block, &dst_deref, *store_index, conv))
-                return;
-            hlsl_block_add_block(instrs, &block);
+                if (dst_comp_type->class != HLSL_CLASS_SAMPLER)
+                {
+                    struct vkd3d_string_buffer *dst_string;
+
+                    dst_string = hlsl_type_to_string(ctx, dst_comp_type);
+                    if (dst_string)
+                        hlsl_error(ctx, &src->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                "Cannot assign sampler_state to %s.", dst_string->buffer);
+                    hlsl_release_string_buffer(ctx, dst_string);
+                    return;
+                }
+
+                if (!hlsl_array_reserve(ctx, (void **)&dst->state_blocks, &dst->state_block_capacity,
+                        dst->state_block_count + 1, sizeof(*dst->state_blocks)))
+                    return;
+
+                dst->state_blocks[dst->state_block_count] = sampler_state->state_block;
+                sampler_state->state_block = NULL;
+                ++dst->state_block_count;
+            }
+            else
+            {
+                if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
+                    return;
+
+                if (!hlsl_new_store_component(ctx, &block, &dst_deref, *store_index, conv))
+                    return;
+                hlsl_block_add_block(instrs, &block);
+            }
         }
 
         ++*store_index;
@@ -2724,6 +2757,8 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             is_default_values_initializer = (ctx->cur_buffer != ctx->globals_buffer)
                     || (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
                     || ctx->cur_scope->annotations;
+            if (hlsl_get_multiarray_element_type(type)->class == HLSL_CLASS_SAMPLER)
+                is_default_values_initializer = false;
             if (hlsl_type_is_shader(type))
                 is_default_values_initializer = false;
 
@@ -2782,6 +2817,9 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             {
                 hlsl_block_add_block(initializers, v->initializer.instrs);
             }
+
+            if (var->state_blocks)
+                TRACE("Variable %s has %u state blocks.\n", var->name, var->state_block_count);
         }
         else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
         {
@@ -6174,16 +6212,6 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
     hlsl_release_string_buffer(ctx, string);
 }
 
-static bool state_block_add_entry(struct hlsl_state_block *state_block, struct hlsl_state_block_entry *entry)
-{
-    if (!vkd3d_array_reserve((void **)&state_block->entries, &state_block->capacity, state_block->count + 1,
-            sizeof(*state_block->entries)))
-        return false;
-
-    state_block->entries[state_block->count++] = entry;
-    return true;
-}
-
 }
 
 %locations
@@ -7858,7 +7886,7 @@ state_block:
             vkd3d_free($5.args);
 
             $$ = $1;
-            state_block_add_entry($$, entry);
+            hlsl_state_block_add_entry($$, entry);
         }
     | state_block any_identifier '(' func_arguments ')' ';'
         {
@@ -7886,7 +7914,7 @@ state_block:
             hlsl_validate_state_block_entry(ctx, entry, &@4);
 
             $$ = $1;
-            state_block_add_entry($$, entry);
+            hlsl_state_block_add_entry($$, entry);
         }
 
 state_block_list:
@@ -8618,6 +8646,25 @@ primary_expr:
                 YYABORT;
             }
             vkd3d_free($1);
+        }
+    | KW_SAMPLER_STATE '{' state_block_start state_block '}'
+        {
+            struct hlsl_ir_node *sampler_state;
+            ctx->in_state_block = 0;
+
+            if (!ctx->in_state_block && ctx->cur_scope != ctx->globals)
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_MISPLACED_SAMPLER_STATE,
+                        "sampler_state must be in global scope or a state block.");
+
+            if (!(sampler_state = hlsl_new_sampler_state(ctx, $4, &@1)))
+            {
+                hlsl_free_state_block($4);
+                YYABORT;
+            }
+            hlsl_free_state_block($4);
+
+            if (!($$ = make_block(ctx, sampler_state)))
+                YYABORT;
         }
     | NEW_IDENTIFIER
         {

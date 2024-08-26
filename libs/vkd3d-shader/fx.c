@@ -2255,7 +2255,7 @@ static unsigned int decompose_fx_4_state_function_call(struct hlsl_ir_var *var, 
         const struct function_component *comp = &components[i];
         unsigned int arg_index = (i + 1) % entry->args_count;
         block->entries[entry_index + i] = clone_stateblock_entry(ctx, entry, comp->name,
-                comp->lhs_has_index, comp->lhs_index, arg_index);
+                comp->lhs_has_index, comp->lhs_index, true, arg_index);
     }
     hlsl_free_state_block_entry(entry);
 
@@ -2301,7 +2301,7 @@ static unsigned int decompose_fx_4_state_block_expand_array(struct hlsl_ir_var *
     for (i = 1; i < array_size; ++i)
     {
         block->entries[entry_index + i] = clone_stateblock_entry(ctx, entry,
-                entry->name, true, i, 0);
+                entry->name, true, i, true, 0);
     }
 
     return array_size;

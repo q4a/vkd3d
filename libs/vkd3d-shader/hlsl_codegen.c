@@ -4062,6 +4062,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
         case HLSL_IR_RESOURCE_LOAD:
         case HLSL_IR_STRING_CONSTANT:
         case HLSL_IR_SWIZZLE:
+        case HLSL_IR_SAMPLER_STATE:
             if (list_empty(&instr->uses))
             {
                 list_remove(&instr->entry);
@@ -4344,7 +4345,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
         case HLSL_IR_STRING_CONSTANT:
             break;
         case HLSL_IR_COMPILE:
-            /* Compile calls are skipped as they are only relevent to effects. */
+        case HLSL_IR_SAMPLER_STATE:
+            /* These types are skipped as they are only relevant to effects. */
             break;
         }
     }

@@ -1907,6 +1907,59 @@ struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, enum hlsl_compile_ty
     return &compile->node;
 }
 
+bool hlsl_state_block_add_entry(struct hlsl_state_block *state_block,
+        struct hlsl_state_block_entry *entry)
+{
+    if (!vkd3d_array_reserve((void **)&state_block->entries,
+            &state_block->capacity, state_block->count + 1,
+            sizeof(*state_block->entries)))
+        return false;
+
+    state_block->entries[state_block->count++] = entry;
+    return true;
+}
+
+struct hlsl_ir_node *hlsl_new_sampler_state(struct hlsl_ctx *ctx,
+        const struct hlsl_state_block *state_block, struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_sampler_state *sampler_state;
+    struct hlsl_type *type = ctx->builtin_types.sampler[HLSL_SAMPLER_DIM_GENERIC];
+
+    if (!(sampler_state = hlsl_alloc(ctx, sizeof(*sampler_state))))
+        return NULL;
+
+    init_node(&sampler_state->node, HLSL_IR_SAMPLER_STATE, type, loc);
+
+    if (!(sampler_state->state_block = hlsl_alloc(ctx, sizeof(*sampler_state->state_block))))
+    {
+        vkd3d_free(sampler_state);
+        return NULL;
+    }
+
+    if (state_block)
+    {
+        for (unsigned int i = 0; i < state_block->count; ++i)
+        {
+            const struct hlsl_state_block_entry *src = state_block->entries[i];
+            struct hlsl_state_block_entry *entry;
+
+            if (!(entry = clone_stateblock_entry(ctx, src, src->name, src->lhs_has_index, src->lhs_index, false, 0)))
+            {
+                hlsl_free_instr(&sampler_state->node);
+                return NULL;
+            }
+
+            if (!hlsl_state_block_add_entry(sampler_state->state_block, entry))
+            {
+                hlsl_free_instr(&sampler_state->node);
+                return NULL;
+            }
+        }
+    }
+
+    return &sampler_state->node;
+}
+
 struct hlsl_ir_node *hlsl_new_stateblock_constant(struct hlsl_ctx *ctx, const char *name,
         struct vkd3d_shader_location *loc)
 {
@@ -2295,6 +2348,13 @@ static struct hlsl_ir_node *clone_compile(struct hlsl_ctx *ctx,
     return node;
 }
 
+static struct hlsl_ir_node *clone_sampler_state(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, struct hlsl_ir_sampler_state *sampler_state)
+{
+    return hlsl_new_sampler_state(ctx, sampler_state->state_block,
+            &sampler_state->node.loc);
+}
+
 static struct hlsl_ir_node *clone_stateblock_constant(struct hlsl_ctx *ctx,
         struct clone_instr_map *map, struct hlsl_ir_stateblock_constant *constant)
 {
@@ -2302,8 +2362,8 @@ static struct hlsl_ir_node *clone_stateblock_constant(struct hlsl_ctx *ctx,
 }
 
 struct hlsl_state_block_entry *clone_stateblock_entry(struct hlsl_ctx *ctx,
-        struct hlsl_state_block_entry *src, const char *name, bool lhs_has_index,
-        unsigned int lhs_index, unsigned int arg_index)
+        const struct hlsl_state_block_entry *src, const char *name, bool lhs_has_index,
+        unsigned int lhs_index, bool single_arg, unsigned int arg_index)
 {
     struct hlsl_state_block_entry *entry;
     struct clone_instr_map map = { 0 };
@@ -2319,7 +2379,11 @@ struct hlsl_state_block_entry *clone_stateblock_entry(struct hlsl_ctx *ctx,
         return NULL;
     }
 
-    entry->args_count = 1;
+    if (single_arg)
+        entry->args_count = 1;
+    else
+        entry->args_count = src->args_count;
+
     if (!(entry->args = hlsl_alloc(ctx, sizeof(*entry->args) * entry->args_count)))
     {
         hlsl_free_state_block_entry(entry);
@@ -2332,7 +2396,16 @@ struct hlsl_state_block_entry *clone_stateblock_entry(struct hlsl_ctx *ctx,
         hlsl_free_state_block_entry(entry);
         return NULL;
     }
-    clone_src(&map, entry->args, &src->args[arg_index]);
+
+    if (single_arg)
+    {
+        clone_src(&map, entry->args, &src->args[arg_index]);
+    }
+    else
+    {
+        for (unsigned int i = 0; i < src->args_count; ++i)
+            clone_src(&map, &entry->args[i], &src->args[i]);
+    }
     vkd3d_free(map.instrs);
 
     return entry;
@@ -2439,6 +2512,9 @@ static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
 
         case HLSL_IR_COMPILE:
             return clone_compile(ctx, map, hlsl_ir_compile(instr));
+
+        case HLSL_IR_SAMPLER_STATE:
+            return clone_sampler_state(ctx, map, hlsl_ir_sampler_state(instr));
 
         case HLSL_IR_STATEBLOCK_CONSTANT:
             return clone_stateblock_constant(ctx, map, hlsl_ir_stateblock_constant(instr));
@@ -2860,6 +2936,7 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
         [HLSL_IR_SWIZZLE        ] = "HLSL_IR_SWIZZLE",
 
         [HLSL_IR_COMPILE]             = "HLSL_IR_COMPILE",
+        [HLSL_IR_SAMPLER_STATE]       = "HLSL_IR_SAMPLER_STATE",
         [HLSL_IR_STATEBLOCK_CONSTANT] = "HLSL_IR_STATEBLOCK_CONSTANT",
     };
 
@@ -3337,6 +3414,12 @@ static void dump_ir_compile(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *bu
     vkd3d_string_buffer_printf(buffer, ")");
 }
 
+static void dump_ir_sampler_state(struct vkd3d_string_buffer *buffer,
+        const struct hlsl_ir_sampler_state *sampler_state)
+{
+    vkd3d_string_buffer_printf(buffer, "sampler_state {...}");
+}
+
 static void dump_ir_stateblock_constant(struct vkd3d_string_buffer *buffer,
         const struct hlsl_ir_stateblock_constant *constant)
 {
@@ -3438,6 +3521,10 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 
         case HLSL_IR_COMPILE:
             dump_ir_compile(ctx, buffer, hlsl_ir_compile(instr));
+            break;
+
+        case HLSL_IR_SAMPLER_STATE:
+            dump_ir_sampler_state(buffer, hlsl_ir_sampler_state(instr));
             break;
 
         case HLSL_IR_STATEBLOCK_CONSTANT:
@@ -3665,6 +3752,13 @@ static void free_ir_compile(struct hlsl_ir_compile *compile)
     vkd3d_free(compile);
 }
 
+static void free_ir_sampler_state(struct hlsl_ir_sampler_state *sampler_state)
+{
+    if (sampler_state->state_block)
+        hlsl_free_state_block(sampler_state->state_block);
+    vkd3d_free(sampler_state);
+}
+
 static void free_ir_stateblock_constant(struct hlsl_ir_stateblock_constant *constant)
 {
     vkd3d_free(constant->name);
@@ -3735,6 +3829,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_COMPILE:
             free_ir_compile(hlsl_ir_compile(node));
+            break;
+
+        case HLSL_IR_SAMPLER_STATE:
+            free_ir_sampler_state(hlsl_ir_sampler_state(node));
             break;
 
         case HLSL_IR_STATEBLOCK_CONSTANT:
