@@ -45,7 +45,7 @@ static int convert_parameter_info(const struct vkd3d_shader_compile_info *compil
 
         if (src->type == VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)
         {
-            dst->u.immediate_constant = src->u.immediate_constant;
+            dst->u.immediate_constant.u.u32 = src->u.immediate_constant.u.u32;
         }
         else if (src->type == VKD3D_SHADER_PARAMETER_TYPE_SPECIALIZATION_CONSTANT)
         {
