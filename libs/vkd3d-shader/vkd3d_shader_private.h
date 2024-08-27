@@ -238,6 +238,8 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_VSIR_INVALID_GS                  = 9019,
 
     VKD3D_SHADER_WARNING_VSIR_DYNAMIC_DESCRIPTOR_ARRAY  = 9300,
+
+    VKD3D_SHADER_ERROR_MSL_INTERNAL                     = 10000,
 };
 
 enum vkd3d_shader_opcode
@@ -1592,6 +1594,8 @@ int spirv_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
+
+int msl_compile(struct vkd3d_shader_message_context *message_context);
 
 enum vkd3d_md5_variant
 {

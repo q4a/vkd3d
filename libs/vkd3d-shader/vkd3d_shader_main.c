@@ -535,6 +535,8 @@ static const char *shader_get_target_type_suffix(enum vkd3d_shader_target_type t
             return "glsl";
         case VKD3D_SHADER_TARGET_FX:
             return "fx";
+        case VKD3D_SHADER_TARGET_MSL:
+            return "msl";
         default:
             FIXME("Unhandled target type %#x.\n", type);
             return "bin";
@@ -1646,6 +1648,10 @@ int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
             vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;
 
+        case VKD3D_SHADER_TARGET_MSL:
+            ret = msl_compile(message_context);
+            break;
+
         default:
             /* Validation should prevent us from reaching this. */
             vkd3d_unreachable();
@@ -1945,6 +1951,9 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
         VKD3D_SHADER_TARGET_D3D_ASM,
 #ifdef VKD3D_SHADER_UNSUPPORTED_GLSL
         VKD3D_SHADER_TARGET_GLSL,
+#endif
+#ifdef VKD3D_SHADER_UNSUPPORTED_MSL
+        VKD3D_SHADER_TARGET_MSL,
 #endif
     };
 

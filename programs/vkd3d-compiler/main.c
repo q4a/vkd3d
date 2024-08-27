@@ -113,7 +113,10 @@ target_type_info[] =
         true},
     {VKD3D_SHADER_TARGET_GLSL,
         "glsl", "An 'OpenGL Shading Language' shader.\n",
-        false}
+        false},
+    {VKD3D_SHADER_TARGET_MSL,
+        "msl",          "A 'Metal Shading Language' shader.\n",
+        false},
 };
 
 static bool read_shader(struct vkd3d_shader_code *shader, FILE *f)

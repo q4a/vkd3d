@@ -1087,6 +1087,10 @@ enum vkd3d_shader_target_type
      * Output is a raw FX section without container. \since 1.11
      */
     VKD3D_SHADER_TARGET_FX,
+    /**
+     * A 'Metal Shading Language' shader. \since 1.14
+     */
+    VKD3D_SHADER_TARGET_MSL,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_TARGET_TYPE),
 };
