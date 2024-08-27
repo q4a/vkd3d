@@ -24,7 +24,7 @@ float4 main() : POSITION
 
 %% Test missing attributes.
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -46,7 +46,7 @@ float4 main() : POSITION
 }
 
 % outputcontrolpoints defaults to 0 for SM >= 6.
-[hull shader fail(sm<6) todo]
+[hull shader fail(sm<6)]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -67,7 +67,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -88,7 +88,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -109,7 +109,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -174,7 +174,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -195,7 +195,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -238,7 +238,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[3] : SV_TessFactor;
@@ -326,7 +326,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[4] : SV_TessFactor;
@@ -460,7 +460,7 @@ float4 main() : POSITION
 
 
 % patchconstantfunc can't point to the main function.
-[hull shader notimpl(sm<6) fail(sm>=6) todo]
+[hull shader notimpl(sm<6) fail(sm>=6)]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;

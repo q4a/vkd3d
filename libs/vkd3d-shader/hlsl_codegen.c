@@ -6055,6 +6055,72 @@ static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct h
     }
 }
 
+static void validate_hull_shader_attributes(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func)
+{
+    if (ctx->domain == VKD3D_TESSELLATOR_DOMAIN_INVALID)
+    {
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [domain] attribute.", entry_func->func->name);
+    }
+
+    if (ctx->output_control_point_count == UINT_MAX)
+    {
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [outputcontrolpoints] attribute.", entry_func->func->name);
+    }
+
+    if (!ctx->output_primitive)
+    {
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [outputtopology] attribute.", entry_func->func->name);
+    }
+
+    if (!ctx->partitioning)
+    {
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [partitioning] attribute.", entry_func->func->name);
+    }
+
+    if (!ctx->patch_constant_func)
+    {
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [patchconstantfunc] attribute.", entry_func->func->name);
+    }
+    else if (ctx->patch_constant_func == entry_func)
+    {
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_RECURSIVE_CALL,
+                "Patch constant function cannot be the entry point function.");
+        /* Native returns E_NOTIMPL instead of E_FAIL here. */
+        ctx->result = VKD3D_ERROR_NOT_IMPLEMENTED;
+        return;
+    }
+
+    switch (ctx->domain)
+    {
+        case VKD3D_TESSELLATOR_DOMAIN_LINE:
+            if (ctx->output_primitive == VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CW
+                    || ctx->output_primitive == VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CCW)
+                hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_OUTPUT_PRIMITIVE,
+                        "Triangle output topologies are not available for isoline domains.");
+            break;
+
+        case VKD3D_TESSELLATOR_DOMAIN_TRIANGLE:
+            if (ctx->output_primitive == VKD3D_SHADER_TESSELLATOR_OUTPUT_LINE)
+                hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_OUTPUT_PRIMITIVE,
+                        "Line output topologies are not available for triangle domains.");
+            break;
+
+        case VKD3D_TESSELLATOR_DOMAIN_QUAD:
+            if (ctx->output_primitive == VKD3D_SHADER_TESSELLATOR_OUTPUT_LINE)
+                hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_OUTPUT_PRIMITIVE,
+                        "Line output topologies are not available for quad domains.");
+            break;
+
+        default:
+            break;
+    }
+}
+
 static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     struct hlsl_ir_node *instr, *next;
@@ -7071,8 +7137,12 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
 
     parse_entry_function_attributes(ctx, entry_func);
+    if (ctx->result)
+        return ctx->result;
 
-    if (profile->type == VKD3D_SHADER_TYPE_COMPUTE && !ctx->found_numthreads)
+    if (profile->type == VKD3D_SHADER_TYPE_HULL)
+        validate_hull_shader_attributes(ctx, entry_func);
+    else if (profile->type == VKD3D_SHADER_TYPE_COMPUTE && !ctx->found_numthreads)
         hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
                 "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
 
