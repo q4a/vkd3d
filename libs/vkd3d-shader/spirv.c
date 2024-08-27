@@ -97,15 +97,37 @@ static enum vkd3d_result vkd3d_spirv_binary_to_text(const struct vkd3d_shader_co
     if (!(spvret = spvBinaryToText(context, spirv->code, spirv->size / sizeof(uint32_t),
             get_binary_to_text_options(formatting), &text, &diagnostic)))
     {
-        void *code = vkd3d_malloc(text->length);
-        if (code)
+        const char *p, *q, *end, *pad, *truncate;
+        struct vkd3d_string_buffer buffer;
+        size_t line_len;
+
+        vkd3d_string_buffer_init(&buffer);
+
+        for (p = text->str, end = p + text->length; p < end; p = q)
         {
-            memcpy(code, text->str, text->length);
-            out->size = text->length;
-            out->code = code;
+            if (!(q = memchr(p, '\n', end - p)))
+                q = end;
+            else
+                ++q;
+
+            /* FIXME: Note that when colour output is enabled, we count colour
+             * escape codes towards the line length. It's possible to fix
+             * that, but not completely trivial. */
+            for (pad = "", line_len = 100; q - p > line_len; line_len = 100 - strlen(pad))
+            {
+                if (!(truncate = memchr(p + line_len, ' ', q - p - line_len)))
+                    break;
+                vkd3d_string_buffer_printf(&buffer, "%s%.*s\n", pad, (int)(truncate - p), p);
+                p = truncate + 1;
+                if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT)
+                    pad = "                       ";
+                else
+                    pad = "        ";
+            }
+            vkd3d_string_buffer_printf(&buffer, "%s%.*s", pad, (int)(q - p), p);
         }
-        else
-            result = VKD3D_ERROR_OUT_OF_MEMORY;
+
+        vkd3d_shader_code_from_string_buffer(out, &buffer);
     }
     else
     {
