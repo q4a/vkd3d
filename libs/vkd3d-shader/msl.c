@@ -18,12 +18,85 @@
 
 #include "vkd3d_shader_private.h"
 
-int msl_compile(struct vkd3d_shader_message_context *message_context)
+struct msl_generator
 {
+    struct vsir_program *program;
+    struct vkd3d_string_buffer_cache string_buffers;
+    struct vkd3d_string_buffer *buffer;
+    struct vkd3d_shader_location location;
+    struct vkd3d_shader_message_context *message_context;
+};
+
+static void VKD3D_PRINTF_FUNC(3, 4) msl_compiler_error(struct msl_generator *gen,
+        enum vkd3d_shader_error error, const char *fmt, ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    vkd3d_shader_verror(gen->message_context, &gen->location, error, fmt, args);
+    va_end(args);
+}
+
+static void msl_unhandled(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    vkd3d_string_buffer_printf(gen->buffer, "/* <unhandled instruction %#x> */\n", ins->opcode);
+    msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+            "Internal compiler error: Unhandled instruction %#x.", ins->opcode);
+}
+
+static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    gen->location = ins->location;
+    msl_unhandled(gen, ins);
+}
+
+static void msl_generator_generate(struct msl_generator *gen)
+{
+    const struct vkd3d_shader_instruction_array *instructions = &gen->program->instructions;
+    unsigned int i;
+
     MESSAGE("Generating a MSL shader. This is unsupported; you get to keep all the pieces if it breaks.\n");
 
-    vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-            "Internal compiler error: Unhandled instruction.");
+    for (i = 0; i < instructions->count; ++i)
+    {
+        msl_handle_instruction(gen, &instructions->elements[i]);
+    }
+
+    if (TRACE_ON())
+        vkd3d_string_buffer_trace(gen->buffer);
+}
+
+static void msl_generator_cleanup(struct msl_generator *gen)
+{
+    vkd3d_string_buffer_release(&gen->string_buffers, gen->buffer);
+    vkd3d_string_buffer_cache_cleanup(&gen->string_buffers);
+}
+
+static int msl_generator_init(struct msl_generator *gen, struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    memset(gen, 0, sizeof(*gen));
+    gen->program = program;
+    vkd3d_string_buffer_cache_init(&gen->string_buffers);
+    if (!(gen->buffer = vkd3d_string_buffer_get(&gen->string_buffers)))
+    {
+        vkd3d_string_buffer_cache_cleanup(&gen->string_buffers);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    gen->message_context = message_context;
+
+    return VKD3D_OK;
+}
+
+int msl_compile(struct vsir_program *program, struct vkd3d_shader_message_context *message_context)
+{
+    struct msl_generator generator;
+    int ret;
+
+    if ((ret = msl_generator_init(&generator, program, message_context)) < 0)
+        return ret;
+    msl_generator_generate(&generator);
+    msl_generator_cleanup(&generator);
 
     return VKD3D_ERROR_INVALID_SHADER;
 }
