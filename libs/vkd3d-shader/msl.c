@@ -88,10 +88,14 @@ static int msl_generator_init(struct msl_generator *gen, struct vsir_program *pr
     return VKD3D_OK;
 }
 
-int msl_compile(struct vsir_program *program, struct vkd3d_shader_message_context *message_context)
+int msl_compile(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
     struct msl_generator generator;
     int ret;
+
+    if ((ret = vsir_program_transform(program, config_flags, compile_info, message_context)) < 0)
+        return ret;
 
     if ((ret = msl_generator_init(&generator, program, message_context)) < 0)
         return ret;

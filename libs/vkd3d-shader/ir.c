@@ -6685,7 +6685,8 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_remove_dead_code);
         vsir_transform(&ctx, vsir_program_normalise_combined_samplers);
 
-        if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL)
+        if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL
+                && compile_info->target_type != VKD3D_SHADER_TARGET_MSL)
             vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
     }
 

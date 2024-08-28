@@ -1649,7 +1649,7 @@ int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
             break;
 
         case VKD3D_SHADER_TARGET_MSL:
-            ret = msl_compile(program, message_context);
+            ret = msl_compile(program, config_flags, compile_info, message_context);
             break;
 
         default:
