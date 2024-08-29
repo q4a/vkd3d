@@ -8958,6 +8958,7 @@ postfix_expr:
             {
                 if (!add_record_access_recurse(ctx, $1, $3, &@2))
                 {
+                    destroy_block($1);
                     vkd3d_free($3);
                     YYABORT;
                 }
