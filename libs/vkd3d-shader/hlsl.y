@@ -2506,6 +2506,16 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
     }
 }
 
+static void initialize_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *dst,
+        const struct parse_initializer *initializer, bool is_default_values_initializer)
+{
+    unsigned int store_index = 0;
+
+    for (unsigned int i = 0; i < initializer->args_count; ++i)
+        initialize_var_components(ctx, initializer->instrs, dst, &store_index,
+                initializer->args[i], is_default_values_initializer);
+}
+
 static bool type_has_object_components(const struct hlsl_type *type)
 {
     if (type->class == HLSL_CLASS_ARRAY)
@@ -2832,8 +2842,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
         if (v->initializer.args_count)
         {
             bool is_default_values_initializer;
-            unsigned int store_index = 0;
-            unsigned int size, k;
+            unsigned int size;
 
             is_default_values_initializer = (ctx->cur_buffer != ctx->globals_buffer)
                     || (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
@@ -2880,11 +2889,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
                 continue;
             }
 
-            for (k = 0; k < v->initializer.args_count; ++k)
-            {
-                initialize_var_components(ctx, v->initializer.instrs, var,
-                        &store_index, v->initializer.args[k], is_default_values_initializer);
-            }
+            initialize_var(ctx, var, &v->initializer, is_default_values_initializer);
 
             if (is_default_values_initializer)
             {
@@ -5402,13 +5407,11 @@ static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type
 {
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
-    unsigned int i, idx = 0;
 
     if (!(var = hlsl_new_synthetic_var(ctx, "constructor", type, loc)))
         return NULL;
 
-    for (i = 0; i < params->args_count; ++i)
-        initialize_var_components(ctx, params->instrs, var, &idx, params->args[i], false);
+    initialize_var(ctx, var, params, false);
 
     if (!(load = hlsl_new_var_load(ctx, var, loc)))
         return NULL;
