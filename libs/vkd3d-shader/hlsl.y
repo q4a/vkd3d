@@ -941,6 +941,9 @@ static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
         {
             struct hlsl_ir_node *store;
 
+            if (return_value->data_type->class == HLSL_CLASS_ERROR)
+                return true;
+
             if (!(return_value = add_implicit_conversion(ctx, block, return_value, return_type, loc)))
                 return false;
 
