@@ -6276,7 +6276,7 @@ static void spirv_compiler_emit_dcl_immediate_constant_buffer(struct spirv_compi
 }
 
 static void spirv_compiler_emit_sampler_declaration(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register_range *range, unsigned int register_id)
+        const struct vkd3d_shader_register_range *range, const struct vkd3d_shader_descriptor_info1 *descriptor)
 {
     const SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
@@ -6286,7 +6286,7 @@ static void spirv_compiler_emit_sampler_declaration(struct spirv_compiler *compi
     uint32_t type_id, var_id;
 
     vsir_register_init(&reg, VKD3DSPR_SAMPLER, VKD3D_DATA_FLOAT, 1);
-    reg.idx[0].offset = register_id;
+    reg.idx[0].offset = descriptor->register_id;
 
     vkd3d_symbol_make_sampler(&reg_symbol, &reg);
     reg_symbol.info.sampler.range = *range;
@@ -10564,7 +10564,7 @@ static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *c
         switch (descriptor->type)
         {
             case VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER:
-                spirv_compiler_emit_sampler_declaration(compiler, &range, descriptor->register_id);
+                spirv_compiler_emit_sampler_declaration(compiler, &range, descriptor);
                 break;
 
             case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
