@@ -5435,6 +5435,14 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
     struct hlsl_type *cond_type = cond->data_type;
     struct hlsl_type *common_type;
 
+    if (cond->data_type->class == HLSL_CLASS_ERROR
+            || first->data_type->class == HLSL_CLASS_ERROR
+            || second->data_type->class == HLSL_CLASS_ERROR)
+    {
+        block->value = ctx->error_instr;
+        return true;
+    }
+
     if (cond_type->class > HLSL_CLASS_LAST_NUMERIC)
     {
         struct vkd3d_string_buffer *string;
