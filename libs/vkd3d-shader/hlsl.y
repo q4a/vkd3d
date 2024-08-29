@@ -2063,7 +2063,6 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
-    struct hlsl_ir_node *copy;
     unsigned int writemask = 0, width = 0;
     bool matrix_writemask = false;
 
@@ -2274,12 +2273,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         hlsl_cleanup_deref(&deref);
     }
 
-    /* Don't use the instruction itself as a source, as this makes structure
-     * splitting easier. Instead copy it here. Since we retrieve sources from
-     * the last instruction in the list, we do need to copy. */
-    if (!(copy = hlsl_new_copy(ctx, rhs)))
-        return false;
-    hlsl_block_add_instr(block, copy);
+    block->value = rhs;
     return true;
 }
 
