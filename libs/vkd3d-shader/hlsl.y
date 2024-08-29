@@ -5141,6 +5141,15 @@ static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
     struct intrinsic_function *intrinsic;
     struct hlsl_ir_function_decl *decl;
 
+    for (unsigned int i = 0; i < args->args_count; ++i)
+    {
+        if (args->args[i]->data_type->class == HLSL_CLASS_ERROR)
+        {
+            args->instrs->value = ctx->error_instr;
+            return args->instrs;
+        }
+    }
+
     if ((decl = find_function_call(ctx, name, args, false, loc)))
     {
         if (!add_user_call(ctx, decl, args, false, loc))
