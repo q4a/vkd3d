@@ -361,6 +361,9 @@ struct hlsl_block
 {
     /* List containing instruction nodes; linked by the hlsl_ir_node.entry fields. */
     struct list instrs;
+    /* Instruction representing the "value" of this block, if applicable.
+     * This may point to an instruction outside of this block! */
+    struct hlsl_ir_node *value;
 };
 
 /* A reference to an instruction node (struct hlsl_ir_node), usable as a field in other structs.
@@ -1212,16 +1215,19 @@ static inline struct hlsl_ir_stateblock_constant *hlsl_ir_stateblock_constant(co
 static inline void hlsl_block_init(struct hlsl_block *block)
 {
     list_init(&block->instrs);
+    block->value = NULL;
 }
 
 static inline void hlsl_block_add_instr(struct hlsl_block *block, struct hlsl_ir_node *instr)
 {
     list_add_tail(&block->instrs, &instr->entry);
+    block->value = (instr->data_type ? instr : NULL);
 }
 
 static inline void hlsl_block_add_block(struct hlsl_block *block, struct hlsl_block *add)
 {
     list_move_tail(&block->instrs, &add->instrs);
+    block->value = add->value;
 }
 
 static inline void hlsl_src_from_node(struct hlsl_src *src, struct hlsl_ir_node *node)

@@ -147,7 +147,7 @@ static void yyerror(YYLTYPE *loc, void *scanner, struct hlsl_ctx *ctx, const cha
 
 static struct hlsl_ir_node *node_from_block(struct hlsl_block *block)
 {
-    return LIST_ENTRY(list_tail(&block->instrs), struct hlsl_ir_node, entry);
+    return block->value;
 }
 
 static struct hlsl_block *make_empty_block(struct hlsl_ctx *ctx)
@@ -639,14 +639,14 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
         return ret;
     hlsl_block_add_block(&expr, block);
 
-    if (!add_implicit_conversion(ctx, &expr, node_from_block(&expr), dst_type, loc))
+    if (!(node = add_implicit_conversion(ctx, &expr, node_from_block(&expr), dst_type, loc)))
     {
         hlsl_block_cleanup(&expr);
         return ret;
     }
 
     /* Wrap the node into a src to allow the reference to survive the multiple const passes. */
-    hlsl_src_from_node(&src, node_from_block(&expr));
+    hlsl_src_from_node(&src, node);
     hlsl_run_const_passes(ctx, &expr);
     node = src.node;
     hlsl_src_remove(&src);
