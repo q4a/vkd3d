@@ -8682,7 +8682,11 @@ primary_expr:
             else
             {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Identifier \"%s\" is not declared.", $1);
-                YYABORT;
+                vkd3d_free($1);
+
+                if (!($$ = make_empty_block(ctx)))
+                    YYABORT;
+                $$->value = ctx->error_instr;
             }
         }
 
