@@ -124,3 +124,46 @@ float4 main() : sv_target
 {
     return var;
 }
+
+% Type name can't be used as an identifier in the same scope the type has been defined in
+[pixel shader fail todo]
+float4 float;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+float4 double;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm>=6)]
+float4 main() : sv_target
+{
+    float4 float = float4(1, 2, 3, 4);
+    return float;
+}
+
+[pixel shader fail(sm>=6) todo]
+float4 main() : sv_target
+{
+    float4 double = float4(1, 2, 3, 4);
+    return double;
+}
+
+[pixel shader]
+struct s
+{
+    float4 f;
+};
+
+float4 main() : sv_target
+{
+    float4 s = float4(1, 2, 3, 4);
+    return s;
+}
