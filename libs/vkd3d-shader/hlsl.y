@@ -6296,7 +6296,6 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %token KW_DISCARD
 %token KW_DO
 %token KW_DOMAINSHADER
-%token KW_DOUBLE
 %token KW_ELSE
 %token KW_EXPORT
 %token KW_EXTERN
