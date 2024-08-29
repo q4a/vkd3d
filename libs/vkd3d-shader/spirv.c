@@ -6194,11 +6194,12 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
 }
 
 static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register_range *range, unsigned int register_id, unsigned int size_in_bytes)
+        const struct vkd3d_shader_register_range *range, const struct vkd3d_shader_descriptor_info1 *descriptor)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t vec4_id, array_type_id, length_id, struct_id, var_id;
     const SpvStorageClass storage_class = SpvStorageClassUniform;
+    unsigned int size_in_bytes = descriptor->buffer_size;
     struct vkd3d_push_constant_buffer_binding *push_cb;
     struct vkd3d_descriptor_variable_info var_info;
     struct vkd3d_shader_register reg;
@@ -6206,7 +6207,7 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
     unsigned int size;
 
     vsir_register_init(&reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 3);
-    reg.idx[0].offset = register_id;
+    reg.idx[0].offset = descriptor->register_id;
     reg.idx[1].offset = range->first;
     reg.idx[2].offset = range->last;
 
@@ -10567,7 +10568,7 @@ static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *c
                 break;
 
             case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
-                spirv_compiler_emit_cbv_declaration(compiler, &range, descriptor->register_id, descriptor->buffer_size);
+                spirv_compiler_emit_cbv_declaration(compiler, &range, descriptor);
                 break;
 
             case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
