@@ -2512,6 +2512,14 @@ static void initialize_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *dst,
 {
     unsigned int store_index = 0;
 
+    if (initializer_size(initializer) != hlsl_type_component_count(dst->data_type))
+    {
+        hlsl_error(ctx, &initializer->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Expected %u components in initializer, but got %u.",
+                hlsl_type_component_count(dst->data_type), initializer_size(initializer));
+        return;
+    }
+
     for (unsigned int i = 0; i < initializer->args_count; ++i)
         initialize_var_components(ctx, initializer->instrs, dst, &store_index,
                 initializer->args[i], is_default_values_initializer);
@@ -2843,7 +2851,6 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
         if (v->initializer.args_count)
         {
             bool is_default_values_initializer;
-            unsigned int size;
 
             is_default_values_initializer = (ctx->cur_buffer != ctx->globals_buffer)
                     || (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
@@ -2879,15 +2886,6 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
                 }
 
                 v->initializer.args[0] = node_from_block(v->initializer.instrs);
-            }
-
-            size = initializer_size(&v->initializer);
-            if (component_count != size)
-            {
-                hlsl_error(ctx, &v->initializer.loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                        "Expected %u components in initializer, but got %u.", component_count, size);
-                free_parse_variable_def(v);
-                continue;
             }
 
             initialize_var(ctx, var, &v->initializer, is_default_values_initializer);
@@ -8955,14 +8953,6 @@ postfix_expr:
                     hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Constructor data type %s is not numeric.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
-                free_parse_initializer(&$4);
-                YYABORT;
-            }
-            if ($2->dimx * $2->dimy != initializer_size(&$4))
-            {
-                hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                        "Expected %u components in constructor, but got %u.",
-                        $2->dimx * $2->dimy, initializer_size(&$4));
                 free_parse_initializer(&$4);
                 YYABORT;
             }
