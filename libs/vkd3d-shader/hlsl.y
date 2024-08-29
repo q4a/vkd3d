@@ -461,6 +461,37 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     return add_cast(ctx, block, node, dst_type, loc);
 }
 
+static bool add_explicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_type *dst_type, const struct parse_array_sizes *arrays, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *instr = node_from_block(block);
+    struct hlsl_type *src_type = instr->data_type;
+    unsigned int i;
+
+    for (i = 0; i < arrays->count; ++i)
+    {
+        if (arrays->sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Implicit size arrays not allowed in casts.");
+        dst_type = hlsl_new_array_type(ctx, dst_type, arrays->sizes[i]);
+    }
+
+    if (!explicit_compatible_data_types(ctx, src_type, dst_type))
+    {
+        struct vkd3d_string_buffer *src_string, *dst_string;
+
+        src_string = hlsl_type_to_string(ctx, src_type);
+        dst_string = hlsl_type_to_string(ctx, dst_type);
+        if (src_string && dst_string)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Can't cast from %s to %s.",
+                    src_string->buffer, dst_string->buffer);
+        hlsl_release_string_buffer(ctx, src_string);
+        hlsl_release_string_buffer(ctx, dst_string);
+        return false;
+    }
+
+    return add_cast(ctx, block, instr, dst_type, loc);
+}
+
 static uint32_t add_modifiers(struct hlsl_ctx *ctx, uint32_t modifiers, uint32_t mod,
         const struct vkd3d_shader_location *loc)
 {
@@ -8903,10 +8934,6 @@ unary_expr:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
     | '(' var_modifiers type arrays ')' unary_expr
         {
-            struct hlsl_type *src_type = node_from_block($6)->data_type;
-            struct hlsl_type *dst_type;
-            unsigned int i;
-
             if ($2)
             {
                 hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
@@ -8914,36 +8941,13 @@ unary_expr:
                 YYABORT;
             }
 
-            dst_type = $3;
-            for (i = 0; i < $4.count; ++i)
-            {
-                if ($4.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
-                {
-                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "Implicit size arrays not allowed in casts.");
-                }
-                dst_type = hlsl_new_array_type(ctx, dst_type, $4.sizes[i]);
-            }
-
-            if (!explicit_compatible_data_types(ctx, src_type, dst_type))
-            {
-                struct vkd3d_string_buffer *src_string, *dst_string;
-
-                src_string = hlsl_type_to_string(ctx, src_type);
-                dst_string = hlsl_type_to_string(ctx, dst_type);
-                if (src_string && dst_string)
-                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Can't cast from %s to %s.",
-                            src_string->buffer, dst_string->buffer);
-                hlsl_release_string_buffer(ctx, src_string);
-                hlsl_release_string_buffer(ctx, dst_string);
-                YYABORT;
-            }
-
-            if (!add_cast(ctx, $6, node_from_block($6), dst_type, &@3))
+            if (!add_explicit_conversion(ctx, $6, $3, &$4, &@3))
             {
                 destroy_block($6);
+                vkd3d_free($4.sizes);
                 YYABORT;
             }
+            vkd3d_free($4.sizes);
             $$ = $6;
         }
 
