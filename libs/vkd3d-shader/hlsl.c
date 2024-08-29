@@ -276,6 +276,7 @@ bool hlsl_type_is_shader(const struct hlsl_type *type)
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
+        case HLSL_CLASS_ERROR:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_RASTERIZER_STATE:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
@@ -418,6 +419,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
+        case HLSL_CLASS_ERROR:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RASTERIZER_STATE:
@@ -494,6 +496,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
     {
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
+        case HLSL_CLASS_ERROR:
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_SAMPLER:
@@ -670,6 +673,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
                 break;
 
             case HLSL_CLASS_EFFECT_GROUP:
+            case HLSL_CLASS_ERROR:
             case HLSL_CLASS_PASS:
             case HLSL_CLASS_TECHNIQUE:
             case HLSL_CLASS_VOID:
@@ -1061,6 +1065,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
 
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
+        case HLSL_CLASS_ERROR:
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RASTERIZER_STATE:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
@@ -1155,6 +1160,7 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
+        case HLSL_CLASS_ERROR:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RASTERIZER_STATE:
@@ -2710,6 +2716,10 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             }
             return string;
 
+        case HLSL_CLASS_ERROR:
+            vkd3d_string_buffer_printf(string, "<error type>");
+            return string;
+
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
@@ -4146,6 +4156,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
     ctx->builtin_types.null = hlsl_new_type(ctx, "NULL", HLSL_CLASS_NULL, HLSL_TYPE_UINT, 1, 1);
     ctx->builtin_types.string = hlsl_new_simple_type(ctx, "string", HLSL_CLASS_STRING);
+    ctx->builtin_types.error = hlsl_new_simple_type(ctx, "<error type>", HLSL_CLASS_ERROR);
     hlsl_scope_add_type(ctx->globals, ctx->builtin_types.string);
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilView", HLSL_CLASS_DEPTH_STENCIL_VIEW));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilState", HLSL_CLASS_DEPTH_STENCIL_STATE));

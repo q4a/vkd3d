@@ -3236,6 +3236,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
+        case HLSL_CLASS_ERROR:
         case HLSL_CLASS_STRUCT:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_PIXEL_SHADER:

@@ -106,6 +106,7 @@ enum hlsl_type_class
     HLSL_CLASS_BLEND_STATE,
     HLSL_CLASS_VOID,
     HLSL_CLASS_NULL,
+    HLSL_CLASS_ERROR,
 };
 
 enum hlsl_base_type
@@ -1046,6 +1047,7 @@ struct hlsl_ctx
         struct hlsl_type *string;
         struct hlsl_type *Void;
         struct hlsl_type *null;
+        struct hlsl_type *error;
     } builtin_types;
 
     /* List of the instruction nodes for initializing static variables. */

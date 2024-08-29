@@ -1661,6 +1661,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
              * solve that problem for us, since we may be called on a partial
              * block, but DCE deletes dead stores, so it needs to be able to
              * see the whole program. */
+        case HLSL_CLASS_ERROR:
             return false;
 
         case HLSL_CLASS_CONSTANT_BUFFER:
