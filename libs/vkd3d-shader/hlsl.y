@@ -8810,7 +8810,6 @@ postfix_expr:
                     YYABORT;
                 }
                 vkd3d_free($3);
-                $$ = $1;
             }
             else if (hlsl_is_numeric_type(node->data_type))
             {
@@ -8824,14 +8823,14 @@ postfix_expr:
                 }
                 hlsl_block_add_instr($1, swizzle);
                 vkd3d_free($3);
-                $$ = $1;
             }
-            else
+            else if (node->data_type->class != HLSL_CLASS_ERROR)
             {
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid subscript \"%s\".", $3);
                 vkd3d_free($3);
                 YYABORT;
             }
+            $$ = $1;
         }
     | postfix_expr '[' expr ']'
         {
