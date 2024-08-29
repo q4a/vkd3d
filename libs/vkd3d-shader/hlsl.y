@@ -647,6 +647,9 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
     struct hlsl_block expr;
     struct hlsl_src src;
 
+    if (node_from_block(block)->data_type->class == HLSL_CLASS_ERROR)
+        return ret;
+
     LIST_FOR_EACH_ENTRY(node, &block->instrs, struct hlsl_ir_node, entry)
     {
         switch (node->type)
