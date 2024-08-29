@@ -2091,6 +2091,12 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
     unsigned int writemask = 0, width = 0;
     bool matrix_writemask = false;
 
+    if (lhs->data_type->class == HLSL_CLASS_ERROR || rhs->data_type->class == HLSL_CLASS_ERROR)
+    {
+        block->value = ctx->error_instr;
+        return true;
+    }
+
     if (assign_op == ASSIGN_OP_SUB)
     {
         if (!(rhs = add_unary_arithmetic_expr(ctx, block, HLSL_OP1_NEG, rhs, &rhs->loc)))
