@@ -40,6 +40,7 @@ struct parse_initializer
     unsigned int args_count;
     struct hlsl_block *instrs;
     bool braces;
+    struct vkd3d_shader_location loc;
 };
 
 struct parse_parameter
@@ -2883,7 +2884,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             size = initializer_size(&v->initializer);
             if (component_count != size)
             {
-                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                hlsl_error(ctx, &v->initializer.loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                         "Expected %u components in initializer, but got %u.", component_count, size);
                 free_parse_variable_def(v);
                 continue;
@@ -8324,6 +8325,7 @@ complex_initializer:
             $$.args[0] = node_from_block($1);
             $$.instrs = $1;
             $$.braces = false;
+            $$.loc = @$;
         }
     | '{' complex_initializer_list '}'
         {
@@ -8355,6 +8357,7 @@ complex_initializer_list:
                 $$.args[$$.args_count++] = $3.args[i];
             hlsl_block_add_block($$.instrs, $3.instrs);
             free_parse_initializer(&$3);
+            $$.loc = @$;
         }
 
 initializer_expr:
@@ -8372,6 +8375,7 @@ initializer_expr_list:
             $$.args[0] = node_from_block($1);
             $$.instrs = $1;
             $$.braces = false;
+            $$.loc = @$;
         }
     | initializer_expr_list ',' initializer_expr
         {
@@ -8690,6 +8694,7 @@ func_arguments:
             if (!($$.instrs = make_empty_block(ctx)))
                 YYABORT;
             $$.braces = false;
+            $$.loc = @$;
         }
     | initializer_expr_list
 
