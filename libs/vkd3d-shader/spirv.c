@@ -6120,12 +6120,12 @@ static void spirv_compiler_decorate_descriptor(struct spirv_compiler *compiler,
 static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *compiler,
         SpvStorageClass storage_class, uint32_t type_id, const struct vkd3d_shader_register *reg,
         const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
-        bool is_uav, bool is_uav_counter, struct vkd3d_descriptor_variable_info *var_info)
+        const struct vkd3d_shader_descriptor_info1 *descriptor, bool is_uav_counter,
+        struct vkd3d_descriptor_variable_info *var_info)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     struct vkd3d_descriptor_binding_address binding_address;
     struct vkd3d_shader_descriptor_binding binding;
-    const struct vkd3d_shader_descriptor_info1 *d;
     uint32_t array_type_id, ptr_type_id, var_id;
     bool write_only = false, coherent = false;
     struct vkd3d_symbol symbol;
@@ -6135,12 +6135,11 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
             resource_type, is_uav_counter, &binding_address);
     var_info->binding_base_idx = binding_address.binding_base_idx;
 
-    if (is_uav)
+    if (descriptor->type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV && !is_uav_counter)
     {
-        d = spirv_compiler_get_descriptor_info(compiler, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
-        write_only = !(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ);
+        write_only = !(descriptor->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ);
         /* ROVs are implicitly globally coherent. */
-        coherent = d->uav_flags & (VKD3DSUF_GLOBALLY_COHERENT | VKD3DSUF_RASTERISER_ORDERED_VIEW);
+        coherent = descriptor->uav_flags & (VKD3DSUF_GLOBALLY_COHERENT | VKD3DSUF_RASTERISER_ORDERED_VIEW);
     }
 
     if (binding.count == 1 && range->first == binding_address.binding_base_idx && range->last != ~0u
@@ -6240,7 +6239,7 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_name(builder, struct_id, "cb%u_struct", size);
 
     var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, struct_id,
-            &reg, range, VKD3D_SHADER_RESOURCE_BUFFER, false, false, &var_info);
+            &reg, range, VKD3D_SHADER_RESOURCE_BUFFER, descriptor, false, &var_info);
 
     vkd3d_symbol_make_register(&reg_symbol, &reg);
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
@@ -6296,8 +6295,8 @@ static void spirv_compiler_emit_sampler_declaration(struct spirv_compiler *compi
         return;
 
     type_id = vkd3d_spirv_get_op_type_sampler(builder);
-    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id, &reg,
-            range, VKD3D_SHADER_RESOURCE_NONE, false, false, &var_info);
+    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id,
+            &reg, range, VKD3D_SHADER_RESOURCE_NONE, descriptor, false, &var_info);
 
     vkd3d_symbol_make_register(&reg_symbol, &reg);
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
@@ -6524,8 +6523,8 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
                 resource_type_info, sampled_type, structure_stride || raw, 0);
     }
 
-    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id, &reg,
-            range, resource_type, is_uav, false, &var_info);
+    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class,
+            type_id, &reg, range, resource_type, descriptor, false, &var_info);
 
     if (is_uav)
     {
@@ -6571,7 +6570,7 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
             }
 
             counter_var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class,
-                    type_id, &reg, range, resource_type, false, true, &counter_var_info);
+                    type_id, &reg, range, resource_type, descriptor, true, &counter_var_info);
         }
     }
 
