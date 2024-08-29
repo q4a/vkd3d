@@ -6092,6 +6092,21 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
     const struct hlsl_type *object_type = object->data_type;
     const struct method_function *method;
 
+    if (object_type->class == HLSL_CLASS_ERROR)
+    {
+        block->value = ctx->error_instr;
+        return true;
+    }
+
+    for (unsigned int i = 0; i < params->args_count; ++i)
+    {
+        if (params->args[i]->data_type->class == HLSL_CLASS_ERROR)
+        {
+            block->value = ctx->error_instr;
+            return true;
+        }
+    }
+
     if (object_type->class != HLSL_CLASS_TEXTURE || object_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
     {
         struct vkd3d_string_buffer *string;
