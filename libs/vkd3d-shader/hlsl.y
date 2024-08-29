@@ -2512,6 +2512,14 @@ static void initialize_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *dst,
 {
     unsigned int store_index = 0;
 
+    /* If any of the elements has an error type, then initializer_size() is not
+     * meaningful. */
+    for (unsigned int i = 0; i < initializer->args_count; ++i)
+    {
+        if (initializer->args[i]->data_type->class == HLSL_CLASS_ERROR)
+            return;
+    }
+
     if (initializer_size(initializer) != hlsl_type_component_count(dst->data_type))
     {
         hlsl_error(ctx, &initializer->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
