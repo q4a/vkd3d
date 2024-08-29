@@ -1710,12 +1710,18 @@ static struct hlsl_ir_node *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, stru
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg};
 
+    if (arg->data_type->class == HLSL_CLASS_ERROR)
+        return arg;
+
     return add_expr(ctx, block, op, args, arg->data_type, loc);
 }
 
 static struct hlsl_ir_node *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
+    if (arg->data_type->class == HLSL_CLASS_ERROR)
+        return arg;
+
     check_integer_type(ctx, arg);
 
     return add_unary_arithmetic_expr(ctx, block, op, arg, loc);
@@ -1726,6 +1732,9 @@ static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct 
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_type *bool_type;
+
+    if (arg->data_type->class == HLSL_CLASS_ERROR)
+        return arg;
 
     bool_type = hlsl_get_numeric_type(ctx, arg->data_type->class, HLSL_TYPE_BOOL,
             arg->data_type->dimx, arg->data_type->dimy);
