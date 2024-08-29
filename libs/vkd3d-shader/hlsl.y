@@ -475,6 +475,9 @@ static bool add_explicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *blo
         dst_type = hlsl_new_array_type(ctx, dst_type, arrays->sizes[i]);
     }
 
+    if (instr->data_type->class == HLSL_CLASS_ERROR)
+        return true;
+
     if (!explicit_compatible_data_types(ctx, src_type, dst_type))
     {
         struct vkd3d_string_buffer *src_string, *dst_string;
