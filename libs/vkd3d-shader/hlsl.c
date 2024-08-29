@@ -3990,12 +3990,12 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     static const char * const names[] =
     {
-        "float",
-        "half",
-        "double",
-        "int",
-        "uint",
-        "bool",
+        [HLSL_TYPE_FLOAT]  = "float",
+        [HLSL_TYPE_HALF]   = "half",
+        [HLSL_TYPE_DOUBLE] = "double",
+        [HLSL_TYPE_INT]    = "int",
+        [HLSL_TYPE_UINT]   = "uint",
+        [HLSL_TYPE_BOOL]   = "bool",
     };
 
     static const char *const variants_float[] = {"min10float", "min16float"};
