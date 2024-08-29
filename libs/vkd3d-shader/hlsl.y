@@ -2059,7 +2059,7 @@ static bool invert_swizzle_matrix(uint32_t *swizzle, unsigned int *writemask, un
     return true;
 }
 
-static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *lhs,
+static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *lhs,
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
@@ -2070,7 +2070,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
     if (assign_op == ASSIGN_OP_SUB)
     {
         if (!(rhs = add_unary_arithmetic_expr(ctx, block, HLSL_OP1_NEG, rhs, &rhs->loc)))
-            return NULL;
+            return false;
         assign_op = ASSIGN_OP_ADD;
     }
     if (assign_op != ASSIGN_OP_ASSIGN)
@@ -2079,7 +2079,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
 
         VKD3D_ASSERT(op);
         if (!(rhs = add_binary_expr(ctx, block, op, lhs, rhs, &rhs->loc)))
-            return NULL;
+            return false;
     }
 
     if (hlsl_is_numeric_type(lhs_type))
@@ -2089,14 +2089,14 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
     }
 
     if (!(rhs = add_implicit_conversion(ctx, block, rhs, lhs_type, &rhs->loc)))
-        return NULL;
+        return false;
 
     while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_INDEX)
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
             hlsl_fixme(ctx, &lhs->loc, "Cast on the LHS.");
-            return NULL;
+            return false;
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
@@ -2111,25 +2111,23 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
                 if (swizzle->val.node->type != HLSL_IR_LOAD && swizzle->val.node->type != HLSL_IR_INDEX)
                 {
                     hlsl_fixme(ctx, &lhs->loc, "Unhandled source of matrix swizzle.");
-                    return NULL;
+                    return false;
                 }
                 if (!invert_swizzle_matrix(&s, &writemask, &width))
                 {
                     hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask for matrix.");
-                    return NULL;
+                    return false;
                 }
                 matrix_writemask = true;
             }
             else if (!invert_swizzle(&s, &writemask, &width))
             {
                 hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
-                return NULL;
+                return false;
             }
 
             if (!(new_swizzle = hlsl_new_swizzle(ctx, s, width, rhs, &swizzle->node.loc)))
-            {
-                return NULL;
-            }
+                return false;
             hlsl_block_add_instr(block, new_swizzle);
 
             lhs = swizzle->val.node;
@@ -2138,7 +2136,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
         else
         {
             hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE, "Invalid lvalue.");
-            return NULL;
+            return false;
         }
     }
 
@@ -2153,11 +2151,11 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
         if (!hlsl_index_is_resource_access(hlsl_ir_index(lhs)))
         {
             hlsl_fixme(ctx, &lhs->loc, "Non-direct structured resource store.");
-            return NULL;
+            return false;
         }
 
         if (!hlsl_init_deref_from_index_chain(ctx, &resource_deref, hlsl_ir_index(lhs)->val.node))
-            return NULL;
+            return false;
 
         resource_type = hlsl_deref_get_type(ctx, &resource_deref);
         VKD3D_ASSERT(resource_type->class == HLSL_CLASS_TEXTURE || resource_type->class == HLSL_CLASS_UAV);
@@ -2179,7 +2177,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
         if (!(store = hlsl_new_resource_store(ctx, &resource_deref, coords, rhs, &lhs->loc)))
         {
             hlsl_cleanup_deref(&resource_deref);
-            return NULL;
+            return false;
         }
         hlsl_block_add_instr(block, store);
         hlsl_cleanup_deref(&resource_deref);
@@ -2206,13 +2204,13 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
                 if (!(load = hlsl_add_load_component(ctx, block, rhs, k++, &rhs->loc)))
                 {
                     hlsl_cleanup_deref(&deref);
-                    return NULL;
+                    return false;
                 }
 
                 if (!hlsl_new_store_component(ctx, &store_block, &deref, component, load))
                 {
                     hlsl_cleanup_deref(&deref);
-                    return NULL;
+                    return false;
                 }
                 hlsl_block_add_block(block, &store_block);
             }
@@ -2237,23 +2235,23 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
                 continue;
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &lhs->loc)))
-                return NULL;
+                return false;
             hlsl_block_add_instr(block, c);
 
             if (!(cell = hlsl_new_index(ctx, &row->node, c, &lhs->loc)))
-                return NULL;
+                return false;
             hlsl_block_add_instr(block, cell);
 
             if (!(load = hlsl_add_load_component(ctx, block, rhs, k++, &rhs->loc)))
-                return NULL;
+                return false;
 
             if (!hlsl_init_deref_from_index_chain(ctx, &deref, cell))
-                return NULL;
+                return false;
 
             if (!(store = hlsl_new_store_index(ctx, &deref, NULL, load, 0, &rhs->loc)))
             {
                 hlsl_cleanup_deref(&deref);
-                return NULL;
+                return false;
             }
             hlsl_block_add_instr(block, store);
             hlsl_cleanup_deref(&deref);
@@ -2265,12 +2263,12 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
         struct hlsl_deref deref;
 
         if (!hlsl_init_deref_from_index_chain(ctx, &deref, lhs))
-            return NULL;
+            return false;
 
         if (!(store = hlsl_new_store_index(ctx, &deref, NULL, rhs, writemask, &rhs->loc)))
         {
             hlsl_cleanup_deref(&deref);
-            return NULL;
+            return false;
         }
         hlsl_block_add_instr(block, store);
         hlsl_cleanup_deref(&deref);
@@ -2280,9 +2278,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
      * splitting easier. Instead copy it here. Since we retrieve sources from
      * the last instruction in the list, we do need to copy. */
     if (!(copy = hlsl_new_copy(ctx, rhs)))
-        return NULL;
+        return false;
     hlsl_block_add_instr(block, copy);
-    return copy;
+    return true;
 }
 
 static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool decrement, bool post,
