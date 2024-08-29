@@ -1012,6 +1012,12 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct hlsl_block *block, str
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
     struct hlsl_ir_node *return_index, *cast;
 
+    if (array->data_type->class == HLSL_CLASS_ERROR || index->data_type->class == HLSL_CLASS_ERROR)
+    {
+        block->value = ctx->error_instr;
+        return true;
+    }
+
     if ((expr_type->class == HLSL_CLASS_TEXTURE || expr_type->class == HLSL_CLASS_UAV)
             && expr_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
