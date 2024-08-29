@@ -2354,6 +2354,9 @@ static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool d
     struct hlsl_ir_node *lhs = node_from_block(block);
     struct hlsl_ir_node *one;
 
+    if (lhs->data_type->class == HLSL_CLASS_ERROR)
+        return true;
+
     if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                 "Argument to %s%screment operator is const.", post ? "post" : "pre", decrement ? "de" : "in");
