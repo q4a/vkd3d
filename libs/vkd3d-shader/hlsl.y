@@ -1243,7 +1243,8 @@ static bool add_record_access_recurse(struct hlsl_ctx *ctx, struct hlsl_block *b
     }
 
     hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Field \"%s\" is not defined.", name);
-    return false;
+    block->value = ctx->error_instr;
+    return true;
 }
 
 static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type, struct list *list)
@@ -8960,27 +8961,27 @@ postfix_expr:
                     vkd3d_free($3);
                     YYABORT;
                 }
-                vkd3d_free($3);
             }
             else if (hlsl_is_numeric_type(node->data_type))
             {
                 struct hlsl_ir_node *swizzle;
 
-                if (!(swizzle = get_swizzle(ctx, node, $3, &@3)))
+                if ((swizzle = get_swizzle(ctx, node, $3, &@3)))
+                {
+                    hlsl_block_add_instr($1, swizzle);
+                }
+                else
                 {
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid swizzle \"%s\".", $3);
-                    vkd3d_free($3);
-                    YYABORT;
+                    $1->value = ctx->error_instr;
                 }
-                hlsl_block_add_instr($1, swizzle);
-                vkd3d_free($3);
             }
             else if (node->data_type->class != HLSL_CLASS_ERROR)
             {
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid subscript \"%s\".", $3);
-                vkd3d_free($3);
-                YYABORT;
+                $1->value = ctx->error_instr;
             }
+            vkd3d_free($3);
             $$ = $1;
         }
     | postfix_expr '[' expr ']'

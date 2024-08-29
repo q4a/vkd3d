@@ -4445,8 +4445,6 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
 
     rb_destroy(&ctx->functions, free_function_rb, NULL);
 
-    hlsl_block_cleanup(&ctx->static_initializers);
-
     /* State blocks must be free before the variables, because they contain instructions that may
      * refer to them. */
     LIST_FOR_EACH_ENTRY_SAFE(scope, next_scope, &ctx->scopes, struct hlsl_scope, entry)
@@ -4461,6 +4459,8 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
             var->state_block_capacity = 0;
         }
     }
+
+    hlsl_block_cleanup(&ctx->static_initializers);
 
     LIST_FOR_EACH_ENTRY_SAFE(scope, next_scope, &ctx->scopes, struct hlsl_scope, entry)
     {
