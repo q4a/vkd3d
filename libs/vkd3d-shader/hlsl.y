@@ -1972,6 +1972,12 @@ static struct hlsl_block *add_binary_expr_merge(struct hlsl_ctx *ctx, struct hls
     hlsl_block_add_block(block1, block2);
     destroy_block(block2);
 
+    if (arg1->data_type->class == HLSL_CLASS_ERROR || arg2->data_type->class == HLSL_CLASS_ERROR)
+    {
+        block1->value = ctx->error_instr;
+        return block1;
+    }
+
     if (add_binary_expr(ctx, block1, op, arg1, arg2, loc) == NULL)
         return NULL;
 
