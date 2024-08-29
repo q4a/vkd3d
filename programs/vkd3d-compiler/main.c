@@ -38,6 +38,7 @@
 enum
 {
     OPTION_HELP = CHAR_MAX + 1,
+    OPTION_ALIAS_DOUBLE_AS_FLOAT,
     OPTION_BUFFER_UAV,
     OPTION_CHILD_EFFECT,
     OPTION_ENTRY,
@@ -185,6 +186,9 @@ static void print_usage(const char *program_name)
         "[options...] [file]\n"
         "Options:\n"
         "  -h, --help            Display this information and exit.\n"
+        "  --alias-double-as-float\n"
+        "                        Treat 'double' as 'float' when compiling HLSL sources\n"
+        "                        with shader model 1-3 target profiles.\n"
         "  -b <type>             Specify the target type. Use --print-target-types to\n"
         "                        list the valid and default target types for a given\n"
         "                        source type.\n"
@@ -488,6 +492,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     static struct option long_options[] =
     {
         {"help",                       no_argument,       NULL, OPTION_HELP},
+        {"alias-double-as-float",      no_argument,       NULL, OPTION_ALIAS_DOUBLE_AS_FLOAT},
         {"buffer-uav",                 required_argument, NULL, OPTION_BUFFER_UAV},
         {"child-effect",               no_argument,       NULL, OPTION_CHILD_EFFECT},
         {"entry",                      required_argument, NULL, OPTION_ENTRY},
@@ -600,6 +605,10 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
             case OPTION_SEMANTIC_COMPAT_MAP:
                 compat_options |= VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
+                break;
+
+            case OPTION_ALIAS_DOUBLE_AS_FLOAT:
+                compat_options |= VKD3D_SHADER_COMPILE_OPTION_DOUBLE_AS_FLOAT_ALIAS;
                 break;
 
             case OPTION_STRIP_DEBUG:

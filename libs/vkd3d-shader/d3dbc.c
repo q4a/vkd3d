@@ -1835,8 +1835,10 @@ void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buff
                         switch (comp_type->e.numeric.type)
                         {
                             case HLSL_TYPE_DOUBLE:
-                                hlsl_fixme(ctx, &var->loc, "Write double default values.");
-                                uni.u = 0;
+                                if (ctx->double_as_float_alias)
+                                    uni.u = var->default_values[k].number.u;
+                                else
+                                    uni.u = 0;
                                 break;
 
                             case HLSL_TYPE_INT:

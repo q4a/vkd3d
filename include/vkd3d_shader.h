@@ -190,6 +190,17 @@ enum vkd3d_shader_compile_option_backward_compatibility
      *  - DEPTH to SV_Depth for pixel shader outputs.
      */
     VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES = 0x00000001,
+    /**
+     *  Causes 'double' to behave as an alias for 'float'. This option only
+     *  applies to HLSL sources with shader model 1-3 target profiles. Without
+     *  this option using the 'double' type produces compilation errors in
+     *  these target profiles.
+     *
+     *  This option is disabled by default.
+     *
+     *  \since 1.14
+     */
+    VKD3D_SHADER_COMPILE_OPTION_DOUBLE_AS_FLOAT_ALIAS = 0x00000002,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY),
 };

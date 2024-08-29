@@ -6622,7 +6622,13 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(ctx, &instr->loc, "SM1 cast from double to float.");
+                    if (ctx->double_as_float_alias)
+                    {
+                        sm1_generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                        return true;
+                    }
+                    hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "The 'double' type is not supported for the %s profile.", ctx->profile->name);
                     break;
 
                 default:
@@ -6660,7 +6666,22 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_TYPE_DOUBLE:
-            hlsl_fixme(ctx, &instr->loc, "SM1 cast to double.");
+            switch (src_type->e.numeric.type)
+            {
+                case HLSL_TYPE_FLOAT:
+                    if (ctx->double_as_float_alias)
+                    {
+                        sm1_generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                        return true;
+                    }
+                    hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "The 'double' type is not supported for the %s profile.", ctx->profile->name);
+                    break;
+
+                default:
+                    hlsl_fixme(ctx, &instr->loc, "SM1 cast to double.");
+                    break;
+            }
             break;
 
         case HLSL_TYPE_BOOL:
