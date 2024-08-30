@@ -613,7 +613,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
             field_offsets[i].name = write_string(field->name, fx);
             field_offsets[i].semantic = write_string(field->semantic.raw_name, fx);
-            field_offsets[i].offset = field->reg_offset[HLSL_REGSET_NUMERIC];
+            field_offsets[i].offset = field->reg_offset[HLSL_REGSET_NUMERIC] * sizeof(float);
             field_offsets[i].type = write_type(field->type, fx);
         }
     }
