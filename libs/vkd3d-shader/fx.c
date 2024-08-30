@@ -575,6 +575,12 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
     }
 }
 
+static bool is_numeric_fx_4_type(const struct hlsl_type *type)
+{
+    type = hlsl_get_multiarray_element_type(type);
+    return type->class == HLSL_CLASS_STRUCT || hlsl_is_numeric_type(type);
+}
+
 static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
     struct field_offsets
@@ -667,7 +673,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     /* Structures can only contain numeric fields, this is validated during variable declaration. */
     total_size = stride = type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float);
     packed_size = 0;
-    if (type->class == HLSL_CLASS_STRUCT || hlsl_is_numeric_type(type))
+    if (is_numeric_fx_4_type(type))
         packed_size = hlsl_type_component_count(type) * sizeof(float);
     if (elements_count)
     {
@@ -2401,6 +2407,9 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
     size = 0;
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
+        if (!is_numeric_fx_4_type(var->data_type))
+            continue;
+
         if (var->buffer != b)
             continue;
 
