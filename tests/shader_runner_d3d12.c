@@ -521,6 +521,95 @@ static D3D12_PRIMITIVE_TOPOLOGY_TYPE d3d12_primitive_topology_type_from_primitiv
     }
 }
 
+static ID3D12PipelineState *create_pipeline(struct d3d12_shader_runner *runner,
+        D3D12_PRIMITIVE_TOPOLOGY primitive_topology, ID3D10Blob *vs_code, ID3D10Blob *ps_code,
+        ID3D10Blob *hs_code, ID3D10Blob *ds_code, ID3D10Blob *gs_code)
+{
+    struct test_context *test_context = &runner->test_context;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
+    D3D12_INPUT_ELEMENT_DESC *input_element_descs;
+    ID3D12Device *device = test_context->device;
+    unsigned int sample_count = 1;
+    ID3D12PipelineState *pso;
+    HRESULT hr;
+
+    for (size_t i = 0; i < runner->r.resource_count; ++i)
+    {
+        struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
+
+        if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
+        {
+            pso_desc.RTVFormats[resource->r.desc.slot] = resource->r.desc.format;
+            pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.desc.slot + 1);
+            pso_desc.BlendState.RenderTarget[resource->r.desc.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+            if (resource->r.desc.sample_count)
+                sample_count = resource->r.desc.sample_count;
+        }
+        else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        {
+            assert(!resource->r.desc.slot);
+            pso_desc.DSVFormat = resource->r.desc.format;
+            pso_desc.DepthStencilState.DepthEnable = true;
+            pso_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            pso_desc.DepthStencilState.DepthFunc = runner->r.depth_func;
+        }
+    }
+
+    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
+    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
+    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
+    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
+    if (hs_code)
+    {
+        pso_desc.HS.pShaderBytecode = ID3D10Blob_GetBufferPointer(hs_code);
+        pso_desc.HS.BytecodeLength = ID3D10Blob_GetBufferSize(hs_code);
+    }
+    if (ds_code)
+    {
+        pso_desc.DS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ds_code);
+        pso_desc.DS.BytecodeLength = ID3D10Blob_GetBufferSize(ds_code);
+    }
+    if (gs_code)
+    {
+        pso_desc.GS.pShaderBytecode = ID3D10Blob_GetBufferPointer(gs_code);
+        pso_desc.GS.BytecodeLength = ID3D10Blob_GetBufferSize(gs_code);
+    }
+    pso_desc.PrimitiveTopologyType = d3d12_primitive_topology_type_from_primitive_topology(primitive_topology);
+    pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    pso_desc.SampleDesc.Count = sample_count;
+    pso_desc.SampleMask = runner->r.sample_mask ? runner->r.sample_mask : ~(UINT)0;
+    pso_desc.pRootSignature = test_context->root_signature;
+
+    input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));
+    for (size_t i = 0; i < runner->r.input_element_count; ++i)
+    {
+        const struct input_element *element = &runner->r.input_elements[i];
+        D3D12_INPUT_ELEMENT_DESC *desc = &input_element_descs[i];
+
+        desc->SemanticName = element->name;
+        desc->SemanticIndex = element->index;
+        desc->Format = element->format;
+        desc->InputSlot = element->slot;
+        desc->AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+        desc->InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+    }
+
+    pso_desc.InputLayout.pInputElementDescs = input_element_descs;
+    pso_desc.InputLayout.NumElements = runner->r.input_element_count;
+
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&pso);
+    todo_if(runner->r.is_todo) ok(hr == S_OK, "Failed to create state, hr %#x.\n", hr);
+
+    free(input_element_descs);
+
+    if (FAILED(hr))
+        return NULL;
+
+    return pso;
+}
+
 static bool d3d12_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count, unsigned int instance_count)
 {
@@ -530,11 +619,9 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL, *gs_code = NULL;
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
     ID3D12GraphicsCommandList *command_list = test_context->list;
-    unsigned int uniform_index, sample_count, rtv_count = 0;
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
     ID3D12CommandQueue *queue = test_context->queue;
-    D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     ID3D12Device *device = test_context->device;
+    unsigned int uniform_index, rtv_count = 0;
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = {0};
     ID3D12PipelineState *pso;
     bool succeeded;
@@ -584,71 +671,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     test_context->root_signature = d3d12_runner_create_root_signature(runner,
             queue, test_context->allocator, command_list, &uniform_index);
 
-    for (i = 0, sample_count = 1; i < runner->r.resource_count; ++i)
-    {
-        struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
+    pso = create_pipeline(runner, primitive_topology, vs_code, ps_code, hs_code, ds_code, gs_code);
 
-        if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
-        {
-            pso_desc.RTVFormats[resource->r.desc.slot] = resource->r.desc.format;
-            pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.desc.slot + 1);
-            pso_desc.BlendState.RenderTarget[resource->r.desc.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-            if (resource->r.desc.sample_count)
-                sample_count = resource->r.desc.sample_count;
-        }
-        else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
-        {
-            assert(!resource->r.desc.slot);
-            pso_desc.DSVFormat = resource->r.desc.format;
-            pso_desc.DepthStencilState.DepthEnable = true;
-            pso_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-            pso_desc.DepthStencilState.DepthFunc = runner->r.depth_func;
-        }
-    }
-
-    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
-    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
-    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
-    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
-    if (hs_code)
-    {
-        pso_desc.HS.pShaderBytecode = ID3D10Blob_GetBufferPointer(hs_code);
-        pso_desc.HS.BytecodeLength = ID3D10Blob_GetBufferSize(hs_code);
-        pso_desc.DS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ds_code);
-        pso_desc.DS.BytecodeLength = ID3D10Blob_GetBufferSize(ds_code);
-    }
-    if (gs_code)
-    {
-        pso_desc.GS.pShaderBytecode = ID3D10Blob_GetBufferPointer(gs_code);
-        pso_desc.GS.BytecodeLength = ID3D10Blob_GetBufferSize(gs_code);
-    }
-    pso_desc.PrimitiveTopologyType = d3d12_primitive_topology_type_from_primitive_topology(primitive_topology);
-    pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-    pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    pso_desc.SampleDesc.Count = sample_count;
-    pso_desc.SampleMask = r->sample_mask ? r->sample_mask : ~(UINT)0;
-    pso_desc.pRootSignature = test_context->root_signature;
-
-    input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));
-    for (i = 0; i < runner->r.input_element_count; ++i)
-    {
-        const struct input_element *element = &runner->r.input_elements[i];
-        D3D12_INPUT_ELEMENT_DESC *desc = &input_element_descs[i];
-
-        desc->SemanticName = element->name;
-        desc->SemanticIndex = element->index;
-        desc->Format = element->format;
-        desc->InputSlot = element->slot;
-        desc->AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-        desc->InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-    }
-
-    pso_desc.InputLayout.pInputElementDescs = input_element_descs;
-    pso_desc.InputLayout.NumElements = runner->r.input_element_count;
-
-    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
-            &IID_ID3D12PipelineState, (void **)&pso);
-    todo_if(runner->r.is_todo) ok(hr == S_OK, "Failed to create state, hr %#x.\n", hr);
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
     if (hs_code)
@@ -657,9 +681,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         ID3D10Blob_Release(ds_code);
     if (gs_code)
         ID3D10Blob_Release(gs_code);
-    free(input_element_descs);
 
-    if (FAILED(hr))
+    if (!pso)
         return false;
 
     add_pso(test_context, pso);
