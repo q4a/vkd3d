@@ -21,6 +21,114 @@
 
 #include "utils.h"
 
+struct d3d12_root_signature_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    ID3D12RootSignature *root_signature;
+};
+
+struct d3d12_shader_bytecode_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_SHADER_BYTECODE shader_bytecode;
+};
+
+struct d3d12_stream_output_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_STREAM_OUTPUT_DESC stream_output_desc;
+};
+
+struct d3d12_blend_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_BLEND_DESC blend_desc;
+};
+
+struct d3d12_sample_mask_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    UINT sample_mask;
+};
+
+struct d3d12_rasterizer_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_RASTERIZER_DESC rasterizer_desc;
+};
+
+struct d3d12_depth_stencil_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_DEPTH_STENCIL_DESC depth_stencil_desc;
+};
+
+struct d3d12_input_layout_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_INPUT_LAYOUT_DESC input_layout;
+};
+
+struct d3d12_ib_strip_cut_value_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_INDEX_BUFFER_STRIP_CUT_VALUE strip_cut_value;
+};
+
+struct d3d12_primitive_topology_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
+};
+
+struct d3d12_render_target_formats_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    struct D3D12_RT_FORMAT_ARRAY render_target_formats;
+};
+
+struct d3d12_depth_stencil_format_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    DXGI_FORMAT depth_stencil_format;
+};
+
+struct d3d12_sample_desc_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    DXGI_SAMPLE_DESC sample_desc;
+};
+
+struct d3d12_node_mask_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    UINT node_mask;
+};
+
+struct d3d12_cached_pso_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_CACHED_PIPELINE_STATE cached_pso;
+};
+
+struct d3d12_flags_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_PIPELINE_STATE_FLAGS flags;
+};
+
+struct d3d12_depth_stencil1_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_DEPTH_STENCIL_DESC1 depth_stencil_desc;
+};
+
+struct d3d12_view_instancing_subobject
+{
+    DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+    D3D12_VIEW_INSTANCING_DESC view_instancing_desc;
+};
+
 #define wait_queue_idle(a, b) wait_queue_idle_(__LINE__, a, b)
 static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue);
 static ID3D12Device *create_device(void);
@@ -1015,6 +1123,7 @@ struct test_context_desc
 struct test_context
 {
     ID3D12Device *device;
+    ID3D12Device2 *device2;
 
     ID3D12CommandQueue *queue;
     ID3D12CommandAllocator *allocator;
@@ -1127,6 +1236,9 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
     }
     device = context->device;
 
+    if (FAILED(hr = ID3D12Device_QueryInterface(device, &IID_ID3D12Device2, (void **)&context->device2)))
+        context->device2 = NULL;
+
     context->queue = create_command_queue_(line, device, D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
 
     hr = ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -1231,6 +1343,9 @@ static inline void destroy_test_context_(unsigned int line, struct test_context 
     ID3D12GraphicsCommandList_Release(context->list);
     destroy_pipeline_state_objects(context);
     free(context->pso);
+
+    if (context->device2)
+        ID3D12Device2_Release(context->device2);
 
     refcount = ID3D12Device_Release(context->device);
     ok_(line)(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);

@@ -521,6 +521,25 @@ static D3D12_PRIMITIVE_TOPOLOGY_TYPE d3d12_primitive_topology_type_from_primitiv
     }
 }
 
+static D3D12_INPUT_ELEMENT_DESC *create_element_descs(const struct d3d12_shader_runner *runner)
+{
+    D3D12_INPUT_ELEMENT_DESC *input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));
+    for (size_t i = 0; i < runner->r.input_element_count; ++i)
+    {
+        const struct input_element *element = &runner->r.input_elements[i];
+        D3D12_INPUT_ELEMENT_DESC *desc = &input_element_descs[i];
+
+        desc->SemanticName = element->name;
+        desc->SemanticIndex = element->index;
+        desc->Format = element->format;
+        desc->InputSlot = element->slot;
+        desc->AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+        desc->InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+    }
+
+    return input_element_descs;
+}
+
 static ID3D12PipelineState *create_pipeline(struct d3d12_shader_runner *runner,
         D3D12_PRIMITIVE_TOPOLOGY primitive_topology, ID3D10Blob *vs_code, ID3D10Blob *ps_code,
         ID3D10Blob *hs_code, ID3D10Blob *ds_code, ID3D10Blob *gs_code)
@@ -581,20 +600,7 @@ static ID3D12PipelineState *create_pipeline(struct d3d12_shader_runner *runner,
     pso_desc.SampleMask = runner->r.sample_mask ? runner->r.sample_mask : ~(UINT)0;
     pso_desc.pRootSignature = test_context->root_signature;
 
-    input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));
-    for (size_t i = 0; i < runner->r.input_element_count; ++i)
-    {
-        const struct input_element *element = &runner->r.input_elements[i];
-        D3D12_INPUT_ELEMENT_DESC *desc = &input_element_descs[i];
-
-        desc->SemanticName = element->name;
-        desc->SemanticIndex = element->index;
-        desc->Format = element->format;
-        desc->InputSlot = element->slot;
-        desc->AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-        desc->InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-    }
-
+    input_element_descs = create_element_descs(runner);
     pso_desc.InputLayout.pInputElementDescs = input_element_descs;
     pso_desc.InputLayout.NumElements = runner->r.input_element_count;
 
@@ -607,6 +613,159 @@ static ID3D12PipelineState *create_pipeline(struct d3d12_shader_runner *runner,
     if (FAILED(hr))
         return NULL;
 
+    return pso;
+}
+
+static ID3D12PipelineState *create_pipeline_device2(struct d3d12_shader_runner *runner,
+        D3D12_PRIMITIVE_TOPOLOGY primitive_topology, ID3D10Blob *vs_code, ID3D10Blob *ps_code,
+        ID3D10Blob *hs_code, ID3D10Blob *ds_code, ID3D10Blob *gs_code)
+{
+    struct test_context *test_context = &runner->test_context;
+    ID3D12Device2 *device2 = test_context->device2;
+    D3D12_PIPELINE_STATE_STREAM_DESC pipeline_desc;
+    D3D12_INPUT_ELEMENT_DESC *input_element_descs;
+    unsigned int sample_count = 1;
+    ID3D12PipelineState *pso;
+    HRESULT hr;
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject vs;
+        struct d3d12_shader_bytecode_subobject ps;
+        struct d3d12_shader_bytecode_subobject hs;
+        struct d3d12_shader_bytecode_subobject ds;
+        struct d3d12_shader_bytecode_subobject gs;
+        struct d3d12_render_target_formats_subobject rtv_format;
+        struct d3d12_blend_subobject blend;
+        struct d3d12_depth_stencil_format_subobject dsv_format;
+        struct d3d12_depth_stencil1_subobject dsv;
+        struct d3d12_rasterizer_subobject rasterizer;
+        struct d3d12_primitive_topology_subobject topology;
+        struct d3d12_sample_desc_subobject sample_desc;
+        struct d3d12_sample_mask_subobject sample_mask;
+        struct d3d12_input_layout_subobject input_layout;
+    }
+    pipeline =
+    {
+        .root_signature =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE,
+            .root_signature = test_context->root_signature,
+        },
+        .vs =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS,
+            .shader_bytecode = shader_bytecode_from_blob(vs_code),
+        },
+        .ps =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS,
+            .shader_bytecode = shader_bytecode_from_blob(ps_code),
+        },
+        .hs =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS,
+            .shader_bytecode = hs_code ? shader_bytecode_from_blob(hs_code) : (D3D12_SHADER_BYTECODE) {0},
+        },
+        .ds =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS,
+            .shader_bytecode = ds_code ? shader_bytecode_from_blob(ds_code) : (D3D12_SHADER_BYTECODE) {0},
+        },
+        .gs =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS,
+            .shader_bytecode = gs_code ? shader_bytecode_from_blob(gs_code) : (D3D12_SHADER_BYTECODE) {0},
+        },
+        .rtv_format =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS,
+        },
+        .blend =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND,
+        },
+        .dsv_format =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT,
+        },
+        .dsv =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1,
+        },
+        .rasterizer =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER,
+            .rasterizer_desc =
+        {
+                .FillMode = D3D12_FILL_MODE_SOLID,
+                .CullMode = D3D12_CULL_MODE_NONE,
+            }
+        },
+        .topology =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY,
+            .primitive_topology_type = d3d12_primitive_topology_type_from_primitive_topology(primitive_topology),
+        },
+        .sample_desc =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC,
+        },
+        .sample_mask =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK,
+            .sample_mask = runner->r.sample_mask ? runner->r.sample_mask : ~(UINT)0,
+        },
+        .input_layout =
+        {
+            .type = D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT,
+        },
+    };
+
+    if (!device2)
+        return NULL;
+
+    input_element_descs = create_element_descs(runner);
+    pipeline.input_layout.input_layout.NumElements = runner->r.input_element_count;
+    pipeline.input_layout.input_layout.pInputElementDescs = input_element_descs;
+
+    for (size_t i = 0; i < runner->r.resource_count; ++i)
+    {
+        struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
+
+        if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
+        {
+            pipeline.rtv_format.render_target_formats.RTFormats[resource->r.desc.slot] = resource->r.desc.format;
+            pipeline.rtv_format.render_target_formats.NumRenderTargets =
+                    max(pipeline.rtv_format.render_target_formats.NumRenderTargets, resource->r.desc.slot + 1);
+            pipeline.blend.blend_desc.RenderTarget[resource->r.desc.slot].RenderTargetWriteMask =
+                    D3D12_COLOR_WRITE_ENABLE_ALL;
+            if (resource->r.desc.sample_count)
+                sample_count = resource->r.desc.sample_count;
+        }
+        else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        {
+            assert(!resource->r.desc.slot);
+            pipeline.dsv_format.depth_stencil_format = resource->r.desc.format;
+            pipeline.dsv.depth_stencil_desc.DepthEnable = true;
+            pipeline.dsv.depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            pipeline.dsv.depth_stencil_desc.DepthFunc = runner->r.depth_func;
+        }
+    }
+
+    pipeline.sample_desc.sample_desc.Count = sample_count;
+
+    pipeline_desc.SizeInBytes = sizeof(pipeline);
+    pipeline_desc.pPipelineStateSubobjectStream = &pipeline;
+
+    hr = ID3D12Device2_CreatePipelineState(device2, &pipeline_desc, &IID_ID3D12PipelineState, (void **)&pso);
+    todo_if(runner->r.is_todo) ok(hr == S_OK, "Failed to create state, hr %#x.\n", hr);
+
+    free(input_element_descs);
+
+    if (FAILED(hr))
+        return NULL;
     return pso;
 }
 
@@ -671,7 +830,9 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     test_context->root_signature = d3d12_runner_create_root_signature(runner,
             queue, test_context->allocator, command_list, &uniform_index);
 
-    pso = create_pipeline(runner, primitive_topology, vs_code, ps_code, hs_code, ds_code, gs_code);
+    pso = test_context->device2
+            ?  create_pipeline_device2(runner, primitive_topology, vs_code, ps_code, hs_code, ds_code, gs_code)
+            : create_pipeline(runner, primitive_topology, vs_code, ps_code, hs_code, ds_code, gs_code);
 
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
