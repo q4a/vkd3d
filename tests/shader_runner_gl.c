@@ -32,6 +32,7 @@
 #include "shader_runner.h"
 #include "vkd3d_d3dcompiler.h"
 
+static PFNGLDEPTHBOUNDSEXTPROC p_glDepthBoundsEXT;
 static PFNGLSPECIALIZESHADERPROC p_glSpecializeShader;
 
 enum shading_language
@@ -133,6 +134,8 @@ static bool check_gl_extensions(struct gl_runner *runner)
         runner->caps.float64 = true;
     if (check_gl_extension("GL_ARB_gpu_shader_int64", count))
         runner->caps.int64 = true;
+    if (check_gl_extension("GL_EXT_depth_bounds_test", count))
+        runner->caps.depth_bounds = true;
 
     return true;
 }
@@ -350,6 +353,7 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
     trace("                 GL_VERSION: %s\n", glGetString(GL_VERSION));
     trace("GL_SHADING_LANGUAGE_VERSION: %s\n", glsl_version);
 
+    p_glDepthBoundsEXT = (void *)eglGetProcAddress("glDepthBoundsEXT");
     p_glSpecializeShader = (void *)eglGetProcAddress("glSpecializeShader");
 
     glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
@@ -1143,6 +1147,11 @@ static bool gl_runner_draw(struct shader_runner *r,
                 glEnable(GL_DEPTH_TEST);
                 glDepthMask(GL_TRUE);
                 glDepthFunc(get_compare_op_gl(runner->r.depth_func));
+                if (runner->r.depth_bounds)
+                {
+                    glEnable(GL_DEPTH_BOUNDS_TEST_EXT);
+                    p_glDepthBoundsEXT(runner->r.depth_min, runner->r.depth_max);
+                }
                 break;
 
             case RESOURCE_TYPE_TEXTURE:

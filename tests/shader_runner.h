@@ -146,6 +146,7 @@ struct shader_runner_caps
     bool int64;
     bool rov;
     bool wave_ops;
+    bool depth_bounds;
 
     uint32_t format_caps[DXGI_FORMAT_COUNT];
 };
@@ -182,6 +183,7 @@ struct shader_runner
     bool require_int64;
     bool require_rov;
     bool require_wave_ops;
+    bool require_depth_bounds;
     uint32_t require_format_caps[DXGI_FORMAT_COUNT];
 
     bool last_render_failed;
@@ -207,6 +209,8 @@ struct shader_runner
     unsigned int compile_options;
 
     D3D12_COMPARISON_FUNC depth_func;
+    bool depth_bounds;
+    float depth_min, depth_max;
 
     enum vkd3d_shader_comparison_func alpha_test_func;
     float alpha_test_ref;

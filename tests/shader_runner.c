@@ -402,6 +402,10 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     {
         runner->require_wave_ops = true;
     }
+    else if (match_string(line, "depth-bounds", &line))
+    {
+        runner->require_depth_bounds = true;
+    }
     else
     {
         fatal_error("Unknown require directive '%s'.\n", line);
@@ -905,6 +909,14 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!(resource = shader_runner_get_resource(runner, RESOURCE_TYPE_DEPTH_STENCIL, 0)))
             fatal_error("Resource not found.\n");
         runner->ops->clear(runner, resource, &v);
+    }
+    else if (match_string(line, "depth-bounds", &line))
+    {
+        if (sscanf(line, "%f %f", &runner->depth_min, &runner->depth_max) != 2)
+            fatal_error("Malformed depth-bounds arguments '%s'.\n", line);
+        if (!runner->caps->depth_bounds)
+            fatal_error("depth-bounds set but runner does not support depth bounds testing.");
+        runner->depth_bounds = true;
     }
     else if (match_string(line, "depth", &line))
     {
@@ -1595,6 +1607,8 @@ static bool check_capabilities(const struct shader_runner *runner, const struct 
         return false;
     if (runner->require_wave_ops && !caps->wave_ops)
         return false;
+    if (runner->require_depth_bounds && !caps->depth_bounds)
+        return false;
 
     for (i = 0; i < ARRAY_SIZE(runner->require_format_caps); ++i)
     {
@@ -1612,7 +1626,7 @@ static void trace_tags(const struct shader_runner_caps *caps)
 
     p = tags;
     rem = ARRAY_SIZE(tags);
-    rc = snprintf(p, rem, "      tags:");
+    rc = snprintf(p, rem, "          tags:");
     p += rc;
     rem -= rc;
 
@@ -1626,7 +1640,7 @@ static void trace_tags(const struct shader_runner_caps *caps)
 
             p = tags;
             rem = ARRAY_SIZE(tags);
-            rc = snprintf(p, rem, "           ");
+            rc = snprintf(p, rem, "               ");
             --i;
         }
         p += rc;
@@ -1644,7 +1658,7 @@ static void trace_format_cap(const struct shader_runner_caps *caps, enum format_
 
     p = buffer;
     rem = ARRAY_SIZE(buffer);
-    rc = snprintf(p, rem, "%10s:", cap_name);
+    rc = snprintf(p, rem, "%14s:", cap_name);
     p += rc;
     rem -= rc;
 
@@ -1660,7 +1674,7 @@ static void trace_format_cap(const struct shader_runner_caps *caps, enum format_
 
                 p = buffer;
                 rem = ARRAY_SIZE(buffer);
-                rc = snprintf(p, rem, "           ");
+                rc = snprintf(p, rem, "               ");
                 --i;
             }
             p += rc;
@@ -1706,10 +1720,11 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             dxc_compiler ? "dxcompiler" : HLSL_COMPILER, caps->runner);
     if (caps->tag_count)
         trace_tags(caps);
-    trace("   float64: %u.\n", caps->float64);
-    trace("     int64: %u.\n", caps->int64);
-    trace("       rov: %u.\n", caps->rov);
-    trace("  wave_ops: %u.\n", caps->wave_ops);
+    trace("       float64: %u.\n", caps->float64);
+    trace("         int64: %u.\n", caps->int64);
+    trace("           rov: %u.\n", caps->rov);
+    trace("      wave-ops: %u.\n", caps->wave_ops);
+    trace("  depth-bounds: %u.\n", caps->depth_bounds);
     trace_format_cap(caps, FORMAT_CAP_UAV_LOAD, "uav-load");
 
     if (!test_options.filename)
@@ -1726,6 +1741,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     runner->alpha_test_func = VKD3D_SHADER_COMPARISON_FUNC_ALWAYS;
 
     runner->sample_mask = ~0u;
+    runner->depth_bounds = false;
+    runner->depth_min = 0.0f;
+    runner->depth_max = 1.0f;
 
     if ((testname = strrchr(test_options.filename, '/')))
         ++testname;
@@ -1969,6 +1987,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 runner->require_int64 = false;
                 runner->require_rov = false;
                 runner->require_wave_ops = false;
+                runner->require_depth_bounds = false;
                 memset(runner->require_format_caps, 0, sizeof(runner->require_format_caps));
                 runner->compile_options = 0;
                 test_action = TEST_ACTION_RUN;

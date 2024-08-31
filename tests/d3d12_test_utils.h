@@ -1128,6 +1128,7 @@ struct test_context
     ID3D12CommandQueue *queue;
     ID3D12CommandAllocator *allocator;
     ID3D12GraphicsCommandList *list;
+    ID3D12GraphicsCommandList1 *list1;
     ID3D12PipelineState **pso;
     size_t pso_count, pso_capacity;
 
@@ -1249,6 +1250,10 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
             context->allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&context->list);
     ok_(line)(SUCCEEDED(hr), "Failed to create command list, hr %#x.\n", hr);
 
+    if (FAILED(hr = ID3D12GraphicsCommandList_QueryInterface(context->list,
+            &IID_ID3D12GraphicsCommandList1, (void**)&context->list1)))
+        context->list1 = NULL;
+
     if (desc && desc->no_render_target)
         return true;
 
@@ -1340,6 +1345,8 @@ static inline void destroy_test_context_(unsigned int line, struct test_context 
 
     ID3D12CommandAllocator_Release(context->allocator);
     ID3D12CommandQueue_Release(context->queue);
+    if (context->list1)
+        ID3D12GraphicsCommandList1_Release(context->list1);
     ID3D12GraphicsCommandList_Release(context->list);
     destroy_pipeline_state_objects(context);
     free(context->pso);

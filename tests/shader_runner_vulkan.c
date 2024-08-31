@@ -836,10 +836,10 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
                 ds_desc.depthTestEnable = VK_TRUE;
                 ds_desc.depthWriteEnable = VK_TRUE;
                 ds_desc.depthCompareOp = vk_compare_op_from_d3d12(runner->r.depth_func);
-                ds_desc.depthBoundsTestEnable = VK_FALSE;
+                ds_desc.depthBoundsTestEnable = runner->r.depth_bounds;
                 ds_desc.stencilTestEnable = VK_FALSE;
-                ds_desc.minDepthBounds = 0.0f;
-                ds_desc.maxDepthBounds = 1.0f;
+                ds_desc.minDepthBounds = runner->r.depth_min;
+                ds_desc.maxDepthBounds = runner->r.depth_max;
                 pipeline_desc.pDepthStencilState = &ds_desc;
                 break;
 
@@ -1816,6 +1816,12 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     {
         features.shaderInt64 = VK_TRUE;
         runner->caps.int64 = true;
+    }
+
+    if (ret_features->depthBounds)
+    {
+        features.depthBounds = VK_TRUE;
+        runner->caps.depth_bounds = true;
     }
 
     if (device_info.interlock_features.fragmentShaderSampleInterlock

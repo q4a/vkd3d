@@ -751,6 +751,7 @@ static ID3D12PipelineState *create_pipeline_device2(struct d3d12_shader_runner *
             pipeline.dsv.depth_stencil_desc.DepthEnable = true;
             pipeline.dsv.depth_stencil_desc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
             pipeline.dsv.depth_stencil_desc.DepthFunc = runner->r.depth_func;
+            pipeline.dsv.depth_stencil_desc.DepthBoundsTestEnable = runner->r.depth_bounds;
         }
     }
 
@@ -777,6 +778,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
 
     ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL, *gs_code = NULL;
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
+    ID3D12GraphicsCommandList1 *command_list1 = test_context->list1;
     ID3D12GraphicsCommandList *command_list = test_context->list;
     ID3D12CommandQueue *queue = test_context->queue;
     ID3D12Device *device = test_context->device;
@@ -894,6 +896,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, rtv_count, rtvs, false, dsv.ptr ? &dsv : NULL);
 
+    if (runner->r.depth_bounds)
+        ID3D12GraphicsCommandList1_OMSetDepthBounds(command_list1, runner->r.depth_min, runner->r.depth_max);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &test_context->scissor_rect);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &test_context->viewport);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, primitive_topology);
@@ -971,6 +975,7 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
         enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
 {
     ID3D12Device *device = runner->test_context.device;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS2 options2;
     D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1;
     D3D12_FEATURE_DATA_D3D12_OPTIONS options;
     HRESULT hr;
@@ -1001,6 +1006,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     ok(hr == S_OK, "Failed to check feature options support, hr %#x.\n", hr);
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1, &options1, sizeof(options1));
     ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS2, &options2, sizeof(options2));
+    ok(hr == S_OK, "Failed to check feature options2 support, hr %#x.\n", hr);
 
 #ifdef VKD3D_CROSSTEST
     runner->caps.runner = "d3d12.dll";
@@ -1013,6 +1020,7 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     runner->caps.int64 = options1.Int64ShaderOps;
     runner->caps.rov = options.ROVsSupported;
     runner->caps.wave_ops = options1.WaveOps;
+    runner->caps.depth_bounds = options2.DepthBoundsTestSupported;
 
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
     {
