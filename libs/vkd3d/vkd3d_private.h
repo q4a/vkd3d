@@ -131,6 +131,7 @@ struct vkd3d_vulkan_info
     bool EXT_calibrated_timestamps;
     bool EXT_conditional_rendering;
     bool EXT_debug_marker;
+    bool EXT_depth_range_unrestricted;
     bool EXT_depth_clip_enable;
     bool EXT_descriptor_indexing;
     bool EXT_fragment_shader_interlock;
@@ -1254,7 +1255,7 @@ struct d3d12_command_list
     VkFormat dsv_format;
 
     bool xfb_enabled;
-
+    bool has_depth_bounds;
     bool is_predicated;
 
     VkFramebuffer current_framebuffer;

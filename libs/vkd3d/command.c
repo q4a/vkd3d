@@ -19,6 +19,7 @@
  */
 
 #include "vkd3d_private.h"
+#include <math.h>
 
 static void d3d12_fence_incref(struct d3d12_fence *fence);
 static void d3d12_fence_decref(struct d3d12_fence *fence);
@@ -2451,6 +2452,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_list_Close(ID3D12GraphicsCommandL
     }
 
     list->is_recording = false;
+    list->has_depth_bounds = false;
 
     if (!list->is_valid)
     {
@@ -2479,7 +2481,7 @@ static void d3d12_command_list_reset_state(struct d3d12_command_list *list,
     list->fb_layer_count = 0;
 
     list->xfb_enabled = false;
-
+    list->has_depth_bounds = false;
     list->is_predicated = false;
 
     list->current_framebuffer = VK_NULL_HANDLE;
@@ -3361,6 +3363,12 @@ static bool d3d12_command_list_begin_render_pass(struct d3d12_command_list *list
                 list->so_counter_buffers, list->so_counter_buffer_offsets));
 
         list->xfb_enabled = true;
+    }
+
+    if (graphics->ds_desc.depthBoundsTestEnable && !list->has_depth_bounds)
+    {
+        list->has_depth_bounds = true;
+        VK_CALL(vkCmdSetDepthBounds(list->vk_command_buffer, 0.0f, 1.0f));
     }
 
     return true;
@@ -5951,7 +5959,25 @@ static void STDMETHODCALLTYPE d3d12_command_list_AtomicCopyBufferUINT64(ID3D12Gr
 static void STDMETHODCALLTYPE d3d12_command_list_OMSetDepthBounds(ID3D12GraphicsCommandList6 *iface,
         FLOAT min, FLOAT max)
 {
-    FIXME("iface %p, min %.8e, max %.8e stub!\n", iface, min, max);
+    struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList6(iface);
+    const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
+
+    TRACE("iface %p, min %.8e, max %.8e.\n", iface, min, max);
+
+    if (isnan(max))
+        max = 0.0f;
+    if (isnan(min))
+        min = 0.0f;
+
+    if (!list->device->vk_info.EXT_depth_range_unrestricted && (min < 0.0f || min > 1.0f || max < 0.0f || max > 1.0f))
+    {
+        WARN("VK_EXT_depth_range_unrestricted was not found, clamping depth bounds to 0.0 and 1.0.\n");
+        max = vkd3d_clamp(max, 0.0f, 1.0f);
+        min = vkd3d_clamp(min, 0.0f, 1.0f);
+    }
+
+    list->has_depth_bounds = true;
+    VK_CALL(vkCmdSetDepthBounds(list->vk_command_buffer, min, max));
 }
 
 static void STDMETHODCALLTYPE d3d12_command_list_SetSamplePositions(ID3D12GraphicsCommandList6 *iface,
