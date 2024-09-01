@@ -2132,7 +2132,7 @@ static unsigned int decompose_fx_4_state_function_call(struct hlsl_ir_var *var, 
 }
 
 /* For some states assignment sets all of the elements. This behaviour is limited to certain states of BlendState
-   object, and only when fx_5_0 profile is used. */
+   object, and only when fx_4_1 or fx_5_0 profile is used. */
 static unsigned int decompose_fx_4_state_block_expand_array(struct hlsl_ir_var *var, struct hlsl_state_block *block,
         unsigned int entry_index, struct fx_write_context *fx)
 {
@@ -2146,7 +2146,7 @@ static unsigned int decompose_fx_4_state_block_expand_array(struct hlsl_ir_var *
 
     if (type->class != HLSL_CLASS_BLEND_STATE)
         return 1;
-    if (ctx->profile->major_version != 5)
+    if (hlsl_version_lt(ctx, 4, 1))
         return 1;
     if (entry->lhs_has_index)
         return 1;
