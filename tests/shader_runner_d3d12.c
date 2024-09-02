@@ -980,6 +980,11 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     D3D12_FEATURE_DATA_D3D12_OPTIONS options;
     HRESULT hr;
 
+    static const char *const tags[] =
+    {
+        "d3d12",
+    };
+
     static const enum DXGI_FORMAT formats[] =
     {
         DXGI_FORMAT_R32_FLOAT,
@@ -1021,6 +1026,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     runner->caps.rov = options.ROVsSupported;
     runner->caps.wave_ops = options1.WaveOps;
     runner->caps.depth_bounds = options2.DepthBoundsTestSupported;
+    runner->caps.tags = tags;
+    runner->caps.tag_count = ARRAY_SIZE(tags);
 
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
     {
