@@ -437,7 +437,7 @@ float4 main() : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;

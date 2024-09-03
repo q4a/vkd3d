@@ -5892,6 +5892,50 @@ static void parse_domain_attribute(struct hlsl_ctx *ctx, const struct hlsl_attri
                 value);
 }
 
+static void parse_outputcontrolpoints_attribute(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr)
+{
+    const struct hlsl_ir_node *instr;
+    const struct hlsl_type *type;
+    const struct hlsl_ir_constant *constant;
+
+    if (attr->args_count != 1)
+    {
+        hlsl_error(ctx, &attr->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Expected 1 parameter for [outputcontrolpoints] attribute, but got %u.", attr->args_count);
+        return;
+    }
+
+    instr = attr->args[0].node;
+    type = instr->data_type;
+
+    if (type->class != HLSL_CLASS_SCALAR
+            || (type->e.numeric.type != HLSL_TYPE_INT && type->e.numeric.type != HLSL_TYPE_UINT))
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, type)))
+            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong type for argument 0 of [outputcontrolpoints]: expected int or uint, but got %s.",
+                    string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return;
+    }
+
+    if (instr->type != HLSL_IR_CONSTANT)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Non-constant expression in [outputcontrolpoints] initializer.");
+        return;
+    }
+    constant = hlsl_ir_constant(instr);
+
+    if ((type->e.numeric.type == HLSL_TYPE_INT && constant->value.u[0].i < 0)
+            || constant->value.u[0].u > 32)
+        hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
+                "Output control point count must be between 0 and 32.");
+
+    ctx->output_control_point_count = constant->value.u[0].u;
+}
+
 static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -5906,6 +5950,8 @@ static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct h
         else if (!strcmp(attr->name, "domain")
                     && (profile->type == VKD3D_SHADER_TYPE_HULL || profile->type == VKD3D_SHADER_TYPE_DOMAIN))
             parse_domain_attribute(ctx, attr);
+        else if (!strcmp(attr->name, "outputcontrolpoints") && profile->type == VKD3D_SHADER_TYPE_HULL)
+            parse_outputcontrolpoints_attribute(ctx, attr);
         else
             hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
                     "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);
