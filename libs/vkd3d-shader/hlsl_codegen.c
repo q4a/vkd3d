@@ -5964,6 +5964,34 @@ static void parse_outputtopology_attribute(struct hlsl_ctx *ctx, const struct hl
                 "expected \"point\", \"line\", \"triangle_cw\", or \"triangle_ccw\".", value);
 }
 
+static void parse_partitioning_attribute(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr)
+{
+    const char *value;
+
+    if (attr->args_count != 1)
+    {
+        hlsl_error(ctx, &attr->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Expected 1 parameter for [partitioning] attribute, but got %u.", attr->args_count);
+        return;
+    }
+
+    if (!(value = get_string_argument_value(ctx, attr, 0)))
+        return;
+
+    if (!strcmp(value, "integer"))
+        ctx->partitioning = VKD3D_SHADER_TESSELLATOR_PARTITIONING_INTEGER;
+    else if (!strcmp(value, "pow2"))
+        ctx->partitioning = VKD3D_SHADER_TESSELLATOR_PARTITIONING_POW2;
+    else if (!strcmp(value, "fractional_even"))
+        ctx->partitioning = VKD3D_SHADER_TESSELLATOR_PARTITIONING_FRACTIONAL_EVEN;
+    else if (!strcmp(value, "fractional_odd"))
+        ctx->partitioning = VKD3D_SHADER_TESSELLATOR_PARTITIONING_FRACTIONAL_ODD;
+    else
+        hlsl_error(ctx, &attr->args[0].node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_PARTITIONING,
+                "Invalid tessellator partitioning \"%s\": "
+                "expected \"integer\", \"pow2\", \"fractional_even\", or \"fractional_odd\".", value);
+}
+
 static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -5982,6 +6010,8 @@ static void parse_entry_function_attributes(struct hlsl_ctx *ctx, const struct h
             parse_outputcontrolpoints_attribute(ctx, attr);
         else if (!strcmp(attr->name, "outputtopology") && profile->type == VKD3D_SHADER_TYPE_HULL)
             parse_outputtopology_attribute(ctx, attr);
+        else if (!strcmp(attr->name, "partitioning") && profile->type == VKD3D_SHADER_TYPE_HULL)
+            parse_partitioning_attribute(ctx, attr);
         else
             hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
                     "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);

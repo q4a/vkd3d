@@ -1076,6 +1076,7 @@ struct hlsl_ctx
     enum vkd3d_tessellator_domain domain;
     unsigned int output_control_point_count;
     enum vkd3d_shader_tessellator_output_primitive output_primitive;
+    enum vkd3d_shader_tessellator_partitioning partitioning;
 
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we
