@@ -5580,6 +5580,23 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             write_sm4_ternary_op(tpf, VKD3D_SM4_OP_MOVC, &expr->node, arg1, arg2, arg3);
             break;
 
+        case HLSL_OP3_MAD:
+            switch (dst_type->e.numeric.type)
+            {
+                case HLSL_TYPE_FLOAT:
+                    write_sm4_ternary_op(tpf, VKD3D_SM4_OP_MAD, &expr->node, arg1, arg2, arg3);
+                    break;
+
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                    write_sm4_ternary_op(tpf, VKD3D_SM4_OP_IMAD, &expr->node, arg1, arg2, arg3);
+                    break;
+
+                default:
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s negation expression.", dst_type_string->buffer);
+            }
+            break;
+
         default:
             hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s expression.", debug_hlsl_expr_op(expr->op));
     }

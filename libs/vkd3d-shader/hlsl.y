@@ -4152,6 +4152,20 @@ static bool intrinsic_log2(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_LOG2, arg, loc);
 }
 
+static bool intrinsic_mad(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
+
+    args[0] = params->args[0];
+    args[1] = params->args[1];
+    args[2] = params->args[2];
+    return add_expr(ctx, params->instrs, HLSL_OP3_MAD, args, args[0]->data_type, loc);
+}
+
 static bool intrinsic_max(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -5053,6 +5067,7 @@ intrinsic_functions[] =
     {"log",                                 1, true,  intrinsic_log},
     {"log10",                               1, true,  intrinsic_log10},
     {"log2",                                1, true,  intrinsic_log2},
+    {"mad",                                 3, true,  intrinsic_mad},
     {"max",                                 2, true,  intrinsic_max},
     {"min",                                 2, true,  intrinsic_min},
     {"mul",                                 2, true,  intrinsic_mul},
