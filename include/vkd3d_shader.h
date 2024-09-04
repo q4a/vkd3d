@@ -1320,8 +1320,8 @@ struct vkd3d_shader_preprocess_info
 
     /**
      * Pointer to an array of predefined macros. Each macro in this array will
-     * be expanded as if a corresponding #define statement were prepended to the
-     * source code.
+     * be expanded as if a corresponding \#define statement were prepended to
+     * the source code.
      *
      * If the same macro is specified multiple times, only the last value is
      * used.
