@@ -2799,7 +2799,7 @@ VKD3D_SHADER_API void vkd3d_shader_free_scan_signature_info(struct vkd3d_shader_
  * \param input_signature The input signature of the second shader.
  *
  * \param count On output, contains the number of entries written into
- * \ref varyings.
+ * "varyings".
  *
  * \param varyings Pointer to an output array of varyings.
  * This must point to space for N varyings, where N is the number of elements
