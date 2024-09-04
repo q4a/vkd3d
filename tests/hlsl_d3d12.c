@@ -2062,7 +2062,8 @@ static void test_signature_reflection(void)
         "        out uint c : sv_coverage,\n"
         "        in float4 d : position,\n"
         "        in float4 e : sv_position,\n"
-        "        out float f : sv_depth)\n"
+        "        out float f : sv_depth,\n"
+        "        in uint g : sv_sampleindex)\n"
         "{\n"
         "    b = d;\n"
         "    c = 0;\n"
@@ -2071,9 +2072,10 @@ static void test_signature_reflection(void)
 
     static const D3D12_SIGNATURE_PARAMETER_DESC ps1_inputs[] =
     {
-        {"apple",       0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
-        {"position",    0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
-        {"sv_position", 0, 2, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"apple",          0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"position",       0, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"sv_position",    0, 2, D3D_NAME_POSITION,      D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"sv_sampleindex", 0, 3, D3D_NAME_SAMPLE_INDEX,  D3D_REGISTER_COMPONENT_UINT32,  0x1},
     };
 
     static const D3D12_SIGNATURE_PARAMETER_DESC ps1_outputs[] =

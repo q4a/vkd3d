@@ -2814,6 +2814,7 @@ bool sysval_semantic_from_hlsl(enum vkd3d_shader_sysval_semantic *semantic,
         {"sv_isfrontface",              false, VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_IS_FRONT_FACE},
         {"sv_rendertargetarrayindex",   false, VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_RENDER_TARGET_ARRAY_INDEX},
         {"sv_viewportarrayindex",       false, VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX},
+        {"sv_sampleindex",              false, VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_SAMPLE_INDEX},
 
         {"color",                       true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_TARGET},
         {"depth",                       true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_DEPTH},
@@ -4461,6 +4462,7 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
             case VKD3D_SHADER_SV_INSTANCE_ID:
             case VKD3D_SHADER_SV_PRIMITIVE_ID:
             case VKD3D_SHADER_SV_VERTEX_ID:
+            case VKD3D_SHADER_SV_SAMPLE_INDEX:
                 instr.opcode = (profile->type == VKD3D_SHADER_TYPE_PIXEL)
                         ? VKD3D_SM4_OP_DCL_INPUT_PS_SGV : VKD3D_SM4_OP_DCL_INPUT_SGV;
                 break;
