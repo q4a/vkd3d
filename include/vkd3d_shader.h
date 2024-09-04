@@ -1292,7 +1292,8 @@ typedef int (*PFN_vkd3d_shader_open_include)(const char *filename, bool local,
  * vkd3d_shader_preprocess_info.
  *
  * \param code Contents of the included file, which were allocated by the
- * \ref pfn_open_include callback. The user must free them.
+ * vkd3d_shader_preprocess_info.pfn_open_include callback.
+ * The user must free them.
  *
  * \param context The user-defined pointer passed to struct
  * vkd3d_shader_preprocess_info.
