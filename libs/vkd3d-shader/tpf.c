@@ -6110,7 +6110,7 @@ static void write_sm4_sfi0(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     /* FIXME: We also emit code that should require UAVS_AT_EVERY_STAGE,
      * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
 
-    if (flags)
+    if (*flags)
         dxbc_writer_add_section(dxbc, TAG_SFI0, flags, sizeof(*flags));
     else
         vkd3d_free(flags);
