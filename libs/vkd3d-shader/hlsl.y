@@ -3156,6 +3156,7 @@ static bool write_acos_or_asin(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc, bool asin_mode)
 {
     struct hlsl_ir_function_decl *func;
+    struct hlsl_ir_node *arg;
     struct hlsl_type *type;
     char *body;
 
@@ -3179,8 +3180,9 @@ static bool write_acos_or_asin(struct hlsl_ctx *ctx,
 
     const char *fn_name = asin_mode ? fn_name_asin : fn_name_acos;
 
-    type = params->args[0]->data_type;
-    type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+    type = arg->data_type;
 
     if (!(body = hlsl_sprintf_alloc(ctx, template,
             type->name, fn_name, type->name,
