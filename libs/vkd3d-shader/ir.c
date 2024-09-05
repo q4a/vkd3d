@@ -2870,7 +2870,8 @@ static bool lower_switch_to_if_ladder_add_block_mapping(struct lower_switch_to_i
     return true;
 }
 
-static enum vkd3d_result lower_switch_to_if_ladder(struct vsir_program *program)
+static enum vkd3d_result vsir_program_lower_switch_to_selection_ladder(struct vsir_program *program,
+        struct vsir_normalisation_context *ctx)
 {
     unsigned int block_count = program->block_count, ssa_count = program->ssa_count, current_label = 0, if_label;
     size_t ins_capacity = 0, ins_count = 0, i, map_capacity = 0, map_count = 0;
@@ -6662,12 +6663,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
     if (program->shader_version.major >= 6)
     {
         vsir_transform(&ctx, vsir_program_materialise_phi_ssas_to_temps);
+        vsir_transform(&ctx, vsir_program_lower_switch_to_selection_ladder);
 
         if (ctx.result < 0)
             return ctx.result;
-
-        if ((result = lower_switch_to_if_ladder(program)) < 0)
-            return result;
 
         if ((result = vsir_program_structurize(program, message_context)) < 0)
             return result;
