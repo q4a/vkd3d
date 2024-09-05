@@ -1673,25 +1673,36 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
     return expr;
 }
 
+static bool type_is_integer(enum hlsl_base_type type)
+{
+    switch (type)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            return true;
+
+        case HLSL_TYPE_DOUBLE:
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+            return false;
+    }
+
+    vkd3d_unreachable();
+}
+
 static void check_integer_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_type *type = instr->data_type;
     struct vkd3d_string_buffer *string;
 
-    switch (type->e.numeric.type)
-    {
-        case HLSL_TYPE_BOOL:
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-            break;
+    if (type_is_integer(type->e.numeric.type))
+        return;
 
-        default:
-            if ((string = hlsl_type_to_string(ctx, type)))
-                hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Expression type '%s' is not integer.", string->buffer);
-            hlsl_release_string_buffer(ctx, string);
-            break;
-    }
+    if ((string = hlsl_type_to_string(ctx, type)))
+        hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Expression type '%s' is not integer.", string->buffer);
+    hlsl_release_string_buffer(ctx, string);
 }
 
 static struct hlsl_ir_node *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -3033,7 +3044,7 @@ static struct hlsl_ir_node *intrinsic_float_convert_arg(struct hlsl_ctx *ctx,
 {
     struct hlsl_type *type = arg->data_type;
 
-    if (type->e.numeric.type == HLSL_TYPE_FLOAT || type->e.numeric.type == HLSL_TYPE_HALF)
+    if (!type_is_integer(type->e.numeric.type))
         return arg;
 
     type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
