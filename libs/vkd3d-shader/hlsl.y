@@ -4583,13 +4583,12 @@ static bool intrinsic_step(struct hlsl_ctx *ctx,
 
     if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
+    type = params->args[0]->data_type;
 
     if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL,
             params->args[1], params->args[0], loc)))
         return false;
 
-    type = ge->data_type;
-    type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
     return !!add_implicit_conversion(ctx, params->instrs, ge, type, loc);
 }
 
