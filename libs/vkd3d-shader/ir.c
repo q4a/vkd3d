@@ -1913,7 +1913,8 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
     param->reg.idx_count = 3;
 }
 
-static enum vkd3d_result instruction_array_normalise_flat_constants(struct vsir_program *program)
+static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_program *program,
+        struct vsir_normalisation_context *ctx)
 {
     struct flat_constants_normaliser normaliser = {0};
     unsigned int i, j;
@@ -6671,12 +6672,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         }
 
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
+        vsir_transform(&ctx, vsir_program_normalise_flat_constants);
 
         if (ctx.result < 0)
             return ctx.result;
-
-        if ((result = instruction_array_normalise_flat_constants(program)) < 0)
-            return result;
 
         remove_dead_code(program);
 
