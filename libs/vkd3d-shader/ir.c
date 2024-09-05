@@ -5283,8 +5283,9 @@ out:
 }
 
 static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vsir_normalisation_context *ctx)
 {
+    struct vkd3d_shader_message_context *message_context = ctx->message_context;
     struct vsir_cfg_emit_target target = {0};
     enum vkd3d_result ret;
     size_t i;
@@ -6664,12 +6665,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
     {
         vsir_transform(&ctx, vsir_program_materialise_phi_ssas_to_temps);
         vsir_transform(&ctx, vsir_program_lower_switch_to_selection_ladder);
+        vsir_transform(&ctx, vsir_program_structurize);
 
         if (ctx.result < 0)
             return ctx.result;
-
-        if ((result = vsir_program_structurize(program, message_context)) < 0)
-            return result;
 
         if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
             return result;
