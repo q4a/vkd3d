@@ -3309,9 +3309,9 @@ static bool write_atan_or_atan2(struct hlsl_ctx *ctx,
             "        : poly_approx;\n"
             "}";
 
-    if (!(type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
-    type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+    type = params->args[0]->data_type;
 
     if (!(buf = hlsl_get_string_buffer(ctx)))
         return false;
