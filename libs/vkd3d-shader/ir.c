@@ -1961,7 +1961,8 @@ static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_progr
     return VKD3D_OK;
 }
 
-static void remove_dead_code(struct vsir_program *program)
+static enum vkd3d_result vsir_program_remove_dead_code(struct vsir_program *program,
+        struct vsir_normalisation_context *ctx)
 {
     size_t i, depth = 0;
     bool dead = false;
@@ -2049,6 +2050,8 @@ static void remove_dead_code(struct vsir_program *program)
                 break;
         }
     }
+
+    return VKD3D_OK;
 }
 
 static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_program *program,
@@ -6681,11 +6684,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
 
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
         vsir_transform(&ctx, vsir_program_normalise_flat_constants);
+        vsir_transform(&ctx, vsir_program_remove_dead_code);
 
         if (ctx.result < 0)
             return ctx.result;
-
-        remove_dead_code(program);
 
         if ((result = vsir_program_normalise_combined_samplers(program, message_context)) < 0)
             return result;
