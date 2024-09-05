@@ -1764,8 +1764,9 @@ static bool use_flat_interpolation(const struct vsir_program *program,
 }
 
 static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vsir_normalisation_context *ctx)
 {
+    struct vkd3d_shader_message_context *message_context = ctx->message_context;
     struct io_normaliser normaliser = {program->instructions};
     struct vkd3d_shader_instruction *ins;
     unsigned int i;
@@ -6669,11 +6670,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
             vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
         }
 
+        vsir_transform(&ctx, vsir_program_normalise_io_registers);
+
         if (ctx.result < 0)
             return ctx.result;
-
-        if ((result = vsir_program_normalise_io_registers(program, message_context)) < 0)
-            return result;
 
         if ((result = instruction_array_normalise_flat_constants(program)) < 0)
             return result;
