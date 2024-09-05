@@ -3060,7 +3060,8 @@ static void ssas_to_temps_block_info_cleanup(struct ssas_to_temps_block_info *bl
     vkd3d_free(block_info);
 }
 
-static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_program *program)
+static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_program *program,
+        struct vsir_normalisation_context *ctx)
 {
     size_t ins_capacity = 0, ins_count = 0, phi_count, incoming_count, i;
     struct ssas_to_temps_block_info *info, *block_info = NULL;
@@ -6658,13 +6659,12 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
 
     vsir_transform(&ctx, vsir_program_lower_instructions);
 
-    if (ctx.result < 0)
-        return ctx.result;
-
     if (program->shader_version.major >= 6)
     {
-        if ((result = vsir_program_materialise_phi_ssas_to_temps(program)) < 0)
-            return result;
+        vsir_transform(&ctx, vsir_program_materialise_phi_ssas_to_temps);
+
+        if (ctx.result < 0)
+            return ctx.result;
 
         if ((result = lower_switch_to_if_ladder(program)) < 0)
             return result;
@@ -6680,6 +6680,9 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
     }
     else
     {
+        if (ctx.result < 0)
+            return ctx.result;
+
         if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
         {
             if ((result = vsir_program_remap_output_signature(program, compile_info, message_context)) < 0)
