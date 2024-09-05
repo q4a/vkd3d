@@ -10614,7 +10614,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i, max_element_count;
 
-    if ((result = vsir_program_normalise(program, compiler->config_flags,
+    if ((result = vsir_program_transform(program, compiler->config_flags,
             compile_info, compiler->message_context)) < 0)
         return result;
 

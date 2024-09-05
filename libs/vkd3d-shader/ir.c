@@ -19,7 +19,7 @@
 #include "vkd3d_shader_private.h"
 #include "vkd3d_types.h"
 
-struct vsir_normalisation_context
+struct vsir_transformation_context
 {
     enum vkd3d_result result;
     struct vsir_program *program;
@@ -451,7 +451,7 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
 }
 
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
@@ -551,7 +551,7 @@ static const struct vkd3d_shader_varying_map *find_varying_map(
 }
 
 static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     const struct vkd3d_shader_location location = {.source_name = ctx->compile_info->source_name};
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
@@ -865,7 +865,7 @@ static bool vsir_instruction_init_label(struct vkd3d_shader_instruction *ins,
 }
 
 static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct hull_flattener flattener = {program->instructions};
     struct vkd3d_shader_instruction_array *instructions;
@@ -1004,7 +1004,7 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 }
 
 static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
-        struct vsir_program *program, struct vsir_normalisation_context *ctx)
+        struct vsir_program *program, struct vsir_transformation_context *ctx)
 {
     struct vkd3d_shader_instruction_array *instructions;
     struct control_point_normaliser normaliser;
@@ -1772,7 +1772,7 @@ static bool use_flat_interpolation(const struct vsir_program *program,
 }
 
 static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     struct io_normaliser normaliser = {program->instructions};
@@ -1922,7 +1922,7 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
 }
 
 static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct flat_constants_normaliser normaliser = {0};
     unsigned int i, j;
@@ -1962,7 +1962,7 @@ static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_progr
 }
 
 static enum vkd3d_result vsir_program_remove_dead_code(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     size_t i, depth = 0;
     bool dead = false;
@@ -2055,7 +2055,7 @@ static enum vkd3d_result vsir_program_remove_dead_code(struct vsir_program *prog
 }
 
 static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     unsigned int i;
 
@@ -2797,7 +2797,7 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 }
 
 static enum vkd3d_result vsir_program_flatten_control_flow_constructs(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     struct cf_flattener flattener = {.program = program};
@@ -2870,7 +2870,7 @@ static bool lower_switch_to_if_ladder_add_block_mapping(struct lower_switch_to_i
 }
 
 static enum vkd3d_result vsir_program_lower_switch_to_selection_ladder(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     unsigned int block_count = program->block_count, ssa_count = program->ssa_count, current_label = 0, if_label;
     size_t ins_capacity = 0, ins_count = 0, i, map_capacity = 0, map_count = 0;
@@ -3061,7 +3061,7 @@ static void ssas_to_temps_block_info_cleanup(struct ssas_to_temps_block_info *bl
 }
 
 static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     size_t ins_capacity = 0, ins_count = 0, phi_count, incoming_count, i;
     struct ssas_to_temps_block_info *info, *block_info = NULL;
@@ -5282,7 +5282,7 @@ out:
 }
 
 static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     struct vsir_cfg_emit_target target = {0};
@@ -5463,7 +5463,7 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps_in_f
 }
 
 static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     enum vkd3d_result ret;
@@ -5609,7 +5609,7 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
 }
 
 static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *program,
-        struct vsir_normalisation_context *ctx)
+        struct vsir_transformation_context *ctx)
 {
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     const struct vkd3d_shader_parameter1 *func = NULL, *ref = NULL;
@@ -6627,8 +6627,8 @@ fail:
 
 #define vsir_transform(ctx, step) vsir_transform_(ctx, #step, step)
 static void vsir_transform_(
-        struct vsir_normalisation_context *ctx, const char *step_name,
-        enum vkd3d_result (*step)(struct vsir_program *program, struct vsir_normalisation_context *ctx))
+        struct vsir_transformation_context *ctx, const char *step_name,
+        enum vkd3d_result (*step)(struct vsir_program *program, struct vsir_transformation_context *ctx))
 {
     if (ctx->result < 0)
         return;
@@ -6647,10 +6647,10 @@ static void vsir_transform_(
     }
 }
 
-enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t config_flags,
+enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
-    struct vsir_normalisation_context ctx =
+    struct vsir_transformation_context ctx =
     {
         .result = VKD3D_OK,
         .program = program,

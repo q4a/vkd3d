@@ -311,7 +311,7 @@ int glsl_compile(struct vsir_program *program, uint64_t config_flags,
     struct vkd3d_glsl_generator generator;
     int ret;
 
-    if ((ret = vsir_program_normalise(program, config_flags, compile_info, message_context)) < 0)
+    if ((ret = vsir_program_transform(program, config_flags, compile_info, message_context)) < 0)
         return ret;
 
     vkd3d_glsl_generator_init(&generator, program, message_context);
