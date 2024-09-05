@@ -3880,9 +3880,9 @@ static bool intrinsic_faceforward(struct hlsl_ctx *ctx,
             "    return dot(i, ng) < 0 ? n : -n;\n"
             "}\n";
 
-    if (!(type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
-    type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+    type = params->args[0]->data_type;
 
     if (!(body = hlsl_sprintf_alloc(ctx, template,
             type->name, type->name, type->name, type->name)))
