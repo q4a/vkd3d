@@ -2799,8 +2799,9 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 }
 
 static enum vkd3d_result vsir_program_flatten_control_flow_constructs(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vsir_normalisation_context *ctx)
 {
+    struct vkd3d_shader_message_context *message_context = ctx->message_context;
     struct cf_flattener flattener = {.program = program};
     enum vkd3d_result result;
 
@@ -6666,12 +6667,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_materialise_phi_ssas_to_temps);
         vsir_transform(&ctx, vsir_program_lower_switch_to_selection_ladder);
         vsir_transform(&ctx, vsir_program_structurize);
+        vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
 
         if (ctx.result < 0)
             return ctx.result;
-
-        if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
-            return result;
 
         if ((result = vsir_program_materialize_undominated_ssas_to_temps(program, message_context)) < 0)
             return result;
@@ -6709,7 +6708,7 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
             return result;
 
         if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL
-                && (result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
+                && (result = vsir_program_flatten_control_flow_constructs(program, &ctx)) < 0)
             return result;
     }
 
