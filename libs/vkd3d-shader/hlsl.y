@@ -3735,15 +3735,14 @@ static bool intrinsic_determinant(struct hlsl_ctx *ctx,
         return false;
     }
 
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, arg, loc)))
+        return false;
+
     dim = min(type->dimx, type->dimy);
     if (dim == 1)
-    {
-        if (!(arg = intrinsic_float_convert_arg(ctx, params, arg, loc)))
-            return false;
         return hlsl_add_load_component(ctx, params->instrs, arg, 0, loc);
-    }
 
-    typename = type->e.numeric.type == HLSL_TYPE_HALF ? "half" : "float";
+    typename = hlsl_get_scalar_type(ctx, arg->data_type->e.numeric.type)->name;
     template = templates[dim];
 
     switch (dim)
