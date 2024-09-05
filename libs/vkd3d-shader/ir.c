@@ -19,6 +19,15 @@
 #include "vkd3d_shader_private.h"
 #include "vkd3d_types.h"
 
+struct vsir_normalisation_context
+{
+    enum vkd3d_result result;
+    struct vsir_program *program;
+    uint64_t config_flags;
+    const struct vkd3d_shader_compile_info *compile_info;
+    struct vkd3d_shader_message_context *message_context;
+};
+
 static int convert_parameter_info(const struct vkd3d_shader_compile_info *compile_info,
         unsigned int *ret_count, const struct vkd3d_shader_parameter1 **ret_parameters)
 {
@@ -442,9 +451,10 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
 }
 
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vsir_normalisation_context *ctx)
 {
     struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct vkd3d_shader_message_context *message_context = ctx->message_context;
     unsigned int tmp_idx = ~0u, i;
     enum vkd3d_result ret;
 
@@ -6611,13 +6621,45 @@ fail:
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
+#define vsir_transform(ctx, step) vsir_transform_(ctx, #step, step)
+static void vsir_transform_(
+        struct vsir_normalisation_context *ctx, const char *step_name,
+        enum vkd3d_result (*step)(struct vsir_program *program, struct vsir_normalisation_context *ctx))
+{
+    if (ctx->result < 0)
+        return;
+
+    if ((ctx->result = step(ctx->program, ctx)) < 0)
+    {
+        WARN("Transformation \"%s\" failed with result %u.\n", step_name, ctx->result);
+        return;
+    }
+
+    if ((ctx->result = vsir_program_validate(ctx->program, ctx->config_flags,
+            ctx->compile_info->source_name, ctx->message_context)) < 0)
+    {
+        WARN("Validation failed with result %u after transformation \"%s\".\n", ctx->result, step_name);
+        return;
+    }
+}
+
 enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
-    enum vkd3d_result result = VKD3D_OK;
+    struct vsir_normalisation_context ctx =
+    {
+        .result = VKD3D_OK,
+        .program = program,
+        .config_flags = config_flags,
+        .compile_info = compile_info,
+        .message_context = message_context,
+    };
+    enum vkd3d_result result;
 
-    if ((result = vsir_program_lower_instructions(program, message_context)) < 0)
-        return result;
+    vsir_transform(&ctx, vsir_program_lower_instructions);
+
+    if (ctx.result < 0)
+        return ctx.result;
 
     if (program->shader_version.major >= 6)
     {
