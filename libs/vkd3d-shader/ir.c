@@ -5609,8 +5609,9 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
 }
 
 static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vsir_normalisation_context *ctx)
 {
+    struct vkd3d_shader_message_context *message_context = ctx->message_context;
     const struct vkd3d_shader_parameter1 *func = NULL, *ref = NULL;
     static const struct vkd3d_shader_location no_loc;
     enum vkd3d_shader_comparison_func compare_func;
@@ -6657,7 +6658,6 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         .compile_info = compile_info,
         .message_context = message_context,
     };
-    enum vkd3d_result result;
 
     vsir_transform(&ctx, vsir_program_lower_instructions);
 
@@ -6689,18 +6689,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
             vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
     }
 
-    if (ctx.result < 0)
-        return ctx.result;
-
-    if ((result = vsir_program_insert_alpha_test(program, message_context)) < 0)
-        return result;
+    vsir_transform(&ctx, vsir_program_insert_alpha_test);
 
     if (TRACE_ON())
         vkd3d_shader_trace(program);
 
-    if ((result = vsir_program_validate(program, config_flags,
-            compile_info->source_name, message_context)) < 0)
-        return result;
-
-    return result;
+    return ctx.result;
 }
