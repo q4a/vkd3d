@@ -1765,8 +1765,7 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
 {
     struct io_normaliser normaliser = {program->instructions};
     struct vkd3d_shader_instruction *ins;
-    bool has_control_point_phase;
-    unsigned int i, j;
+    unsigned int i;
 
     normaliser.phase = VKD3DSIH_INVALID;
     normaliser.shader_type = program->shader_version.type;
@@ -1775,7 +1774,7 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
     normaliser.output_signature = &program->output_signature;
     normaliser.patch_constant_signature = &program->patch_constant_signature;
 
-    for (i = 0, has_control_point_phase = false; i < program->instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
         ins = &program->instructions.elements[i];
 
@@ -1789,30 +1788,12 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
                 vkd3d_shader_instruction_make_nop(ins);
                 break;
             case VKD3DSIH_HS_CONTROL_POINT_PHASE:
-                has_control_point_phase = true;
-                /* fall through */
             case VKD3DSIH_HS_FORK_PHASE:
             case VKD3DSIH_HS_JOIN_PHASE:
                 normaliser.phase = ins->opcode;
                 break;
             default:
                 break;
-        }
-    }
-
-    if (normaliser.shader_type == VKD3D_SHADER_TYPE_HULL && !has_control_point_phase)
-    {
-        /* Inputs and outputs must match for the default phase, so merge ranges must match too. */
-        for (i = 0; i < MAX_REG_OUTPUT; ++i)
-        {
-            for (j = 0; j < VKD3D_VEC4_SIZE; ++j)
-            {
-                if (!normaliser.input_range_map[i][j] && normaliser.output_range_map[i][j])
-                    normaliser.input_range_map[i][j] = normaliser.output_range_map[i][j];
-                else if (normaliser.input_range_map[i][j] && !normaliser.output_range_map[i][j])
-                    normaliser.output_range_map[i][j] = normaliser.input_range_map[i][j];
-                else VKD3D_ASSERT(normaliser.input_range_map[i][j] == normaliser.output_range_map[i][j]);
-            }
         }
     }
 
