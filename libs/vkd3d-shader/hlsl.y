@@ -3809,7 +3809,7 @@ static bool intrinsic_dst(struct hlsl_ctx *ctx, const struct parse_initializer *
             "    return %s(1, src0.y * src1.y, src0.z, src1.w);\n"
             "}";
 
-    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
         return false;
     type = params->args[0]->data_type;
     if (!(type->class == HLSL_CLASS_SCALAR
