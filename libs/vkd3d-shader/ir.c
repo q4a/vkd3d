@@ -551,9 +551,11 @@ static const struct vkd3d_shader_varying_map *find_varying_map(
 }
 
 static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program *program,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
+        struct vsir_normalisation_context *ctx)
 {
-    const struct vkd3d_shader_location location = {.source_name = compile_info->source_name};
+    const struct vkd3d_shader_location location = {.source_name = ctx->compile_info->source_name};
+    struct vkd3d_shader_message_context *message_context = ctx->message_context;
+    const struct vkd3d_shader_compile_info *compile_info = ctx->compile_info;
     struct shader_signature *signature = &program->output_signature;
     const struct vkd3d_shader_varying_map_info *varying_map;
     unsigned int i;
@@ -6657,14 +6659,11 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
     }
     else
     {
+        if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
+            vsir_transform(&ctx, vsir_program_remap_output_signature);
+
         if (ctx.result < 0)
             return ctx.result;
-
-        if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
-        {
-            if ((result = vsir_program_remap_output_signature(program, compile_info, message_context)) < 0)
-                return result;
-        }
 
         if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
         {
