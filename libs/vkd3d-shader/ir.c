@@ -905,9 +905,9 @@ static bool control_point_normaliser_is_in_control_point_phase(const struct cont
     return normaliser->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE;
 }
 
-struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
-        struct vkd3d_shader_instruction_array *instructions)
+struct vkd3d_shader_src_param *vsir_program_create_outpointid_param(struct vsir_program *program)
 {
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     struct vkd3d_shader_src_param *rel_addr;
 
     if (instructions->outpointid_param)
@@ -1004,7 +1004,7 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 }
 
 static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
-        struct vkd3d_shader_instruction_array *src_instructions, const struct shader_signature *input_signature)
+        struct vsir_program *program, struct vsir_normalisation_context *ctx)
 {
     struct vkd3d_shader_instruction_array *instructions;
     struct control_point_normaliser normaliser;
@@ -1014,12 +1014,12 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
     enum vkd3d_result ret;
     unsigned int i, j;
 
-    if (!(normaliser.outpointid_param = instruction_array_create_outpointid_param(src_instructions)))
+    if (!(normaliser.outpointid_param = vsir_program_create_outpointid_param(program)))
     {
         ERR("Failed to allocate src param.\n");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
-    normaliser.instructions = *src_instructions;
+    normaliser.instructions = program->instructions;
     instructions = &normaliser.instructions;
     normaliser.phase = VKD3DSIH_INVALID;
 
@@ -1056,22 +1056,22 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
                 input_control_point_count = ins->declaration.count;
                 break;
             case VKD3DSIH_HS_CONTROL_POINT_PHASE:
-                *src_instructions = normaliser.instructions;
+                program->instructions = normaliser.instructions;
                 return VKD3D_OK;
             case VKD3DSIH_HS_FORK_PHASE:
             case VKD3DSIH_HS_JOIN_PHASE:
                 /* ins may be relocated if the instruction array expands. */
                 location = ins->location;
-                ret = control_point_normaliser_emit_hs_input(&normaliser, input_signature,
+                ret = control_point_normaliser_emit_hs_input(&normaliser, &program->input_signature,
                         input_control_point_count, i, &location);
-                *src_instructions = normaliser.instructions;
+                program->instructions = normaliser.instructions;
                 return ret;
             default:
                 break;
         }
     }
 
-    *src_instructions = normaliser.instructions;
+    program->instructions = normaliser.instructions;
     return VKD3D_OK;
 }
 
@@ -6666,19 +6666,11 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
         {
             vsir_transform(&ctx, vsir_program_flatten_hull_shader_phases);
-
-            if (ctx.result < 0)
-                return ctx.result;
-
-            if ((result = instruction_array_normalise_hull_shader_control_point_io(&program->instructions,
-                    &program->input_signature)) < 0)
-                return result;
+            vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
         }
-        else
-        {
-            if (ctx.result < 0)
-                return ctx.result;
-        }
+
+        if (ctx.result < 0)
+            return ctx.result;
 
         if ((result = vsir_program_normalise_io_registers(program, message_context)) < 0)
             return result;

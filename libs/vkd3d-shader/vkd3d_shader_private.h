@@ -1354,8 +1354,6 @@ bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *ins
         struct vkd3d_shader_immediate_constant_buffer *icb);
 bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_array *instructions,
         unsigned int dst, unsigned int src);
-struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
-        struct vkd3d_shader_instruction_array *instructions);
 void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions);
 
 enum vkd3d_shader_config_flags
@@ -1399,6 +1397,8 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context);
 enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t config_flags,
         const char *source_name, struct vkd3d_shader_message_context *message_context);
+struct vkd3d_shader_src_param *vsir_program_create_outpointid_param(
+        struct vsir_program *program);
 bool vsir_instruction_init_with_params(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode opcode, unsigned int dst_count, unsigned int src_count);

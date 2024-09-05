@@ -3888,7 +3888,7 @@ static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shade
         if (is_control_point)
         {
             if (reg_type == VKD3DSPR_OUTPUT)
-                param->reg.idx[count].rel_addr = instruction_array_create_outpointid_param(&sm6->p.program->instructions);
+                param->reg.idx[count].rel_addr = vsir_program_create_outpointid_param(sm6->p.program);
             param->reg.idx[count++].offset = 0;
         }
 
