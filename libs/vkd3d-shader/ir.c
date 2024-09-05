@@ -864,9 +864,10 @@ static bool vsir_instruction_init_label(struct vkd3d_shader_instruction *ins,
     return true;
 }
 
-static enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *src_instructions)
+static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_program *program,
+        struct vsir_normalisation_context *ctx)
 {
-    struct hull_flattener flattener = {*src_instructions};
+    struct hull_flattener flattener = {program->instructions};
     struct vkd3d_shader_instruction_array *instructions;
     struct shader_phase_location_array locations;
     enum vkd3d_result result = VKD3D_OK;
@@ -888,7 +889,7 @@ static enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd
         vsir_instruction_init(&instructions->elements[instructions->count++], &flattener.last_ret_location, VKD3DSIH_RET);
     }
 
-    *src_instructions = flattener.instructions;
+    program->instructions = flattener.instructions;
     return result;
 }
 
@@ -6662,17 +6663,21 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
             vsir_transform(&ctx, vsir_program_remap_output_signature);
 
-        if (ctx.result < 0)
-            return ctx.result;
-
         if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
         {
-            if ((result = instruction_array_flatten_hull_shader_phases(&program->instructions)) < 0)
-                return result;
+            vsir_transform(&ctx, vsir_program_flatten_hull_shader_phases);
+
+            if (ctx.result < 0)
+                return ctx.result;
 
             if ((result = instruction_array_normalise_hull_shader_control_point_io(&program->instructions,
                     &program->input_signature)) < 0)
                 return result;
+        }
+        else
+        {
+            if (ctx.result < 0)
+                return ctx.result;
         }
 
         if ((result = vsir_program_normalise_io_registers(program, message_context)) < 0)
