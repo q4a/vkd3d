@@ -6668,9 +6668,6 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_structurize);
         vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
         vsir_transform(&ctx, vsir_program_materialize_undominated_ssas_to_temps);
-
-        if (ctx.result < 0)
-            return ctx.result;
     }
     else
     {
@@ -6688,13 +6685,12 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_remove_dead_code);
         vsir_transform(&ctx, vsir_program_normalise_combined_samplers);
 
-        if (ctx.result < 0)
-            return ctx.result;
-
-        if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL
-                && (result = vsir_program_flatten_control_flow_constructs(program, &ctx)) < 0)
-            return result;
+        if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL)
+            vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
     }
+
+    if (ctx.result < 0)
+        return ctx.result;
 
     if ((result = vsir_program_insert_alpha_test(program, message_context)) < 0)
         return result;
