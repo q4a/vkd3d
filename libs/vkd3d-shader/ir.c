@@ -5731,14 +5731,14 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
     if (ctx->invalid_instruction_idx)
     {
         vkd3d_shader_error(ctx->message_context, &ctx->null_location, error, "%s", buf.buffer);
-        ERR("VSIR validation error: %s\n", buf.buffer);
+        WARN("VSIR validation error: %s\n", buf.buffer);
     }
     else
     {
         const struct vkd3d_shader_instruction *ins = &ctx->program->instructions.elements[ctx->instruction_idx];
         vkd3d_shader_error(ctx->message_context, &ins->location, error,
                 "instruction %zu: %s", ctx->instruction_idx + 1, buf.buffer);
-        ERR("VSIR validation error: instruction %zu: %s\n", ctx->instruction_idx + 1, buf.buffer);
+        WARN("VSIR validation error: instruction %zu: %s\n", ctx->instruction_idx + 1, buf.buffer);
     }
 
     vkd3d_string_buffer_cleanup(&buf);
