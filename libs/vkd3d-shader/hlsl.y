@@ -3564,7 +3564,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
     enum hlsl_base_type base;
 
     base = expr_common_base_type(arg1->data_type->e.numeric.type, arg2->data_type->e.numeric.type);
-    if (base != HLSL_TYPE_HALF)
+    if (type_is_integer(base))
         base = HLSL_TYPE_FLOAT;
 
     cast_type = hlsl_get_vector_type(ctx, base, 3);
