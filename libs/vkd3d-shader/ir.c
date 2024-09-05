@@ -2055,7 +2055,7 @@ static enum vkd3d_result vsir_program_remove_dead_code(struct vsir_program *prog
 }
 
 static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vsir_normalisation_context *ctx)
 {
     unsigned int i;
 
@@ -2140,7 +2140,8 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
             case VKD3DSIH_TEXREG2AR:
             case VKD3DSIH_TEXREG2GB:
             case VKD3DSIH_TEXREG2RGB:
-                vkd3d_shader_error(message_context, &ins->location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                vkd3d_shader_error(ctx->message_context, &ins->location,
+                        VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                         "Aborting due to not yet implemented feature: "
                         "Combined sampler instruction %#x.", ins->opcode);
                 return VKD3D_ERROR_NOT_IMPLEMENTED;
@@ -6685,12 +6686,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
         vsir_transform(&ctx, vsir_program_normalise_flat_constants);
         vsir_transform(&ctx, vsir_program_remove_dead_code);
+        vsir_transform(&ctx, vsir_program_normalise_combined_samplers);
 
         if (ctx.result < 0)
             return ctx.result;
-
-        if ((result = vsir_program_normalise_combined_samplers(program, message_context)) < 0)
-            return result;
 
         if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL
                 && (result = vsir_program_flatten_control_flow_constructs(program, &ctx)) < 0)
