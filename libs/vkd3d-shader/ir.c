@@ -6243,12 +6243,13 @@ static void vsir_validate_instruction(struct validation_context *ctx)
     /* We support two different control flow types in shaders:
      * block-based, like DXIL and SPIR-V, and structured, like D3DBC
      * and TPF. The shader is detected as block-based when its first
-     * instruction, except for DCL_* and phases, is a LABEL. Currently
-     * we mandate that each shader is either purely block-based or
+     * instruction, except for NOP, DCL_* and phases, is a LABEL.
+     * Currently we mandate that each shader is either purely block-based or
      * purely structured. In principle we could allow structured
      * constructs in a block, provided they are confined in a single
      * block, but need for that hasn't arisen yet, so we don't. */
-    if (ctx->cf_type == CF_TYPE_UNKNOWN && !vsir_instruction_is_dcl(instruction))
+    if (ctx->cf_type == CF_TYPE_UNKNOWN && instruction->opcode != VKD3DSIH_NOP
+            && !vsir_instruction_is_dcl(instruction))
     {
         if (instruction->opcode == VKD3DSIH_LABEL)
             ctx->cf_type = CF_TYPE_BLOCKS;
