@@ -3210,6 +3210,9 @@ static void command_list_flush_vk_heap_updates(struct d3d12_command_list *list)
 
 static void command_list_add_descriptor_heap(struct d3d12_command_list *list, struct d3d12_descriptor_heap *heap)
 {
+    if (!list->device->use_vk_heaps)
+        return;
+
     if (!contains_heap(list->descriptor_heaps, list->descriptor_heap_count, heap))
     {
         if (list->descriptor_heap_count == ARRAY_SIZE(list->descriptor_heaps))
