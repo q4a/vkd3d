@@ -1401,6 +1401,8 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
                 else
                     e->interpolation_mode = f->interpolation_mode;
             }
+
+            vkd3d_free((void *)f->semantic_name);
         }
     }
     element_count = new_count;
@@ -1428,6 +1430,12 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
             TRACE("Merging %s, base reg %u, count %u.\n", e->semantic_name, e->register_index, register_count);
             e->register_count = register_count;
             e->mask = signature_element_range_expand_mask(e, register_count, range_map);
+
+            for (j = 1; j < register_count; ++j)
+            {
+                f = &elements[i + j];
+                vkd3d_free((void *)f->semantic_name);
+            }
         }
     }
     element_count = new_count;
