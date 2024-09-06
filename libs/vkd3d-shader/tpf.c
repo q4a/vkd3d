@@ -4630,6 +4630,17 @@ static void write_sm4_dcl_thread_group(const struct tpf_writer *tpf, const uint3
     write_sm4_instruction(tpf, &instr);
 }
 
+static void write_sm4_dcl_global_flags(const struct tpf_writer *tpf, uint32_t flags)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_GLOBAL_FLAGS,
+        .extra_bits = flags << VKD3D_SM4_GLOBAL_FLAGS_SHIFT,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
 static void write_sm4_ret(const struct tpf_writer *tpf)
 {
     struct sm4_instruction instr =
@@ -6118,6 +6129,9 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, const struct hlsl_ir_function_d
         else if (resource->regset == HLSL_REGSET_UAVS)
             write_sm4_dcl_textures(&tpf, resource, true);
     }
+
+    if (entry_func->early_depth_test && profile->major_version >= 5)
+        write_sm4_dcl_global_flags(&tpf, VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
