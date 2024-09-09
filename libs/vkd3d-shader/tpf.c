@@ -616,6 +616,20 @@ enum vkd3d_sm4_shader_data_type
     VKD3D_SM4_SHADER_DATA_MESSAGE                   = 0x4,
 };
 
+enum vkd3d_sm4_stat_field
+{
+    VKD3D_STAT_UNUSED = 0,
+    VKD3D_STAT_MOV,
+    VKD3D_STAT_INSTR_COUNT,
+    VKD3D_STAT_COUNT,
+};
+
+struct vkd3d_sm4_stat_field_info
+{
+    enum vkd3d_sm4_opcode opcode;
+    enum vkd3d_sm4_stat_field field;
+};
+
 struct sm4_index_range
 {
     unsigned int index;
@@ -634,6 +648,7 @@ struct vkd3d_sm4_lookup_tables
     const struct vkd3d_sm4_opcode_info *opcode_info_from_sm4[VKD3D_SM4_OP_COUNT];
     const struct vkd3d_sm4_register_type_info *register_type_info_from_sm4[VKD3D_SM4_REGISTER_TYPE_COUNT];
     const struct vkd3d_sm4_register_type_info *register_type_info_from_vkd3d[VKD3DSPR_COUNT];
+    const struct vkd3d_sm4_stat_field_info *stat_field_from_sm4[VKD3D_SM4_OP_COUNT];
 };
 
 struct vkd3d_shader_sm4_parser
@@ -1330,11 +1345,17 @@ static const enum vkd3d_shader_register_precision register_precision_table[] =
     /* VKD3D_SM4_REGISTER_PRECISION_MIN_UINT_16 */  VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16,
 };
 
+struct sm4_stat
+{
+    uint32_t fields[VKD3D_STAT_COUNT];
+};
+
 struct tpf_writer
 {
     struct hlsl_ctx *ctx;
     struct vkd3d_bytecode_buffer *buffer;
     struct vkd3d_sm4_lookup_tables lookup;
+    struct sm4_stat *stat;
 };
 
 static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
@@ -1662,6 +1683,11 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM5_RT_OUTPUT_STENCIL_REF,      VKD3DSPR_OUTSTENCILREF,   VKD3D_SM4_SWIZZLE_VEC4},
     };
 
+    static const struct vkd3d_sm4_stat_field_info stat_field_table[] =
+    {
+        {VKD3D_SM4_OP_MOV, VKD3D_STAT_MOV},
+    };
+
     memset(lookup, 0, sizeof(*lookup));
 
     for (i = 0; i < ARRAY_SIZE(opcode_table); ++i)
@@ -1678,12 +1704,21 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         lookup->register_type_info_from_sm4[info->sm4_type] = info;
         lookup->register_type_info_from_vkd3d[info->vkd3d_type] = info;
     }
+
+    for (i = 0; i < ARRAY_SIZE(stat_field_table); ++i)
+    {
+        const struct vkd3d_sm4_stat_field_info *info = &stat_field_table[i];
+
+        lookup->stat_field_from_sm4[info->opcode] = info;
+    }
 }
 
-static void tpf_writer_init(struct tpf_writer *tpf, struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
+static void tpf_writer_init(struct tpf_writer *tpf, struct hlsl_ctx *ctx, struct sm4_stat *stat,
+        struct vkd3d_bytecode_buffer *buffer)
 {
     tpf->ctx = ctx;
     tpf->buffer = buffer;
+    tpf->stat = stat;
     init_sm4_lookup_tables(&tpf->lookup);
 }
 
@@ -1719,6 +1754,16 @@ static enum vkd3d_sm4_swizzle_type vkd3d_sm4_get_default_swizzle_type(
 
     VKD3D_ASSERT(register_type_info);
     return register_type_info->default_src_swizzle_type;
+}
+
+static enum vkd3d_sm4_stat_field get_stat_field_from_sm4_opcode(
+        const struct vkd3d_sm4_lookup_tables *lookup, enum vkd3d_sm4_opcode sm4_opcode)
+{
+    const struct vkd3d_sm4_stat_field_info *field_info;
+
+    if (sm4_opcode >= VKD3D_SM4_OP_COUNT || !(field_info = lookup->stat_field_from_sm4[sm4_opcode]))
+        return VKD3D_STAT_UNUSED;
+    return field_info->field;
 }
 
 static enum vkd3d_data_type map_data_type(char t)
@@ -4187,6 +4232,7 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
 {
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
     uint32_t token = instr->opcode | instr->extra_bits;
+    enum vkd3d_sm4_stat_field stat_field;
     unsigned int size, i, j;
     size_t token_position;
 
@@ -4219,6 +4265,11 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
     size = (bytecode_get_size(buffer) - token_position) / sizeof(uint32_t);
     token |= (size << VKD3D_SM4_INSTRUCTION_LENGTH_SHIFT);
     set_u32(buffer, token_position, token);
+
+    ++tpf->stat->fields[VKD3D_STAT_INSTR_COUNT];
+
+    stat_field = get_stat_field_from_sm4_opcode(&tpf->lookup, instr->opcode & VKD3D_SM4_OPCODE_MASK);
+    ++tpf->stat->fields[stat_field];
 }
 
 static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
@@ -6017,8 +6068,8 @@ static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_bloc
     }
 }
 
-static void write_sm4_shdr(struct hlsl_ctx *ctx,
-        const struct hlsl_ir_function_decl *entry_func, struct dxbc_writer *dxbc)
+static void write_sm4_shdr(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func,
+        struct sm4_stat *stat, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
@@ -6043,7 +6094,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         VKD3D_SM4_LIB,
     };
 
-    tpf_writer_init(&tpf, ctx, &buffer);
+    tpf_writer_init(&tpf, ctx, stat, &buffer);
 
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
 
@@ -6135,8 +6186,58 @@ static void write_sm4_sfi0(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         vkd3d_free(flags);
 }
 
+static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, struct dxbc_writer *dxbc)
+{
+    struct vkd3d_bytecode_buffer buffer = {0};
+
+    put_u32(&buffer, stat->fields[VKD3D_STAT_INSTR_COUNT]);
+    put_u32(&buffer, 0); /* Temp count */
+    put_u32(&buffer, 0); /* Def count */
+    put_u32(&buffer, 0); /* DCL count */
+    put_u32(&buffer, 0); /* Float instruction count */
+    put_u32(&buffer, 0); /* Int instruction count */
+    put_u32(&buffer, 0); /* Uint instruction count */
+    put_u32(&buffer, 0); /* Static flow control count */
+    put_u32(&buffer, 0); /* Dynamic flow control count */
+    put_u32(&buffer, 0); /* Macro instruction count */
+    put_u32(&buffer, 0); /* Temp array count */
+    put_u32(&buffer, 0); /* Array instr count */
+    put_u32(&buffer, 0); /* Cut instr count */
+    put_u32(&buffer, 0); /* Emit instr count */
+    put_u32(&buffer, 0); /* Texture instructions */
+    put_u32(&buffer, 0); /* Texture load instructions */
+    put_u32(&buffer, 0); /* Texture comparison instructions */
+    put_u32(&buffer, 0); /* Texture bias instructions */
+    put_u32(&buffer, 0); /* Texture gradient instructions */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_MOV]);
+    put_u32(&buffer, 0); /* MOVC instructions */
+    put_u32(&buffer, 0); /* Conversion instructions */
+    put_u32(&buffer, 0); /* Bitwise instructions */
+    put_u32(&buffer, 0); /* Input primitive */
+    put_u32(&buffer, 0); /* GS output topology */
+    put_u32(&buffer, 0); /* GS max output vertex count */
+    put_u32(&buffer, 0); /* Unknown */
+    put_u32(&buffer, 0); /* Unknown */
+    put_u32(&buffer, 0); /* Sample frequency */
+
+    if (hlsl_version_ge(ctx, 5, 0))
+    {
+        put_u32(&buffer, 0); /* GS instance count */
+        put_u32(&buffer, 0); /* Control point count */
+        put_u32(&buffer, 0); /* HS output primitive */
+        put_u32(&buffer, 0); /* HS partitioning */
+        put_u32(&buffer, 0); /* Tessellator domain */
+        put_u32(&buffer, 0); /* Barrier instructions */
+        put_u32(&buffer, 0); /* Interlocked instructions */
+        put_u32(&buffer, 0); /* UAV store instructions */
+    }
+
+    add_section(ctx, dxbc, TAG_STAT, &buffer);
+}
+
 int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
 {
+    struct sm4_stat stat = {0};
     struct dxbc_writer dxbc;
     size_t i;
     int ret;
@@ -6146,8 +6247,9 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     write_sm4_signature(ctx, &dxbc, false);
     write_sm4_signature(ctx, &dxbc, true);
     write_sm4_rdef(ctx, &dxbc);
-    write_sm4_shdr(ctx, entry_func, &dxbc);
+    write_sm4_shdr(ctx, entry_func, &stat, &dxbc);
     write_sm4_sfi0(ctx, &dxbc);
+    write_sm4_stat(ctx, &stat, &dxbc);
 
     if (!(ret = ctx->result))
         ret = dxbc_writer_write(&dxbc, out);
