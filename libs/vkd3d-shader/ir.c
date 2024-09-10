@@ -74,7 +74,7 @@ static int convert_parameter_info(const struct vkd3d_shader_compile_info *compil
 }
 
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
-        const struct vkd3d_shader_version *version, unsigned int reserve)
+        const struct vkd3d_shader_version *version, unsigned int reserve, enum vsir_control_flow_type cf_type)
 {
     memset(program, 0, sizeof(*program));
 
@@ -96,6 +96,7 @@ bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_c
     }
 
     program->shader_version = *version;
+    program->cf_type = cf_type;
     return shader_instruction_array_init(&program->instructions, reserve);
 }
 
@@ -2803,6 +2804,8 @@ static enum vkd3d_result vsir_program_flatten_control_flow_constructs(struct vsi
     struct cf_flattener flattener = {.program = program};
     enum vkd3d_result result;
 
+    VKD3D_ASSERT(program->cf_type == VSIR_CF_STRUCTURED);
+
     if ((result = cf_flattener_iterate_instruction_array(&flattener, message_context)) >= 0)
     {
         vkd3d_free(program->instructions.elements);
@@ -2810,6 +2813,7 @@ static enum vkd3d_result vsir_program_flatten_control_flow_constructs(struct vsi
         program->instructions.capacity = flattener.instruction_capacity;
         program->instructions.count = flattener.instruction_count;
         program->block_count = flattener.block_id;
+        program->cf_type = VSIR_CF_BLOCKS;
     }
     else
     {
@@ -2876,6 +2880,8 @@ static enum vkd3d_result vsir_program_lower_switch_to_selection_ladder(struct vs
     size_t ins_capacity = 0, ins_count = 0, i, map_capacity = 0, map_count = 0;
     struct vkd3d_shader_instruction *instructions = NULL;
     struct lower_switch_to_if_ladder_block_mapping *block_map = NULL;
+
+    VKD3D_ASSERT(program->cf_type == VSIR_CF_BLOCKS);
 
     if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count))
         goto fail;
@@ -3068,6 +3074,8 @@ static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_
     struct vkd3d_shader_instruction *instructions = NULL;
     struct ssas_to_temps_alloc alloc = {0};
     unsigned int current_label = 0;
+
+    VKD3D_ASSERT(program->cf_type == VSIR_CF_BLOCKS);
 
     if (!(block_info = vkd3d_calloc(program->block_count, sizeof(*block_info))))
     {
@@ -5289,6 +5297,8 @@ static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
     enum vkd3d_result ret;
     size_t i;
 
+    VKD3D_ASSERT(program->cf_type == VSIR_CF_BLOCKS);
+
     target.jump_target_temp_idx = program->temp_count;
     target.temp_count = program->temp_count + 1;
 
@@ -5336,6 +5346,7 @@ static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
     program->instructions.capacity = target.ins_capacity;
     program->instructions.count = target.ins_count;
     program->temp_count = target.temp_count;
+    program->cf_type = VSIR_CF_STRUCTURED;
 
     return VKD3D_OK;
 
@@ -5468,6 +5479,8 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(stru
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     enum vkd3d_result ret;
     size_t i;
+
+    VKD3D_ASSERT(program->cf_type == VSIR_CF_BLOCKS);
 
     for (i = 0; i < program->instructions.count;)
     {
@@ -5701,7 +5714,6 @@ struct validation_context
     enum vkd3d_result status;
     bool dcl_temps_found;
     enum vkd3d_shader_opcode phase;
-    enum vsir_control_flow_type cf_type;
     bool inside_block;
 
     struct validation_context_temp_data
@@ -6130,11 +6142,9 @@ static const char *name_from_cf_type(enum vsir_control_flow_type type)
 static void vsir_validate_cf_type(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction, enum vsir_control_flow_type expected_type)
 {
-    VKD3D_ASSERT(ctx->cf_type != VSIR_CF_UNKNOWN);
-    VKD3D_ASSERT(expected_type != VSIR_CF_UNKNOWN);
-    if (ctx->cf_type != expected_type)
+    if (ctx->program->cf_type != expected_type)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid instruction %#x in %s shader.",
-                instruction->opcode, name_from_cf_type(ctx->cf_type));
+                instruction->opcode, name_from_cf_type(ctx->program->cf_type));
 }
 
 static void vsir_validate_instruction(struct validation_context *ctx)
@@ -6249,24 +6259,8 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 "Instruction %#x appear before any phase instruction in a hull shader.",
                 instruction->opcode);
 
-    /* We support two different control flow types in shaders:
-     * block-based, like DXIL and SPIR-V, and structured, like D3DBC
-     * and TPF. The shader is detected as block-based when its first
-     * instruction, except for NOP, DCL_* and phases, is a LABEL.
-     * Currently we mandate that each shader is either purely block-based or
-     * purely structured. In principle we could allow structured
-     * constructs in a block, provided they are confined in a single
-     * block, but need for that hasn't arisen yet, so we don't. */
-    if (ctx->cf_type == VSIR_CF_UNKNOWN && instruction->opcode != VKD3DSIH_NOP
-            && !vsir_instruction_is_dcl(instruction))
-    {
-        if (instruction->opcode == VKD3DSIH_LABEL)
-            ctx->cf_type = VSIR_CF_BLOCKS;
-        else
-            ctx->cf_type = VSIR_CF_STRUCTURED;
-    }
-
-    if (ctx->cf_type == VSIR_CF_BLOCKS && !vsir_instruction_is_dcl(instruction))
+    if (ctx->program->cf_type == VSIR_CF_BLOCKS && !vsir_instruction_is_dcl(instruction)
+            && instruction->opcode != VKD3DSIH_NOP)
     {
         switch (instruction->opcode)
         {

@@ -7041,7 +7041,7 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     version.major = ctx->profile->major_version;
     version.minor = ctx->profile->minor_version;
     version.type = ctx->profile->type;
-    if (!vsir_program_init(program, NULL, &version, 0))
+    if (!vsir_program_init(program, NULL, &version, 0, VSIR_CF_STRUCTURED))
     {
         ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
         return;
