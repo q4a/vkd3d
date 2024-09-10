@@ -6635,14 +6635,14 @@ static void vsir_transform_(
 
     if ((ctx->result = step(ctx->program, ctx)) < 0)
     {
-        WARN("Transformation \"%s\" failed with result %u.\n", step_name, ctx->result);
+        WARN("Transformation \"%s\" failed with result %d.\n", step_name, ctx->result);
         return;
     }
 
     if ((ctx->result = vsir_program_validate(ctx->program, ctx->config_flags,
             ctx->compile_info->source_name, ctx->message_context)) < 0)
     {
-        WARN("Validation failed with result %u after transformation \"%s\".\n", ctx->result, step_name);
+        WARN("Validation failed with result %d after transformation \"%s\".\n", ctx->result, step_name);
         return;
     }
 }
