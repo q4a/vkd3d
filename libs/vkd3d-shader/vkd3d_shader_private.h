@@ -1364,6 +1364,13 @@ enum vkd3d_shader_config_flags
     VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION = 0x00000001,
 };
 
+enum vsir_control_flow_type
+{
+    VSIR_CF_UNKNOWN,
+    VSIR_CF_STRUCTURED,
+    VSIR_CF_BLOCKS,
+};
+
 struct vsir_program
 {
     struct vkd3d_shader_version shader_version;

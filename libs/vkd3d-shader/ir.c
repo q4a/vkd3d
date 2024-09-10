@@ -5701,12 +5701,7 @@ struct validation_context
     enum vkd3d_result status;
     bool dcl_temps_found;
     enum vkd3d_shader_opcode phase;
-    enum cf_type
-    {
-        CF_TYPE_UNKNOWN = 0,
-        CF_TYPE_STRUCTURED,
-        CF_TYPE_BLOCKS,
-    } cf_type;
+    enum vsir_control_flow_type cf_type;
     bool inside_block;
 
     struct validation_context_temp_data
@@ -6119,13 +6114,13 @@ static bool vsir_validate_src_max_count(struct validation_context *ctx,
     return true;
 }
 
-static const char *name_from_cf_type(enum cf_type type)
+static const char *name_from_cf_type(enum vsir_control_flow_type type)
 {
     switch (type)
     {
-        case CF_TYPE_STRUCTURED:
+        case VSIR_CF_STRUCTURED:
             return "structured";
-        case CF_TYPE_BLOCKS:
+        case VSIR_CF_BLOCKS:
             return "block-based";
         default:
             vkd3d_unreachable();
@@ -6133,10 +6128,10 @@ static const char *name_from_cf_type(enum cf_type type)
 }
 
 static void vsir_validate_cf_type(struct validation_context *ctx,
-        const struct vkd3d_shader_instruction *instruction, enum cf_type expected_type)
+        const struct vkd3d_shader_instruction *instruction, enum vsir_control_flow_type expected_type)
 {
-    VKD3D_ASSERT(ctx->cf_type != CF_TYPE_UNKNOWN);
-    VKD3D_ASSERT(expected_type != CF_TYPE_UNKNOWN);
+    VKD3D_ASSERT(ctx->cf_type != VSIR_CF_UNKNOWN);
+    VKD3D_ASSERT(expected_type != VSIR_CF_UNKNOWN);
     if (ctx->cf_type != expected_type)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid instruction %#x in %s shader.",
                 instruction->opcode, name_from_cf_type(ctx->cf_type));
@@ -6262,16 +6257,16 @@ static void vsir_validate_instruction(struct validation_context *ctx)
      * purely structured. In principle we could allow structured
      * constructs in a block, provided they are confined in a single
      * block, but need for that hasn't arisen yet, so we don't. */
-    if (ctx->cf_type == CF_TYPE_UNKNOWN && instruction->opcode != VKD3DSIH_NOP
+    if (ctx->cf_type == VSIR_CF_UNKNOWN && instruction->opcode != VKD3DSIH_NOP
             && !vsir_instruction_is_dcl(instruction))
     {
         if (instruction->opcode == VKD3DSIH_LABEL)
-            ctx->cf_type = CF_TYPE_BLOCKS;
+            ctx->cf_type = VSIR_CF_BLOCKS;
         else
-            ctx->cf_type = CF_TYPE_STRUCTURED;
+            ctx->cf_type = VSIR_CF_STRUCTURED;
     }
 
-    if (ctx->cf_type == CF_TYPE_BLOCKS && !vsir_instruction_is_dcl(instruction))
+    if (ctx->cf_type == VSIR_CF_BLOCKS && !vsir_instruction_is_dcl(instruction))
     {
         switch (instruction->opcode)
         {
@@ -6315,7 +6310,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_IF:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 1);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -6324,7 +6319,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_IFC:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 2);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -6333,7 +6328,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ELSE:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF)
@@ -6343,7 +6338,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ENDIF:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || (ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF && ctx->blocks[ctx->depth - 1] != VKD3DSIH_ELSE))
@@ -6353,7 +6348,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_LOOP:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, version->major <= 3 ? 2 : 0);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -6362,7 +6357,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ENDLOOP:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_LOOP)
@@ -6372,7 +6367,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_REP:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 1);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -6381,7 +6376,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ENDREP:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_REP)
@@ -6391,7 +6386,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_SWITCH:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 1);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -6400,7 +6395,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ENDSWITCH:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_SWITCH)
@@ -6415,7 +6410,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_LABEL:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_BLOCKS);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 1);
             if (instruction->src_count >= 1 && !vsir_register_is_label(&instruction->src[0].reg))
@@ -6425,7 +6420,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_BRANCH:
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_BLOCKS);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
             vsir_validate_dst_count(ctx, instruction, 0);
             if (!vsir_validate_src_min_count(ctx, instruction, 1))
                 break;
@@ -6465,7 +6460,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         {
             unsigned int case_count;
 
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_BLOCKS);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
             vsir_validate_dst_count(ctx, instruction, 0);
             /* Parameters are source, default label, merge label and
              * then pairs of constant value and case label. */
@@ -6510,7 +6505,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         {
             unsigned int incoming_count;
 
-            vsir_validate_cf_type(ctx, instruction, CF_TYPE_BLOCKS);
+            vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
             vsir_validate_dst_count(ctx, instruction, 1);
             vsir_validate_src_min_count(ctx, instruction, 2);
             if (instruction->src_count % 2 != 0)
