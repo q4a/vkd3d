@@ -6170,6 +6170,16 @@ static void vsir_validate_dcl_temps(struct validation_context *ctx,
     ctx->dcl_temps_found = true;
 }
 
+static void vsir_validate_else(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
+    if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                "ELSE instruction doesn't terminate IF block.");
+    else
+        ctx->blocks[ctx->depth - 1] = VKD3DSIH_ELSE;
+}
+
 static void vsir_validate_if(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
@@ -6192,6 +6202,7 @@ struct vsir_validator_instruction_desc
 static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
 {
     [VKD3DSIH_DCL_TEMPS] = {0, 0, vsir_validate_dcl_temps},
+    [VKD3DSIH_ELSE] =      {0, 0, vsir_validate_else},
     [VKD3DSIH_IF] =        {0, 1, vsir_validate_if},
     [VKD3DSIH_IFC] =       {0, 2, vsir_validate_ifc},
 };
@@ -6356,16 +6367,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     switch (instruction->opcode)
     {
-        case VKD3DSIH_ELSE:
-            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
-            vsir_validate_dst_count(ctx, instruction, 0);
-            vsir_validate_src_count(ctx, instruction, 0);
-            if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "ELSE instruction doesn't terminate IF block.");
-            else
-                ctx->blocks[ctx->depth - 1] = instruction->opcode;
-            break;
-
         case VKD3DSIH_ENDIF:
             vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
