@@ -6176,6 +6176,12 @@ static void vsir_validate_if(struct validation_context *ctx, const struct vkd3d_
     vsir_validator_push_block(ctx, VKD3DSIH_IF);
 }
 
+static void vsir_validate_ifc(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
+    vsir_validator_push_block(ctx, VKD3DSIH_IF);
+}
+
 struct vsir_validator_instruction_desc
 {
     unsigned int dst_param_count;
@@ -6187,6 +6193,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
 {
     [VKD3DSIH_DCL_TEMPS] = {0, 0, vsir_validate_dcl_temps},
     [VKD3DSIH_IF] =        {0, 1, vsir_validate_if},
+    [VKD3DSIH_IFC] =       {0, 2, vsir_validate_ifc},
 };
 
 static void vsir_validate_instruction(struct validation_context *ctx)
@@ -6349,15 +6356,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     switch (instruction->opcode)
     {
-        case VKD3DSIH_IFC:
-            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
-            vsir_validate_dst_count(ctx, instruction, 0);
-            vsir_validate_src_count(ctx, instruction, 2);
-            if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
-                return;
-            ctx->blocks[ctx->depth++] = VKD3DSIH_IF;
-            break;
-
         case VKD3DSIH_ELSE:
             vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
