@@ -6301,26 +6301,6 @@ static void vsir_validate_phi(struct validation_context *ctx, const struct vkd3d
                 instruction->src_count);
     incoming_count = instruction->src_count / 2;
 
-    if (!register_is_ssa(&instruction->dst[0].reg))
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                "Invalid destination of type %#x in PHI instruction, expected SSA.",
-                instruction->dst[0].reg.type);
-
-    if (instruction->dst[0].reg.dimension != VSIR_DIMENSION_SCALAR)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
-                "Invalid destination dimension %#x in PHI instruction, expected scalar.",
-                instruction->dst[0].reg.dimension);
-
-    if (instruction->dst[0].modifiers != VKD3DSPDM_NONE)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS,
-                "Invalid modifiers %#x for the destination of a PHI instruction, expected none.",
-                instruction->dst[0].modifiers);
-
-    if (instruction->dst[0].shift != 0)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT,
-                "Invalid shift %#x for the destination of a PHI instruction, expected none.",
-                instruction->dst[0].shift);
-
     for (i = 0; i < incoming_count; ++i)
     {
         unsigned int value_idx = 2 * i;
@@ -6342,6 +6322,29 @@ static void vsir_validate_phi(struct validation_context *ctx, const struct vkd3d
                     "Invalid label register for case %u of type %#x in PHI instruction, "
                     "expected LABEL.", i, instruction->src[value_idx].reg.type);
     }
+
+    if (instruction->dst_count < 1)
+        return;
+
+    if (!register_is_ssa(&instruction->dst[0].reg))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                "Invalid destination of type %#x in PHI instruction, expected SSA.",
+                instruction->dst[0].reg.type);
+
+    if (instruction->dst[0].reg.dimension != VSIR_DIMENSION_SCALAR)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                "Invalid destination dimension %#x in PHI instruction, expected scalar.",
+                instruction->dst[0].reg.dimension);
+
+    if (instruction->dst[0].modifiers != VKD3DSPDM_NONE)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS,
+                "Invalid modifiers %#x for the destination of a PHI instruction, expected none.",
+                instruction->dst[0].modifiers);
+
+    if (instruction->dst[0].shift != 0)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT,
+                "Invalid shift %#x for the destination of a PHI instruction, expected none.",
+                instruction->dst[0].shift);
 }
 
 static void vsir_validate_rep(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
