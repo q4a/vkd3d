@@ -6147,6 +6147,16 @@ static void vsir_validate_cf_type(struct validation_context *ctx,
                 instruction->opcode, name_from_cf_type(ctx->program->cf_type));
 }
 
+static void vsir_validator_push_block(struct validation_context *ctx, enum vkd3d_shader_opcode opcode)
+{
+    if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
+    {
+        ctx->status = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+    ctx->blocks[ctx->depth++] = opcode;
+}
+
 static void vsir_validate_dcl_temps(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6160,6 +6170,12 @@ static void vsir_validate_dcl_temps(struct validation_context *ctx,
     ctx->dcl_temps_found = true;
 }
 
+static void vsir_validate_if(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
+    vsir_validator_push_block(ctx, VKD3DSIH_IF);
+}
+
 struct vsir_validator_instruction_desc
 {
     unsigned int dst_param_count;
@@ -6170,6 +6186,7 @@ struct vsir_validator_instruction_desc
 static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
 {
     [VKD3DSIH_DCL_TEMPS] = {0, 0, vsir_validate_dcl_temps},
+    [VKD3DSIH_IF] =        {0, 1, vsir_validate_if},
 };
 
 static void vsir_validate_instruction(struct validation_context *ctx)
@@ -6332,15 +6349,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     switch (instruction->opcode)
     {
-        case VKD3DSIH_IF:
-            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
-            vsir_validate_dst_count(ctx, instruction, 0);
-            vsir_validate_src_count(ctx, instruction, 1);
-            if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
-                return;
-            ctx->blocks[ctx->depth++] = instruction->opcode;
-            break;
-
         case VKD3DSIH_IFC:
             vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
@@ -6608,7 +6616,8 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
     if (!(ctx.ssas = vkd3d_calloc(ctx.program->ssa_count, sizeof(*ctx.ssas))))
         goto fail;
 
-    for (ctx.instruction_idx = 0; ctx.instruction_idx < program->instructions.count; ++ctx.instruction_idx)
+    for (ctx.instruction_idx = 0; ctx.instruction_idx < program->instructions.count
+            && ctx.status != VKD3D_ERROR_OUT_OF_MEMORY; ++ctx.instruction_idx)
         vsir_validate_instruction(&ctx);
 
     ctx.invalid_instruction_idx = true;
