@@ -6280,6 +6280,11 @@ static void vsir_validate_label(struct validation_context *ctx, const struct vkd
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
                 "Invalid register of type %#x in a LABEL instruction, expected LABEL.",
                 instruction->src[0].reg.type);
+
+    if (ctx->inside_block)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                "Invalid LABEL instruction inside a block.");
+    ctx->inside_block = true;
 }
 
 static void vsir_validate_loop(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
@@ -6559,19 +6564,16 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 "Instruction %#x appear before any phase instruction in a hull shader.",
                 instruction->opcode);
 
-    if (ctx->program->cf_type == VSIR_CF_BLOCKS && !vsir_instruction_is_dcl(instruction)
-            && instruction->opcode != VKD3DSIH_NOP)
+    if (ctx->program->cf_type == VSIR_CF_BLOCKS && !ctx->inside_block)
     {
         switch (instruction->opcode)
         {
+            case VKD3DSIH_NOP:
             case VKD3DSIH_LABEL:
-                if (ctx->inside_block)
-                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid LABEL instruction inside a block.");
-                ctx->inside_block = true;
                 break;
 
             default:
-                if (!ctx->inside_block)
+                if (!vsir_instruction_is_dcl(instruction))
                     validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
                             "Invalid instruction %#x outside any block.",
                             instruction->opcode);
