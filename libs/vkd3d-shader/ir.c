@@ -6207,6 +6207,16 @@ static void vsir_validate_endrep(struct validation_context *ctx, const struct vk
         --ctx->depth;
 }
 
+static void vsir_validate_endswitch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
+    if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_SWITCH)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                "ENDSWITCH instruction doesn't terminate SWITCH block.");
+    else
+        --ctx->depth;
+}
+
 static void vsir_validate_if(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
@@ -6252,6 +6262,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_ENDIF] =     {0,   0, vsir_validate_endif},
     [VKD3DSIH_ENDLOOP] =   {0,   0, vsir_validate_endloop},
     [VKD3DSIH_ENDREP] =    {0,   0, vsir_validate_endrep},
+    [VKD3DSIH_ENDSWITCH] = {0,   0, vsir_validate_endswitch},
     [VKD3DSIH_IF] =        {0,   1, vsir_validate_if},
     [VKD3DSIH_IFC] =       {0,   2, vsir_validate_ifc},
     [VKD3DSIH_LOOP] =      {0, ~0u, vsir_validate_loop},
@@ -6419,16 +6430,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     switch (instruction->opcode)
     {
-        case VKD3DSIH_ENDSWITCH:
-            vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
-            vsir_validate_dst_count(ctx, instruction, 0);
-            vsir_validate_src_count(ctx, instruction, 0);
-            if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_SWITCH)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "ENDSWITCH instruction doesn't terminate SWITCH block.");
-            else
-                --ctx->depth;
-            break;
-
         case VKD3DSIH_RET:
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
