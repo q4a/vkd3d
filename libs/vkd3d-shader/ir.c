@@ -6193,6 +6193,8 @@ static void vsir_validate_branch(struct validation_context *ctx, const struct vk
                         instruction->src[i].reg.type);
         }
     }
+
+    ctx->inside_block = false;
 }
 
 static void vsir_validate_dcl_temps(struct validation_context *ctx,
@@ -6359,6 +6361,7 @@ static void vsir_validate_rep(struct validation_context *ctx, const struct vkd3d
 
 static void vsir_validate_ret(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
+    ctx->inside_block = false;
 }
 
 static void vsir_validate_switch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
@@ -6412,6 +6415,8 @@ static void vsir_validate_switch_monolithic(struct validation_context *ctx,
                     "Invalid label register for case %u of type %#x in monolithic SWITCH instruction, "
                     "expected LABEL.", i, instruction->src[value_idx].reg.type);
     }
+
+    ctx->inside_block = false;
 }
 
 struct vsir_validator_instruction_desc
@@ -6563,16 +6568,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 if (ctx->inside_block)
                     validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid LABEL instruction inside a block.");
                 ctx->inside_block = true;
-                break;
-
-            case VKD3DSIH_RET:
-            case VKD3DSIH_BRANCH:
-            case VKD3DSIH_SWITCH_MONOLITHIC:
-                if (!ctx->inside_block)
-                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
-                            "Invalid instruction %#x outside any block.",
-                            instruction->opcode);
-                ctx->inside_block = false;
                 break;
 
             default:
