@@ -23,6 +23,7 @@
 
 #include "hlsl.h"
 #include "vkd3d_shader_private.h"
+#include "vkd3d_d3dcommon.h"
 
 #define SM4_MAX_SRC_COUNT 6
 #define SM4_MAX_DST_COUNT 2
