@@ -6287,6 +6287,10 @@ static void vsir_validate_loop(struct validation_context *ctx, const struct vkd3
     vsir_validator_push_block(ctx, VKD3DSIH_LOOP);
 }
 
+static void vsir_validate_nop(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+}
+
 static void vsir_validate_phi(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     unsigned int i, incoming_count;
@@ -6430,6 +6434,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_IFC] =               {0,   2, vsir_validate_ifc},
     [VKD3DSIH_LABEL] =             {0,   1, vsir_validate_label},
     [VKD3DSIH_LOOP] =              {0, ~0u, vsir_validate_loop},
+    [VKD3DSIH_NOP] =               {0,   0, vsir_validate_nop},
     [VKD3DSIH_PHI] =               {1, ~0u, vsir_validate_phi},
     [VKD3DSIH_REP] =               {0,   1, vsir_validate_rep},
     [VKD3DSIH_RET] =               {0,   0, vsir_validate_ret},
