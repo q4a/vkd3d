@@ -6303,6 +6303,53 @@ static void vsir_validate_switch(struct validation_context *ctx, const struct vk
     vsir_validator_push_block(ctx, VKD3DSIH_SWITCH);
 }
 
+static void vsir_validate_switch_monolithic(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    unsigned int i, case_count;
+
+    vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
+
+    /* Parameters are source, default label, merge label and
+     * then pairs of constant value and case label. */
+
+    if (!vsir_validate_src_min_count(ctx, instruction, 3))
+        return;
+
+    if (instruction->src_count % 2 != 1)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
+                "Invalid source count %u for a monolithic SWITCH instruction, it must be an odd number.",
+                instruction->src_count);
+
+    if (!vsir_register_is_label(&instruction->src[1].reg))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                "Invalid default label register of type %#x in monolithic SWITCH instruction, expected LABEL.",
+                instruction->src[1].reg.type);
+
+    if (!vsir_register_is_label(&instruction->src[2].reg))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                "Invalid merge label register of type %#x in monolithic SWITCH instruction, expected LABEL.",
+                instruction->src[2].reg.type);
+
+    case_count = (instruction->src_count - 3) / 2;
+
+    for (i = 0; i < case_count; ++i)
+    {
+        unsigned int value_idx = 3 + 2 * i;
+        unsigned int label_idx = 3 + 2 * i + 1;
+
+        if (!register_is_constant(&instruction->src[value_idx].reg))
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Invalid value register for case %u of type %#x in monolithic SWITCH instruction, "
+                    "expected IMMCONST or IMMCONST64.", i, instruction->src[value_idx].reg.type);
+
+        if (!vsir_register_is_label(&instruction->src[label_idx].reg))
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Invalid label register for case %u of type %#x in monolithic SWITCH instruction, "
+                    "expected LABEL.", i, instruction->src[value_idx].reg.type);
+    }
+}
+
 struct vsir_validator_instruction_desc
 {
     unsigned int dst_param_count;
@@ -6312,20 +6359,21 @@ struct vsir_validator_instruction_desc
 
 static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
 {
-    [VKD3DSIH_BRANCH] =    {0, ~0u, vsir_validate_branch},
-    [VKD3DSIH_DCL_TEMPS] = {0,   0, vsir_validate_dcl_temps},
-    [VKD3DSIH_ELSE] =      {0,   0, vsir_validate_else},
-    [VKD3DSIH_ENDIF] =     {0,   0, vsir_validate_endif},
-    [VKD3DSIH_ENDLOOP] =   {0,   0, vsir_validate_endloop},
-    [VKD3DSIH_ENDREP] =    {0,   0, vsir_validate_endrep},
-    [VKD3DSIH_ENDSWITCH] = {0,   0, vsir_validate_endswitch},
-    [VKD3DSIH_IF] =        {0,   1, vsir_validate_if},
-    [VKD3DSIH_IFC] =       {0,   2, vsir_validate_ifc},
-    [VKD3DSIH_LABEL] =     {0,   1, vsir_validate_label},
-    [VKD3DSIH_LOOP] =      {0, ~0u, vsir_validate_loop},
-    [VKD3DSIH_REP] =       {0,   1, vsir_validate_rep},
-    [VKD3DSIH_RET] =       {0,   0, vsir_validate_ret},
-    [VKD3DSIH_SWITCH] =    {0,   1, vsir_validate_switch},
+    [VKD3DSIH_BRANCH] =            {0, ~0u, vsir_validate_branch},
+    [VKD3DSIH_DCL_TEMPS] =         {0,   0, vsir_validate_dcl_temps},
+    [VKD3DSIH_ELSE] =              {0,   0, vsir_validate_else},
+    [VKD3DSIH_ENDIF] =             {0,   0, vsir_validate_endif},
+    [VKD3DSIH_ENDLOOP] =           {0,   0, vsir_validate_endloop},
+    [VKD3DSIH_ENDREP] =            {0,   0, vsir_validate_endrep},
+    [VKD3DSIH_ENDSWITCH] =         {0,   0, vsir_validate_endswitch},
+    [VKD3DSIH_IF] =                {0,   1, vsir_validate_if},
+    [VKD3DSIH_IFC] =               {0,   2, vsir_validate_ifc},
+    [VKD3DSIH_LABEL] =             {0,   1, vsir_validate_label},
+    [VKD3DSIH_LOOP] =              {0, ~0u, vsir_validate_loop},
+    [VKD3DSIH_REP] =               {0,   1, vsir_validate_rep},
+    [VKD3DSIH_RET] =               {0,   0, vsir_validate_ret},
+    [VKD3DSIH_SWITCH] =            {0,   1, vsir_validate_switch},
+    [VKD3DSIH_SWITCH_MONOLITHIC] = {0, ~0u, vsir_validate_switch_monolithic},
 };
 
 static void vsir_validate_instruction(struct validation_context *ctx)
@@ -6488,51 +6536,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     switch (instruction->opcode)
     {
-        case VKD3DSIH_SWITCH_MONOLITHIC:
-        {
-            unsigned int case_count;
-
-            vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
-            vsir_validate_dst_count(ctx, instruction, 0);
-            /* Parameters are source, default label, merge label and
-             * then pairs of constant value and case label. */
-            if (!vsir_validate_src_min_count(ctx, instruction, 3))
-                break;
-            if (instruction->src_count % 2 != 1)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                        "Invalid source count %u for a monolithic SWITCH instruction, it must be an odd number.",
-                        instruction->src_count);
-
-            if (!vsir_register_is_label(&instruction->src[1].reg))
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                        "Invalid default label register of type %#x in monolithic SWITCH instruction, expected LABEL.",
-                        instruction->src[1].reg.type);
-
-            if (!vsir_register_is_label(&instruction->src[2].reg))
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                        "Invalid merge label register of type %#x in monolithic SWITCH instruction, expected LABEL.",
-                        instruction->src[2].reg.type);
-
-            case_count = (instruction->src_count - 3) / 2;
-
-            for (i = 0; i < case_count; ++i)
-            {
-                unsigned int value_idx = 3 + 2 * i;
-                unsigned int label_idx = 3 + 2 * i + 1;
-
-                if (!register_is_constant(&instruction->src[value_idx].reg))
-                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                            "Invalid value register for case %zu of type %#x in monolithic SWITCH instruction, "
-                            "expected IMMCONST or IMMCONST64.", i, instruction->src[value_idx].reg.type);
-
-                if (!vsir_register_is_label(&instruction->src[label_idx].reg))
-                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                            "Invalid label register for case %zu of type %#x in monolithic SWITCH instruction, "
-                            "expected LABEL.", i, instruction->src[value_idx].reg.type);
-            }
-            break;
-        }
-
         case VKD3DSIH_PHI:
         {
             unsigned int incoming_count;
