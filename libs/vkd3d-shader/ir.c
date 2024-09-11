@@ -6147,6 +6147,31 @@ static void vsir_validate_cf_type(struct validation_context *ctx,
                 instruction->opcode, name_from_cf_type(ctx->program->cf_type));
 }
 
+static void vsir_validate_dcl_temps(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    if (ctx->dcl_temps_found)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_DUPLICATE_DCL_TEMPS,
+                "Duplicate DCL_TEMPS instruction.");
+    if (instruction->declaration.count > ctx->program->temp_count)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS,
+                "Invalid DCL_TEMPS count %u, expected at most %u.",
+                instruction->declaration.count, ctx->program->temp_count);
+    ctx->dcl_temps_found = true;
+}
+
+struct vsir_validator_instruction_desc
+{
+    unsigned int dst_param_count;
+    unsigned int src_param_count;
+    void (*validate)(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction);
+};
+
+static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
+{
+    [VKD3DSIH_DCL_TEMPS] = {0, 0, vsir_validate_dcl_temps},
+};
+
 static void vsir_validate_instruction(struct validation_context *ctx)
 {
     const struct vkd3d_shader_version *version = &ctx->program->shader_version;
@@ -6289,20 +6314,24 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         }
     }
 
+    if (instruction->opcode < ARRAY_SIZE(vsir_validator_instructions))
+    {
+        const struct vsir_validator_instruction_desc *desc;
+
+        desc = &vsir_validator_instructions[instruction->opcode];
+
+        if (desc->validate)
+        {
+            if (desc->dst_param_count != ~0u)
+                vsir_validate_dst_count(ctx, instruction, desc->dst_param_count);
+            if (desc->src_param_count != ~0u)
+                vsir_validate_src_count(ctx, instruction, desc->src_param_count);
+            desc->validate(ctx, instruction);
+        }
+    }
+
     switch (instruction->opcode)
     {
-        case VKD3DSIH_DCL_TEMPS:
-            vsir_validate_dst_count(ctx, instruction, 0);
-            vsir_validate_src_count(ctx, instruction, 0);
-            if (ctx->dcl_temps_found)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_DUPLICATE_DCL_TEMPS, "Duplicate DCL_TEMPS instruction.");
-            if (instruction->declaration.count > ctx->program->temp_count)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS,
-                        "Invalid DCL_TEMPS count %u, expected at most %u.",
-                        instruction->declaration.count, ctx->program->temp_count);
-            ctx->dcl_temps_found = true;
-            break;
-
         case VKD3DSIH_IF:
             vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
