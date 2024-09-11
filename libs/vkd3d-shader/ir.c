@@ -6153,6 +6153,48 @@ static void vsir_validator_push_block(struct validation_context *ctx, enum vkd3d
     ctx->blocks[ctx->depth++] = opcode;
 }
 
+static void vsir_validate_branch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    size_t i;
+
+    vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
+    vsir_validate_dst_count(ctx, instruction, 0);
+
+    if (!vsir_validate_src_min_count(ctx, instruction, 1))
+        return;
+
+    if (vsir_register_is_label(&instruction->src[0].reg))
+    {
+        /* Unconditional branch: parameters are jump label,
+         * optional merge label, optional continue label. */
+        vsir_validate_src_max_count(ctx, instruction, 3);
+
+        for (i = 0; i < instruction->src_count; ++i)
+        {
+            if (!vsir_register_is_label(&instruction->src[i].reg))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                        "Invalid register of type %#x in unconditional BRANCH instruction, expected LABEL.",
+                        instruction->src[i].reg.type);
+        }
+    }
+    else
+    {
+        /* Conditional branch: parameters are condition, true
+         * jump label, false jump label, optional merge label,
+         * optional continue label. */
+        vsir_validate_src_min_count(ctx, instruction, 3);
+        vsir_validate_src_max_count(ctx, instruction, 5);
+
+        for (i = 1; i < instruction->src_count; ++i)
+        {
+            if (!vsir_register_is_label(&instruction->src[i].reg))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                        "Invalid register of type %#x in conditional BRANCH instruction, expected LABEL.",
+                        instruction->src[i].reg.type);
+        }
+    }
+}
+
 static void vsir_validate_dcl_temps(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6270,6 +6312,7 @@ struct vsir_validator_instruction_desc
 
 static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
 {
+    [VKD3DSIH_BRANCH] =    {0, ~0u, vsir_validate_branch},
     [VKD3DSIH_DCL_TEMPS] = {0,   0, vsir_validate_dcl_temps},
     [VKD3DSIH_ELSE] =      {0,   0, vsir_validate_else},
     [VKD3DSIH_ENDIF] =     {0,   0, vsir_validate_endif},
@@ -6445,43 +6488,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     switch (instruction->opcode)
     {
-        case VKD3DSIH_BRANCH:
-            vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
-            vsir_validate_dst_count(ctx, instruction, 0);
-            if (!vsir_validate_src_min_count(ctx, instruction, 1))
-                break;
-            if (vsir_register_is_label(&instruction->src[0].reg))
-            {
-                /* Unconditional branch: parameters are jump label,
-                 * optional merge label, optional continue label. */
-                vsir_validate_src_max_count(ctx, instruction, 3);
-
-                for (i = 0; i < instruction->src_count; ++i)
-                {
-                    if (!vsir_register_is_label(&instruction->src[i].reg))
-                        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                                "Invalid register of type %#x in unconditional BRANCH instruction, expected LABEL.",
-                                instruction->src[i].reg.type);
-                }
-            }
-            else
-            {
-                /* Conditional branch: parameters are condition, true
-                 * jump label, false jump label, optional merge label,
-                 * optional continue label. */
-                vsir_validate_src_min_count(ctx, instruction, 3);
-                vsir_validate_src_max_count(ctx, instruction, 5);
-
-                for (i = 1; i < instruction->src_count; ++i)
-                {
-                    if (!vsir_register_is_label(&instruction->src[i].reg))
-                        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                                "Invalid register of type %#x in conditional BRANCH instruction, expected LABEL.",
-                                instruction->src[i].reg.type);
-                }
-            }
-            break;
-
         case VKD3DSIH_SWITCH_MONOLITHIC:
         {
             unsigned int case_count;
