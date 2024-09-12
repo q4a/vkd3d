@@ -153,20 +153,6 @@ static inline bool shader_register_is_phase_instance_id(const struct vkd3d_shade
     return reg->type == VKD3DSPR_FORKINSTID || reg->type == VKD3DSPR_JOININSTID;
 }
 
-static bool vsir_instruction_is_dcl(const struct vkd3d_shader_instruction *instruction)
-{
-    enum vkd3d_shader_opcode opcode = instruction->opcode;
-    return (VKD3DSIH_DCL <= opcode && opcode <= VKD3DSIH_DCL_VERTICES_OUT)
-            || opcode == VKD3DSIH_HS_DECLS;
-}
-
-static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *ins)
-{
-    struct vkd3d_shader_location location = ins->location;
-
-    vsir_instruction_init(ins, &location, VKD3DSIH_NOP);
-}
-
 void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count)
 {
@@ -246,6 +232,14 @@ static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigne
     dst->write_mask = VKD3DSP_WRITEMASK_0;
 }
 
+void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_opcode opcode)
+{
+    memset(ins, 0, sizeof(*ins));
+    ins->location = *location;
+    ins->opcode = opcode;
+}
+
 bool vsir_instruction_init_with_params(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode opcode, unsigned int dst_count, unsigned int src_count)
@@ -269,6 +263,37 @@ bool vsir_instruction_init_with_params(struct vsir_program *program,
     memset(ins->dst, 0, sizeof(*ins->dst) * ins->dst_count);
     memset(ins->src, 0, sizeof(*ins->src) * ins->src_count);
     return true;
+}
+
+static bool vsir_instruction_init_label(struct vkd3d_shader_instruction *ins,
+        const struct vkd3d_shader_location *location, unsigned int label_id, struct vsir_program *program)
+{
+    struct vkd3d_shader_src_param *src_param;
+
+    if (!(src_param = vsir_program_get_src_params(program, 1)))
+        return false;
+
+    vsir_src_param_init_label(src_param, label_id);
+
+    vsir_instruction_init(ins, location, VKD3DSIH_LABEL);
+    ins->src = src_param;
+    ins->src_count = 1;
+
+    return true;
+}
+
+static bool vsir_instruction_is_dcl(const struct vkd3d_shader_instruction *instruction)
+{
+    enum vkd3d_shader_opcode opcode = instruction->opcode;
+    return (VKD3DSIH_DCL <= opcode && opcode <= VKD3DSIH_DCL_VERTICES_OUT)
+            || opcode == VKD3DSIH_HS_DECLS;
+}
+
+static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *ins)
+{
+    struct vkd3d_shader_location location = ins->location;
+
+    vsir_instruction_init(ins, &location, VKD3DSIH_NOP);
 }
 
 static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op, enum vkd3d_data_type data_type,
@@ -838,31 +863,6 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
     }
 
     return VKD3D_OK;
-}
-
-void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
-        enum vkd3d_shader_opcode opcode)
-{
-    memset(ins, 0, sizeof(*ins));
-    ins->location = *location;
-    ins->opcode = opcode;
-}
-
-static bool vsir_instruction_init_label(struct vkd3d_shader_instruction *ins,
-        const struct vkd3d_shader_location *location, unsigned int label_id, struct vsir_program *program)
-{
-    struct vkd3d_shader_src_param *src_param;
-
-    if (!(src_param = vsir_program_get_src_params(program, 1)))
-        return false;
-
-    vsir_src_param_init_label(src_param, label_id);
-
-    vsir_instruction_init(ins, location, VKD3DSIH_LABEL);
-    ins->src = src_param;
-    ins->src_count = 1;
-
-    return true;
 }
 
 static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_program *program,
