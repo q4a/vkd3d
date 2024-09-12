@@ -180,6 +180,15 @@ static void src_param_init_parameter(struct vkd3d_shader_src_param *src, uint32_
     src->reg.idx[0].offset = idx;
 }
 
+static void vsir_src_param_init_resource(struct vkd3d_shader_src_param *src, unsigned int id, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_RESOURCE, VKD3D_DATA_RESOURCE, 2);
+    src->reg.idx[0].offset = id;
+    src->reg.idx[1].offset = idx;
+    src->reg.dimension = VSIR_DIMENSION_VEC4;
+    src->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+}
+
 static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
     vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
@@ -2058,7 +2067,7 @@ static enum vkd3d_result vsir_program_remove_dead_code(struct vsir_program *prog
 static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    unsigned int i;
+    unsigned int idx, i;
 
     for (i = 0; i < program->instructions.count; ++i)
     {
@@ -2068,6 +2077,9 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
         switch (ins->opcode)
         {
             case VKD3DSIH_TEX:
+                VKD3D_ASSERT(ins->src[1].reg.idx_count == 1);
+                VKD3D_ASSERT(!ins->src[1].reg.idx[0].rel_addr);
+
                 if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 3)))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 memset(srcs, 0, sizeof(*srcs) * 3);
@@ -2075,14 +2087,8 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
                 ins->opcode = VKD3DSIH_SAMPLE;
 
                 srcs[0] = ins->src[0];
-
-                srcs[1].reg.type = VKD3DSPR_RESOURCE;
-                srcs[1].reg.idx[0] = ins->src[1].reg.idx[0];
-                srcs[1].reg.idx[1] = ins->src[1].reg.idx[0];
-                srcs[1].reg.idx_count = 2;
-                srcs[1].reg.data_type = VKD3D_DATA_RESOURCE;
-                srcs[1].reg.dimension = VSIR_DIMENSION_VEC4;
-                srcs[1].swizzle = VKD3D_SHADER_NO_SWIZZLE;
+                idx = ins->src[1].reg.idx[0].offset;
+                vsir_src_param_init_resource(&srcs[1], idx, idx);
 
                 srcs[2].reg.type = VKD3DSPR_SAMPLER;
                 srcs[2].reg.idx[0] = ins->src[1].reg.idx[0];
@@ -2095,6 +2101,9 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
                 break;
 
             case VKD3DSIH_TEXLDD:
+                VKD3D_ASSERT(ins->src[1].reg.idx_count == 1);
+                VKD3D_ASSERT(!ins->src[1].reg.idx[0].rel_addr);
+
                 if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 5)))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 memset(srcs, 0, sizeof(*srcs) * 5);
@@ -2102,14 +2111,8 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
                 ins->opcode = VKD3DSIH_SAMPLE_GRAD;
 
                 srcs[0] = ins->src[0];
-
-                srcs[1].reg.type = VKD3DSPR_RESOURCE;
-                srcs[1].reg.idx[0] = ins->src[1].reg.idx[0];
-                srcs[1].reg.idx[1] = ins->src[1].reg.idx[0];
-                srcs[1].reg.idx_count = 2;
-                srcs[1].reg.data_type = VKD3D_DATA_RESOURCE;
-                srcs[1].reg.dimension = VSIR_DIMENSION_VEC4;
-                srcs[1].swizzle = VKD3D_SHADER_NO_SWIZZLE;
+                idx = ins->src[1].reg.idx[0].offset;
+                vsir_src_param_init_resource(&srcs[1], idx, idx);
 
                 srcs[2].reg.type = VKD3DSPR_SAMPLER;
                 srcs[2].reg.idx[0] = ins->src[1].reg.idx[0];
