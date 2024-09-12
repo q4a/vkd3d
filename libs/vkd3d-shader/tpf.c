@@ -629,6 +629,12 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_UINT,
     VKD3D_STAT_EMIT,
     VKD3D_STAT_CUT,
+    VKD3D_STAT_SAMPLE,
+    VKD3D_STAT_SAMPLE_C,
+    VKD3D_STAT_SAMPLE_GRAD,
+    VKD3D_STAT_SAMPLE_BIAS,
+    VKD3D_STAT_LOAD,
+    VKD3D_STAT_STORE,
     VKD3D_STAT_COUNT,
 };
 
@@ -1772,6 +1778,37 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_CUT,         VKD3D_STAT_CUT},
         {VKD3D_SM5_OP_EMIT_STREAM, VKD3D_STAT_EMIT},
         {VKD3D_SM5_OP_CUT_STREAM,  VKD3D_STAT_CUT},
+
+        {VKD3D_SM4_OP_SAMPLE,           VKD3D_STAT_SAMPLE},
+        {VKD3D_SM4_OP_SAMPLE_LOD,       VKD3D_STAT_SAMPLE},
+        {VKD3D_SM5_OP_SAMPLE_LOD_S,     VKD3D_STAT_SAMPLE},
+        {VKD3D_SM5_OP_SAMPLE_CL_S,      VKD3D_STAT_SAMPLE},
+        {VKD3D_SM4_OP_GATHER4,          VKD3D_STAT_SAMPLE},
+        {VKD3D_SM5_OP_GATHER4_PO,       VKD3D_STAT_SAMPLE},
+        {VKD3D_SM4_OP_SAMPLE_C,         VKD3D_STAT_SAMPLE_C},
+        {VKD3D_SM4_OP_SAMPLE_C_LZ,      VKD3D_STAT_SAMPLE_C},
+        {VKD3D_SM5_OP_SAMPLE_C_LZ_S,    VKD3D_STAT_SAMPLE_C},
+        {VKD3D_SM5_OP_SAMPLE_C_CL_S,    VKD3D_STAT_SAMPLE_C},
+        {VKD3D_SM5_OP_GATHER4_C,        VKD3D_STAT_SAMPLE_C},
+        {VKD3D_SM5_OP_GATHER4_PO_C,     VKD3D_STAT_SAMPLE_C},
+        {VKD3D_SM4_OP_SAMPLE_GRAD,      VKD3D_STAT_SAMPLE_GRAD},
+        {VKD3D_SM5_OP_SAMPLE_GRAD_CL_S, VKD3D_STAT_SAMPLE_GRAD},
+        {VKD3D_SM4_OP_SAMPLE_B,         VKD3D_STAT_SAMPLE_BIAS},
+
+        {VKD3D_SM4_OP_LD,              VKD3D_STAT_LOAD},
+        {VKD3D_SM4_OP_LD2DMS,          VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD_UAV_TYPED,    VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD_RAW,          VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD_STRUCTURED,   VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD_S,            VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD2DMS_S,        VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD_UAV_TYPED_S,  VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD_RAW_S,        VKD3D_STAT_LOAD},
+        {VKD3D_SM5_OP_LD_STRUCTURED_S, VKD3D_STAT_LOAD},
+
+        {VKD3D_SM5_OP_STORE_UAV_TYPED, VKD3D_STAT_STORE},
+        {VKD3D_SM5_OP_STORE_RAW,       VKD3D_STAT_STORE},
+        {VKD3D_SM5_OP_STORE_STRUCTURED,VKD3D_STAT_STORE},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -6304,11 +6341,11 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, 0); /* Array instr count */
     put_u32(&buffer, stat->fields[VKD3D_STAT_CUT]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_EMIT]);
-    put_u32(&buffer, 0); /* Texture instructions */
-    put_u32(&buffer, 0); /* Texture load instructions */
-    put_u32(&buffer, 0); /* Texture comparison instructions */
-    put_u32(&buffer, 0); /* Texture bias instructions */
-    put_u32(&buffer, 0); /* Texture gradient instructions */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_SAMPLE]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_LOAD]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_SAMPLE_C]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_SAMPLE_BIAS]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_SAMPLE_GRAD]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_MOV]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_MOVC]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_CONV]);
@@ -6329,7 +6366,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
         put_u32(&buffer, 0); /* Tessellator domain */
         put_u32(&buffer, 0); /* Barrier instructions */
         put_u32(&buffer, 0); /* Interlocked instructions */
-        put_u32(&buffer, 0); /* UAV store instructions */
+        put_u32(&buffer, stat->fields[VKD3D_STAT_STORE]);
     }
 
     add_section(ctx, dxbc, TAG_STAT, &buffer);
