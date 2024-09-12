@@ -620,8 +620,9 @@ enum vkd3d_sm4_shader_data_type
 enum vkd3d_sm4_stat_field
 {
     VKD3D_STAT_UNUSED = 0,
-    VKD3D_STAT_MOV,
     VKD3D_STAT_INSTR_COUNT,
+    VKD3D_STAT_MOV,
+    VKD3D_STAT_CONV,
     VKD3D_STAT_COUNT,
 };
 
@@ -1686,7 +1687,19 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
 
     static const struct vkd3d_sm4_stat_field_info stat_field_table[] =
     {
-        {VKD3D_SM4_OP_MOV, VKD3D_STAT_MOV},
+        {VKD3D_SM4_OP_MOV,      VKD3D_STAT_MOV},
+        {VKD3D_SM4_OP_ITOF,     VKD3D_STAT_CONV},
+        {VKD3D_SM4_OP_FTOI,     VKD3D_STAT_CONV},
+        {VKD3D_SM4_OP_FTOU,     VKD3D_STAT_CONV},
+        {VKD3D_SM4_OP_UTOF,     VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_DTOU,     VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_UTOD,     VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_DTOF,     VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_FTOD,     VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_DTOI,     VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_ITOD,     VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_F32TOF16, VKD3D_STAT_CONV},
+        {VKD3D_SM5_OP_F16TOF32, VKD3D_STAT_CONV},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -6226,7 +6239,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, 0); /* Texture gradient instructions */
     put_u32(&buffer, stat->fields[VKD3D_STAT_MOV]);
     put_u32(&buffer, 0); /* MOVC instructions */
-    put_u32(&buffer, 0); /* Conversion instructions */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_CONV]);
     put_u32(&buffer, 0); /* Bitwise instructions */
     put_u32(&buffer, 0); /* Input primitive */
     put_u32(&buffer, 0); /* GS output topology */
