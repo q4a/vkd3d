@@ -623,6 +623,9 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_INSTR_COUNT,
     VKD3D_STAT_MOV,
     VKD3D_STAT_CONV,
+    VKD3D_STAT_FLOAT,
+    VKD3D_STAT_INT,
+    VKD3D_STAT_UINT,
     VKD3D_STAT_COUNT,
 };
 
@@ -1700,6 +1703,63 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM5_OP_ITOD,     VKD3D_STAT_CONV},
         {VKD3D_SM5_OP_F32TOF16, VKD3D_STAT_CONV},
         {VKD3D_SM5_OP_F16TOF32, VKD3D_STAT_CONV},
+
+        {VKD3D_SM4_OP_ADD,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_DIV,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_DP2,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_DP3,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_DP4,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_EQ,       VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_EXP,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_FRC,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_GE,       VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_LT,       VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_MAD,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_MIN,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_MAX,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_MUL,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_NE,       VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_ROUND_NE, VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_ROUND_NI, VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_ROUND_PI, VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_ROUND_Z,  VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_RSQ,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_SQRT,     VKD3D_STAT_FLOAT},
+        {VKD3D_SM4_OP_SINCOS,   VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_RCP,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DADD,     VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DMAX,     VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DMIN,     VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DMUL,     VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DEQ,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DGE,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DLT,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DNE,      VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DDIV,     VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DFMA,     VKD3D_STAT_FLOAT},
+        {VKD3D_SM5_OP_DRCP,     VKD3D_STAT_FLOAT},
+
+        {VKD3D_SM4_OP_IADD, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_IEQ,  VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_IGE,  VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_ILT,  VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_IMAD, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_IMAX, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_IMIN, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_IMUL, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_INE,  VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_INEG, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_ISHL, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_ISHR, VKD3D_STAT_INT},
+        {VKD3D_SM4_OP_ITOF, VKD3D_STAT_INT},
+
+        {VKD3D_SM4_OP_UDIV, VKD3D_STAT_UINT},
+        {VKD3D_SM4_OP_ULT,  VKD3D_STAT_UINT},
+        {VKD3D_SM4_OP_UGE,  VKD3D_STAT_UINT},
+        {VKD3D_SM4_OP_UMUL, VKD3D_STAT_UINT},
+        {VKD3D_SM4_OP_UMAX, VKD3D_STAT_UINT},
+        {VKD3D_SM4_OP_UMIN, VKD3D_STAT_UINT},
+        {VKD3D_SM4_OP_USHR, VKD3D_STAT_UINT},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -6222,9 +6282,9 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, 0); /* Temp count */
     put_u32(&buffer, 0); /* Def count */
     put_u32(&buffer, 0); /* DCL count */
-    put_u32(&buffer, 0); /* Float instruction count */
-    put_u32(&buffer, 0); /* Int instruction count */
-    put_u32(&buffer, 0); /* Uint instruction count */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_FLOAT]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_INT]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_UINT]);
     put_u32(&buffer, 0); /* Static flow control count */
     put_u32(&buffer, 0); /* Dynamic flow control count */
     put_u32(&buffer, 0); /* Macro instruction count */
