@@ -6197,6 +6197,17 @@ static void vsir_validate_branch(struct validation_context *ctx, const struct vk
     ctx->inside_block = false;
 }
 
+static void vsir_validate_dcl_hs_max_tessfactor(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    /* Exclude non-finite values. */
+    if (!(instruction->declaration.max_tessellation_factor >= 1.0f
+            && instruction->declaration.max_tessellation_factor <= 64.0f))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                "Max tessellation factor %f is invalid.",
+                instruction->declaration.max_tessellation_factor);
+}
+
 static void vsir_validate_dcl_temps(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6433,23 +6444,24 @@ struct vsir_validator_instruction_desc
 
 static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
 {
-    [VKD3DSIH_BRANCH] =            {0, ~0u, vsir_validate_branch},
-    [VKD3DSIH_DCL_TEMPS] =         {0,   0, vsir_validate_dcl_temps},
-    [VKD3DSIH_ELSE] =              {0,   0, vsir_validate_else},
-    [VKD3DSIH_ENDIF] =             {0,   0, vsir_validate_endif},
-    [VKD3DSIH_ENDLOOP] =           {0,   0, vsir_validate_endloop},
-    [VKD3DSIH_ENDREP] =            {0,   0, vsir_validate_endrep},
-    [VKD3DSIH_ENDSWITCH] =         {0,   0, vsir_validate_endswitch},
-    [VKD3DSIH_IF] =                {0,   1, vsir_validate_if},
-    [VKD3DSIH_IFC] =               {0,   2, vsir_validate_ifc},
-    [VKD3DSIH_LABEL] =             {0,   1, vsir_validate_label},
-    [VKD3DSIH_LOOP] =              {0, ~0u, vsir_validate_loop},
-    [VKD3DSIH_NOP] =               {0,   0, vsir_validate_nop},
-    [VKD3DSIH_PHI] =               {1, ~0u, vsir_validate_phi},
-    [VKD3DSIH_REP] =               {0,   1, vsir_validate_rep},
-    [VKD3DSIH_RET] =               {0,   0, vsir_validate_ret},
-    [VKD3DSIH_SWITCH] =            {0,   1, vsir_validate_switch},
-    [VKD3DSIH_SWITCH_MONOLITHIC] = {0, ~0u, vsir_validate_switch_monolithic},
+    [VKD3DSIH_BRANCH] =                {0, ~0u, vsir_validate_branch},
+    [VKD3DSIH_DCL_HS_MAX_TESSFACTOR] = {0,   0, vsir_validate_dcl_hs_max_tessfactor},
+    [VKD3DSIH_DCL_TEMPS] =             {0,   0, vsir_validate_dcl_temps},
+    [VKD3DSIH_ELSE] =                  {0,   0, vsir_validate_else},
+    [VKD3DSIH_ENDIF] =                 {0,   0, vsir_validate_endif},
+    [VKD3DSIH_ENDLOOP] =               {0,   0, vsir_validate_endloop},
+    [VKD3DSIH_ENDREP] =                {0,   0, vsir_validate_endrep},
+    [VKD3DSIH_ENDSWITCH] =             {0,   0, vsir_validate_endswitch},
+    [VKD3DSIH_IF] =                    {0,   1, vsir_validate_if},
+    [VKD3DSIH_IFC] =                   {0,   2, vsir_validate_ifc},
+    [VKD3DSIH_LABEL] =                 {0,   1, vsir_validate_label},
+    [VKD3DSIH_LOOP] =                  {0, ~0u, vsir_validate_loop},
+    [VKD3DSIH_NOP] =                   {0,   0, vsir_validate_nop},
+    [VKD3DSIH_PHI] =                   {1, ~0u, vsir_validate_phi},
+    [VKD3DSIH_REP] =                   {0,   1, vsir_validate_rep},
+    [VKD3DSIH_RET] =                   {0,   0, vsir_validate_ret},
+    [VKD3DSIH_SWITCH] =                {0,   1, vsir_validate_switch},
+    [VKD3DSIH_SWITCH_MONOLITHIC] =     {0, ~0u, vsir_validate_switch_monolithic},
 };
 
 static void vsir_validate_instruction(struct validation_context *ctx)
@@ -6490,14 +6502,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         instruction->opcode);
             ctx->phase = instruction->opcode;
             ctx->dcl_temps_found = false;
-            return;
-
-        case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
-            /* Exclude non-finite values. */
-            if (!(instruction->declaration.max_tessellation_factor >= 1.0f
-                    && instruction->declaration.max_tessellation_factor <= 64.0f))
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION, "Max tessellation factor %f is invalid.",
-                        instruction->declaration.max_tessellation_factor);
             return;
 
         case VKD3DSIH_DCL_INPUT_PRIMITIVE:
