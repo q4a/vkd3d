@@ -593,6 +593,53 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_tex(struct vsir_program *program, struct vkd3d_shader_instruction *tex)
+{
+    unsigned int idx = tex->src[1].reg.idx[0].offset;
+    struct vkd3d_shader_src_param *srcs;
+
+    VKD3D_ASSERT(tex->src[1].reg.idx_count == 1);
+    VKD3D_ASSERT(!tex->src[1].reg.idx[0].rel_addr);
+
+    if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 3)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    srcs[0] = tex->src[0];
+    vsir_src_param_init_resource(&srcs[1], idx, idx);
+    vsir_src_param_init_sampler(&srcs[2], idx, idx);
+
+    tex->opcode = VKD3DSIH_SAMPLE;
+    tex->src = srcs;
+    tex->src_count = 3;
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_program_lower_texldd(struct vsir_program *program,
+        struct vkd3d_shader_instruction *texldd)
+{
+    unsigned int idx = texldd->src[1].reg.idx[0].offset;
+    struct vkd3d_shader_src_param *srcs;
+
+    VKD3D_ASSERT(texldd->src[1].reg.idx_count == 1);
+    VKD3D_ASSERT(!texldd->src[1].reg.idx[0].rel_addr);
+
+    if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 5)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    srcs[0] = texldd->src[0];
+    vsir_src_param_init_resource(&srcs[1], idx, idx);
+    vsir_src_param_init_sampler(&srcs[2], idx, idx);
+    srcs[3] = texldd->src[2];
+    srcs[4] = texldd->src[3];
+
+    texldd->opcode = VKD3DSIH_SAMPLE_GRAD;
+    texldd->src = srcs;
+    texldd->src_count = 5;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
@@ -633,6 +680,38 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 if ((ret = vsir_program_lower_sm1_sincos(program, ins)) < 0)
                     return ret;
                 break;
+
+            case VKD3DSIH_TEX:
+                if ((ret = vsir_program_lower_tex(program, ins)) < 0)
+                    return ret;
+                break;
+
+            case VKD3DSIH_TEXLDD:
+                if ((ret = vsir_program_lower_texldd(program, ins)) < 0)
+                    return ret;
+                break;
+
+            case VKD3DSIH_TEXBEM:
+            case VKD3DSIH_TEXBEML:
+            case VKD3DSIH_TEXCOORD:
+            case VKD3DSIH_TEXDEPTH:
+            case VKD3DSIH_TEXDP3:
+            case VKD3DSIH_TEXDP3TEX:
+            case VKD3DSIH_TEXLDL:
+            case VKD3DSIH_TEXM3x2PAD:
+            case VKD3DSIH_TEXM3x2TEX:
+            case VKD3DSIH_TEXM3x3DIFF:
+            case VKD3DSIH_TEXM3x3PAD:
+            case VKD3DSIH_TEXM3x3SPEC:
+            case VKD3DSIH_TEXM3x3TEX:
+            case VKD3DSIH_TEXM3x3VSPEC:
+            case VKD3DSIH_TEXREG2AR:
+            case VKD3DSIH_TEXREG2GB:
+            case VKD3DSIH_TEXREG2RGB:
+                vkd3d_shader_error(ctx->message_context, &ins->location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                        "Aborting due to unimplemented feature: Combined sampler instruction %#x.",
+                        ins->opcode);
+                return VKD3D_ERROR_NOT_IMPLEMENTED;
 
             default:
                 break;
@@ -2065,88 +2144,6 @@ static enum vkd3d_result vsir_program_remove_dead_code(struct vsir_program *prog
             default:
                 if (dead)
                     vkd3d_shader_instruction_make_nop(ins);
-                break;
-        }
-    }
-
-    return VKD3D_OK;
-}
-
-static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_program *program,
-        struct vsir_transformation_context *ctx)
-{
-    unsigned int idx, i;
-
-    for (i = 0; i < program->instructions.count; ++i)
-    {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-        struct vkd3d_shader_src_param *srcs;
-
-        switch (ins->opcode)
-        {
-            case VKD3DSIH_TEX:
-                VKD3D_ASSERT(ins->src[1].reg.idx_count == 1);
-                VKD3D_ASSERT(!ins->src[1].reg.idx[0].rel_addr);
-
-                if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 3)))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-                memset(srcs, 0, sizeof(*srcs) * 3);
-
-                ins->opcode = VKD3DSIH_SAMPLE;
-
-                srcs[0] = ins->src[0];
-                idx = ins->src[1].reg.idx[0].offset;
-                vsir_src_param_init_resource(&srcs[1], idx, idx);
-                vsir_src_param_init_sampler(&srcs[2], idx, idx);
-                ins->src = srcs;
-                ins->src_count = 3;
-                break;
-
-            case VKD3DSIH_TEXLDD:
-                VKD3D_ASSERT(ins->src[1].reg.idx_count == 1);
-                VKD3D_ASSERT(!ins->src[1].reg.idx[0].rel_addr);
-
-                if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 5)))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-                memset(srcs, 0, sizeof(*srcs) * 5);
-
-                ins->opcode = VKD3DSIH_SAMPLE_GRAD;
-
-                srcs[0] = ins->src[0];
-                idx = ins->src[1].reg.idx[0].offset;
-                vsir_src_param_init_resource(&srcs[1], idx, idx);
-                vsir_src_param_init_sampler(&srcs[2], idx, idx);
-                srcs[3] = ins->src[2];
-                srcs[4] = ins->src[3];
-
-                ins->src = srcs;
-                ins->src_count = 5;
-                break;
-
-            case VKD3DSIH_TEXBEM:
-            case VKD3DSIH_TEXBEML:
-            case VKD3DSIH_TEXCOORD:
-            case VKD3DSIH_TEXDEPTH:
-            case VKD3DSIH_TEXDP3:
-            case VKD3DSIH_TEXDP3TEX:
-            case VKD3DSIH_TEXLDL:
-            case VKD3DSIH_TEXM3x2PAD:
-            case VKD3DSIH_TEXM3x2TEX:
-            case VKD3DSIH_TEXM3x3DIFF:
-            case VKD3DSIH_TEXM3x3PAD:
-            case VKD3DSIH_TEXM3x3SPEC:
-            case VKD3DSIH_TEXM3x3TEX:
-            case VKD3DSIH_TEXM3x3VSPEC:
-            case VKD3DSIH_TEXREG2AR:
-            case VKD3DSIH_TEXREG2GB:
-            case VKD3DSIH_TEXREG2RGB:
-                vkd3d_shader_error(ctx->message_context, &ins->location,
-                        VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                        "Aborting due to not yet implemented feature: "
-                        "Combined sampler instruction %#x.", ins->opcode);
-                return VKD3D_ERROR_NOT_IMPLEMENTED;
-
-            default:
                 break;
         }
     }
@@ -6709,7 +6706,6 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
         vsir_transform(&ctx, vsir_program_normalise_flat_constants);
         vsir_transform(&ctx, vsir_program_remove_dead_code);
-        vsir_transform(&ctx, vsir_program_normalise_combined_samplers);
 
         if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL
                 && compile_info->target_type != VKD3D_SHADER_TARGET_MSL)
