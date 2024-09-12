@@ -6153,6 +6153,21 @@ static void vsir_validator_push_block(struct validation_context *ctx, enum vkd3d
     ctx->blocks[ctx->depth++] = opcode;
 }
 
+static void vsir_validate_hull_shader_phase(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    if (ctx->program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
+                "Phase instruction %#x is only valid in a hull shader.",
+                instruction->opcode);
+    if (ctx->depth != 0)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                "Phase instruction %#x must appear to top level.",
+                instruction->opcode);
+    ctx->phase = instruction->opcode;
+    ctx->dcl_temps_found = false;
+}
+
 static void vsir_validate_branch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     size_t i;
@@ -6519,6 +6534,10 @@ struct vsir_validator_instruction_desc
 static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
 {
     [VKD3DSIH_BRANCH] =                           {0, ~0u, vsir_validate_branch},
+    [VKD3DSIH_HS_CONTROL_POINT_PHASE] =           {0,   0, vsir_validate_hull_shader_phase},
+    [VKD3DSIH_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
+    [VKD3DSIH_HS_FORK_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
+    [VKD3DSIH_HS_JOIN_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_DCL_GS_INSTANCES] =                 {0,   0, vsir_validate_dcl_gs_instances},
     [VKD3DSIH_DCL_HS_MAX_TESSFACTOR] =            {0,   0, vsir_validate_dcl_hs_max_tessfactor},
     [VKD3DSIH_DCL_INPUT_PRIMITIVE] =              {0,   0, vsir_validate_dcl_input_primitive},
@@ -6566,36 +6585,25 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 instruction->opcode);
     }
 
-    switch (instruction->opcode)
+    if (version->type == VKD3D_SHADER_TYPE_HULL && ctx->phase == VKD3DSIH_INVALID)
     {
-        case VKD3DSIH_HS_DECLS:
-        case VKD3DSIH_HS_CONTROL_POINT_PHASE:
-        case VKD3DSIH_HS_FORK_PHASE:
-        case VKD3DSIH_HS_JOIN_PHASE:
-            vsir_validate_dst_count(ctx, instruction, 0);
-            vsir_validate_src_count(ctx, instruction, 0);
-            if (version->type != VKD3D_SHADER_TYPE_HULL)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
-                        "Phase instruction %#x is only valid in a hull shader.",
-                        instruction->opcode);
-            if (ctx->depth != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
-                        "Phase instruction %#x must appear to top level.",
-                        instruction->opcode);
-            ctx->phase = instruction->opcode;
-            ctx->dcl_temps_found = false;
-            return;
+        switch (instruction->opcode)
+        {
+            case VKD3DSIH_NOP:
+            case VKD3DSIH_HS_DECLS:
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                break;
 
-        default:
-            break;
+            default:
+                if (!vsir_instruction_is_dcl(instruction))
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
+                            "Instruction %#x appear before any phase instruction in a hull shader.",
+                            instruction->opcode);
+                break;
+        }
     }
-
-    /* Only DCL instructions may occur outside hull shader phases. */
-    if (!vsir_instruction_is_dcl(instruction) && version->type == VKD3D_SHADER_TYPE_HULL
-            && ctx->phase == VKD3DSIH_INVALID)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
-                "Instruction %#x appear before any phase instruction in a hull shader.",
-                instruction->opcode);
 
     if (ctx->program->cf_type == VSIR_CF_BLOCKS && !ctx->inside_block)
     {
@@ -6603,6 +6611,10 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         {
             case VKD3DSIH_NOP:
             case VKD3DSIH_LABEL:
+            case VKD3DSIH_HS_DECLS:
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
                 break;
 
             default:
