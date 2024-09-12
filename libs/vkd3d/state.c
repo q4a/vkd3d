@@ -1266,8 +1266,8 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
                 ++cur_binding;
             }
 
-            table->ranges[j].vk_binding_count = table->ranges[j].descriptor_count;
-            table->ranges[j].binding = vk_binding;
+            range->vk_binding_count = range->descriptor_count;
+            range->binding = vk_binding;
 
             context->current_binding = cur_binding;
         }
