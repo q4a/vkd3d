@@ -189,6 +189,14 @@ static void vsir_src_param_init_resource(struct vkd3d_shader_src_param *src, uns
     src->swizzle = VKD3D_SHADER_NO_SWIZZLE;
 }
 
+static void vsir_src_param_init_sampler(struct vkd3d_shader_src_param *src, unsigned int id, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_SAMPLER, VKD3D_DATA_SAMPLER, 2);
+    src->reg.idx[0].offset = id;
+    src->reg.idx[1].offset = idx;
+    src->reg.dimension = VSIR_DIMENSION_NONE;
+}
+
 static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
     vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
@@ -2089,13 +2097,7 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
                 srcs[0] = ins->src[0];
                 idx = ins->src[1].reg.idx[0].offset;
                 vsir_src_param_init_resource(&srcs[1], idx, idx);
-
-                srcs[2].reg.type = VKD3DSPR_SAMPLER;
-                srcs[2].reg.idx[0] = ins->src[1].reg.idx[0];
-                srcs[2].reg.idx[1] = ins->src[1].reg.idx[0];
-                srcs[2].reg.idx_count = 2;
-                srcs[2].reg.data_type = VKD3D_DATA_SAMPLER;
-
+                vsir_src_param_init_sampler(&srcs[2], idx, idx);
                 ins->src = srcs;
                 ins->src_count = 3;
                 break;
@@ -2113,13 +2115,7 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
                 srcs[0] = ins->src[0];
                 idx = ins->src[1].reg.idx[0].offset;
                 vsir_src_param_init_resource(&srcs[1], idx, idx);
-
-                srcs[2].reg.type = VKD3DSPR_SAMPLER;
-                srcs[2].reg.idx[0] = ins->src[1].reg.idx[0];
-                srcs[2].reg.idx[1] = ins->src[1].reg.idx[0];
-                srcs[2].reg.idx_count = 2;
-                srcs[2].reg.data_type = VKD3D_DATA_SAMPLER;
-
+                vsir_src_param_init_sampler(&srcs[2], idx, idx);
                 srcs[3] = ins->src[2];
                 srcs[4] = ins->src[3];
 
