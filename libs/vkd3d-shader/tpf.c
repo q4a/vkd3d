@@ -622,6 +622,7 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_UNUSED = 0,
     VKD3D_STAT_INSTR_COUNT,
     VKD3D_STAT_MOV,
+    VKD3D_STAT_MOVC,
     VKD3D_STAT_CONV,
     VKD3D_STAT_FLOAT,
     VKD3D_STAT_INT,
@@ -1693,6 +1694,10 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
     static const struct vkd3d_sm4_stat_field_info stat_field_table[] =
     {
         {VKD3D_SM4_OP_MOV,      VKD3D_STAT_MOV},
+        {VKD3D_SM4_OP_MOVC,     VKD3D_STAT_MOVC},
+        {VKD3D_SM5_OP_DMOV,     VKD3D_STAT_MOV},
+        {VKD3D_SM5_OP_DMOVC,    VKD3D_STAT_MOVC},
+
         {VKD3D_SM4_OP_ITOF,     VKD3D_STAT_CONV},
         {VKD3D_SM4_OP_FTOI,     VKD3D_STAT_CONV},
         {VKD3D_SM4_OP_FTOU,     VKD3D_STAT_CONV},
@@ -6305,7 +6310,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, 0); /* Texture bias instructions */
     put_u32(&buffer, 0); /* Texture gradient instructions */
     put_u32(&buffer, stat->fields[VKD3D_STAT_MOV]);
-    put_u32(&buffer, 0); /* MOVC instructions */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_MOVC]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_CONV]);
     put_u32(&buffer, 0); /* Bitwise instructions */
     put_u32(&buffer, 0); /* Input primitive */
