@@ -626,6 +626,8 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_FLOAT,
     VKD3D_STAT_INT,
     VKD3D_STAT_UINT,
+    VKD3D_STAT_EMIT,
+    VKD3D_STAT_CUT,
     VKD3D_STAT_COUNT,
 };
 
@@ -1760,6 +1762,11 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_UMAX, VKD3D_STAT_UINT},
         {VKD3D_SM4_OP_UMIN, VKD3D_STAT_UINT},
         {VKD3D_SM4_OP_USHR, VKD3D_STAT_UINT},
+
+        {VKD3D_SM4_OP_EMIT,        VKD3D_STAT_EMIT},
+        {VKD3D_SM4_OP_CUT,         VKD3D_STAT_CUT},
+        {VKD3D_SM5_OP_EMIT_STREAM, VKD3D_STAT_EMIT},
+        {VKD3D_SM5_OP_CUT_STREAM,  VKD3D_STAT_CUT},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -6290,8 +6297,8 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, 0); /* Macro instruction count */
     put_u32(&buffer, 0); /* Temp array count */
     put_u32(&buffer, 0); /* Array instr count */
-    put_u32(&buffer, 0); /* Cut instr count */
-    put_u32(&buffer, 0); /* Emit instr count */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_CUT]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_EMIT]);
     put_u32(&buffer, 0); /* Texture instructions */
     put_u32(&buffer, 0); /* Texture load instructions */
     put_u32(&buffer, 0); /* Texture comparison instructions */
