@@ -6256,6 +6256,15 @@ static void vsir_validate_dcl_temps(struct validation_context *ctx,
     ctx->dcl_temps_found = true;
 }
 
+static void vsir_validate_dcl_tessellator_domain(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    if (instruction->declaration.tessellator_domain == VKD3D_TESSELLATOR_DOMAIN_INVALID
+            || instruction->declaration.tessellator_domain >= VKD3D_TESSELLATOR_DOMAIN_COUNT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                "Tessellator domain %#x is invalid.", instruction->declaration.tessellator_domain);
+}
+
 static void vsir_validate_dcl_vertices_out(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6494,6 +6503,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT] = {0,   0, vsir_validate_dcl_output_control_point_count},
     [VKD3DSIH_DCL_OUTPUT_TOPOLOGY] =            {0,   0, vsir_validate_dcl_output_topology},
     [VKD3DSIH_DCL_TEMPS] =                      {0,   0, vsir_validate_dcl_temps},
+    [VKD3DSIH_DCL_TESSELLATOR_DOMAIN] =         {0,   0, vsir_validate_dcl_tessellator_domain},
     [VKD3DSIH_DCL_VERTICES_OUT] =               {0,   0, vsir_validate_dcl_vertices_out},
     [VKD3DSIH_ELSE] =                           {0,   0, vsir_validate_else},
     [VKD3DSIH_ENDIF] =                          {0,   0, vsir_validate_endif},
@@ -6550,13 +6560,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         instruction->opcode);
             ctx->phase = instruction->opcode;
             ctx->dcl_temps_found = false;
-            return;
-
-        case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
-            if (instruction->declaration.tessellator_domain == VKD3D_TESSELLATOR_DOMAIN_INVALID
-                    || instruction->declaration.tessellator_domain >= VKD3D_TESSELLATOR_DOMAIN_COUNT)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
-                        "Tessellator domain %#x is invalid.", instruction->declaration.tessellator_domain);
             return;
 
         case VKD3DSIH_DCL_TESSELLATOR_OUTPUT_PRIMITIVE:
