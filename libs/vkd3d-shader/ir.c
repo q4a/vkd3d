@@ -127,6 +127,27 @@ const struct vkd3d_shader_parameter1 *vsir_program_get_parameter(
     return NULL;
 }
 
+void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count)
+{
+    reg->type = reg_type;
+    reg->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
+    reg->non_uniform = false;
+    reg->data_type = data_type;
+    reg->idx[0].offset = ~0u;
+    reg->idx[0].rel_addr = NULL;
+    reg->idx[0].is_in_bounds = false;
+    reg->idx[1].offset = ~0u;
+    reg->idx[1].rel_addr = NULL;
+    reg->idx[1].is_in_bounds = false;
+    reg->idx[2].offset = ~0u;
+    reg->idx[2].rel_addr = NULL;
+    reg->idx[2].is_in_bounds = false;
+    reg->idx_count = idx_count;
+    reg->dimension = VSIR_DIMENSION_SCALAR;
+    reg->alignment = 0;
+}
+
 static inline bool shader_register_is_phase_instance_id(const struct vkd3d_shader_register *reg)
 {
     return reg->type == VKD3DSPR_FORKINSTID || reg->type == VKD3DSPR_JOININSTID;
@@ -144,6 +165,57 @@ static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *i
     struct vkd3d_shader_location location = ins->location;
 
     vsir_instruction_init(ins, &location, VKD3DSIH_NOP);
+}
+
+void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count)
+{
+    vsir_register_init(&param->reg, reg_type, data_type, idx_count);
+    param->swizzle = 0;
+    param->modifiers = VKD3DSPSM_NONE;
+}
+
+static void src_param_init_const_uint(struct vkd3d_shader_src_param *src, uint32_t value)
+{
+    vsir_src_param_init(src, VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
+    src->reg.u.immconst_u32[0] = value;
+}
+
+void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
+{
+    vsir_src_param_init(param, VKD3DSPR_LABEL, VKD3D_DATA_UNUSED, 1);
+    param->reg.dimension = VSIR_DIMENSION_NONE;
+    param->reg.idx[0].offset = label_id;
+}
+
+static void src_param_init_parameter(struct vkd3d_shader_src_param *src, uint32_t idx, enum vkd3d_data_type type)
+{
+    vsir_src_param_init(src, VKD3DSPR_PARAMETER, type, 1);
+    src->reg.idx[0].offset = idx;
+}
+
+static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
+    src->reg.idx[0].offset = idx;
+}
+
+static void src_param_init_temp_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
+    src->reg.idx[0].offset = idx;
+}
+
+static void src_param_init_temp_float(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    src->reg.idx[0].offset = idx;
+}
+
+static void src_param_init_temp_uint(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+    src->reg.idx[0].offset = idx;
 }
 
 bool vsir_instruction_init_with_params(struct vsir_program *program,
@@ -740,35 +812,6 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
     return VKD3D_OK;
 }
 
-void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
-        enum vkd3d_data_type data_type, unsigned int idx_count)
-{
-    reg->type = reg_type;
-    reg->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
-    reg->non_uniform = false;
-    reg->data_type = data_type;
-    reg->idx[0].offset = ~0u;
-    reg->idx[0].rel_addr = NULL;
-    reg->idx[0].is_in_bounds = false;
-    reg->idx[1].offset = ~0u;
-    reg->idx[1].rel_addr = NULL;
-    reg->idx[1].is_in_bounds = false;
-    reg->idx[2].offset = ~0u;
-    reg->idx[2].rel_addr = NULL;
-    reg->idx[2].is_in_bounds = false;
-    reg->idx_count = idx_count;
-    reg->dimension = VSIR_DIMENSION_SCALAR;
-    reg->alignment = 0;
-}
-
-void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d_shader_register_type reg_type,
-        enum vkd3d_data_type data_type, unsigned int idx_count)
-{
-    vsir_register_init(&param->reg, reg_type, data_type, idx_count);
-    param->swizzle = 0;
-    param->modifiers = VKD3DSPSM_NONE;
-}
-
 void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count)
 {
@@ -776,25 +819,6 @@ void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader
     param->write_mask = VKD3DSP_WRITEMASK_0;
     param->modifiers = VKD3DSPDM_NONE;
     param->shift = 0;
-}
-
-void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
-{
-    vsir_src_param_init(param, VKD3DSPR_LABEL, VKD3D_DATA_UNUSED, 1);
-    param->reg.dimension = VSIR_DIMENSION_NONE;
-    param->reg.idx[0].offset = label_id;
-}
-
-static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
-{
-    vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
-    src->reg.idx[0].offset = idx;
-}
-
-static void src_param_init_temp_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
-{
-    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
-    src->reg.idx[0].offset = idx;
 }
 
 static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
@@ -814,30 +838,6 @@ static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigne
     vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
     dst->reg.idx[0].offset = idx;
     dst->write_mask = VKD3DSP_WRITEMASK_0;
-}
-
-static void src_param_init_temp_float(struct vkd3d_shader_src_param *src, unsigned int idx)
-{
-    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
-    src->reg.idx[0].offset = idx;
-}
-
-static void src_param_init_temp_uint(struct vkd3d_shader_src_param *src, unsigned int idx)
-{
-    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
-    src->reg.idx[0].offset = idx;
-}
-
-static void src_param_init_const_uint(struct vkd3d_shader_src_param *src, uint32_t value)
-{
-    vsir_src_param_init(src, VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
-    src->reg.u.immconst_u32[0] = value;
-}
-
-static void src_param_init_parameter(struct vkd3d_shader_src_param *src, uint32_t idx, enum vkd3d_data_type type)
-{
-    vsir_src_param_init(src, VKD3DSPR_PARAMETER, type, 1);
-    src->reg.idx[0].offset = idx;
 }
 
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
