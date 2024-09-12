@@ -2795,7 +2795,7 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             /* We use separate bindings for buffer and texture SRVs/UAVs.
              * See d3d12_root_signature_init(). For unbounded ranges the
              * descriptors exist in two consecutive sets, otherwise they occur
-             * in pairs in one set. */
+             * as consecutive ranges within a set. */
             if (range->descriptor_count == UINT_MAX)
             {
                 if (vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
@@ -2807,11 +2807,9 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             }
             else
             {
-                if (!use_array)
-                    vk_descriptor_write->dstBinding = vk_binding + 2 * index;
                 if (vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
                         && vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
-                    ++vk_descriptor_write->dstBinding;
+                    vk_descriptor_write->dstBinding += use_array ? 1 : range->descriptor_count;
             }
 
             if (vk_descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER

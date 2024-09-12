@@ -930,10 +930,16 @@ static HRESULT d3d12_root_signature_init_descriptor_table_binding(struct d3d12_r
                 register_space, range->base_register_idx + i, is_buffer, shader_visibility,
                 vk_binding_array_count, context, NULL, NULL)))
             return hr;
+    }
 
-        if (descriptor_type != VKD3D_SHADER_DESCRIPTOR_TYPE_SRV && descriptor_type != VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
-            continue;
+    if (descriptor_type != VKD3D_SHADER_DESCRIPTOR_TYPE_SRV && descriptor_type != VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
+    {
+        context->unbounded_offset = UINT_MAX;
+        return S_OK;
+    }
 
+    for (i = 0; i < bindings_per_range; ++i)
+    {
         if (FAILED(hr = d3d12_root_signature_append_vk_binding(root_signature, descriptor_type,
                 register_space, range->base_register_idx + i, false, shader_visibility,
                 vk_binding_array_count, context, NULL, NULL)))
