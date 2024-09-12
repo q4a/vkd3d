@@ -6197,6 +6197,14 @@ static void vsir_validate_branch(struct validation_context *ctx, const struct vk
     ctx->inside_block = false;
 }
 
+static void vsir_validate_dcl_gs_instances(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    if (!instruction->declaration.count || instruction->declaration.count > 32)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS instance count %u is invalid.",
+                instruction->declaration.count);
+}
+
 static void vsir_validate_dcl_hs_max_tessfactor(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6471,6 +6479,7 @@ struct vsir_validator_instruction_desc
 static const struct vsir_validator_instruction_desc vsir_validator_instructions[] =
 {
     [VKD3DSIH_BRANCH] =                {0, ~0u, vsir_validate_branch},
+    [VKD3DSIH_DCL_GS_INSTANCES] =      {0,   0, vsir_validate_dcl_gs_instances},
     [VKD3DSIH_DCL_HS_MAX_TESSFACTOR] = {0,   0, vsir_validate_dcl_hs_max_tessfactor},
     [VKD3DSIH_DCL_INPUT_PRIMITIVE] =   {0,   0, vsir_validate_dcl_input_primitive},
     [VKD3DSIH_DCL_OUTPUT_TOPOLOGY] =   {0,   0, vsir_validate_dcl_output_topology},
@@ -6531,12 +6540,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         instruction->opcode);
             ctx->phase = instruction->opcode;
             ctx->dcl_temps_found = false;
-            return;
-
-        case VKD3DSIH_DCL_GS_INSTANCES:
-            if (!instruction->declaration.count || instruction->declaration.count > 32)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS instance count %u is invalid.",
-                        instruction->declaration.count);
             return;
 
         case VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT:
