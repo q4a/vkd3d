@@ -218,6 +218,34 @@ static void src_param_init_temp_uint(struct vkd3d_shader_src_param *src, unsigne
     src->reg.idx[0].offset = idx;
 }
 
+void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count)
+{
+    vsir_register_init(&param->reg, reg_type, data_type, idx_count);
+    param->write_mask = VKD3DSP_WRITEMASK_0;
+    param->modifiers = VKD3DSPDM_NONE;
+    param->shift = 0;
+}
+
+static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
+    dst->reg.idx[0].offset = idx;
+}
+
+static void dst_param_init_temp_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
+    dst->reg.idx[0].offset = idx;
+}
+
+static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigned int idx)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+    dst->reg.idx[0].offset = idx;
+    dst->write_mask = VKD3DSP_WRITEMASK_0;
+}
+
 bool vsir_instruction_init_with_params(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode opcode, unsigned int dst_count, unsigned int src_count)
@@ -810,34 +838,6 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
     }
 
     return VKD3D_OK;
-}
-
-void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader_register_type reg_type,
-        enum vkd3d_data_type data_type, unsigned int idx_count)
-{
-    vsir_register_init(&param->reg, reg_type, data_type, idx_count);
-    param->write_mask = VKD3DSP_WRITEMASK_0;
-    param->modifiers = VKD3DSPDM_NONE;
-    param->shift = 0;
-}
-
-static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
-{
-    vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
-    dst->reg.idx[0].offset = idx;
-}
-
-static void dst_param_init_temp_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
-{
-    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
-    dst->reg.idx[0].offset = idx;
-}
-
-static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigned int idx)
-{
-    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
-    dst->reg.idx[0].offset = idx;
-    dst->write_mask = VKD3DSP_WRITEMASK_0;
 }
 
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
