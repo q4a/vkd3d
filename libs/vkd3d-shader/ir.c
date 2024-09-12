@@ -6208,6 +6208,15 @@ static void vsir_validate_dcl_hs_max_tessfactor(struct validation_context *ctx,
                 instruction->declaration.max_tessellation_factor);
 }
 
+static void vsir_validate_dcl_input_primitive(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    if (instruction->declaration.primitive_type.type == VKD3D_PT_UNDEFINED
+            || instruction->declaration.primitive_type.type >= VKD3D_PT_COUNT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS input primitive %u is invalid.",
+                instruction->declaration.primitive_type.type);
+}
+
 static void vsir_validate_dcl_temps(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6446,6 +6455,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
 {
     [VKD3DSIH_BRANCH] =                {0, ~0u, vsir_validate_branch},
     [VKD3DSIH_DCL_HS_MAX_TESSFACTOR] = {0,   0, vsir_validate_dcl_hs_max_tessfactor},
+    [VKD3DSIH_DCL_INPUT_PRIMITIVE] =   {0,   0, vsir_validate_dcl_input_primitive},
     [VKD3DSIH_DCL_TEMPS] =             {0,   0, vsir_validate_dcl_temps},
     [VKD3DSIH_ELSE] =                  {0,   0, vsir_validate_else},
     [VKD3DSIH_ENDIF] =                 {0,   0, vsir_validate_endif},
@@ -6502,13 +6512,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         instruction->opcode);
             ctx->phase = instruction->opcode;
             ctx->dcl_temps_found = false;
-            return;
-
-        case VKD3DSIH_DCL_INPUT_PRIMITIVE:
-            if (instruction->declaration.primitive_type.type == VKD3D_PT_UNDEFINED
-                    || instruction->declaration.primitive_type.type >= VKD3D_PT_COUNT)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS input primitive %u is invalid.",
-                        instruction->declaration.primitive_type.type);
             return;
 
         case VKD3DSIH_DCL_VERTICES_OUT:
