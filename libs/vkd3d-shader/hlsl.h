@@ -661,6 +661,7 @@ struct hlsl_ir_switch
 
 enum hlsl_ir_expr_op
 {
+    HLSL_OP0_ERROR,
     HLSL_OP0_VOID,
     HLSL_OP0_RASTERIZER_SAMPLE_COUNT,
 
@@ -1049,6 +1050,9 @@ struct hlsl_ctx
         struct hlsl_type *null;
         struct hlsl_type *error;
     } builtin_types;
+
+    /* Pre-allocated "error" expression. */
+    struct hlsl_ir_node *error_instr;
 
     /* List of the instruction nodes for initializing static variables. */
     struct hlsl_block static_initializers;

@@ -1635,6 +1635,16 @@ struct hlsl_ir_node *hlsl_new_ternary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_ex
     return hlsl_new_expr(ctx, op, operands, arg1->data_type, &arg1->loc);
 }
 
+static struct hlsl_ir_node *hlsl_new_error_expr(struct hlsl_ctx *ctx)
+{
+    static const struct vkd3d_shader_location loc = {.source_name = "<error>"};
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+
+    /* Use a dummy location; we should never report any messages related to
+     * this expression. */
+    return hlsl_new_expr(ctx, HLSL_OP0_ERROR, operands, ctx->builtin_types.error, &loc);
+}
+
 struct hlsl_ir_node *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition,
         struct hlsl_block *then_block, struct hlsl_block *else_block, const struct vkd3d_shader_location *loc)
 {
@@ -3059,6 +3069,7 @@ const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
 {
     static const char *const op_names[] =
     {
+        [HLSL_OP0_ERROR]        = "error",
         [HLSL_OP0_VOID]         = "void",
         [HLSL_OP0_RASTERIZER_SAMPLE_COUNT] = "GetRenderTargetSampleCount",
 
@@ -4278,6 +4289,10 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
                 break;
         }
     }
+
+    if (!(ctx->error_instr = hlsl_new_error_expr(ctx)))
+        return false;
+    hlsl_block_add_instr(&ctx->static_initializers, ctx->error_instr);
 
     ctx->domain = VKD3D_TESSELLATOR_DOMAIN_INVALID;
     ctx->output_control_point_count = UINT_MAX;

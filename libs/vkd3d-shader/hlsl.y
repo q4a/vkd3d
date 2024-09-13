@@ -1756,7 +1756,11 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_type *common_type;
 
-    common_type = get_common_numeric_type(ctx, arg1, arg2, loc);
+    if (!(common_type = get_common_numeric_type(ctx, arg1, arg2, loc)))
+    {
+        block->value = ctx->error_instr;
+        return block->value;
+    }
 
     if (!(args[0] = add_implicit_conversion(ctx, block, arg1, common_type, loc)))
         return NULL;
