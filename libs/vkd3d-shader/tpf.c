@@ -639,6 +639,7 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_DCL_INPUT_PRIMITIVE,
     VKD3D_STAT_DCL_OUTPUT_TOPOLOGY,
     VKD3D_STAT_DCL_GS_INSTANCES,
+    VKD3D_STAT_BITWISE,
     VKD3D_STAT_COUNT,
 };
 
@@ -1818,6 +1819,11 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_DCL_INPUT_PRIMITIVE, VKD3D_STAT_DCL_INPUT_PRIMITIVE},
         {VKD3D_SM4_OP_DCL_OUTPUT_TOPOLOGY, VKD3D_STAT_DCL_OUTPUT_TOPOLOGY},
         {VKD3D_SM5_OP_DCL_GS_INSTANCES,    VKD3D_STAT_DCL_GS_INSTANCES},
+
+        {VKD3D_SM4_OP_AND, VKD3D_STAT_BITWISE},
+        {VKD3D_SM4_OP_NOT, VKD3D_STAT_BITWISE},
+        {VKD3D_SM4_OP_OR,  VKD3D_STAT_BITWISE},
+        {VKD3D_SM4_OP_XOR, VKD3D_STAT_BITWISE},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -6372,7 +6378,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, stat->fields[VKD3D_STAT_MOV]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_MOVC]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_CONV]);
-    put_u32(&buffer, 0); /* Bitwise instructions */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_BITWISE]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_INPUT_PRIMITIVE]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_OUTPUT_TOPOLOGY]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_VERTICES_OUT]);
