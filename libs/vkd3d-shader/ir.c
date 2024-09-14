@@ -9284,29 +9284,58 @@ static void vsir_validate_hull_shader_phase(struct validation_context *ctx,
     ctx->dcl_temps_found = false;
 }
 
-static void vsir_validate_float_elementwise_operation(struct validation_context *ctx,
-        const struct vkd3d_shader_instruction *instruction)
+static void vsir_validate_elementwise_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction, const bool types[VKD3D_DATA_COUNT])
 {
+    enum vkd3d_data_type dst_data_type;
     unsigned int i;
 
     if (instruction->dst_count < 1)
         return;
 
-    if (instruction->dst[0].reg.data_type != VKD3D_DATA_FLOAT)
+    dst_data_type = instruction->dst[0].reg.data_type;
+
+    if (dst_data_type >= VKD3D_DATA_COUNT)
+        return;
+
+    if (!types[dst_data_type])
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                 "Invalid data type %#x for elementwise operation \"%s\" (%#x).",
-                instruction->dst[0].reg.data_type,
-                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+                dst_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
 
     for (i = 0; i < instruction->src_count; ++i)
     {
-        if (instruction->src[i].reg.data_type != instruction->dst[0].reg.data_type)
+        if (instruction->src[i].reg.data_type != dst_data_type)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                     "Data type %#x for operand %u doesn't match the destination data type %#x "
                     "for elementwise operation \"%s\" (%#x).",
-                    instruction->src[i].reg.data_type, i, instruction->dst[0].reg.data_type,
+                    instruction->src[i].reg.data_type, i, dst_data_type,
                     vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
     }
+}
+
+static void vsir_validate_float_elementwise_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_FLOAT] = true,
+    };
+
+    vsir_validate_elementwise_operation(ctx, instruction, types);
+}
+
+static void vsir_validate_logic_elementwise_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_UINT] = true,
+        [VKD3D_DATA_UINT64] = true,
+        [VKD3D_DATA_BOOL] = true,
+    };
+
+    vsir_validate_elementwise_operation(ctx, instruction, types);
 }
 
 static void vsir_validate_branch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
@@ -9997,6 +10026,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_ABS] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VKD3DSIH_ACOS] =                             {1,   1, vsir_validate_float_elementwise_operation},
     [VKD3DSIH_ADD] =                              {1,   2, vsir_validate_float_elementwise_operation},
+    [VKD3DSIH_AND] =                              {1,   2, vsir_validate_logic_elementwise_operation},
     [VKD3DSIH_BRANCH] =                           {0, ~0u, vsir_validate_branch},
     [VKD3DSIH_HS_CONTROL_POINT_PHASE] =           {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
