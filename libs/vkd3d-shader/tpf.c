@@ -640,6 +640,7 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_DCL_OUTPUT_TOPOLOGY,
     VKD3D_STAT_DCL_GS_INSTANCES,
     VKD3D_STAT_BITWISE,
+    VKD3D_STAT_ATOMIC,
     VKD3D_STAT_COUNT,
 };
 
@@ -1824,6 +1825,28 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_NOT, VKD3D_STAT_BITWISE},
         {VKD3D_SM4_OP_OR,  VKD3D_STAT_BITWISE},
         {VKD3D_SM4_OP_XOR, VKD3D_STAT_BITWISE},
+
+        {VKD3D_SM5_OP_ATOMIC_AND,          VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_OR,           VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_XOR,          VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_CMP_STORE,    VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_IADD,         VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_IMAX,         VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_IMIN,         VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_UMAX,         VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_ATOMIC_UMIN,         VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_ALLOC,    VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_CONSUME,  VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_IADD,     VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_AND,      VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_OR,       VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_XOR,      VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_EXCH,     VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_CMP_EXCH, VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_IMAX,     VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_IMIN,     VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_UMAX,     VKD3D_STAT_ATOMIC},
+        {VKD3D_SM5_OP_IMM_ATOMIC_UMIN,     VKD3D_STAT_ATOMIC},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -6394,7 +6417,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
         put_u32(&buffer, 0); /* HS partitioning */
         put_u32(&buffer, 0); /* Tessellator domain */
         put_u32(&buffer, 0); /* Barrier instructions */
-        put_u32(&buffer, 0); /* Interlocked instructions */
+        put_u32(&buffer, stat->fields[VKD3D_STAT_ATOMIC]);
         put_u32(&buffer, stat->fields[VKD3D_STAT_STORE]);
     }
 
