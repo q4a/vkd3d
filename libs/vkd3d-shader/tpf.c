@@ -635,6 +635,10 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_SAMPLE_BIAS,
     VKD3D_STAT_LOAD,
     VKD3D_STAT_STORE,
+    VKD3D_STAT_DCL_VERTICES_OUT,
+    VKD3D_STAT_DCL_INPUT_PRIMITIVE,
+    VKD3D_STAT_DCL_OUTPUT_TOPOLOGY,
+    VKD3D_STAT_DCL_GS_INSTANCES,
     VKD3D_STAT_COUNT,
 };
 
@@ -1809,6 +1813,11 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM5_OP_STORE_UAV_TYPED, VKD3D_STAT_STORE},
         {VKD3D_SM5_OP_STORE_RAW,       VKD3D_STAT_STORE},
         {VKD3D_SM5_OP_STORE_STRUCTURED,VKD3D_STAT_STORE},
+
+        {VKD3D_SM4_OP_DCL_VERTICES_OUT,    VKD3D_STAT_DCL_VERTICES_OUT},
+        {VKD3D_SM4_OP_DCL_INPUT_PRIMITIVE, VKD3D_STAT_DCL_INPUT_PRIMITIVE},
+        {VKD3D_SM4_OP_DCL_OUTPUT_TOPOLOGY, VKD3D_STAT_DCL_OUTPUT_TOPOLOGY},
+        {VKD3D_SM5_OP_DCL_GS_INSTANCES,    VKD3D_STAT_DCL_GS_INSTANCES},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -4392,7 +4401,21 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
     ++tpf->stat->fields[VKD3D_STAT_INSTR_COUNT];
 
     stat_field = get_stat_field_from_sm4_opcode(&tpf->lookup, instr->opcode & VKD3D_SM4_OPCODE_MASK);
-    ++tpf->stat->fields[stat_field];
+
+    switch (instr->opcode & VKD3D_SM4_OPCODE_MASK)
+    {
+        case VKD3D_SM4_OP_DCL_OUTPUT_TOPOLOGY:
+        case VKD3D_SM4_OP_DCL_INPUT_PRIMITIVE:
+            tpf->stat->fields[stat_field] = (instr->opcode & VKD3D_SM4_PRIMITIVE_TYPE_MASK)
+                    >> VKD3D_SM4_PRIMITIVE_TYPE_SHIFT;
+            break;
+        case VKD3D_SM4_OP_DCL_VERTICES_OUT:
+        case VKD3D_SM5_OP_DCL_GS_INSTANCES:
+            tpf->stat->fields[stat_field] = instr->idx[0];
+            break;
+        default:
+            ++tpf->stat->fields[stat_field];
+    }
 }
 
 static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
@@ -6350,16 +6373,16 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, stat->fields[VKD3D_STAT_MOVC]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_CONV]);
     put_u32(&buffer, 0); /* Bitwise instructions */
-    put_u32(&buffer, 0); /* Input primitive */
-    put_u32(&buffer, 0); /* GS output topology */
-    put_u32(&buffer, 0); /* GS max output vertex count */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_INPUT_PRIMITIVE]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_OUTPUT_TOPOLOGY]);
+    put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_VERTICES_OUT]);
     put_u32(&buffer, 0); /* Unknown */
     put_u32(&buffer, 0); /* Unknown */
     put_u32(&buffer, 0); /* Sample frequency */
 
     if (hlsl_version_ge(ctx, 5, 0))
     {
-        put_u32(&buffer, 0); /* GS instance count */
+        put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_GS_INSTANCES]);
         put_u32(&buffer, 0); /* Control point count */
         put_u32(&buffer, 0); /* HS output primitive */
         put_u32(&buffer, 0); /* HS partitioning */
