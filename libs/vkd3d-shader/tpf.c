@@ -641,6 +641,10 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_DCL_GS_INSTANCES,
     VKD3D_STAT_BITWISE,
     VKD3D_STAT_ATOMIC,
+    VKD3D_STAT_TESS_DOMAIN,
+    VKD3D_STAT_TESS_PARTITIONING,
+    VKD3D_STAT_TESS_OUTPUT_PRIMITIVE,
+    VKD3D_STAT_TESS_CONTROL_POINT_COUNT,
     VKD3D_STAT_COUNT,
 };
 
@@ -1847,6 +1851,12 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM5_OP_IMM_ATOMIC_IMIN,     VKD3D_STAT_ATOMIC},
         {VKD3D_SM5_OP_IMM_ATOMIC_UMAX,     VKD3D_STAT_ATOMIC},
         {VKD3D_SM5_OP_IMM_ATOMIC_UMIN,     VKD3D_STAT_ATOMIC},
+
+        {VKD3D_SM5_OP_DCL_TESSELLATOR_DOMAIN, VKD3D_STAT_TESS_DOMAIN},
+        {VKD3D_SM5_OP_DCL_TESSELLATOR_PARTITIONING, VKD3D_STAT_TESS_PARTITIONING},
+        {VKD3D_SM5_OP_DCL_TESSELLATOR_OUTPUT_PRIMITIVE, VKD3D_STAT_TESS_OUTPUT_PRIMITIVE},
+        {VKD3D_SM5_OP_DCL_INPUT_CONTROL_POINT_COUNT, VKD3D_STAT_TESS_CONTROL_POINT_COUNT},
+        {VKD3D_SM5_OP_DCL_OUTPUT_CONTROL_POINT_COUNT, VKD3D_STAT_TESS_CONTROL_POINT_COUNT},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -4391,8 +4401,9 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vk
 
 static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
 {
+    enum vkd3d_shader_type shader_type = tpf->ctx->profile->type;
+    uint32_t token = instr->opcode | instr->extra_bits, opcode;
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
-    uint32_t token = instr->opcode | instr->extra_bits;
     enum vkd3d_sm4_stat_field stat_field;
     unsigned int size, i, j;
     size_t token_position;
@@ -4429,9 +4440,10 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
 
     ++tpf->stat->fields[VKD3D_STAT_INSTR_COUNT];
 
-    stat_field = get_stat_field_from_sm4_opcode(&tpf->lookup, instr->opcode & VKD3D_SM4_OPCODE_MASK);
+    opcode = instr->opcode & VKD3D_SM4_OPCODE_MASK;
+    stat_field = get_stat_field_from_sm4_opcode(&tpf->lookup, opcode);
 
-    switch (instr->opcode & VKD3D_SM4_OPCODE_MASK)
+    switch (opcode)
     {
         case VKD3D_SM4_OP_DCL_OUTPUT_TOPOLOGY:
         case VKD3D_SM4_OP_DCL_INPUT_PRIMITIVE:
@@ -4442,9 +4454,25 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
         case VKD3D_SM5_OP_DCL_GS_INSTANCES:
             tpf->stat->fields[stat_field] = instr->idx[0];
             break;
+        case VKD3D_SM5_OP_DCL_TESSELLATOR_DOMAIN:
+        case VKD3D_SM5_OP_DCL_TESSELLATOR_PARTITIONING:
+        case VKD3D_SM5_OP_DCL_TESSELLATOR_OUTPUT_PRIMITIVE:
+            tpf->stat->fields[stat_field] = (instr->opcode & VKD3D_SM5_TESSELLATOR_MASK) >> VKD3D_SM5_TESSELLATOR_SHIFT;
+            break;
+        case VKD3D_SM5_OP_DCL_INPUT_CONTROL_POINT_COUNT:
+        case VKD3D_SM5_OP_DCL_OUTPUT_CONTROL_POINT_COUNT:
+            if ((shader_type == VKD3D_SHADER_TYPE_HULL && opcode == VKD3D_SM5_OP_DCL_OUTPUT_CONTROL_POINT_COUNT)
+                    || (shader_type == VKD3D_SHADER_TYPE_DOMAIN
+                            && opcode == VKD3D_SM5_OP_DCL_INPUT_CONTROL_POINT_COUNT))
+            {
+                tpf->stat->fields[stat_field] = (instr->opcode & VKD3D_SM5_CONTROL_POINT_COUNT_MASK)
+                        >> VKD3D_SM5_CONTROL_POINT_COUNT_SHIFT;
+            }
+            break;
         default:
             ++tpf->stat->fields[stat_field];
     }
+
 }
 
 static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
@@ -6412,10 +6440,10 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     if (hlsl_version_ge(ctx, 5, 0))
     {
         put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_GS_INSTANCES]);
-        put_u32(&buffer, 0); /* Control point count */
-        put_u32(&buffer, 0); /* HS output primitive */
-        put_u32(&buffer, 0); /* HS partitioning */
-        put_u32(&buffer, 0); /* Tessellator domain */
+        put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_CONTROL_POINT_COUNT]);
+        put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_OUTPUT_PRIMITIVE]);
+        put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_PARTITIONING]);
+        put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_DOMAIN]);
         put_u32(&buffer, 0); /* Barrier instructions */
         put_u32(&buffer, stat->fields[VKD3D_STAT_ATOMIC]);
         put_u32(&buffer, stat->fields[VKD3D_STAT_STORE]);
