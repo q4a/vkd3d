@@ -303,5 +303,5 @@ void main(patch_constant_data input,
 }
 
 [test]
-todo draw 3 control point patch list 3
-todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
+if(!llvmpipe) todo(glsl | msl | mvk & vulkan) draw 3 control point patch list 3
+if(!llvmpipe) todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
