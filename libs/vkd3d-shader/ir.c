@@ -1734,6 +1734,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
 
 struct io_normaliser
 {
+    struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_instruction_array instructions;
     enum vkd3d_shader_type shader_type;
     uint8_t major;
@@ -1800,7 +1801,8 @@ static unsigned int range_map_get_register_count(uint8_t range_map[][VKD3D_VEC4_
     return range_map[register_idx][vsir_write_mask_get_component_idx(write_mask)];
 }
 
-static void range_map_set_register_range(uint8_t range_map[][VKD3D_VEC4_SIZE], unsigned int register_idx,
+static enum vkd3d_result range_map_set_register_range(struct io_normaliser *normaliser,
+        uint8_t range_map[][VKD3D_VEC4_SIZE], unsigned int register_idx,
         unsigned int register_count, uint32_t write_mask, bool is_dcl_indexrange)
 {
     unsigned int i, j, r, c, component_idx, component_count;
@@ -1813,15 +1815,20 @@ static void range_map_set_register_range(uint8_t range_map[][VKD3D_VEC4_SIZE], u
 
     if (range_map[register_idx][component_idx] > register_count && is_dcl_indexrange)
     {
-        /* Validated in the TPF reader. */
-        VKD3D_ASSERT(range_map[register_idx][component_idx] != UINT8_MAX);
-        return;
+        if (range_map[register_idx][component_idx] == UINT8_MAX)
+        {
+            WARN("Conflicting index ranges.\n");
+            vkd3d_shader_error(normaliser->message_context, NULL,
+                    VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE, "Conflicting index ranges.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+        return VKD3D_OK;
     }
     if (range_map[register_idx][component_idx] == register_count)
     {
         /* Already done. This happens when fxc splits a register declaration by
          * component(s). The dcl_indexrange instructions are split too. */
-        return;
+        return VKD3D_OK;
     }
     range_map[register_idx][component_idx] = register_count;
 
@@ -1834,13 +1841,21 @@ static void range_map_set_register_range(uint8_t range_map[][VKD3D_VEC4_SIZE], u
             /* A synthetic patch constant range which overlaps an existing range can start upstream of it
              * for fork/join phase instancing, but ranges declared by dcl_indexrange should not overlap.
              * The latter is validated in the TPF reader. */
-            VKD3D_ASSERT(!range_map[r][c] || !is_dcl_indexrange);
+            if (range_map[r][c] && is_dcl_indexrange)
+            {
+                WARN("Conflicting index ranges.\n");
+                vkd3d_shader_error(normaliser->message_context, NULL,
+                        VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE, "Conflicting index ranges.");
+                return VKD3D_ERROR_INVALID_SHADER;
+            }
             range_map[r][c] = UINT8_MAX;
         }
     }
+
+    return VKD3D_OK;
 }
 
-static void io_normaliser_add_index_range(struct io_normaliser *normaliser,
+static enum vkd3d_result io_normaliser_add_index_range(struct io_normaliser *normaliser,
         const struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_shader_index_range *range = &ins->declaration.index_range;
@@ -1881,7 +1896,7 @@ static void io_normaliser_add_index_range(struct io_normaliser *normaliser,
     reg_idx = reg->idx[reg->idx_count - 1].offset;
     write_mask = range->dst.write_mask;
     element = vsir_signature_find_element_for_reg(signature, reg_idx, write_mask);
-    range_map_set_register_range(range_map, reg_idx, range->register_count, element->mask, true);
+    return range_map_set_register_range(normaliser, range_map, reg_idx, range->register_count, element->mask, true);
 }
 
 static int signature_element_mask_compare(const void *a, const void *b)
@@ -1908,11 +1923,12 @@ static bool sysval_semantics_should_merge(const struct signature_element *e, con
 }
 
 /* Merge tess factor sysvals because they are an array in SPIR-V. */
-static void shader_signature_map_patch_constant_index_ranges(struct shader_signature *s,
-        uint8_t range_map[][VKD3D_VEC4_SIZE])
+static enum vkd3d_result shader_signature_map_patch_constant_index_ranges(struct io_normaliser *normaliser,
+        struct shader_signature *s, uint8_t range_map[][VKD3D_VEC4_SIZE])
 {
-    struct signature_element *e, *f;
     unsigned int i, j, register_count;
+    struct signature_element *e, *f;
+    enum vkd3d_result ret;
 
     qsort(s->elements, s->element_count, sizeof(s->elements[0]), signature_element_mask_compare);
 
@@ -1933,8 +1949,12 @@ static void shader_signature_map_patch_constant_index_ranges(struct shader_signa
         if (register_count < 2)
             continue;
 
-        range_map_set_register_range(range_map, e->register_index, register_count, e->mask, false);
+        if ((ret = range_map_set_register_range(normaliser, range_map,
+                e->register_index, register_count, e->mask, false) < 0))
+            return ret;
     }
+
+    return VKD3D_OK;
 }
 
 static int signature_element_register_compare(const void *a, const void *b)
@@ -2022,17 +2042,18 @@ static unsigned int signature_element_range_expand_mask(struct signature_element
     return e->mask;
 }
 
-static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map[][VKD3D_VEC4_SIZE],
-        bool is_patch_constant)
+static enum vkd3d_result shader_signature_merge(struct io_normaliser *normaliser,
+        struct shader_signature *s, uint8_t range_map[][VKD3D_VEC4_SIZE], bool is_patch_constant)
 {
     unsigned int i, j, element_count, new_count, register_count;
     struct signature_element *elements;
+    enum vkd3d_result ret = VKD3D_OK;
     struct signature_element *e, *f;
     bool used;
 
     element_count = s->element_count;
     if (!(elements = vkd3d_malloc(element_count * sizeof(*elements))))
-        return false;
+        return VKD3D_ERROR_OUT_OF_MEMORY;
     if (element_count)
         memcpy(elements, s->elements, element_count * sizeof(*elements));
 
@@ -2091,8 +2112,9 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
     s->elements = elements;
     s->element_count = element_count;
 
-    if (is_patch_constant)
-        shader_signature_map_patch_constant_index_ranges(s, range_map);
+    if (is_patch_constant
+            && (ret = shader_signature_map_patch_constant_index_ranges(normaliser, s, range_map)) < 0)
+        return ret;
 
     for (i = 0, new_count = 0; i < element_count; i += register_count, elements[new_count++] = *e)
     {
@@ -2126,7 +2148,7 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
 
     s->element_count = element_count;
 
-    return true;
+    return ret;
 }
 
 static unsigned int shader_register_normalise_arrayed_addressing(struct vkd3d_shader_register *reg,
@@ -2342,8 +2364,9 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
 static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    struct io_normaliser normaliser = {program->instructions};
+    struct io_normaliser normaliser = {ctx->message_context, program->instructions};
     struct vkd3d_shader_instruction *ins;
+    enum vkd3d_result ret;
     unsigned int i;
 
     VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_HULL_CONTROL_POINT_IO);
@@ -2365,7 +2388,8 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
                 normaliser.output_control_point_count = ins->declaration.count;
                 break;
             case VKD3DSIH_DCL_INDEX_RANGE:
-                io_normaliser_add_index_range(&normaliser, ins);
+                if ((ret = io_normaliser_add_index_range(&normaliser, ins)) < 0)
+                    return ret;
                 vkd3d_shader_instruction_make_nop(ins);
                 break;
             case VKD3DSIH_HS_CONTROL_POINT_PHASE:
@@ -2378,12 +2402,14 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
         }
     }
 
-    if (!shader_signature_merge(&program->input_signature, normaliser.input_range_map, false)
-            || !shader_signature_merge(&program->output_signature, normaliser.output_range_map, false)
-            || !shader_signature_merge(&program->patch_constant_signature, normaliser.pc_range_map, true))
+    if ((ret = shader_signature_merge(&normaliser, &program->input_signature, normaliser.input_range_map, false)) < 0
+            || (ret = shader_signature_merge(&normaliser, &program->output_signature,
+                    normaliser.output_range_map, false)) < 0
+            || (ret = shader_signature_merge(&normaliser, &program->patch_constant_signature,
+                    normaliser.pc_range_map, true)) < 0)
     {
         program->instructions = normaliser.instructions;
-        return VKD3D_ERROR_OUT_OF_MEMORY;
+        return ret;
     }
 
     normaliser.phase = VKD3DSIH_INVALID;
