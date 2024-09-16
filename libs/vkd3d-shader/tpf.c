@@ -1157,7 +1157,18 @@ static void shader_sm4_read_dcl_input_ps(struct vkd3d_shader_instruction *ins, u
         struct signature_element *e = vsir_signature_find_element_for_reg(
                 &priv->p.program->input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
 
-        e->interpolation_mode = ins->flags;
+        if (!e)
+        {
+            WARN("No matching signature element for input register %u with mask %#x.\n",
+                    dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_DCL,
+                    "No matching signature element for input register %u with mask %#x.\n",
+                    dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+        }
+        else
+        {
+            e->interpolation_mode = ins->flags;
+        }
     }
 }
 
@@ -1172,7 +1183,18 @@ static void shader_sm4_read_dcl_input_ps_siv(struct vkd3d_shader_instruction *in
         struct signature_element *e = vsir_signature_find_element_for_reg(
                 &priv->p.program->input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
 
-        e->interpolation_mode = ins->flags;
+        if (!e)
+        {
+            WARN("No matching signature element for input register %u with mask %#x.\n",
+                    dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_DCL,
+                    "No matching signature element for input register %u with mask %#x.\n",
+                    dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+        }
+        else
+        {
+            e->interpolation_mode = ins->flags;
+        }
     }
     ins->declaration.register_semantic.sysval_semantic = *tokens;
 }

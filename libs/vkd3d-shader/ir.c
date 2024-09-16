@@ -1208,8 +1208,8 @@ static bool io_normaliser_is_in_control_point_phase(const struct io_normaliser *
     return normaliser->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE;
 }
 
-static unsigned int shader_signature_find_element_for_reg(const struct shader_signature *signature,
-        unsigned int reg_idx, unsigned int write_mask)
+static bool shader_signature_find_element_for_reg(const struct shader_signature *signature,
+        unsigned int reg_idx, unsigned int write_mask, unsigned int *element_idx)
 {
     unsigned int i, base_write_mask;
 
@@ -1219,7 +1219,8 @@ static unsigned int shader_signature_find_element_for_reg(const struct shader_si
         if (e->register_index <= reg_idx && e->register_index + e->register_count > reg_idx
                 && (e->mask & write_mask) == write_mask)
         {
-            return i;
+            *element_idx = i;
+            return true;
         }
     }
 
@@ -1229,15 +1230,20 @@ static unsigned int shader_signature_find_element_for_reg(const struct shader_si
             reg_idx, write_mask);
     base_write_mask = 1u << vsir_write_mask_get_component_idx(write_mask);
     if (base_write_mask != write_mask)
-        return shader_signature_find_element_for_reg(signature, reg_idx, base_write_mask);
+        return shader_signature_find_element_for_reg(signature, reg_idx, base_write_mask, element_idx);
 
-    vkd3d_unreachable();
+    return false;
 }
 
 struct signature_element *vsir_signature_find_element_for_reg(const struct shader_signature *signature,
         unsigned int reg_idx, unsigned int write_mask)
 {
-    return &signature->elements[shader_signature_find_element_for_reg(signature, reg_idx, write_mask)];
+    unsigned int element_idx;
+
+    if (shader_signature_find_element_for_reg(signature, reg_idx, write_mask, &element_idx))
+        return &signature->elements[element_idx];
+
+    return NULL;
 }
 
 static unsigned int range_map_get_register_count(uint8_t range_map[][VKD3D_VEC4_SIZE],
@@ -1291,9 +1297,10 @@ static void io_normaliser_add_index_range(struct io_normaliser *normaliser,
 {
     const struct vkd3d_shader_index_range *range = &ins->declaration.index_range;
     const struct vkd3d_shader_register *reg = &range->dst.reg;
-    unsigned int reg_idx, write_mask, element_idx;
     const struct shader_signature *signature;
     uint8_t (*range_map)[VKD3D_VEC4_SIZE];
+    struct signature_element *element;
+    unsigned int reg_idx, write_mask;
 
     switch (reg->type)
     {
@@ -1325,9 +1332,8 @@ static void io_normaliser_add_index_range(struct io_normaliser *normaliser,
 
     reg_idx = reg->idx[reg->idx_count - 1].offset;
     write_mask = range->dst.write_mask;
-    element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
-    range_map_set_register_range(range_map, reg_idx, range->register_count,
-            signature->elements[element_idx].mask, true);
+    element = vsir_signature_find_element_for_reg(signature, reg_idx, write_mask);
+    range_map_set_register_range(range_map, reg_idx, range->register_count, element->mask, true);
 }
 
 static int signature_element_mask_compare(const void *a, const void *b)
@@ -1648,7 +1654,8 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
 
     id_idx = reg->idx_count - 1;
     write_mask = dst_param->write_mask;
-    element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
+    if (!shader_signature_find_element_for_reg(signature, reg_idx, write_mask, &element_idx))
+        vkd3d_unreachable();
     e = &signature->elements[element_idx];
 
     dst_param->write_mask >>= vsir_write_mask_get_component_idx(e->mask);
@@ -1771,7 +1778,8 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
 
     id_idx = reg->idx_count - 1;
     write_mask = VKD3DSP_WRITEMASK_0 << vsir_swizzle_get_component(src_param->swizzle, 0);
-    element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
+    if (!shader_signature_find_element_for_reg(signature, reg_idx, write_mask, &element_idx))
+        vkd3d_unreachable();
 
     e = &signature->elements[element_idx];
     if ((e->register_count > 1 || vsir_sysval_semantic_is_tess_factor(e->sysval_semantic)))
