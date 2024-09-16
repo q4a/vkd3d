@@ -186,6 +186,12 @@ static void msl_mov(struct msl_generator *gen, const struct vkd3d_shader_instruc
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void msl_ret(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "return;\n");
+}
+
 static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     gen->location = ins->location;
@@ -196,6 +202,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_MOV:
             msl_mov(gen, ins);
+            break;
+        case VKD3DSIH_RET:
+            msl_ret(gen, ins);
             break;
         default:
             msl_unhandled(gen, ins);
