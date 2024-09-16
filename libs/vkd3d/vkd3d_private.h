@@ -65,6 +65,8 @@
  * this number to prevent excessive pool memory use. */
 #define VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE (16 * 1024u)
 
+#define VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT (VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER + 1)
+
 extern uint64_t object_global_serial_id;
 
 struct d3d12_command_list;
@@ -899,6 +901,8 @@ struct d3d12_root_descriptor_table_range
     unsigned int vk_binding_count;
     uint32_t set;
     uint32_t binding;
+    uint32_t image_set;
+    uint32_t image_binding;
 
     enum vkd3d_shader_descriptor_type type;
     uint32_t descriptor_magic;
@@ -920,6 +924,7 @@ struct d3d12_root_constant
 
 struct d3d12_root_descriptor
 {
+    uint32_t set;
     uint32_t binding;
 };
 

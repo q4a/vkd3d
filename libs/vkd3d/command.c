@@ -2805,15 +2805,8 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
                 break;
             }
 
-            if (range->descriptor_count == UINT_MAX)
-            {
-                vk_descriptor_write->dstSet = vk_descriptor_sets[set + 1];
-                vk_descriptor_write->dstBinding = 0;
-            }
-            else
-            {
-                vk_descriptor_write->dstBinding += use_array ? 1 : range->descriptor_count;
-            }
+            vk_descriptor_write->dstSet = vk_descriptor_sets[range->image_set];
+            vk_descriptor_write->dstBinding = use_array ? range->image_binding : range->image_binding + index;
 
             vk_image_info->sampler = VK_NULL_HANDLE;
             vk_image_info->imageView = u.view->v.u.vk_image_view;
@@ -2934,10 +2927,11 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
 }
 
 static bool vk_write_descriptor_set_from_root_descriptor(VkWriteDescriptorSet *vk_descriptor_write,
-        const struct d3d12_root_parameter *root_parameter, VkDescriptorSet vk_descriptor_set,
+        const struct d3d12_root_parameter *root_parameter, const VkDescriptorSet *vk_descriptor_sets,
         VkBufferView *vk_buffer_view, const VkDescriptorBufferInfo *vk_buffer_info)
 {
     const struct d3d12_root_descriptor *root_descriptor;
+    VkDescriptorSet vk_descriptor_set;
 
     switch (root_parameter->parameter_type)
     {
@@ -2956,6 +2950,7 @@ static bool vk_write_descriptor_set_from_root_descriptor(VkWriteDescriptorSet *v
     }
 
     root_descriptor = &root_parameter->u.descriptor;
+    vk_descriptor_set = vk_descriptor_sets ? vk_descriptor_sets[root_descriptor->set] : VK_NULL_HANDLE;
 
     vk_descriptor_write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     vk_descriptor_write->pNext = NULL;
@@ -3011,7 +3006,7 @@ static void d3d12_command_list_update_push_descriptors(struct d3d12_command_list
         }
 
         if (!vk_write_descriptor_set_from_root_descriptor(&descriptor_writes[descriptor_count],
-                root_parameter, bindings->descriptor_sets[0], vk_buffer_view, vk_buffer_info))
+                root_parameter, bindings->descriptor_sets, vk_buffer_view, vk_buffer_info))
             continue;
 
         ++descriptor_count;
@@ -4612,8 +4607,7 @@ static void d3d12_command_list_set_root_cbv(struct d3d12_command_list *list,
 
     if (vk_info->KHR_push_descriptor)
     {
-        vk_write_descriptor_set_from_root_descriptor(&descriptor_write,
-                root_parameter, VK_NULL_HANDLE, NULL, &buffer_info);
+        vk_write_descriptor_set_from_root_descriptor(&descriptor_write, root_parameter, NULL, NULL, &buffer_info);
         VK_CALL(vkCmdPushDescriptorSetKHR(list->vk_command_buffer, bindings->vk_bind_point,
                 root_signature->vk_pipeline_layout, 0, 1, &descriptor_write));
     }
@@ -4621,7 +4615,7 @@ static void d3d12_command_list_set_root_cbv(struct d3d12_command_list *list,
     {
         d3d12_command_list_prepare_descriptors(list, bind_point);
         vk_write_descriptor_set_from_root_descriptor(&descriptor_write,
-                root_parameter, bindings->descriptor_sets[0], NULL, &buffer_info);
+                root_parameter, bindings->descriptor_sets, NULL, &buffer_info);
         VK_CALL(vkUpdateDescriptorSets(list->device->vk_device, 1, &descriptor_write, 0, NULL));
 
         VKD3D_ASSERT(index < ARRAY_SIZE(bindings->push_descriptors));
@@ -4685,8 +4679,7 @@ static void d3d12_command_list_set_root_descriptor(struct d3d12_command_list *li
 
     if (vk_info->KHR_push_descriptor)
     {
-        vk_write_descriptor_set_from_root_descriptor(&descriptor_write,
-                root_parameter, VK_NULL_HANDLE, &vk_buffer_view, NULL);
+        vk_write_descriptor_set_from_root_descriptor(&descriptor_write, root_parameter, NULL, &vk_buffer_view, NULL);
         VK_CALL(vkCmdPushDescriptorSetKHR(list->vk_command_buffer, bindings->vk_bind_point,
                 root_signature->vk_pipeline_layout, 0, 1, &descriptor_write));
     }
@@ -4694,7 +4687,7 @@ static void d3d12_command_list_set_root_descriptor(struct d3d12_command_list *li
     {
         d3d12_command_list_prepare_descriptors(list, bind_point);
         vk_write_descriptor_set_from_root_descriptor(&descriptor_write,
-                root_parameter, bindings->descriptor_sets[0], &vk_buffer_view,  NULL);
+                root_parameter, bindings->descriptor_sets, &vk_buffer_view,  NULL);
         VK_CALL(vkUpdateDescriptorSets(list->device->vk_device, 1, &descriptor_write, 0, NULL));
 
         VKD3D_ASSERT(index < ARRAY_SIZE(bindings->push_descriptors));
