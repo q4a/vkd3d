@@ -25,6 +25,7 @@ struct msl_generator
     struct vkd3d_string_buffer *buffer;
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
+    unsigned int indent;
 };
 
 static void VKD3D_PRINTF_FUNC(3, 4) msl_compiler_error(struct msl_generator *gen,
@@ -37,8 +38,15 @@ static void VKD3D_PRINTF_FUNC(3, 4) msl_compiler_error(struct msl_generator *gen
     va_end(args);
 }
 
+static void msl_print_indent(struct vkd3d_string_buffer *buffer, unsigned int indent)
+{
+    vkd3d_string_buffer_printf(buffer, "%*s", 4 * indent, "");
+}
+
+
 static void msl_unhandled(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
+    msl_print_indent(gen->buffer, gen->indent);
     vkd3d_string_buffer_printf(gen->buffer, "/* <unhandled instruction %#x> */\n", ins->opcode);
     msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
             "Internal compiler error: Unhandled instruction %#x.", ins->opcode);
@@ -57,10 +65,15 @@ static void msl_generator_generate(struct msl_generator *gen)
 
     MESSAGE("Generating a MSL shader. This is unsupported; you get to keep all the pieces if it breaks.\n");
 
+    vkd3d_string_buffer_printf(gen->buffer, "void shader_main()\n{\n");
+
+    ++gen->indent;
     for (i = 0; i < instructions->count; ++i)
     {
         msl_handle_instruction(gen, &instructions->elements[i]);
     }
+
+    vkd3d_string_buffer_printf(gen->buffer, "}\n");
 
     if (TRACE_ON())
         vkd3d_string_buffer_trace(gen->buffer);
