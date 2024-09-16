@@ -55,7 +55,15 @@ static void msl_unhandled(struct msl_generator *gen, const struct vkd3d_shader_i
 static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     gen->location = ins->location;
-    msl_unhandled(gen, ins);
+
+    switch (ins->opcode)
+    {
+        case VKD3DSIH_NOP:
+            break;
+        default:
+            msl_unhandled(gen, ins);
+            break;
+    }
 }
 
 static void msl_generator_generate(struct msl_generator *gen)
