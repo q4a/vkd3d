@@ -2677,7 +2677,7 @@ static void vkd3d_time_domains_init(struct d3d12_device *device)
 static void device_init_descriptor_pool_sizes(struct d3d12_device *device)
 {
     const struct vkd3d_device_descriptor_limits *limits = &device->vk_info.descriptor_limits;
-    unsigned int *pool_sizes = device->vk_pool_sizes;
+    unsigned int *pool_sizes = device->vk_pool_limits;
 
     pool_sizes[VKD3D_SHADER_DESCRIPTOR_TYPE_CBV] = min(limits->uniform_buffer_max_descriptors,
             VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);

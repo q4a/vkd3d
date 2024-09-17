@@ -1488,12 +1488,25 @@ static HRESULT vkd3d_create_pipeline_layout(struct d3d12_device *device,
 static HRESULT d3d12_descriptor_set_layout_init(struct d3d12_descriptor_set_layout *layout,
         struct d3d12_device *device, const struct vk_binding_array *array)
 {
+    unsigned int descriptor_count;
+    bool unbounded;
     HRESULT hr;
+    size_t i;
 
-    if (FAILED(hr = vkd3d_create_descriptor_set_layout(device, array->flags, array->count,
-            array->unbounded_offset != UINT_MAX, array->bindings, &layout->vk_layout)))
+    descriptor_count = array->unbounded_offset;
+    if (!(unbounded = descriptor_count != UINT_MAX))
+    {
+        for (i = 0, descriptor_count = 0; i < array->count; ++i)
+        {
+            descriptor_count += array->bindings[i].descriptorCount;
+        }
+    }
+
+    if (FAILED(hr = vkd3d_create_descriptor_set_layout(device, array->flags,
+            array->count, unbounded, array->bindings, &layout->vk_layout)))
         return hr;
     layout->descriptor_type = array->descriptor_type;
+    layout->descriptor_count = descriptor_count;
     layout->unbounded_offset = array->unbounded_offset;
     layout->table_index = array->table_index;
 

@@ -61,6 +61,7 @@
 /* D3D12 binding tier 3 has a limit of 2048 samplers. */
 #define VKD3D_MAX_DESCRIPTOR_SET_SAMPLERS 2048u
 #define VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE (16 * 1024u)
+#define VKD3D_INITIAL_DESCRIPTORS_POOL_SIZE 1024u
 
 #define VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT (VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER + 1)
 
@@ -959,6 +960,7 @@ struct d3d12_descriptor_set_layout
 {
     enum vkd3d_shader_descriptor_type descriptor_type;
     VkDescriptorSetLayout vk_layout;
+    unsigned int descriptor_count;
     unsigned int unbounded_offset;
     unsigned int table_index;
 };
@@ -1157,9 +1159,15 @@ struct vkd3d_buffer
     VkDeviceMemory vk_memory;
 };
 
+struct vkd3d_vk_descriptor_pool
+{
+    unsigned int descriptor_count;
+    VkDescriptorPool vk_pool;
+};
+
 struct vkd3d_vk_descriptor_pool_array
 {
-    VkDescriptorPool *pools;
+    struct vkd3d_vk_descriptor_pool *pools;
     size_t capacity, count;
 };
 
@@ -1187,6 +1195,7 @@ struct d3d12_command_allocator
     size_t framebuffer_count;
 
     struct vkd3d_vk_descriptor_pool_array descriptor_pools[VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT];
+    unsigned int vk_pool_sizes[VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT];
 
     struct vkd3d_view **views;
     size_t views_size;
@@ -1558,7 +1567,7 @@ struct d3d12_device
     struct vkd3d_desc_object_cache view_desc_cache;
     struct vkd3d_desc_object_cache cbuffer_desc_cache;
 
-    unsigned int vk_pool_sizes[VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT];
+    unsigned int vk_pool_limits[VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT];
     struct vkd3d_vk_descriptor_heap_layout vk_descriptor_heap_layouts[VKD3D_SET_INDEX_COUNT];
     bool use_vk_heaps;
 
