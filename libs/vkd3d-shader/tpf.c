@@ -645,6 +645,7 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_TESS_PARTITIONING,
     VKD3D_STAT_TESS_OUTPUT_PRIMITIVE,
     VKD3D_STAT_TESS_CONTROL_POINT_COUNT,
+    VKD3D_STAT_BARRIER,
     VKD3D_STAT_COUNT,
 };
 
@@ -1857,6 +1858,8 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM5_OP_DCL_TESSELLATOR_OUTPUT_PRIMITIVE, VKD3D_STAT_TESS_OUTPUT_PRIMITIVE},
         {VKD3D_SM5_OP_DCL_INPUT_CONTROL_POINT_COUNT, VKD3D_STAT_TESS_CONTROL_POINT_COUNT},
         {VKD3D_SM5_OP_DCL_OUTPUT_CONTROL_POINT_COUNT, VKD3D_STAT_TESS_CONTROL_POINT_COUNT},
+
+        {VKD3D_SM5_OP_SYNC, VKD3D_STAT_BARRIER},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -6444,7 +6447,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
         put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_OUTPUT_PRIMITIVE]);
         put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_PARTITIONING]);
         put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_DOMAIN]);
-        put_u32(&buffer, 0); /* Barrier instructions */
+        put_u32(&buffer, stat->fields[VKD3D_STAT_BARRIER]);
         put_u32(&buffer, stat->fields[VKD3D_STAT_ATOMIC]);
         put_u32(&buffer, stat->fields[VKD3D_STAT_STORE]);
     }
