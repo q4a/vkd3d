@@ -1780,7 +1780,7 @@ void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buff
     size_offset = put_u32(buffer, 0);
     ctab_offset = put_u32(buffer, VKD3D_MAKE_TAG('C','T','A','B'));
 
-    ctab_start = put_u32(buffer, sizeof(D3DXSHADER_CONSTANTTABLE));
+    ctab_start = put_u32(buffer, 7 * sizeof(uint32_t)); /* CTAB header size. */
     creator_offset = put_u32(buffer, 0);
     put_u32(buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
     put_u32(buffer, uniform_count);
