@@ -1721,7 +1721,7 @@ static void sm1_sort_externs(struct hlsl_ctx *ctx)
 
 void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
 {
-    size_t ctab_offset, ctab_start, ctab_end, vars_start, size_offset, creator_offset, offset;
+    size_t ctab_offset, ctab_start, ctab_end, vars_offset, vars_start, size_offset, creator_offset, offset;
     unsigned int uniform_count = 0;
     struct hlsl_ir_var *var;
 
@@ -1757,11 +1757,12 @@ void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buff
     creator_offset = put_u32(buffer, 0);
     put_u32(buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
     put_u32(buffer, uniform_count);
-    put_u32(buffer, sizeof(D3DXSHADER_CONSTANTTABLE)); /* offset of constants */
+    vars_offset = put_u32(buffer, 0);
     put_u32(buffer, 0); /* FIXME: flags */
     put_u32(buffer, 0); /* FIXME: target string */
 
     vars_start = bytecode_align(buffer);
+    set_u32(buffer, vars_offset, vars_start - ctab_start);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
