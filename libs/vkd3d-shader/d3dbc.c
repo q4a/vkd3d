@@ -110,6 +110,13 @@ enum vkd3d_sm1_misc_register
     VKD3D_SM1_MISC_FACE             = 0x1,
 };
 
+enum vkd3d_sm1_rastout_register
+{
+    VKD3D_SM1_RASTOUT_POSITION      = 0x0,
+    VKD3D_SM1_RASTOUT_FOG           = 0x1,
+    VKD3D_SM1_RASTOUT_POINT_SIZE    = 0x2,
+};
+
 enum vkd3d_sm1_opcode
 {
     VKD3D_SM1_OP_NOP          = 0x00,
@@ -1396,17 +1403,17 @@ bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
         {"vpos",        false, VKD3D_SHADER_TYPE_PIXEL, 3, VKD3DSPR_MISCTYPE,     VKD3D_SM1_MISC_POSITION},
 
         {"color",       true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_ATTROUT},
-        {"fog",         true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     D3DSRO_FOG},
-        {"position",    true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     D3DSRO_POSITION},
-        {"psize",       true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     D3DSRO_POINT_SIZE},
-        {"sv_position", true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     D3DSRO_POSITION},
+        {"fog",         true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_FOG},
+        {"position",    true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_POSITION},
+        {"psize",       true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_POINT_SIZE},
+        {"sv_position", true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_POSITION},
         {"texcoord",    true,  VKD3D_SHADER_TYPE_VERTEX, 1, VKD3DSPR_TEXCRDOUT},
 
         {"color",       true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_ATTROUT},
-        {"fog",         true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     D3DSRO_FOG},
-        {"position",    true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     D3DSRO_POSITION},
-        {"psize",       true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     D3DSRO_POINT_SIZE},
-        {"sv_position", true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     D3DSRO_POSITION},
+        {"fog",         true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_FOG},
+        {"position",    true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_POSITION},
+        {"psize",       true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_POINT_SIZE},
+        {"sv_position", true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_RASTOUT,     VKD3D_SM1_RASTOUT_POSITION},
         {"texcoord",    true,  VKD3D_SHADER_TYPE_VERTEX, 2, VKD3DSPR_TEXCRDOUT},
     };
 
