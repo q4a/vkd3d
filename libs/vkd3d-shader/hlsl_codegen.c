@@ -7577,10 +7577,13 @@ static void process_entry_function(struct hlsl_ctx *ctx, struct hlsl_ir_function
     const struct hlsl_profile_info *profile = ctx->profile;
     struct hlsl_block *const body = &entry_func->body;
     struct recursive_call_ctx recursive_call_ctx;
+    struct hlsl_block static_initializers;
     struct hlsl_ir_var *var;
     unsigned int i;
 
-    list_move_head(&body->instrs, &ctx->static_initializers.instrs);
+    if (!hlsl_clone_block(ctx, &static_initializers, &ctx->static_initializers))
+        return;
+    list_move_head(&body->instrs, &static_initializers.instrs);
 
     memset(&recursive_call_ctx, 0, sizeof(recursive_call_ctx));
     hlsl_transform_ir(ctx, find_recursive_calls, body, &recursive_call_ctx);
