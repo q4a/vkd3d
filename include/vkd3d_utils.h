@@ -58,7 +58,11 @@ VKD3D_UTILS_API HRESULT vkd3d_signal_event(HANDLE event);
 VKD3D_UTILS_API unsigned int vkd3d_wait_event(HANDLE event, unsigned int milliseconds);
 VKD3D_UTILS_API void vkd3d_destroy_event(HANDLE event);
 
-#define D3D12CreateDevice(a, b, c, d) D3D12CreateDeviceVKD3D(a, b, c, d, VKD3D_UTILS_API_VERSION)
+#if __STDC_VERSION__ >= 199901L || __cplusplus >= 201103L
+# define D3D12CreateDevice(...) D3D12CreateDeviceVKD3D(__VA_ARGS__, VKD3D_UTILS_API_VERSION)
+#else
+# define D3D12CreateDevice(a, b, c, d) D3D12CreateDeviceVKD3D(a, b, c, d, VKD3D_UTILS_API_VERSION)
+#endif
 VKD3D_UTILS_API HRESULT WINAPI D3D12CreateRootSignatureDeserializer(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 VKD3D_UTILS_API HRESULT WINAPI D3D12GetDebugInterface(REFIID iid, void **debug);
