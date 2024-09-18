@@ -646,6 +646,7 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_TESS_OUTPUT_PRIMITIVE,
     VKD3D_STAT_TESS_CONTROL_POINT_COUNT,
     VKD3D_STAT_BARRIER,
+    VKD3D_STAT_LOD,
     VKD3D_STAT_COUNT,
 };
 
@@ -1805,6 +1806,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_SAMPLE_GRAD,      VKD3D_STAT_SAMPLE_GRAD},
         {VKD3D_SM5_OP_SAMPLE_GRAD_CL_S, VKD3D_STAT_SAMPLE_GRAD},
         {VKD3D_SM4_OP_SAMPLE_B,         VKD3D_STAT_SAMPLE_BIAS},
+        {VKD3D_SM4_OP_LOD,              VKD3D_STAT_LOD},
 
         {VKD3D_SM4_OP_LD,              VKD3D_STAT_LOAD},
         {VKD3D_SM4_OP_LD2DMS,          VKD3D_STAT_LOAD},
@@ -6437,7 +6439,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_OUTPUT_TOPOLOGY]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_VERTICES_OUT]);
     put_u32(&buffer, 0); /* Unknown */
-    put_u32(&buffer, 0); /* Unknown */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_LOD]);
     put_u32(&buffer, 0); /* Sample frequency */
 
     if (hlsl_version_ge(ctx, 5, 0))
