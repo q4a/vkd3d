@@ -37269,24 +37269,27 @@ done:
 
 static void test_unbounded_resource_arrays(void)
 {
-    ID3D12Resource *constant_buffers[64], *input_buffers[64], *output_buffers[128];
+    ID3D12Resource *constant_buffers[64], *input_buffers[32], *output_buffers[128];
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc;
     ID3D12GraphicsCommandList *command_list;
+    ID3D12Resource *input_textures[32];
     struct d3d12_resource_readback rb;
+    unsigned int i, heap_offset;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
-    unsigned int i;
     HRESULT hr;
 
     static const D3D12_DESCRIPTOR_RANGE descriptor_ranges[] =
     {
-        {D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, 2, 1, 0},
-        {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 2, 1, 64},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 2, 1, 0},
+        /* Test a buffer/texture descriptor type with a shader which accesses both. */
+        {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 2, 2, 0},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, 2, 1, 64},
         {D3D12_DESCRIPTOR_RANGE_TYPE_UAV,        1, 1, 4, 128},
         {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, UINT_MAX, 1, 1, 128},
         {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 65, 1, 2, 127},
@@ -37310,6 +37313,7 @@ static void test_unbounded_resource_arrays(void)
         ConstantBuffer<cb> c1[] : register(b2, space1);
 
         Buffer<uint> t1[] : register(t2, space1);
+        Texture2D<uint> t2[] : register(t2, space2);
 
         RWBuffer<uint> u1[] : register(u1, space1);
         RWBuffer<uint> u1_4 : register(u1, space4);
@@ -37324,7 +37328,13 @@ static void test_unbounded_resource_arrays(void)
              * for id being the thread id. The error check is skipped if the statements are conditional. */
             if (id < 64)
             {
-                uint u = t1[NonUniformResourceIndex(i)][0];
+                uint u;
+
+                if (i < 32)
+                    u = t1[NonUniformResourceIndex(i)][0];
+                else
+                    u = t2[NonUniformResourceIndex(i)][uint2(0, 0)];
+
                 if (id > 0)
                     u1[NonUniformResourceIndex(id)][0] = u;
                 else
@@ -37334,20 +37344,26 @@ static void test_unbounded_resource_arrays(void)
             }
         }
 #endif
-        0x43425844, 0x24ec278f, 0xe9e6d2d7, 0xa5f914bb, 0x5cb76317, 0x00000001, 0x000002a8, 0x00000003,
+        0x43425844, 0x8a5b49a5, 0xe0747f9a, 0xda1361d4, 0x060961bb, 0x00000001, 0x00000368, 0x00000003,
         0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
-        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000254, 0x00050051, 0x00000095, 0x0100086a,
+        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000314, 0x00050051, 0x000000c5, 0x0100086a,
         0x07000859, 0x00308e46, 0x00000000, 0x00000002, 0xffffffff, 0x00000001, 0x00000001, 0x07000858,
-        0x00307e46, 0x00000000, 0x00000002, 0xffffffff, 0x00004444, 0x00000001, 0x0700089c, 0x0031ee46,
-        0x00000000, 0x00000001, 0xffffffff, 0x00004444, 0x00000001, 0x0700089c, 0x0031ee46, 0x00000001,
-        0x00000002, 0xffffffff, 0x00004444, 0x00000002, 0x0700089c, 0x0031ee46, 0x00000002, 0x00000001,
-        0xffffffff, 0x00004444, 0x00000003, 0x0700089c, 0x0031ee46, 0x00000003, 0x00000001, 0x00000001,
-        0x00004444, 0x00000004, 0x0200005f, 0x00020012, 0x02000068, 0x00000001, 0x0400009b, 0x00000040,
-        0x00000001, 0x00000001, 0x0600004f, 0x00100012, 0x00000000, 0x0002000a, 0x00004001, 0x00000040,
-        0x0304001f, 0x0010000a, 0x00000000, 0x04000036, 0x00100012, 0x00000000, 0x0002000a, 0x0a000036,
-        0x00100022, 0x00000000, 0x8630800a, 0x00020001, 0x00000000, 0x00000002, 0x0010000a, 0x00000000,
-        0x00000000, 0x0e00002d, 0x00100022, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000,
-        0x00000000, 0x86207e16, 0x00020001, 0x00000000, 0x00000002, 0x0010001a, 0x00000000, 0x0204001f,
+        0x00307e46, 0x00000000, 0x00000002, 0xffffffff, 0x00004444, 0x00000001, 0x07001858, 0x00307e46,
+        0x00000001, 0x00000002, 0xffffffff, 0x00004444, 0x00000002, 0x0700089c, 0x0031ee46, 0x00000000,
+        0x00000001, 0xffffffff, 0x00004444, 0x00000001, 0x0700089c, 0x0031ee46, 0x00000001, 0x00000002,
+        0xffffffff, 0x00004444, 0x00000002, 0x0700089c, 0x0031ee46, 0x00000002, 0x00000001, 0xffffffff,
+        0x00004444, 0x00000003, 0x0700089c, 0x0031ee46, 0x00000003, 0x00000001, 0x00000001, 0x00004444,
+        0x00000004, 0x0200005f, 0x00020012, 0x02000068, 0x00000001, 0x0400009b, 0x00000040, 0x00000001,
+        0x00000001, 0x0600004f, 0x00100012, 0x00000000, 0x0002000a, 0x00004001, 0x00000040, 0x0304001f,
+        0x0010000a, 0x00000000, 0x04000036, 0x00100012, 0x00000000, 0x0002000a, 0x0c00004f, 0x00100022,
+        0x00000000, 0x8630800a, 0x00020001, 0x00000000, 0x00000002, 0x0010000a, 0x00000000, 0x00000000,
+        0x00004001, 0x00000020, 0x0304001f, 0x0010001a, 0x00000000, 0x0a000036, 0x00100022, 0x00000000,
+        0x8630800a, 0x00020001, 0x00000000, 0x00000002, 0x0010000a, 0x00000000, 0x00000000, 0x0e00002d,
+        0x00100022, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x86207e16,
+        0x00020001, 0x00000000, 0x00000002, 0x0010001a, 0x00000000, 0x01000012, 0x0a000036, 0x00100042,
+        0x00000000, 0x8630800a, 0x00020001, 0x00000000, 0x00000002, 0x0010000a, 0x00000000, 0x00000000,
+        0x0e00002d, 0x00100022, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x86207e16, 0x00020001, 0x00000001, 0x00000002, 0x0010002a, 0x00000000, 0x01000015, 0x0204001f,
         0x0002000a, 0x0e0000a4, 0x8621e0f2, 0x00020001, 0x00000000, 0x00000001, 0x0010000a, 0x00000000,
         0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100556, 0x00000000, 0x01000012,
         0x0b0000a4, 0x0021e0f2, 0x00000003, 0x00000001, 0x00004002, 0x00000000, 0x00000000, 0x00000000,
@@ -37386,21 +37402,6 @@ static void test_unbounded_resource_arrays(void)
 
     heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256);
 
-    for (i = 0; i < ARRAY_SIZE(constant_buffers); ++i)
-    {
-        uint32_t cb_data = 63 - i;
-        constant_buffers[i] = create_default_buffer(device, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
-                D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST);
-        upload_buffer_data(constant_buffers[i], 0, sizeof(cb_data), &cb_data, queue, command_list);
-        reset_command_list(command_list, context.allocator);
-        transition_resource_state(command_list, constant_buffers[i],
-                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-
-        cbv_desc.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(constant_buffers[i]);
-        cbv_desc.SizeInBytes = align(sizeof(cb_data), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-        ID3D12Device_CreateConstantBufferView(context.device, &cbv_desc, get_cpu_descriptor_handle(&context, heap, i));
-    }
-
     for (i = 0; i < ARRAY_SIZE(input_buffers); ++i)
     {
         uint32_t srv_data = i ^ 0x35;
@@ -37418,8 +37419,54 @@ static void test_unbounded_resource_arrays(void)
         srv_desc.Buffer.FirstElement = 0;
         srv_desc.Buffer.NumElements = 1;
         ID3D12Device_CreateShaderResourceView(device, input_buffers[i], &srv_desc,
-                get_cpu_descriptor_handle(&context, heap, ARRAY_SIZE(constant_buffers) + i));
+                get_cpu_descriptor_handle(&context, heap, i));
     }
+    heap_offset = ARRAY_SIZE(input_buffers);
+
+    for (i = 0; i < ARRAY_SIZE(input_textures); ++i)
+    {
+        uint32_t srv_data = (i + heap_offset) ^ 0x35;
+        D3D12_SUBRESOURCE_DATA data;
+
+        input_textures[i] = create_default_texture2d(device, 1, 1, 1, 1, DXGI_FORMAT_R32_UINT, D3D12_RESOURCE_FLAG_NONE,
+            D3D12_RESOURCE_STATE_COPY_DEST);
+        data.pData = &srv_data;
+        data.RowPitch = sizeof(uint32_t);
+        data.SlicePitch = data.RowPitch;
+        upload_texture_data(input_textures[i], &data, 1, queue, command_list);
+        reset_command_list(command_list, context.allocator);
+        transition_resource_state(command_list, input_textures[i],
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+        memset(&srv_desc, 0, sizeof(srv_desc));
+        srv_desc.Format = DXGI_FORMAT_R32_UINT;
+        srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv_desc.Texture2D.MipLevels = 1;
+        srv_desc.Texture2D.MostDetailedMip = 0;
+        srv_desc.Texture2D.PlaneSlice = 0;
+        srv_desc.Texture2D.ResourceMinLODClamp = 0;
+        ID3D12Device_CreateShaderResourceView(device, input_textures[i], &srv_desc,
+                get_cpu_descriptor_handle(&context, heap, heap_offset + i));
+    }
+    heap_offset += ARRAY_SIZE(input_textures);
+
+    for (i = 0; i < ARRAY_SIZE(constant_buffers); ++i)
+    {
+        uint32_t cb_data = 63 - i;
+        constant_buffers[i] = create_default_buffer(device, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+                D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST);
+        upload_buffer_data(constant_buffers[i], 0, sizeof(cb_data), &cb_data, queue, command_list);
+        reset_command_list(command_list, context.allocator);
+        transition_resource_state(command_list, constant_buffers[i],
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+
+        cbv_desc.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(constant_buffers[i]);
+        cbv_desc.SizeInBytes = align(sizeof(cb_data), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+        ID3D12Device_CreateConstantBufferView(context.device, &cbv_desc,
+                get_cpu_descriptor_handle(&context, heap, heap_offset + i));
+    }
+    heap_offset += ARRAY_SIZE(constant_buffers);
 
     for (i = 0; i < ARRAY_SIZE(output_buffers); ++i)
     {
@@ -37432,8 +37479,7 @@ static void test_unbounded_resource_arrays(void)
         uav_desc.Buffer.FirstElement = 0;
         uav_desc.Buffer.NumElements = 1;
         ID3D12Device_CreateUnorderedAccessView(device, output_buffers[i], NULL,
-                &uav_desc, get_cpu_descriptor_handle(&context, heap,
-                ARRAY_SIZE(constant_buffers) + ARRAY_SIZE(input_buffers) + i));
+                &uav_desc, get_cpu_descriptor_handle(&context, heap, heap_offset + i));
     }
 
     context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
@@ -37463,6 +37509,8 @@ static void test_unbounded_resource_arrays(void)
         ID3D12Resource_Release(output_buffers[i]);
     for (i = 0; i < ARRAY_SIZE(input_buffers); ++i)
         ID3D12Resource_Release(input_buffers[i]);
+    for (i = 0; i < ARRAY_SIZE(input_textures); ++i)
+        ID3D12Resource_Release(input_textures[i]);
     for (i = 0; i < ARRAY_SIZE(constant_buffers); ++i)
         ID3D12Resource_Release(constant_buffers[i]);
     ID3D12DescriptorHeap_Release(heap);
