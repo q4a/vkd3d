@@ -4425,44 +4425,11 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vk
     }
 }
 
-static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
+static void sm4_update_stat_counters(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
 {
     enum vkd3d_shader_type shader_type = tpf->ctx->profile->type;
-    uint32_t token = instr->opcode | instr->extra_bits, opcode;
-    struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
     enum vkd3d_sm4_stat_field stat_field;
-    unsigned int size, i, j;
-    size_t token_position;
-
-    if (instr->modifier_count > 0)
-        token |= VKD3D_SM4_INSTRUCTION_MODIFIER;
-
-    token_position = put_u32(buffer, 0);
-
-    for (i = 0; i < instr->modifier_count; ++i)
-    {
-        uint32_t modifier_token = sm4_encode_instruction_modifier(&instr->modifiers[i]);
-
-        if (instr->modifier_count > i + 1)
-            modifier_token |= VKD3D_SM4_INSTRUCTION_MODIFIER;
-        put_u32(buffer, modifier_token);
-    }
-
-    for (i = 0; i < instr->dst_count; ++i)
-        sm4_write_dst_register(tpf, &instr->dsts[i]);
-
-    for (i = 0; i < instr->src_count; ++i)
-        sm4_write_src_register(tpf, &instr->srcs[i]);
-
-    if (instr->byte_stride)
-        put_u32(buffer, instr->byte_stride);
-
-    for (j = 0; j < instr->idx_count; ++j)
-        put_u32(buffer, instr->idx[j]);
-
-    size = (bytecode_get_size(buffer) - token_position) / sizeof(uint32_t);
-    token |= (size << VKD3D_SM4_INSTRUCTION_LENGTH_SHIFT);
-    set_u32(buffer, token_position, token);
+    uint32_t opcode;
 
     ++tpf->stat->fields[VKD3D_STAT_INSTR_COUNT];
 
@@ -4498,7 +4465,46 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
         default:
             ++tpf->stat->fields[stat_field];
     }
+}
 
+static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
+{
+    uint32_t token = instr->opcode | instr->extra_bits;
+    struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
+    unsigned int size, i, j;
+    size_t token_position;
+
+    if (instr->modifier_count > 0)
+        token |= VKD3D_SM4_INSTRUCTION_MODIFIER;
+
+    token_position = put_u32(buffer, 0);
+
+    for (i = 0; i < instr->modifier_count; ++i)
+    {
+        uint32_t modifier_token = sm4_encode_instruction_modifier(&instr->modifiers[i]);
+
+        if (instr->modifier_count > i + 1)
+            modifier_token |= VKD3D_SM4_INSTRUCTION_MODIFIER;
+        put_u32(buffer, modifier_token);
+    }
+
+    for (i = 0; i < instr->dst_count; ++i)
+        sm4_write_dst_register(tpf, &instr->dsts[i]);
+
+    for (i = 0; i < instr->src_count; ++i)
+        sm4_write_src_register(tpf, &instr->srcs[i]);
+
+    if (instr->byte_stride)
+        put_u32(buffer, instr->byte_stride);
+
+    for (j = 0; j < instr->idx_count; ++j)
+        put_u32(buffer, instr->idx[j]);
+
+    size = (bytecode_get_size(buffer) - token_position) / sizeof(uint32_t);
+    token |= (size << VKD3D_SM4_INSTRUCTION_LENGTH_SHIFT);
+    set_u32(buffer, token_position, token);
+
+    sm4_update_stat_counters(tpf, instr);
 }
 
 static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
