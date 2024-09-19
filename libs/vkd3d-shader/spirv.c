@@ -299,6 +299,16 @@ static void vkd3d_spirv_stream_free(struct vkd3d_spirv_stream *stream)
     vkd3d_spirv_stream_clear(stream);
 }
 
+static void vkd3d_shader_code_from_spirv_stream(struct vkd3d_shader_code *code, struct vkd3d_spirv_stream *stream)
+{
+    code->code = stream->words;
+    code->size = stream->word_count * sizeof(*stream->words);
+
+    stream->words = NULL;
+    stream->capacity = 0;
+    stream->word_count = 0;
+}
+
 static size_t vkd3d_spirv_stream_current_location(struct vkd3d_spirv_stream *stream)
 {
     return stream->word_count;
@@ -2018,9 +2028,7 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
 {
     uint64_t capability_mask = builder->capability_mask;
     struct vkd3d_spirv_stream stream;
-    uint32_t *code;
     unsigned int i;
-    size_t size;
 
     vkd3d_spirv_stream_init(&stream);
 
@@ -2086,18 +2094,8 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
         return false;
     }
 
-    if (!(code = vkd3d_calloc(stream.word_count, sizeof(*code))))
-    {
-        vkd3d_spirv_stream_free(&stream);
-        return false;
-    }
-
-    size = stream.word_count * sizeof(*code);
-    memcpy(code, stream.words, size);
+    vkd3d_shader_code_from_spirv_stream(spirv, &stream);
     vkd3d_spirv_stream_free(&stream);
-
-    spirv->code = code;
-    spirv->size = size;
 
     return true;
 }
