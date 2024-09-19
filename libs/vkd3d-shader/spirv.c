@@ -2075,12 +2075,16 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
     if (builder->invocation_count)
         vkd3d_spirv_build_op_execution_mode(&builder->execution_mode_stream,
                 builder->main_function_id, SpvExecutionModeInvocations, &builder->invocation_count, 1);
-    vkd3d_spirv_stream_append(&stream, &builder->execution_mode_stream);
 
-    vkd3d_spirv_stream_append(&stream, &builder->debug_stream);
-    vkd3d_spirv_stream_append(&stream, &builder->annotation_stream);
-    vkd3d_spirv_stream_append(&stream, &builder->global_stream);
-    vkd3d_spirv_stream_append(&stream, &builder->function_stream);
+    if (!vkd3d_spirv_stream_append(&stream, &builder->execution_mode_stream)
+            || !vkd3d_spirv_stream_append(&stream, &builder->debug_stream)
+            || !vkd3d_spirv_stream_append(&stream, &builder->annotation_stream)
+            || !vkd3d_spirv_stream_append(&stream, &builder->global_stream)
+            || !vkd3d_spirv_stream_append(&stream, &builder->function_stream))
+    {
+        vkd3d_spirv_stream_free(&stream);
+        return false;
+    }
 
     if (!(code = vkd3d_calloc(stream.word_count, sizeof(*code))))
     {
