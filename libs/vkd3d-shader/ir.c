@@ -1211,12 +1211,13 @@ static bool io_normaliser_is_in_control_point_phase(const struct io_normaliser *
 static bool shader_signature_find_element_for_reg(const struct shader_signature *signature,
         unsigned int reg_idx, unsigned int write_mask, unsigned int *element_idx)
 {
+    const struct signature_element *e;
     unsigned int i, base_write_mask;
 
     for (i = 0; i < signature->element_count; ++i)
     {
-        struct signature_element *e = &signature->elements[i];
-        if (e->register_index <= reg_idx && e->register_index + e->register_count > reg_idx
+        e = &signature->elements[i];
+        if (e->register_index <= reg_idx && e->register_count > reg_idx - e->register_index
                 && (e->mask & write_mask) == write_mask)
         {
             *element_idx = i;
