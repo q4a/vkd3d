@@ -648,6 +648,7 @@ enum vkd3d_sm4_stat_field
     VKD3D_STAT_BARRIER,
     VKD3D_STAT_LOD,
     VKD3D_STAT_GATHER,
+    VKD3D_STAT_TEMPS,
     VKD3D_STAT_COUNT,
 };
 
@@ -1883,6 +1884,8 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM5_OP_DCL_OUTPUT_CONTROL_POINT_COUNT, VKD3D_STAT_TESS_CONTROL_POINT_COUNT},
 
         {VKD3D_SM5_OP_SYNC, VKD3D_STAT_BARRIER},
+
+        {VKD3D_SM4_OP_DCL_TEMPS, VKD3D_STAT_TEMPS},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -4438,6 +4441,9 @@ static void sm4_update_stat_counters(const struct tpf_writer *tpf, const struct 
 
     switch (opcode)
     {
+        case VKD3D_SM4_OP_DCL_TEMPS:
+            tpf->stat->fields[stat_field] = max(tpf->stat->fields[stat_field], instr->idx[0]);
+            break;
         case VKD3D_SM4_OP_DCL_OUTPUT_TOPOLOGY:
         case VKD3D_SM4_OP_DCL_INPUT_PRIMITIVE:
             tpf->stat->fields[stat_field] = (instr->opcode & VKD3D_SM4_PRIMITIVE_TYPE_MASK)
@@ -6440,7 +6446,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     struct vkd3d_bytecode_buffer buffer = {0};
 
     put_u32(&buffer, stat->fields[VKD3D_STAT_INSTR_COUNT]);
-    put_u32(&buffer, 0); /* Temp count */
+    put_u32(&buffer, stat->fields[VKD3D_STAT_TEMPS]);
     put_u32(&buffer, 0); /* Def count */
     put_u32(&buffer, 0); /* DCL count */
     put_u32(&buffer, stat->fields[VKD3D_STAT_FLOAT]);
