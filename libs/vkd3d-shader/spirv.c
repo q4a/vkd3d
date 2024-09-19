@@ -1941,39 +1941,10 @@ static uint32_t vkd3d_spirv_get_type_id(struct vkd3d_spirv_builder *builder,
 static uint32_t vkd3d_spirv_get_type_id_for_data_type(struct vkd3d_spirv_builder *builder,
         enum vkd3d_data_type data_type, unsigned int component_count)
 {
-    uint32_t scalar_id;
+    enum vkd3d_shader_component_type component_type;
 
-    if (component_count == 1)
-    {
-        switch (data_type)
-        {
-            case VKD3D_DATA_HALF: /* Minimum precision. TODO: native 16-bit */
-            case VKD3D_DATA_FLOAT:
-            case VKD3D_DATA_SNORM:
-            case VKD3D_DATA_UNORM:
-                return vkd3d_spirv_get_op_type_float(builder, 32);
-                break;
-            case VKD3D_DATA_INT:
-            case VKD3D_DATA_UINT:
-            case VKD3D_DATA_UINT16: /* Minimum precision. TODO: native 16-bit */
-                return vkd3d_spirv_get_op_type_int(builder, 32, data_type == VKD3D_DATA_INT);
-                break;
-            case VKD3D_DATA_DOUBLE:
-                return vkd3d_spirv_get_op_type_float(builder, 64);
-            case VKD3D_DATA_UINT64:
-                return vkd3d_spirv_get_op_type_int(builder, 64, 0);
-            case VKD3D_DATA_BOOL:
-                return vkd3d_spirv_get_op_type_bool(builder);
-            default:
-                FIXME("Unhandled data type %#x.\n", data_type);
-                return 0;
-        }
-    }
-    else
-    {
-        scalar_id = vkd3d_spirv_get_type_id_for_data_type(builder, data_type, 1);
-        return vkd3d_spirv_get_op_type_vector(builder, scalar_id, component_count);
-    }
+    component_type = vkd3d_component_type_from_data_type(data_type);
+    return vkd3d_spirv_get_type_id(builder, component_type, component_count);
 }
 
 static void vkd3d_spirv_builder_init(struct vkd3d_spirv_builder *builder, const char *entry_point)
