@@ -1655,8 +1655,12 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         case HLSL_CLASS_MATRIX:
         case HLSL_CLASS_ARRAY:
         case HLSL_CLASS_STRUCT:
-            /* FIXME: Actually we shouldn't even get here, but we don't split
-             * matrices yet. */
+            /* We can't handle complex types here.
+             * They should have been already split anyway by earlier passes,
+             * but they may not have been deleted yet. We can't rely on DCE to
+             * solve that problem for us, since we may be called on a partial
+             * block, but DCE deletes dead stores, so it needs to be able to
+             * see the whole program. */
             return false;
 
         case HLSL_CLASS_CONSTANT_BUFFER:
