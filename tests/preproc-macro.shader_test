@@ -375,3 +375,7 @@ key1
 [preproc]
 #define key1 ::key2 pass
 key1
+
+[preproc]
+#define KEY(a, b) a b
+KEY(KEY(x, y), pass)
