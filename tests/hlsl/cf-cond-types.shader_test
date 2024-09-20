@@ -102,7 +102,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader todo]
+[pixel shader]
 static const float1x1 f;
 float4 main() : sv_target
 {

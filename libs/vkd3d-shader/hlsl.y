@@ -489,9 +489,10 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
     check_condition_type(ctx, condition);
 
     bool_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL);
-    if (!(cast = hlsl_new_cast(ctx, condition, bool_type, &condition->loc)))
+    /* We already checked for a 1-component numeric type, so
+     * add_implicit_conversion() is equivalent to add_cast() here. */
+    if (!(cast = add_cast(ctx, cond_block, condition, bool_type, &condition->loc)))
         return false;
-    hlsl_block_add_instr(cond_block, cast);
 
     if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, cast, &condition->loc)))
         return false;
