@@ -317,3 +317,61 @@ KEY(pa)
 #define KEY KEY2(fa il)
 KEY
 pass
+
+[preproc]
+#define Key1::Key2 pass
+Key1::Key2
+
+[preproc]
+#define ::Key pass
+::Key
+
+[preproc]
+#define Key1::Key2(x) pass
+Key1::Key2(fail)
+
+[preproc]
+#define Key1::Key2::Key3 pass
+Key1::Key2::Key3
+
+[preproc]
+#define Key1:pass value
+Key1:pass
+
+[preproc]
+#define Key1::::pass value
+Key1::::pass
+
+[preproc]
+#define fail:: pass
+fail
+
+[preproc]
+#define pass bar
+#define key::bar fail
+key::pass
+
+[preproc]
+#define pass bar
+#define bar::key fail
+pass::key
+
+[preproc]
+#define fail::1KEY pass
+fail::1KEY
+
+[preproc]
+#define::pass value
+::pass
+
+[preproc]
+#define fail(key1::key2) key1::key2
+fail(pass)
+
+[preproc]
+#define key1:: key2 pass
+key1
+
+[preproc]
+#define key1 ::key2 pass
+key1
