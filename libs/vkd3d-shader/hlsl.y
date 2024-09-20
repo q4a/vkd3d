@@ -5346,11 +5346,6 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
         }
         else
         {
-            cond_type = hlsl_get_numeric_type(ctx, cond_type->class, HLSL_TYPE_BOOL,
-                    cond_type->dimx, cond_type->dimy);
-            if (!(cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc)))
-                return false;
-
             if (common_type->dimx == 1 && common_type->dimy == 1)
             {
                 common_type = hlsl_get_numeric_type(ctx, cond_type->class,
@@ -5372,6 +5367,11 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
                 hlsl_release_string_buffer(ctx, cond_string);
                 hlsl_release_string_buffer(ctx, value_string);
             }
+
+            cond_type = hlsl_get_numeric_type(ctx, common_type->class, HLSL_TYPE_BOOL,
+                    common_type->dimx, common_type->dimy);
+            if (!(cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc)))
+                return false;
         }
 
         if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
