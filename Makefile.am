@@ -104,6 +104,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/early-depth-stencil.shader_test \
 	tests/hlsl/effect-annotations-fx_2.shader_test \
 	tests/hlsl/effect-annotations-fx_4.shader_test \
+	tests/hlsl/effect-assignments-fx_5.shader_test \
 	tests/hlsl/effect-compile.shader_test \
 	tests/hlsl/effect-initial-values-fx_2.shader_test \
 	tests/hlsl/effect-initial-values-fx_4.shader_test \
