@@ -648,6 +648,7 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
 
     /* Wrap the node into a src to allow the reference to survive the multiple const passes. */
     hlsl_src_from_node(&src, node);
+    hlsl_lower_index_loads(ctx, &expr);
     hlsl_run_const_passes(ctx, &expr);
     node = src.node;
     hlsl_src_remove(&src);
