@@ -1516,11 +1516,14 @@ static uint32_t write_fx_4_state_numeric_value(struct hlsl_ir_constant *value, s
 static void write_fx_4_state_assignment(const struct hlsl_ir_var *var, struct hlsl_state_block_entry *entry,
         struct fx_write_context *fx)
 {
-    uint32_t value_offset = 0, assignment_type = 0, rhs_offset;
-    uint32_t type_offset;
+    uint32_t value_offset = 0, assignment_type = 0, rhs_offset, type_offset, offset;
+    struct vkd3d_bytecode_buffer *unstructured = &fx->unstructured;
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    struct hlsl_ctx *ctx = fx->ctx;
     struct hlsl_ir_node *value = entry->args->node;
+    struct hlsl_ctx *ctx = fx->ctx;
+    struct hlsl_ir_var *index_var;
+    struct hlsl_ir_constant *c;
+    struct hlsl_ir_load *load;
 
     put_u32(buffer, entry->name_id);
     put_u32(buffer, entry->lhs_index);
@@ -1531,7 +1534,7 @@ static void write_fx_4_state_assignment(const struct hlsl_ir_var *var, struct hl
     {
         case HLSL_IR_CONSTANT:
         {
-            struct hlsl_ir_constant *c = hlsl_ir_constant(value);
+            c = hlsl_ir_constant(value);
 
             value_offset = write_fx_4_state_numeric_value(c, fx);
             assignment_type = 1;
@@ -1539,13 +1542,69 @@ static void write_fx_4_state_assignment(const struct hlsl_ir_var *var, struct hl
         }
         case HLSL_IR_LOAD:
         {
-            struct hlsl_ir_load *l = hlsl_ir_load(value);
+            load = hlsl_ir_load(value);
 
-            if (l->src.path_len)
+            if (load->src.path_len)
                 hlsl_fixme(ctx, &var->loc, "Indexed access in RHS values is not implemented.");
 
-            value_offset = write_fx_4_string(l->src.var->name, fx);
+            value_offset = write_fx_4_string(load->src.var->name, fx);
             assignment_type = 2;
+            break;
+        }
+        case HLSL_IR_INDEX:
+        {
+            struct hlsl_ir_index *index = hlsl_ir_index(value);
+            struct hlsl_ir_node *val = index->val.node;
+            struct hlsl_ir_node *idx = index->idx.node;
+            struct hlsl_type *type;
+
+            if (val->type != HLSL_IR_LOAD)
+            {
+                hlsl_fixme(ctx, &var->loc, "Unexpected indexed RHS value type.");
+                break;
+            }
+
+            load = hlsl_ir_load(val);
+            value_offset = write_fx_4_string(load->src.var->name, fx);
+            type = load->src.var->data_type;
+
+            switch (idx->type)
+            {
+                case HLSL_IR_CONSTANT:
+                {
+                    c = hlsl_ir_constant(idx);
+                    value_offset = put_u32(unstructured, value_offset);
+                    put_u32(unstructured, c->value.u[0].u);
+                    assignment_type = 3;
+
+                    if (c->value.u[0].u >= type->e.array.elements_count)
+                        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
+                                "Array index %u exceeds array size %u.", c->value.u[0].u, type->e.array.elements_count);
+                    break;
+                }
+
+                case HLSL_IR_LOAD:
+                {
+                    load = hlsl_ir_load(idx);
+                    index_var = load->src.var;
+
+                    /* Special case for uint index variables, for anything more complex use an expression. */
+                    if (hlsl_types_are_equal(index_var->data_type, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT))
+                            && !load->src.path_len)
+                    {
+                        offset = write_fx_4_string(index_var->name, fx);
+
+                        value_offset = put_u32(unstructured, value_offset);
+                        put_u32(unstructured, offset);
+                        assignment_type = 4;
+                        break;
+                    }
+                }
+                /* fall through */
+
+                default:
+                    hlsl_fixme(ctx, &var->loc, "Complex array index expressions in RHS values are not implemented.");
+            }
             break;
         }
         default:

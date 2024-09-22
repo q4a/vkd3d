@@ -18,7 +18,7 @@ technique11
     }
 }
 
-[effect todo]
+[effect]
 uint stencil_ref;
 uint stencil_refs[2];
 uint index;
@@ -39,7 +39,7 @@ technique11
     }
 }
 
-[effect fail todo]
+[effect fail]
 uint stencil_refs[2];
 
 technique11
