@@ -13148,6 +13148,25 @@ static void test_root_signature_byte_code(void)
             &IID_ID3D12RootSignatureDeserializer, (void **)&versioned_deserializer);
     ok(hr == E_NOINTERFACE, "Got unexpected hr %#x.\n", hr);
 
+    versioned_deserializer = (ID3D12VersionedRootSignatureDeserializer *)0xdeadbeef;
+    hr = pfn_D3D12CreateVersionedRootSignatureDeserializer(empty_rootsig, 0,
+            &IID_ID3D12VersionedRootSignatureDeserializer, (void **)&versioned_deserializer);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    todo ok(!versioned_deserializer, "Got unexpected versioned_deserializer %p.\n", versioned_deserializer);
+
+    versioned_deserializer = (ID3D12VersionedRootSignatureDeserializer *)0xdeadbeef;
+    hr = pfn_D3D12CreateVersionedRootSignatureDeserializer(NULL, 0,
+            &IID_ID3D12VersionedRootSignatureDeserializer, (void **)&versioned_deserializer);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    todo ok(!versioned_deserializer, "Got unexpected versioned_deserializer %p.\n", versioned_deserializer);
+
+    versioned_deserializer = (ID3D12VersionedRootSignatureDeserializer *)0xdeadbeef;
+    i = 0xdeadbeef;
+    hr = pfn_D3D12CreateVersionedRootSignatureDeserializer(&i, sizeof(i),
+            &IID_ID3D12VersionedRootSignatureDeserializer, (void **)&versioned_deserializer);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    todo ok(!versioned_deserializer, "Got unexpected versioned_deserializer %p.\n", versioned_deserializer);
+
     hr = pfn_D3D12CreateVersionedRootSignatureDeserializer(empty_rootsig, sizeof(empty_rootsig),
             &IID_ID3D12VersionedRootSignatureDeserializer, (void **)&versioned_deserializer);
     ok(hr == S_OK, "Failed to create deserializer, hr %#x.\n", hr);
