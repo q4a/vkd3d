@@ -5994,6 +5994,24 @@ static void vsir_validate_register(struct validation_context *ctx,
                         reg->dimension);
             break;
 
+        case VKD3DSPR_UAV:
+            if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
+                        "Invalid precision %#x for a UAV register.",
+                        reg->precision);
+
+            if (reg->data_type != VKD3D_DATA_UNUSED)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                        "Invalid data type %#x for a UAV register.",
+                        reg->data_type);
+
+            /* NONE is allowed in counter operations. */
+            if (reg->dimension == VSIR_DIMENSION_SCALAR)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                        "Invalid dimension %#x for a UAV register.",
+                        reg->dimension);
+            break;
+
         default:
             break;
     }
