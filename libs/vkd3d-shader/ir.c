@@ -6080,6 +6080,11 @@ static void vsir_validate_src_param(struct validation_context *ctx,
             }
             break;
 
+        case VKD3DSPR_NULL:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Invalid NULL register used as source parameter.");
+            break;
+
         default:
             break;
     }
