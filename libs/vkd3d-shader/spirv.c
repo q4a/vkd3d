@@ -6354,7 +6354,7 @@ static SpvImageFormat image_format_for_image_read(enum vkd3d_shader_component_ty
 static uint32_t spirv_compiler_get_image_type_id(struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg, const struct vkd3d_shader_register_range *range,
         const struct vkd3d_spirv_resource_type *resource_type_info, enum vkd3d_shader_component_type data_type,
-        bool raw_structured, uint32_t depth)
+        bool raw_structured)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_descriptor_info1 *d;
@@ -6377,7 +6377,7 @@ static uint32_t spirv_compiler_get_image_type_id(struct spirv_compiler *compiler
 
     sampled_type_id = vkd3d_spirv_get_type_id(builder, data_type, 1);
     return vkd3d_spirv_get_op_type_image(builder, sampled_type_id, resource_type_info->dim,
-            depth, resource_type_info->arrayed, resource_type_info->ms,
+            2, resource_type_info->arrayed, resource_type_info->ms,
             reg->type == VKD3DSPR_UAV ? 2 : 1, format);
 }
 
@@ -6392,18 +6392,14 @@ static void spirv_compiler_emit_combined_sampler_declarations(struct spirv_compi
     const struct vkd3d_shader_combined_resource_sampler *current;
     uint32_t image_type_id, type_id, ptr_type_id, var_id;
     enum vkd3d_shader_binding_flag resource_type_flag;
-    const struct vkd3d_shader_descriptor_info1 *d;
     struct vkd3d_symbol symbol;
     unsigned int i;
-    bool depth;
 
     resource_type_flag = resource_type == VKD3D_SHADER_RESOURCE_BUFFER
             ? VKD3D_SHADER_BINDING_FLAG_BUFFER : VKD3D_SHADER_BINDING_FLAG_IMAGE;
 
     for (i = 0; i < shader_interface->combined_sampler_count; ++i)
     {
-        struct vkd3d_shader_register_range sampler_range;
-
         current = &shader_interface->combined_samplers[i];
 
         if (current->resource_space != resource_range->space || current->resource_index != resource_range->first)
@@ -6425,16 +6421,8 @@ static void spirv_compiler_emit_combined_sampler_declarations(struct spirv_compi
                     current->sampler_space, current->binding.count);
         }
 
-        sampler_range.space = current->sampler_space;
-        sampler_range.first = current->sampler_index;
-        sampler_range.last = current->sampler_index;
-        d = spirv_compiler_get_descriptor_info(compiler,
-                VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, &sampler_range);
-        depth = current->sampler_index != VKD3D_SHADER_DUMMY_SAMPLER_INDEX
-                && (d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE);
-
         image_type_id = spirv_compiler_get_image_type_id(compiler, resource, resource_range,
-                resource_type_info, sampled_type, structure_stride || raw, depth);
+                resource_type_info, sampled_type, structure_stride || raw);
         type_id = vkd3d_spirv_get_op_type_sampled_image(builder, image_type_id);
 
         ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
@@ -6528,7 +6516,7 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
     else
     {
         type_id = spirv_compiler_get_image_type_id(compiler, &reg, range,
-                resource_type_info, sampled_type, structure_stride || raw, 0);
+                resource_type_info, sampled_type, structure_stride || raw);
     }
 
     var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class,
@@ -8440,11 +8428,10 @@ static void spirv_compiler_prepare_image(struct spirv_compiler *compiler,
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t sampler_var_id, sampler_id, sampled_image_type_id;
     const struct vkd3d_symbol *symbol = NULL;
-    bool load, sampled, depth_comparison;
+    bool load, sampled;
 
     load = !(flags & VKD3D_IMAGE_FLAG_NO_LOAD);
     sampled = flags & VKD3D_IMAGE_FLAG_SAMPLED;
-    depth_comparison = flags & VKD3D_IMAGE_FLAG_DEPTH;
 
     if (resource_reg->type == VKD3DSPR_RESOURCE)
         symbol = spirv_compiler_find_combined_sampler(compiler, resource_reg, sampler_reg);
@@ -8498,7 +8485,7 @@ static void spirv_compiler_prepare_image(struct spirv_compiler *compiler,
 
     image->image_type_id = spirv_compiler_get_image_type_id(compiler, resource_reg,
             &symbol->info.resource.range, image->resource_type_info,
-            image->sampled_type, image->structure_stride || image->raw, depth_comparison);
+            image->sampled_type, image->structure_stride || image->raw);
 
     if (sampled)
     {
