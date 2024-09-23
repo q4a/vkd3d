@@ -6860,7 +6860,6 @@ static void sm6_parser_emit_cmpxchg(struct sm6_parser *sm6, const struct dxil_re
     struct vkd3d_shader_dst_param *dst_params;
     struct vkd3d_shader_src_param *src_params;
     const struct sm6_value *ptr, *cmp, *new;
-    const struct sm6_type *type;
     unsigned int i = 0;
     bool is_volatile;
     uint64_t code;
@@ -6886,9 +6885,10 @@ static void sm6_parser_emit_cmpxchg(struct sm6_parser *sm6, const struct dxil_re
         return;
     }
 
-    type = ptr->type->u.pointer.type;
-    cmp = sm6_parser_get_value_by_ref(sm6, record, type, &i);
-    new = sm6_parser_get_value_by_ref(sm6, record, type, &i);
+    /* Forward-referenced comparands are stored as value/type pairs, even
+     * though in principle we could use the destination type. */
+    cmp = sm6_parser_get_value_by_ref(sm6, record, NULL, &i);
+    new = sm6_parser_get_value_by_ref(sm6, record, ptr->type->u.pointer.type, &i);
     if (!cmp || !new)
         return;
 
