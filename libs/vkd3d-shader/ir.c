@@ -5960,6 +5960,23 @@ static void vsir_validate_register(struct validation_context *ctx,
                         reg->idx_count);
             break;
 
+        case VKD3DSPR_SAMPLER:
+            if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
+                        "Invalid precision %#x for a SAMPLER register.",
+                        reg->precision);
+
+            if (reg->data_type != VKD3D_DATA_UNUSED)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                        "Invalid data type %#x for a SAMPLER register.",
+                        reg->data_type);
+
+            /* VEC4 is allowed in gather operations. */
+            if (reg->dimension == VSIR_DIMENSION_SCALAR)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                        "Invalid dimension SCALAR for a SAMPLER register.");
+            break;
+
         default:
             break;
     }
