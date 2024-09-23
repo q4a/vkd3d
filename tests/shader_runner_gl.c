@@ -242,6 +242,15 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
         DXGI_FORMAT_R32G32B32A32_SINT,
     };
 
+#ifndef VKD3D_SHADER_UNSUPPORTED_GLSL
+    if (language == GLSL)
+    {
+        skip("GLSL support is not enabled. If this is unintentional, "
+                "add -DVKD3D_SHADER_UNSUPPORTED_GLSL to CPPFLAGS.\n");
+        return false;
+    }
+#endif
+
     memset(runner, 0, sizeof(*runner));
     runner->language = language;
 
