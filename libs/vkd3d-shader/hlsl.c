@@ -4408,14 +4408,14 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
     struct hlsl_type *type, *next_type;
     unsigned int i;
 
-    hlsl_block_cleanup(&ctx->static_initializers);
-
     for (i = 0; i < ctx->source_files_count; ++i)
         vkd3d_free((void *)ctx->source_files[i]);
     vkd3d_free(ctx->source_files);
     vkd3d_string_buffer_cache_cleanup(&ctx->string_buffers);
 
     rb_destroy(&ctx->functions, free_function_rb, NULL);
+
+    hlsl_block_cleanup(&ctx->static_initializers);
 
     /* State blocks must be free before the variables, because they contain instructions that may
      * refer to them. */
