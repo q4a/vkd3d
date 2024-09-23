@@ -6045,6 +6045,11 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
                     "Invalid IMMCONST64 register used as destination parameter.");
             break;
 
+        case VKD3DSPR_SAMPLER:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Invalid SAMPLER register used as destination parameter.");
+            break;
+
         default:
             break;
     }
