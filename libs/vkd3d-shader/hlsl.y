@@ -7796,6 +7796,11 @@ stateblock_lhs_identifier:
             if (!($$ = hlsl_strdup(ctx, "pixelshader")))
                 YYABORT;
         }
+    | KW_TEXTURE
+        {
+            if (!($$ = hlsl_strdup(ctx, "texture")))
+                YYABORT;
+        }
     | KW_VERTEXSHADER
         {
             if (!($$ = hlsl_strdup(ctx, "vertexshader")))
