@@ -6050,6 +6050,11 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
                     "Invalid SAMPLER register used as destination parameter.");
             break;
 
+        case VKD3DSPR_RESOURCE:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Invalid RESOURCE register used as destination parameter.");
+            break;
+
         default:
             break;
     }
