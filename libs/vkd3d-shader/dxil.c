@@ -7286,7 +7286,6 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
     unsigned int i = 0, alignment, operand_count;
     struct vkd3d_shader_src_param *src_params;
     struct vkd3d_shader_dst_param *dst_param;
-    const struct sm6_type *pointee_type;
     const struct sm6_value *ptr, *src;
     uint64_t alignment_code;
 
@@ -7298,13 +7297,14 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
         return;
     }
 
-    pointee_type = ptr->type->u.pointer.type;
-    if (!(src = sm6_parser_get_value_by_ref(sm6, record, pointee_type, &i)))
+    /* Forward-referenced sources are stored as value/type pairs, even
+     * though in principle we could use the destination type. */
+    if (!(src = sm6_parser_get_value_by_ref(sm6, record, NULL, &i)))
         return;
     if (!sm6_value_validate_is_numeric(src, sm6))
         return;
 
-    if (pointee_type != src->type)
+    if (ptr->type->u.pointer.type != src->type)
     {
         WARN("Type mismatch.\n");
         vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
