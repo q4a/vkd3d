@@ -1074,7 +1074,7 @@ static void run_shader_tests_for_model_range(void *dxc_compiler,
 
     if (minimum_shader_model >= SHADER_MODEL_6_0 && !device_supports_shader_model_6_0(device))
     {
-        trace("Device does not support shader model 6.0.\n");
+        skip("The device does not support shader model 6.0.\n");
         destroy_test_context(&runner.test_context);
         return;
     }
