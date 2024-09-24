@@ -4419,6 +4419,9 @@ struct register_allocator
         uint32_t reg;
         unsigned int writemask;
         unsigned int first_write, last_read;
+
+        /* Two allocations with different mode can't share the same register. */
+        int mode;
     } *allocations;
     size_t count, capacity;
 
@@ -4431,7 +4434,7 @@ struct register_allocator
 };
 
 static unsigned int get_available_writemask(const struct register_allocator *allocator,
-        unsigned int first_write, unsigned int last_read, uint32_t reg_idx)
+        unsigned int first_write, unsigned int last_read, uint32_t reg_idx, int mode)
 {
     unsigned int writemask = VKD3DSP_WRITEMASK_ALL;
     size_t i;
@@ -4446,7 +4449,11 @@ static unsigned int get_available_writemask(const struct register_allocator *all
 
         if (allocation->reg == reg_idx
                 && first_write < allocation->last_read && last_read > allocation->first_write)
+        {
             writemask &= ~allocation->writemask;
+            if (allocation->mode != mode)
+                writemask = 0;
+        }
 
         if (!writemask)
             break;
@@ -4455,8 +4462,8 @@ static unsigned int get_available_writemask(const struct register_allocator *all
     return writemask;
 }
 
-static void record_allocation(struct hlsl_ctx *ctx, struct register_allocator *allocator,
-        uint32_t reg_idx, unsigned int writemask, unsigned int first_write, unsigned int last_read)
+static void record_allocation(struct hlsl_ctx *ctx, struct register_allocator *allocator, uint32_t reg_idx,
+        unsigned int writemask, unsigned int first_write, unsigned int last_read, int mode)
 {
     struct allocation *allocation;
 
@@ -4469,6 +4476,7 @@ static void record_allocation(struct hlsl_ctx *ctx, struct register_allocator *a
     allocation->writemask = writemask;
     allocation->first_write = first_write;
     allocation->last_read = last_read;
+    allocation->mode = mode;
 
     allocator->reg_count = max(allocator->reg_count, reg_idx + 1);
 }
@@ -4476,9 +4484,9 @@ static void record_allocation(struct hlsl_ctx *ctx, struct register_allocator *a
 /* reg_size is the number of register components to be reserved, while component_count is the number
  * of components for the register's writemask. In SM1, floats and vectors allocate the whole
  * register, even if they don't use it completely. */
-static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_allocator *allocator,
-        unsigned int first_write, unsigned int last_read, unsigned int reg_size,
-        unsigned int component_count)
+static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx,
+        struct register_allocator *allocator, unsigned int first_write, unsigned int last_read,
+        unsigned int reg_size, unsigned int component_count, int mode)
 {
     struct hlsl_reg ret = {0};
     unsigned int writemask;
@@ -4488,7 +4496,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
 
     for (reg_idx = 0;; ++reg_idx)
     {
-        writemask = get_available_writemask(allocator, first_write, last_read, reg_idx);
+        writemask = get_available_writemask(allocator, first_write, last_read, reg_idx, mode);
 
         if (vkd3d_popcount(writemask) >= reg_size)
         {
@@ -4497,7 +4505,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
         }
     }
 
-    record_allocation(ctx, allocator, reg_idx, writemask, first_write, last_read);
+    record_allocation(ctx, allocator, reg_idx, writemask, first_write, last_read, mode);
 
     ret.id = reg_idx;
     ret.allocation_size = 1;
@@ -4508,7 +4516,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
 
 /* Allocate a register with writemask, while reserving reg_writemask. */
 static struct hlsl_reg allocate_register_with_masks(struct hlsl_ctx *ctx, struct register_allocator *allocator,
-        unsigned int first_write, unsigned int last_read, uint32_t reg_writemask, uint32_t writemask)
+        unsigned int first_write, unsigned int last_read, uint32_t reg_writemask, uint32_t writemask, int mode)
 {
     struct hlsl_reg ret = {0};
     uint32_t reg_idx;
@@ -4517,11 +4525,12 @@ static struct hlsl_reg allocate_register_with_masks(struct hlsl_ctx *ctx, struct
 
     for (reg_idx = 0;; ++reg_idx)
     {
-        if ((get_available_writemask(allocator, first_write, last_read, reg_idx) & reg_writemask) == reg_writemask)
+        if ((get_available_writemask(allocator, first_write, last_read,
+                reg_idx, mode) & reg_writemask) == reg_writemask)
             break;
     }
 
-    record_allocation(ctx, allocator, reg_idx, reg_writemask, first_write, last_read);
+    record_allocation(ctx, allocator, reg_idx, reg_writemask, first_write, last_read, mode);
 
     ret.id = reg_idx;
     ret.allocation_size = 1;
@@ -4530,8 +4539,8 @@ static struct hlsl_reg allocate_register_with_masks(struct hlsl_ctx *ctx, struct
     return ret;
 }
 
-static bool is_range_available(const struct register_allocator *allocator,
-        unsigned int first_write, unsigned int last_read, uint32_t reg_idx, unsigned int reg_size)
+static bool is_range_available(const struct register_allocator *allocator, unsigned int first_write,
+        unsigned int last_read, uint32_t reg_idx, unsigned int reg_size, int mode)
 {
     unsigned int last_reg_mask = (1u << (reg_size % 4)) - 1;
     unsigned int writemask;
@@ -4539,18 +4548,18 @@ static bool is_range_available(const struct register_allocator *allocator,
 
     for (i = 0; i < (reg_size / 4); ++i)
     {
-        writemask = get_available_writemask(allocator, first_write, last_read, reg_idx + i);
+        writemask = get_available_writemask(allocator, first_write, last_read, reg_idx + i, mode);
         if (writemask != VKD3DSP_WRITEMASK_ALL)
             return false;
     }
-    writemask = get_available_writemask(allocator, first_write, last_read, reg_idx + (reg_size / 4));
+    writemask = get_available_writemask(allocator, first_write, last_read, reg_idx + (reg_size / 4), mode);
     if ((writemask & last_reg_mask) != last_reg_mask)
         return false;
     return true;
 }
 
 static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct register_allocator *allocator,
-        unsigned int first_write, unsigned int last_read, unsigned int reg_size)
+        unsigned int first_write, unsigned int last_read, unsigned int reg_size, int mode)
 {
     struct hlsl_reg ret = {0};
     uint32_t reg_idx;
@@ -4558,14 +4567,15 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct register_allo
 
     for (reg_idx = 0;; ++reg_idx)
     {
-        if (is_range_available(allocator, first_write, last_read, reg_idx, reg_size))
+        if (is_range_available(allocator, first_write, last_read, reg_idx, reg_size, mode))
             break;
     }
 
     for (i = 0; i < reg_size / 4; ++i)
-        record_allocation(ctx, allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, first_write, last_read);
+        record_allocation(ctx, allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, first_write, last_read, mode);
     if (reg_size % 4)
-        record_allocation(ctx, allocator, reg_idx + (reg_size / 4), (1u << (reg_size % 4)) - 1, first_write, last_read);
+        record_allocation(ctx, allocator, reg_idx + (reg_size / 4),
+                (1u << (reg_size % 4)) - 1, first_write, last_read, mode);
 
     ret.id = reg_idx;
     ret.allocation_size = align(reg_size, 4) / 4;
@@ -4581,9 +4591,9 @@ static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx,
     /* FIXME: We could potentially pack structs or arrays more efficiently... */
 
     if (type->class <= HLSL_CLASS_VECTOR)
-        return allocate_register(ctx, allocator, first_write, last_read, type->dimx, type->dimx);
+        return allocate_register(ctx, allocator, first_write, last_read, type->dimx, type->dimx, 0);
     else
-        return allocate_range(ctx, allocator, first_write, last_read, reg_size);
+        return allocate_range(ctx, allocator, first_write, last_read, reg_size, 0);
 }
 
 static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
@@ -4762,7 +4772,7 @@ static void allocate_instr_temp_register(struct hlsl_ctx *ctx,
 
     if (reg_writemask)
         instr->reg = allocate_register_with_masks(ctx, allocator,
-                instr->index, instr->last_read, reg_writemask, dst_writemask);
+                instr->index, instr->last_read, reg_writemask, dst_writemask, 0);
     else
         instr->reg = allocate_numeric_registers_for_type(ctx, allocator,
                 instr->index, instr->last_read, instr->data_type);
@@ -5083,14 +5093,14 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
             {
                 if (i < bind_count)
                 {
-                    if (get_available_writemask(&allocator_used, 1, UINT_MAX, reg_idx + i) != VKD3DSP_WRITEMASK_ALL)
+                    if (get_available_writemask(&allocator_used, 1, UINT_MAX, reg_idx + i, 0) != VKD3DSP_WRITEMASK_ALL)
                     {
                         hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                                 "Overlapping register() reservations on 'c%u'.", reg_idx + i);
                     }
-                    record_allocation(ctx, &allocator_used, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX);
+                    record_allocation(ctx, &allocator_used, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX, 0);
                 }
-                record_allocation(ctx, &allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX);
+                record_allocation(ctx, &allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX, 0);
             }
 
             var->regs[HLSL_REGSET_NUMERIC].id = reg_idx;
@@ -5113,7 +5123,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
 
         if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
         {
-            var->regs[HLSL_REGSET_NUMERIC] = allocate_range(ctx, &allocator, 1, UINT_MAX, alloc_size);
+            var->regs[HLSL_REGSET_NUMERIC] = allocate_range(ctx, &allocator, 1, UINT_MAX, alloc_size, 0);
             TRACE("Allocated %s to %s.\n", var->name,
                     debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
@@ -5156,7 +5166,7 @@ uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_d
             var = entry_func->parameters.vars[i];
             if (var->is_output_semantic)
             {
-                record_allocation(ctx, &allocator, 0, VKD3DSP_WRITEMASK_ALL, var->first_write, var->last_read);
+                record_allocation(ctx, &allocator, 0, VKD3DSP_WRITEMASK_ALL, var->first_write, var->last_read, 0);
                 break;
             }
         }
