@@ -3133,7 +3133,8 @@ static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
         ctx->result = buffer->status;
 }
 
-static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, bool output)
+static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
+        const struct hlsl_ir_function_decl *func, bool output)
 {
     struct vkd3d_bytecode_buffer buffer = {0};
     struct vkd3d_string_buffer *string;
@@ -3145,7 +3146,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
     count_position = put_u32(&buffer, 0);
     put_u32(&buffer, 8); /* unknown */
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         unsigned int width = (1u << var->data_type->dimx) - 1, use_mask;
         enum vkd3d_shader_sysval_semantic semantic;
@@ -3210,7 +3211,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
     }
 
     i = 0;
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         enum vkd3d_shader_sysval_semantic semantic;
         const char *name = var->semantic.name;
@@ -6440,7 +6441,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, const struct hlsl_ir_function_d
     if (entry_func->early_depth_test && profile->major_version >= 5)
         write_sm4_dcl_global_flags(&tpf, VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL);
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if ((var->is_input_semantic && var->last_read) || (var->is_output_semantic && var->first_write))
             write_sm4_dcl_semantic(&tpf, var);
@@ -6565,8 +6566,8 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     dxbc_writer_init(&dxbc);
 
-    write_sm4_signature(ctx, &dxbc, false);
-    write_sm4_signature(ctx, &dxbc, true);
+    write_sm4_signature(ctx, &dxbc, entry_func, false);
+    write_sm4_signature(ctx, &dxbc, entry_func, true);
     write_sm4_rdef(ctx, &dxbc);
     write_sm4_shdr(ctx, entry_func, &stat, &dxbc);
     write_sm4_sfi0(ctx, &dxbc);
