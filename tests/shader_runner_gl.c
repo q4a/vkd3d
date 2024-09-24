@@ -162,6 +162,21 @@ static bool check_egl_client_extension(const char *extension)
     return false;
 }
 
+static bool check_glsl_support(void)
+{
+    const enum vkd3d_shader_target_type *target_types;
+    unsigned int count, i;
+
+    target_types = vkd3d_shader_get_supported_target_types(VKD3D_SHADER_SOURCE_DXBC_TPF, &count);
+    for (i = 0; i < count; ++i)
+    {
+        if (target_types[i] == VKD3D_SHADER_TARGET_GLSL)
+            return true;
+    }
+
+    return false;
+}
+
 static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool is_shadow)
 {
     size_t i;
@@ -242,14 +257,12 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
         DXGI_FORMAT_R32G32B32A32_SINT,
     };
 
-#ifndef VKD3D_SHADER_UNSUPPORTED_GLSL
-    if (language == GLSL)
+    if (language == GLSL && !check_glsl_support())
     {
         skip("GLSL support is not enabled. If this is unintentional, "
                 "add -DVKD3D_SHADER_UNSUPPORTED_GLSL to CPPFLAGS.\n");
         return false;
     }
-#endif
 
     memset(runner, 0, sizeof(*runner));
     runner->language = language;
