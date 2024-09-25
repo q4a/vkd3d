@@ -1288,8 +1288,7 @@ static HRESULT d3d12_root_signature_init_root_descriptors(struct d3d12_root_sign
         const D3D12_ROOT_SIGNATURE_DESC *desc, struct vkd3d_descriptor_set_context *context)
 {
     struct vk_binding_array *vk_bindings = &context->vk_bindings;
-    VkDescriptorSetLayoutBinding *cur_binding;
-    unsigned int i;
+    unsigned int binding_idx, i;
     HRESULT hr;
 
     root_signature->push_descriptor_mask = 0;
@@ -1304,21 +1303,17 @@ static HRESULT d3d12_root_signature_init_root_descriptors(struct d3d12_root_sign
 
         root_signature->push_descriptor_mask |= 1u << i;
 
-        cur_binding = &vk_bindings->bindings[vk_bindings->count];
         if (FAILED(hr = d3d12_root_signature_assign_vk_bindings(root_signature,
                 vkd3d_descriptor_type_from_d3d12_root_parameter_type(p->ParameterType),
                 p->u.Descriptor.RegisterSpace, p->u.Descriptor.ShaderRegister, 1, true, false,
-                vkd3d_shader_visibility_from_d3d12(p->ShaderVisibility), context, &cur_binding->binding)))
+                vkd3d_shader_visibility_from_d3d12(p->ShaderVisibility), context, &binding_idx)))
             return hr;
-        cur_binding->descriptorType = vk_descriptor_type_from_d3d12_root_parameter(p->ParameterType);
-        cur_binding->descriptorCount = 1;
-        cur_binding->stageFlags = stage_flags_from_visibility(p->ShaderVisibility);
-        cur_binding->pImmutableSamplers = NULL;
+        vk_binding_array_add_binding(vk_bindings, binding_idx,
+                vk_descriptor_type_from_d3d12_root_parameter(p->ParameterType),
+                1, stage_flags_from_visibility(p->ShaderVisibility), NULL);
 
         root_signature->parameters[i].parameter_type = p->ParameterType;
-        root_signature->parameters[i].u.descriptor.binding = cur_binding->binding;
-
-        ++vk_bindings->count;
+        root_signature->parameters[i].u.descriptor.binding = binding_idx;
     }
 
     return S_OK;
