@@ -313,20 +313,6 @@ static enum vkd3d_shader_descriptor_type vkd3d_descriptor_type_from_d3d12_root_p
     }
 }
 
-static bool vk_binding_from_d3d12_descriptor_range(struct VkDescriptorSetLayoutBinding *binding_desc,
-        enum vkd3d_shader_descriptor_type descriptor_type, D3D12_SHADER_VISIBILITY shader_visibility,
-        bool is_buffer, uint32_t vk_binding, unsigned int descriptor_count)
-{
-    binding_desc->binding = vk_binding;
-    binding_desc->descriptorType
-            = vk_descriptor_type_from_vkd3d_descriptor_type(descriptor_type, is_buffer);
-    binding_desc->descriptorCount = descriptor_count;
-    binding_desc->stageFlags = stage_flags_from_visibility(shader_visibility);
-    binding_desc->pImmutableSamplers = NULL;
-
-    return true;
-}
-
 struct d3d12_root_signature_info
 {
     size_t binding_count;
@@ -738,6 +724,19 @@ static bool vk_binding_array_init(struct vk_binding_array *array, size_t capacit
     return true;
 }
 
+static void vk_binding_array_add_binding(struct vk_binding_array *array, unsigned int binding_idx,
+        VkDescriptorType descriptor_type, unsigned int descriptor_count, VkShaderStageFlags stage_flags)
+{
+    VkDescriptorSetLayoutBinding *binding;
+
+    binding = &array->bindings[array->count++];
+    binding->binding = binding_idx;
+    binding->descriptorType = descriptor_type;
+    binding->descriptorCount = descriptor_count;
+    binding->stageFlags = stage_flags;
+    binding->pImmutableSamplers = NULL;
+}
+
 struct vkd3d_descriptor_set_context
 {
     struct vk_binding_array vk_bindings;
@@ -928,21 +927,17 @@ static HRESULT d3d12_root_signature_init_descriptor_array_binding(struct d3d12_r
 
     if (descriptor_type == VKD3D_SHADER_DESCRIPTOR_TYPE_SRV || descriptor_type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
     {
-        if (!vk_binding_from_d3d12_descriptor_range(&vk_bindings->bindings[vk_bindings->count],
-                descriptor_type, visibility, true, context->descriptor_binding, range->vk_binding_count))
-            return E_NOTIMPL;
-        ++vk_bindings->count;
-
+        vk_binding_array_add_binding(vk_bindings, context->descriptor_binding,
+                vk_descriptor_type_from_vkd3d_descriptor_type(descriptor_type, true),
+                range->vk_binding_count, stage_flags_from_visibility(visibility));
         if (FAILED(hr = d3d12_root_signature_append_vk_binding(root_signature, descriptor_type, range->register_space,
                 range->base_register_idx, true, shader_visibility, range->vk_binding_count, context)))
             return hr;
     }
 
-    if (!vk_binding_from_d3d12_descriptor_range(&vk_bindings->bindings[vk_bindings->count],
-            descriptor_type, visibility, is_buffer, context->descriptor_binding, range->vk_binding_count))
-        return E_NOTIMPL;
-    ++vk_bindings->count;
-
+    vk_binding_array_add_binding(vk_bindings, context->descriptor_binding,
+            vk_descriptor_type_from_vkd3d_descriptor_type(descriptor_type, is_buffer),
+            range->vk_binding_count, stage_flags_from_visibility(visibility));
     if (FAILED(hr = d3d12_root_signature_append_vk_binding(root_signature, descriptor_type, range->register_space,
             range->base_register_idx, is_buffer, shader_visibility, range->vk_binding_count, context)))
         return hr;
@@ -1269,16 +1264,14 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
                     vk_current_binding = vk_binding + 2 * k;
 
                     /* Assign binding for image view. */
-                    if (!vk_binding_from_d3d12_descriptor_range(&vk_bindings->bindings[vk_bindings->count],
-                            range->type, p->ShaderVisibility, false, vk_current_binding + 1, 1))
-                        return E_NOTIMPL;
-                    ++vk_bindings->count;
+                    vk_binding_array_add_binding(vk_bindings, vk_current_binding + 1,
+                            vk_descriptor_type_from_vkd3d_descriptor_type(range->type, false),
+                            1, stage_flags_from_visibility(p->ShaderVisibility));
                 }
 
-                if (!vk_binding_from_d3d12_descriptor_range(&vk_bindings->bindings[vk_bindings->count],
-                        range->type, p->ShaderVisibility, true, vk_current_binding, 1))
-                    return E_NOTIMPL;
-                ++vk_bindings->count;
+                vk_binding_array_add_binding(vk_bindings, vk_current_binding,
+                        vk_descriptor_type_from_vkd3d_descriptor_type(range->type, true),
+                        1, stage_flags_from_visibility(p->ShaderVisibility));
             }
 
             range->vk_binding_count = range->descriptor_count;
