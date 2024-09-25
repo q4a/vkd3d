@@ -5253,7 +5253,7 @@ enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hlsl_type
 }
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        struct register_allocator *allocator, bool output, bool is_patch_constant_func)
+        struct register_allocator *allocator, bool output, bool optimize, bool is_patch_constant_func)
 {
     static const char *const shader_names[] =
     {
@@ -5312,6 +5312,13 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
         if ((builtin = sm4_register_from_semantic_name(&version, var->semantic.name, output, &type, &has_idx)))
             reg = has_idx ? var->semantic.index : 0;
+
+        if (semantic == VKD3D_SHADER_SV_TESS_FACTOR_TRIINT)
+        {
+            /* While SV_InsideTessFactor can be declared as 'float' for "tri"
+             * domains, it is allocated as if it was 'float[1]'. */
+            var->force_align = true;
+        }
     }
 
     if (builtin)
@@ -5323,18 +5330,21 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     {
         int mode = (ctx->profile->major_version < 4)
                 ? 0 : sm4_get_interpolation_mode(var->data_type, var->storage_modifiers);
+        unsigned int reg_size = optimize ? var->data_type->dimx : 4;
 
         var->regs[HLSL_REGSET_NUMERIC] = allocate_register(ctx, allocator, 1,
-                UINT_MAX, 4, var->data_type->dimx, mode, var->force_align);
+                UINT_MAX, reg_size, var->data_type->dimx, mode, var->force_align);
 
-        TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v',
-                var->regs[HLSL_REGSET_NUMERIC], var->data_type));
+        TRACE("Allocated %s to %s (mode %d).\n", var->name, debug_register(output ? 'o' : 'v',
+                var->regs[HLSL_REGSET_NUMERIC], var->data_type), mode);
     }
 }
 
 static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct register_allocator input_allocator = {0}, output_allocator = {0};
+    bool is_vertex_shader = ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX;
+    bool is_pixel_shader = ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL;
     bool is_patch_constant_func = entry_func == ctx->patch_constant_func;
     struct hlsl_ir_var *var;
 
@@ -5344,9 +5354,9 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_input_semantic)
-            allocate_semantic_register(ctx, var, &input_allocator, false, is_patch_constant_func);
+            allocate_semantic_register(ctx, var, &input_allocator, false, !is_vertex_shader, is_patch_constant_func);
         if (var->is_output_semantic)
-            allocate_semantic_register(ctx, var, &output_allocator, true, is_patch_constant_func);
+            allocate_semantic_register(ctx, var, &output_allocator, true, !is_pixel_shader, is_patch_constant_func);
     }
 
     vkd3d_free(input_allocator.allocations);
