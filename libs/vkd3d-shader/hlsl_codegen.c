@@ -5190,6 +5190,36 @@ uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_d
     return allocator.reg_count;
 }
 
+enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hlsl_type *type, unsigned int storage_modifiers)
+{
+    unsigned int i;
+
+    static const struct
+    {
+        unsigned int modifiers;
+        enum vkd3d_shader_interpolation_mode mode;
+    }
+    modes[] =
+    {
+        {HLSL_STORAGE_CENTROID | HLSL_STORAGE_NOPERSPECTIVE, VKD3DSIM_LINEAR_NOPERSPECTIVE_CENTROID},
+        {HLSL_STORAGE_NOPERSPECTIVE, VKD3DSIM_LINEAR_NOPERSPECTIVE},
+        {HLSL_STORAGE_CENTROID, VKD3DSIM_LINEAR_CENTROID},
+        {HLSL_STORAGE_CENTROID | HLSL_STORAGE_LINEAR, VKD3DSIM_LINEAR_CENTROID},
+    };
+
+    if ((storage_modifiers & HLSL_STORAGE_NOINTERPOLATION)
+            || base_type_get_semantic_equivalent(type->e.numeric.type) == HLSL_TYPE_UINT)
+        return VKD3DSIM_CONSTANT;
+
+    for (i = 0; i < ARRAY_SIZE(modes); ++i)
+    {
+        if ((storage_modifiers & modes[i].modifiers) == modes[i].modifiers)
+            return modes[i].mode;
+    }
+
+    return VKD3DSIM_LINEAR;
+}
+
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
         struct register_allocator *allocator, bool output, bool is_patch_constant_func)
 {
@@ -5259,7 +5289,10 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     }
     else
     {
-        var->regs[HLSL_REGSET_NUMERIC] = allocate_register(ctx, allocator, 1, UINT_MAX, 4, var->data_type->dimx, 0);
+        int mode = (ctx->profile->major_version < 4)
+                ? 0 : sm4_get_interpolation_mode(var->data_type, var->storage_modifiers);
+
+        var->regs[HLSL_REGSET_NUMERIC] = allocate_register(ctx, allocator, 1, UINT_MAX, 4, var->data_type->dimx, mode);
 
         TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v',
                 var->regs[HLSL_REGSET_NUMERIC], var->data_type));
@@ -6328,16 +6361,15 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
         if (sm4_register_from_semantic_name(&program->shader_version, var->semantic.name, output, &type, &has_idx))
         {
             register_index = has_idx ? var->semantic.index : ~0u;
+            mask = (1u << var->data_type->dimx) - 1;
         }
         else
         {
             VKD3D_ASSERT(var->regs[HLSL_REGSET_NUMERIC].allocated);
             register_index = var->regs[HLSL_REGSET_NUMERIC].id;
+            mask = var->regs[HLSL_REGSET_NUMERIC].writemask;
         }
 
-        /* NOTE: remember to change this to the actually allocated mask once
-         * we start optimizing interstage signatures. */
-        mask = (1u << var->data_type->dimx) - 1;
         use_mask = mask; /* FIXME: retrieve use mask accurately. */
 
         switch (var->data_type->e.numeric.type)

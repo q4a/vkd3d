@@ -1636,6 +1636,9 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func);
 
+enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hlsl_type *type,
+        unsigned int storage_modifiers);
+
 struct hlsl_ir_function_decl *hlsl_compile_internal_function(struct hlsl_ctx *ctx, const char *name, const char *hlsl);
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl);
