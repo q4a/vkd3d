@@ -725,7 +725,8 @@ static bool vk_binding_array_init(struct vk_binding_array *array, size_t capacit
 }
 
 static void vk_binding_array_add_binding(struct vk_binding_array *array, unsigned int binding_idx,
-        VkDescriptorType descriptor_type, unsigned int descriptor_count, VkShaderStageFlags stage_flags)
+        VkDescriptorType descriptor_type, unsigned int descriptor_count,
+        VkShaderStageFlags stage_flags, const VkSampler *immutable_sampler)
 {
     VkDescriptorSetLayoutBinding *binding;
 
@@ -734,7 +735,7 @@ static void vk_binding_array_add_binding(struct vk_binding_array *array, unsigne
     binding->descriptorType = descriptor_type;
     binding->descriptorCount = descriptor_count;
     binding->stageFlags = stage_flags;
-    binding->pImmutableSamplers = NULL;
+    binding->pImmutableSamplers = immutable_sampler;
 }
 
 struct vkd3d_descriptor_set_context
@@ -929,7 +930,7 @@ static HRESULT d3d12_root_signature_init_descriptor_array_binding(struct d3d12_r
     {
         vk_binding_array_add_binding(vk_bindings, context->descriptor_binding,
                 vk_descriptor_type_from_vkd3d_descriptor_type(descriptor_type, true),
-                range->vk_binding_count, stage_flags_from_visibility(visibility));
+                range->vk_binding_count, stage_flags_from_visibility(visibility), NULL);
         if (FAILED(hr = d3d12_root_signature_append_vk_binding(root_signature, descriptor_type, range->register_space,
                 range->base_register_idx, true, shader_visibility, range->vk_binding_count, context)))
             return hr;
@@ -937,7 +938,7 @@ static HRESULT d3d12_root_signature_init_descriptor_array_binding(struct d3d12_r
 
     vk_binding_array_add_binding(vk_bindings, context->descriptor_binding,
             vk_descriptor_type_from_vkd3d_descriptor_type(descriptor_type, is_buffer),
-            range->vk_binding_count, stage_flags_from_visibility(visibility));
+            range->vk_binding_count, stage_flags_from_visibility(visibility), NULL);
     if (FAILED(hr = d3d12_root_signature_append_vk_binding(root_signature, descriptor_type, range->register_space,
             range->base_register_idx, is_buffer, shader_visibility, range->vk_binding_count, context)))
         return hr;
@@ -1266,12 +1267,12 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
                     /* Assign binding for image view. */
                     vk_binding_array_add_binding(vk_bindings, vk_current_binding + 1,
                             vk_descriptor_type_from_vkd3d_descriptor_type(range->type, false),
-                            1, stage_flags_from_visibility(p->ShaderVisibility));
+                            1, stage_flags_from_visibility(p->ShaderVisibility), NULL);
                 }
 
                 vk_binding_array_add_binding(vk_bindings, vk_current_binding,
                         vk_descriptor_type_from_vkd3d_descriptor_type(range->type, true),
-                        1, stage_flags_from_visibility(p->ShaderVisibility));
+                        1, stage_flags_from_visibility(p->ShaderVisibility), NULL);
             }
 
             range->vk_binding_count = range->descriptor_count;
@@ -1328,8 +1329,7 @@ static HRESULT d3d12_root_signature_init_static_samplers(struct d3d12_root_signa
         struct vkd3d_descriptor_set_context *context)
 {
     struct vk_binding_array *vk_bindings = &context->vk_bindings;
-    VkDescriptorSetLayoutBinding *cur_binding;
-    unsigned int i;
+    unsigned int binding_idx, i;
     HRESULT hr;
 
     VKD3D_ASSERT(root_signature->static_sampler_count == desc->NumStaticSamplers);
@@ -1340,17 +1340,12 @@ static HRESULT d3d12_root_signature_init_static_samplers(struct d3d12_root_signa
         if (FAILED(hr = vkd3d_create_static_sampler(device, s, &root_signature->static_samplers[i])))
             return hr;
 
-        cur_binding = &vk_bindings->bindings[vk_bindings->count];
         if (FAILED(hr = d3d12_root_signature_assign_vk_bindings(root_signature,
                 VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, s->RegisterSpace, s->ShaderRegister, 1, false, false,
-                vkd3d_shader_visibility_from_d3d12(s->ShaderVisibility), context, &cur_binding->binding)))
+                vkd3d_shader_visibility_from_d3d12(s->ShaderVisibility), context, &binding_idx)))
             return hr;
-        cur_binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-        cur_binding->descriptorCount = 1;
-        cur_binding->stageFlags = stage_flags_from_visibility(s->ShaderVisibility);
-        cur_binding->pImmutableSamplers = &root_signature->static_samplers[i];
-
-        ++vk_bindings->count;
+        vk_binding_array_add_binding(vk_bindings, binding_idx, VK_DESCRIPTOR_TYPE_SAMPLER, 1,
+                stage_flags_from_visibility(s->ShaderVisibility), &root_signature->static_samplers[i]);
     }
 
     if (device->use_vk_heaps)
