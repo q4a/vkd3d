@@ -5179,7 +5179,7 @@ uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_d
 }
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        unsigned int *counter, bool output, bool is_patch_constant_func)
+        struct register_allocator *allocator, bool output, bool is_patch_constant_func)
 {
     static const char *const shader_names[] =
     {
@@ -5247,10 +5247,8 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     }
     else
     {
-        var->regs[HLSL_REGSET_NUMERIC].allocated = true;
-        var->regs[HLSL_REGSET_NUMERIC].id = (*counter)++;
-        var->regs[HLSL_REGSET_NUMERIC].allocation_size = 1;
-        var->regs[HLSL_REGSET_NUMERIC].writemask = (1 << var->data_type->dimx) - 1;
+        var->regs[HLSL_REGSET_NUMERIC] = allocate_register(ctx, allocator, 1, UINT_MAX, 4, var->data_type->dimx, 0);
+
         TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v',
                 var->regs[HLSL_REGSET_NUMERIC], var->data_type));
     }
@@ -5258,17 +5256,20 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
 static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
+    struct register_allocator input_allocator = {0}, output_allocator = {0};
     bool is_patch_constant_func = entry_func == ctx->patch_constant_func;
-    unsigned int input_counter = 0, output_counter = 0;
     struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_input_semantic)
-            allocate_semantic_register(ctx, var, &input_counter, false, is_patch_constant_func);
+            allocate_semantic_register(ctx, var, &input_allocator, false, is_patch_constant_func);
         if (var->is_output_semantic)
-            allocate_semantic_register(ctx, var, &output_counter, true, is_patch_constant_func);
+            allocate_semantic_register(ctx, var, &output_allocator, true, is_patch_constant_func);
     }
+
+    vkd3d_free(input_allocator.allocations);
+    vkd3d_free(output_allocator.allocations);
 }
 
 static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx,
