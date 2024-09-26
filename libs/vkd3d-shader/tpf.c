@@ -896,7 +896,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins, u
                 >> VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
     }
 
-    reg_data_type = opcode == VKD3D_SM4_OP_DCL_RESOURCE ? VKD3D_DATA_RESOURCE : VKD3D_DATA_UAV;
+    reg_data_type = opcode == VKD3D_SM4_OP_DCL_RESOURCE ? VKD3D_DATA_RESOURCE : VKD3D_DATA_UNUSED;
     shader_sm4_read_dst_param(priv, &tokens, end, reg_data_type, &semantic->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &semantic->resource.reg.reg, &semantic->resource.range);
 
@@ -916,7 +916,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins, u
         }
     }
 
-    if (reg_data_type == VKD3D_DATA_UAV)
+    if (opcode != VKD3D_SM4_OP_DCL_RESOURCE)
         ins->flags = (opcode_token & VKD3D_SM5_UAV_FLAGS_MASK) >> VKD3D_SM5_UAV_FLAGS_SHIFT;
 
     shader_sm4_read_register_space(priv, &tokens, end, &semantic->resource.range.space);
@@ -1302,7 +1302,7 @@ static void shader_sm5_read_dcl_uav_raw(struct vkd3d_shader_instruction *ins, ui
     struct vkd3d_shader_raw_resource *resource = &ins->declaration.raw_resource;
     const uint32_t *end = &tokens[token_count];
 
-    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UAV, &resource->resource.reg);
+    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UNUSED, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     ins->flags = (opcode_token & VKD3D_SM5_UAV_FLAGS_MASK) >> VKD3D_SM5_UAV_FLAGS_SHIFT;
     shader_sm4_read_register_space(priv, &tokens, end, &resource->resource.range.space);
@@ -1314,7 +1314,7 @@ static void shader_sm5_read_dcl_uav_structured(struct vkd3d_shader_instruction *
     struct vkd3d_shader_structured_resource *resource = &ins->declaration.structured_resource;
     const uint32_t *end = &tokens[token_count];
 
-    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UAV, &resource->resource.reg);
+    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UNUSED, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     ins->flags = (opcode_token & VKD3D_SM5_UAV_FLAGS_MASK) >> VKD3D_SM5_UAV_FLAGS_SHIFT;
     resource->byte_stride = *tokens++;
@@ -1563,7 +1563,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM5_OP_CUT_STREAM,                       VKD3DSIH_CUT_STREAM,                       "",     "f"},
         {VKD3D_SM5_OP_FCALL,                            VKD3DSIH_FCALL,                            "",     "O",
                 shader_sm5_read_fcall},
-        {VKD3D_SM5_OP_BUFINFO,                          VKD3DSIH_BUFINFO,                          "i",    "U"},
+        {VKD3D_SM5_OP_BUFINFO,                          VKD3DSIH_BUFINFO,                          "i",    "*"},
         {VKD3D_SM5_OP_DERIV_RTX_COARSE,                 VKD3DSIH_DSX_COARSE,                       "f",    "f"},
         {VKD3D_SM5_OP_DERIV_RTX_FINE,                   VKD3DSIH_DSX_FINE,                         "f",    "f"},
         {VKD3D_SM5_OP_DERIV_RTY_COARSE,                 VKD3DSIH_DSY_COARSE,                       "f",    "f"},
@@ -1622,33 +1622,33 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
                 shader_sm5_read_dcl_resource_raw},
         {VKD3D_SM5_OP_DCL_RESOURCE_STRUCTURED,          VKD3DSIH_DCL_RESOURCE_STRUCTURED,          "",     "",
                 shader_sm5_read_dcl_resource_structured},
-        {VKD3D_SM5_OP_LD_UAV_TYPED,                     VKD3DSIH_LD_UAV_TYPED,                     "u",    "iU"},
-        {VKD3D_SM5_OP_STORE_UAV_TYPED,                  VKD3DSIH_STORE_UAV_TYPED,                  "U",    "iu"},
-        {VKD3D_SM5_OP_LD_RAW,                           VKD3DSIH_LD_RAW,                           "u",    "iU"},
-        {VKD3D_SM5_OP_STORE_RAW,                        VKD3DSIH_STORE_RAW,                        "U",    "uu"},
+        {VKD3D_SM5_OP_LD_UAV_TYPED,                     VKD3DSIH_LD_UAV_TYPED,                     "u",    "i*"},
+        {VKD3D_SM5_OP_STORE_UAV_TYPED,                  VKD3DSIH_STORE_UAV_TYPED,                  "*",    "iu"},
+        {VKD3D_SM5_OP_LD_RAW,                           VKD3DSIH_LD_RAW,                           "u",    "i*"},
+        {VKD3D_SM5_OP_STORE_RAW,                        VKD3DSIH_STORE_RAW,                        "*",    "uu"},
         {VKD3D_SM5_OP_LD_STRUCTURED,                    VKD3DSIH_LD_STRUCTURED,                    "u",    "iiR"},
-        {VKD3D_SM5_OP_STORE_STRUCTURED,                 VKD3DSIH_STORE_STRUCTURED,                 "U",    "iiu"},
-        {VKD3D_SM5_OP_ATOMIC_AND,                       VKD3DSIH_ATOMIC_AND,                       "U",    "iu"},
-        {VKD3D_SM5_OP_ATOMIC_OR,                        VKD3DSIH_ATOMIC_OR,                        "U",    "iu"},
-        {VKD3D_SM5_OP_ATOMIC_XOR,                       VKD3DSIH_ATOMIC_XOR,                       "U",    "iu"},
-        {VKD3D_SM5_OP_ATOMIC_CMP_STORE,                 VKD3DSIH_ATOMIC_CMP_STORE,                 "U",    "iuu"},
-        {VKD3D_SM5_OP_ATOMIC_IADD,                      VKD3DSIH_ATOMIC_IADD,                      "U",    "ii"},
-        {VKD3D_SM5_OP_ATOMIC_IMAX,                      VKD3DSIH_ATOMIC_IMAX,                      "U",    "ii"},
-        {VKD3D_SM5_OP_ATOMIC_IMIN,                      VKD3DSIH_ATOMIC_IMIN,                      "U",    "ii"},
-        {VKD3D_SM5_OP_ATOMIC_UMAX,                      VKD3DSIH_ATOMIC_UMAX,                      "U",    "iu"},
-        {VKD3D_SM5_OP_ATOMIC_UMIN,                      VKD3DSIH_ATOMIC_UMIN,                      "U",    "iu"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_ALLOC,                 VKD3DSIH_IMM_ATOMIC_ALLOC,                 "u",    "U"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_CONSUME,               VKD3DSIH_IMM_ATOMIC_CONSUME,               "u",    "U"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_IADD,                  VKD3DSIH_IMM_ATOMIC_IADD,                  "uU",   "ii"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_AND,                   VKD3DSIH_IMM_ATOMIC_AND,                   "uU",   "iu"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_OR,                    VKD3DSIH_IMM_ATOMIC_OR,                    "uU",   "iu"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_XOR,                   VKD3DSIH_IMM_ATOMIC_XOR,                   "uU",   "iu"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_EXCH,                  VKD3DSIH_IMM_ATOMIC_EXCH,                  "uU",   "iu"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_CMP_EXCH,              VKD3DSIH_IMM_ATOMIC_CMP_EXCH,              "uU",   "iuu"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_IMAX,                  VKD3DSIH_IMM_ATOMIC_IMAX,                  "iU",   "ii"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_IMIN,                  VKD3DSIH_IMM_ATOMIC_IMIN,                  "iU",   "ii"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_UMAX,                  VKD3DSIH_IMM_ATOMIC_UMAX,                  "uU",   "iu"},
-        {VKD3D_SM5_OP_IMM_ATOMIC_UMIN,                  VKD3DSIH_IMM_ATOMIC_UMIN,                  "uU",   "iu"},
+        {VKD3D_SM5_OP_STORE_STRUCTURED,                 VKD3DSIH_STORE_STRUCTURED,                 "*",    "iiu"},
+        {VKD3D_SM5_OP_ATOMIC_AND,                       VKD3DSIH_ATOMIC_AND,                       "*",    "iu"},
+        {VKD3D_SM5_OP_ATOMIC_OR,                        VKD3DSIH_ATOMIC_OR,                        "*",    "iu"},
+        {VKD3D_SM5_OP_ATOMIC_XOR,                       VKD3DSIH_ATOMIC_XOR,                       "*",    "iu"},
+        {VKD3D_SM5_OP_ATOMIC_CMP_STORE,                 VKD3DSIH_ATOMIC_CMP_STORE,                 "*",    "iuu"},
+        {VKD3D_SM5_OP_ATOMIC_IADD,                      VKD3DSIH_ATOMIC_IADD,                      "*",    "ii"},
+        {VKD3D_SM5_OP_ATOMIC_IMAX,                      VKD3DSIH_ATOMIC_IMAX,                      "*",    "ii"},
+        {VKD3D_SM5_OP_ATOMIC_IMIN,                      VKD3DSIH_ATOMIC_IMIN,                      "*",    "ii"},
+        {VKD3D_SM5_OP_ATOMIC_UMAX,                      VKD3DSIH_ATOMIC_UMAX,                      "*",    "iu"},
+        {VKD3D_SM5_OP_ATOMIC_UMIN,                      VKD3DSIH_ATOMIC_UMIN,                      "*",    "iu"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_ALLOC,                 VKD3DSIH_IMM_ATOMIC_ALLOC,                 "u",    "*"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_CONSUME,               VKD3DSIH_IMM_ATOMIC_CONSUME,               "u",    "*"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_IADD,                  VKD3DSIH_IMM_ATOMIC_IADD,                  "u*",   "ii"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_AND,                   VKD3DSIH_IMM_ATOMIC_AND,                   "u*",   "iu"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_OR,                    VKD3DSIH_IMM_ATOMIC_OR,                    "u*",   "iu"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_XOR,                   VKD3DSIH_IMM_ATOMIC_XOR,                   "u*",   "iu"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_EXCH,                  VKD3DSIH_IMM_ATOMIC_EXCH,                  "u*",   "iu"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_CMP_EXCH,              VKD3DSIH_IMM_ATOMIC_CMP_EXCH,              "u*",   "iuu"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_IMAX,                  VKD3DSIH_IMM_ATOMIC_IMAX,                  "i*",   "ii"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_IMIN,                  VKD3DSIH_IMM_ATOMIC_IMIN,                  "i*",   "ii"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_UMAX,                  VKD3DSIH_IMM_ATOMIC_UMAX,                  "u*",   "iu"},
+        {VKD3D_SM5_OP_IMM_ATOMIC_UMIN,                  VKD3DSIH_IMM_ATOMIC_UMIN,                  "u*",   "iu"},
         {VKD3D_SM5_OP_SYNC,                             VKD3DSIH_SYNC,                             "",     "",
                 shader_sm5_read_sync},
         {VKD3D_SM5_OP_DADD,                             VKD3DSIH_DADD,                             "d",    "dd"},
@@ -1982,8 +1982,6 @@ static enum vkd3d_data_type map_data_type(char t)
             return VKD3D_DATA_OPAQUE;
         case 'R':
             return VKD3D_DATA_RESOURCE;
-        case 'U':
-            return VKD3D_DATA_UAV;
         case '*':
             return VKD3D_DATA_UNUSED;
         default:

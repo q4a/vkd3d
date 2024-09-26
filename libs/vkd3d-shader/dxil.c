@@ -4161,8 +4161,7 @@ static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_
     dst_param_init(&dst_params[0]);
 
     dst_params[1].reg = ptr->u.reg;
-    /* The groupshared register has data type UAV when accessed. */
-    dst_params[1].reg.data_type = VKD3D_DATA_UAV;
+    dst_params[1].reg.data_type = VKD3D_DATA_UNUSED;
     dst_params[1].reg.idx[1].rel_addr = NULL;
     dst_params[1].reg.idx[1].offset = ~0u;
     dst_params[1].reg.idx_count = 1;
@@ -8982,7 +8981,7 @@ static enum vkd3d_result sm6_parser_resources_load_uav(struct sm6_parser *sm6,
     d->resource_type = ins->resource_type;
     d->kind = values[0];
     d->reg_type = VKD3DSPR_UAV;
-    d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_UAV;
+    d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_UNUSED;
     d->resource_data_type = (ins->opcode == VKD3DSIH_DCL_UAV_TYPED)
             ? ins->declaration.semantic.resource_data_type[0] : VKD3D_DATA_UNUSED;
 

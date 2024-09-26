@@ -676,7 +676,6 @@ static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum 
         [VKD3D_DATA_FLOAT    ] = "float",
         [VKD3D_DATA_INT      ] = "int",
         [VKD3D_DATA_RESOURCE ] = "resource",
-        [VKD3D_DATA_UAV      ] = "uav",
         [VKD3D_DATA_UINT     ] = "uint",
         [VKD3D_DATA_UNORM    ] = "unorm",
         [VKD3D_DATA_SNORM    ] = "snorm",
