@@ -10530,9 +10530,16 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, struct vsir_pro
 
     dxil_block_destroy(&sm6->root_block);
 
+    if (sm6->p.failed)
+    {
+        ret = VKD3D_ERROR_INVALID_SHADER;
+        goto fail;
+    }
+
     return VKD3D_OK;
 
 fail:
+    sm6_parser_cleanup(sm6);
     vsir_program_cleanup(program);
     return ret;
 }
@@ -10574,18 +10581,20 @@ int dxil_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t co
     free_dxbc_shader_desc(&dxbc_desc);
     vkd3d_free(byte_code);
 
-    if (!sm6.p.failed && ret >= 0)
-        ret = vkd3d_shader_parser_validate(&sm6.p, config_flags);
-
-    if (sm6.p.failed && ret >= 0)
-        ret = VKD3D_ERROR_INVALID_SHADER;
-
-    sm6_parser_cleanup(&sm6);
     if (ret < 0)
     {
         WARN("Failed to parse shader.\n");
         return ret;
     }
 
-    return ret;
+    if ((ret = vkd3d_shader_parser_validate(&sm6.p, config_flags)) < 0)
+    {
+        sm6_parser_cleanup(&sm6);
+        vsir_program_cleanup(program);
+        return ret;
+    }
+
+    sm6_parser_cleanup(&sm6);
+
+    return VKD3D_OK;
 }
