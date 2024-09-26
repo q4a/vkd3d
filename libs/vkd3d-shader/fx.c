@@ -467,6 +467,7 @@ static uint32_t get_fx_4_type_size(const struct hlsl_type *type)
 
 static const uint32_t fx_4_numeric_base_type[] =
 {
+    [HLSL_TYPE_HALF]  = 1,
     [HLSL_TYPE_FLOAT] = 1,
     [HLSL_TYPE_INT  ] = 2,
     [HLSL_TYPE_UINT ] = 3,
@@ -503,6 +504,7 @@ static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, 
     switch (type->e.numeric.type)
     {
         case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
         case HLSL_TYPE_INT:
         case HLSL_TYPE_UINT:
         case HLSL_TYPE_BOOL:
@@ -579,6 +581,12 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         case HLSL_CLASS_STRING:
             return "String";
 
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            if (type->e.numeric.type == HLSL_TYPE_HALF)
+                return "float";
+            /* fall-through */
         default:
             return type->name;
     }
@@ -1267,6 +1275,7 @@ static uint32_t write_fx_4_default_value(struct hlsl_type *value_type, struct hl
                 switch (type->e.numeric.type)
                 {
                     case HLSL_TYPE_FLOAT:
+                    case HLSL_TYPE_HALF:
                     case HLSL_TYPE_INT:
                     case HLSL_TYPE_UINT:
                     case HLSL_TYPE_BOOL:
