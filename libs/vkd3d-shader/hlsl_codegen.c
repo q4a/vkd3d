@@ -344,6 +344,23 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
     return ext_var;
 }
 
+static uint32_t combine_field_storage_modifiers(uint32_t modifiers, uint32_t field_modifiers)
+{
+    field_modifiers |= modifiers;
+
+    /* TODO: 'sample' modifier is not supported yet. */
+
+    /* 'nointerpolation' always takes precedence, next the same is done for
+     * 'sample', remaining modifiers are combined. */
+    if (field_modifiers & HLSL_STORAGE_NOINTERPOLATION)
+    {
+        field_modifiers &= ~HLSL_INTERPOLATION_MODIFIERS_MASK;
+        field_modifiers |= HLSL_STORAGE_NOINTERPOLATION;
+    }
+
+    return field_modifiers;
+}
+
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func, struct hlsl_ir_load *lhs,
         uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
@@ -425,12 +442,13 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
 
         for (i = 0; i < hlsl_type_element_count(type); ++i)
         {
-            uint32_t element_modifiers = modifiers;
+            uint32_t element_modifiers;
 
             if (type->class == HLSL_CLASS_ARRAY)
             {
                 elem_semantic_index = semantic_index
                         + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
+                element_modifiers = modifiers;
             }
             else
             {
@@ -444,17 +462,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 semantic = &field->semantic;
                 elem_semantic_index = semantic->index;
                 loc = &field->loc;
-                element_modifiers |= field->storage_modifiers;
-
-                /* TODO: 'sample' modifier is not supported yet */
-
-                /* 'nointerpolation' always takes precedence, next the same is done for 'sample',
-                   remaining modifiers are combined. */
-                if (element_modifiers & HLSL_STORAGE_NOINTERPOLATION)
-                {
-                    element_modifiers &= ~HLSL_INTERPOLATION_MODIFIERS_MASK;
-                    element_modifiers |= HLSL_STORAGE_NOINTERPOLATION;
-                }
+                element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
             }
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
@@ -563,10 +571,13 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
 
         for (i = 0; i < hlsl_type_element_count(type); ++i)
         {
+            uint32_t element_modifiers;
+
             if (type->class == HLSL_CLASS_ARRAY)
             {
                 elem_semantic_index = semantic_index
                         + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
+                element_modifiers = modifiers;
             }
             else
             {
@@ -577,6 +588,7 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 semantic = &field->semantic;
                 elem_semantic_index = semantic->index;
                 loc = &field->loc;
+                element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
             }
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
@@ -587,7 +599,7 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 return;
             hlsl_block_add_instr(&func->body, &element_load->node);
 
-            append_output_copy_recurse(ctx, func, element_load, modifiers, semantic, elem_semantic_index);
+            append_output_copy_recurse(ctx, func, element_load, element_modifiers, semantic, elem_semantic_index);
         }
     }
     else
