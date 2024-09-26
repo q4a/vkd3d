@@ -6262,6 +6262,24 @@ static void vsir_validate_register(struct validation_context *ctx,
                         "Invalid offset for a RASTOUT register.");
             break;
 
+        case VKD3DSPR_MISCTYPE:
+            if (reg->idx_count != 1)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                        "Invalid index count %u for a MISCTYPE register.",
+                        reg->idx_count);
+                break;
+            }
+
+            if (reg->idx[0].rel_addr)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "Non-NULL relative address for a MISCTYPE register.");
+
+            if (reg->idx[0].offset >= 2)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "Invalid offset for a MISCTYPE register.");
+            break;
+
         default:
             break;
     }
