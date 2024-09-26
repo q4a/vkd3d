@@ -4459,6 +4459,13 @@ struct register_allocator
 
     /* Total number of registers allocated so far. Used to declare sm4 temp count. */
     uint32_t reg_count;
+
+    /* Special flag so allocations that can share registers prioritize those
+     * that will result in smaller writemasks.
+     * For instance, a single-register allocation would prefer to share a register
+     * whose .xy components are already allocated (becoming .z) instead of a
+     * register whose .xyz components are already allocated (becoming .w). */
+    bool prioritize_smaller_writemasks;
 };
 
 static unsigned int get_available_writemask(const struct register_allocator *allocator,
@@ -4517,23 +4524,31 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
         unsigned int component_count, int mode, bool force_align)
 {
     unsigned int required_size = force_align ? 4 : reg_size;
+    unsigned int writemask = 0, pref;
     struct hlsl_reg ret = {0};
-    unsigned int writemask;
     uint32_t reg_idx;
 
     VKD3D_ASSERT(component_count <= reg_size);
 
-    for (reg_idx = 0;; ++reg_idx)
+    pref = allocator->prioritize_smaller_writemasks ? 4 : required_size;
+    for (; pref >= required_size; --pref)
     {
-        writemask = get_available_writemask(allocator, first_write, last_read, reg_idx, mode);
-
-        if (vkd3d_popcount(writemask) >= required_size)
+        for (reg_idx = 0; pref == required_size || reg_idx < allocator->reg_count; ++reg_idx)
         {
-            writemask = hlsl_combine_writemasks(writemask, (1u << reg_size) - 1);
-            break;
+            unsigned int available_writemask = get_available_writemask(allocator,
+                    first_write, last_read, reg_idx, mode);
+
+            if (vkd3d_popcount(available_writemask) >= pref)
+            {
+                writemask = hlsl_combine_writemasks(available_writemask, (1u << reg_size) - 1);
+                break;
+            }
         }
+        if (writemask)
+            break;
     }
 
+    VKD3D_ASSERT(vkd3d_popcount(writemask) == reg_size);
     record_allocation(ctx, allocator, reg_idx, writemask, first_write, last_read, mode);
 
     ret.id = reg_idx;
@@ -5322,6 +5337,9 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     struct register_allocator input_allocator = {0}, output_allocator = {0};
     bool is_patch_constant_func = entry_func == ctx->patch_constant_func;
     struct hlsl_ir_var *var;
+
+    input_allocator.prioritize_smaller_writemasks = true;
+    output_allocator.prioritize_smaller_writemasks = true;
 
     LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
