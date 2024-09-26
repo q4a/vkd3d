@@ -5206,7 +5206,8 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint32_t space, uint32_t index)
+static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx,
+        uint32_t space, uint32_t index, bool allocated_only)
 {
     const struct hlsl_buffer *buffer;
 
@@ -5214,7 +5215,12 @@ static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint3
     {
         if (buffer->reservation.reg_type == 'b'
                 && buffer->reservation.reg_space == space && buffer->reservation.reg_index == index)
+        {
+            if (allocated_only && !buffer->reg.allocated)
+                continue;
+
             return buffer;
+        }
     }
     return NULL;
 }
@@ -5397,8 +5403,8 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
             if (reservation->reg_type == 'b')
             {
-                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx,
-                        reservation->reg_space, reservation->reg_index);
+                const struct hlsl_buffer *allocated_buffer = get_reserved_buffer(ctx,
+                        reservation->reg_space, reservation->reg_index, true);
                 unsigned int max_index = get_max_cbuffer_reg_index(ctx);
 
                 if (buffer->reservation.reg_index > max_index)
@@ -5406,14 +5412,14 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
                             "Buffer reservation cb%u exceeds target's maximum (cb%u).",
                             buffer->reservation.reg_index, max_index);
 
-                if (reserved_buffer && reserved_buffer != buffer)
+                if (allocated_buffer && allocated_buffer != buffer)
                 {
                     hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                             "Multiple buffers bound to space %u, index %u.",
                             reservation->reg_space, reservation->reg_index);
-                    hlsl_note(ctx, &reserved_buffer->loc, VKD3D_SHADER_LOG_ERROR,
+                    hlsl_note(ctx, &allocated_buffer->loc, VKD3D_SHADER_LOG_ERROR,
                             "Buffer %s is already bound to space %u, index %u.",
-                            reserved_buffer->name, reservation->reg_space, reservation->reg_index);
+                            allocated_buffer->name, reservation->reg_space, reservation->reg_index);
                 }
 
                 buffer->reg.space = reservation->reg_space;
@@ -5430,12 +5436,12 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
             else if (!reservation->reg_type)
             {
                 unsigned int max_index = get_max_cbuffer_reg_index(ctx);
-                while (get_reserved_buffer(ctx, 0, index))
+                while (get_reserved_buffer(ctx, 0, index, false))
                     ++index;
 
                 if (index > max_index)
                     hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
-                        "Too many buffers allocated, target's maximum is %u.", max_index);
+                        "Too many buffers reserved, target's maximum is %u.", max_index);
 
                 buffer->reg.space = 0;
                 buffer->reg.index = index;
