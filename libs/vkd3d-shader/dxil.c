@@ -8907,7 +8907,7 @@ static enum vkd3d_result sm6_parser_resources_load_srv(struct sm6_parser *sm6,
     d->resource_type = ins->resource_type;
     d->kind = kind;
     d->reg_type = VKD3DSPR_RESOURCE;
-    d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_UNUSED;
+    d->reg_data_type = VKD3D_DATA_UNUSED;
     d->resource_data_type = (ins->opcode == VKD3DSIH_DCL)
             ? ins->declaration.semantic.resource_data_type[0] : VKD3D_DATA_UNUSED;
 
@@ -8981,7 +8981,7 @@ static enum vkd3d_result sm6_parser_resources_load_uav(struct sm6_parser *sm6,
     d->resource_type = ins->resource_type;
     d->kind = values[0];
     d->reg_type = VKD3DSPR_UAV;
-    d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_UNUSED;
+    d->reg_data_type = VKD3D_DATA_UNUSED;
     d->resource_data_type = (ins->opcode == VKD3DSIH_DCL_UAV_TYPED)
             ? ins->declaration.semantic.resource_data_type[0] : VKD3D_DATA_UNUSED;
 
