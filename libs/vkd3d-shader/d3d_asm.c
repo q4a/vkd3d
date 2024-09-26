@@ -675,7 +675,6 @@ static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum 
     {
         [VKD3D_DATA_FLOAT    ] = "float",
         [VKD3D_DATA_INT      ] = "int",
-        [VKD3D_DATA_RESOURCE ] = "resource",
         [VKD3D_DATA_UINT     ] = "uint",
         [VKD3D_DATA_UNORM    ] = "unorm",
         [VKD3D_DATA_SNORM    ] = "snorm",
@@ -1227,7 +1226,6 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
                     case VKD3D_DATA_INT:
                         shader_print_int_literal(compiler, "", reg->u.immconst_u32[0], "");
                         break;
-                    case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_UINT:
                         shader_print_uint_literal(compiler, "", reg->u.immconst_u32[0], "");
                         break;
@@ -1263,7 +1261,6 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
                         shader_print_int_literal(compiler, ", ", reg->u.immconst_u32[2], "");
                         shader_print_int_literal(compiler, ", ", reg->u.immconst_u32[3], "");
                         break;
-                    case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_UINT:
                         shader_print_uint_literal(compiler, "", reg->u.immconst_u32[0], "");
                         shader_print_uint_literal(compiler, ", ", reg->u.immconst_u32[1], "");
