@@ -824,6 +824,29 @@ float4 main(uniform float param) : sv_target
     return glob * param * a * b * c * d * e * f * g * h * i * j * k * l;
 }
 
+[pixel shader todo]
+// Multiple cbuffers can share the same reservation if only one of them is actually used.
+
+cbuffer buf0 : register(b0)
+{
+    float a;
+};
+
+cbuffer buf1 : register(b0)
+{
+    float b;
+};
+
+float4 other_main() : sv_target
+{
+    return a * a;
+}
+
+float4 main() : sv_target
+{
+    return b;
+}
+
 [require]
 shader model >= 5.1
 
