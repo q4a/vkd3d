@@ -6244,6 +6244,24 @@ static void vsir_validate_register(struct validation_context *ctx,
                         reg->idx_count);
             break;
 
+        case VKD3DSPR_RASTOUT:
+            if (reg->idx_count != 1)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                        "Invalid index count %u for a RASTOUT register.",
+                        reg->idx_count);
+                break;
+            }
+
+            if (reg->idx[0].rel_addr)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "Non-NULL relative address for a RASTOUT register.");
+
+            if (reg->idx[0].offset >= 3)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "Invalid offset for a RASTOUT register.");
+            break;
+
         default:
             break;
     }
