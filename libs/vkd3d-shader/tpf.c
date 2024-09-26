@@ -3649,6 +3649,48 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
     return extern_resources;
 }
 
+/* For some reason, for matrices, values from default value initializers end up in different
+ * components than from regular initializers. Default value initializers fill the matrix in
+ * vertical reading order (left-to-right top-to-bottom) instead of regular reading order
+ * (top-to-bottom left-to-right), so they have to be adjusted.
+ * An exception is that the order of matrix initializers for function parameters are row-major
+ * (top-to-bottom left-to-right). */
+static unsigned int get_component_index_from_default_initializer_index(struct hlsl_type *type, unsigned int index)
+{
+    unsigned int element_comp_count, element, x, y, i;
+    unsigned int base = 0;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_MATRIX:
+            x = index / type->dimy;
+            y = index % type->dimy;
+            return y * type->dimx + x;
+
+        case HLSL_CLASS_ARRAY:
+            element_comp_count = hlsl_type_component_count(type->e.array.type);
+            element = index / element_comp_count;
+            base = element * element_comp_count;
+            return base + get_component_index_from_default_initializer_index(type->e.array.type, index - base);
+
+        case HLSL_CLASS_STRUCT:
+            for (i = 0; i < type->e.record.field_count; ++i)
+            {
+                struct hlsl_type *field_type = type->e.record.fields[i].type;
+
+                element_comp_count = hlsl_type_component_count(field_type);
+                if (index - base < element_comp_count)
+                    return base + get_component_index_from_default_initializer_index(field_type, index - base);
+                base += element_comp_count;
+            }
+            break;
+
+        default:
+            return index;
+    }
+    vkd3d_unreachable();
+}
+
 static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     uint32_t binding_desc_size = (hlsl_version_ge(ctx, 5, 1) ? 10 : 8) * sizeof(uint32_t);
@@ -3849,7 +3891,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
                     for (k = 0; k < comp_count; ++k)
                     {
                         struct hlsl_type *comp_type = hlsl_type_get_component_type(ctx, var->data_type, k);
-                        unsigned int comp_offset;
+                        unsigned int comp_offset, comp_index;
                         enum hlsl_regset regset;
 
                         if (comp_type->class == HLSL_CLASS_STRING)
@@ -3859,7 +3901,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
                             continue;
                         }
 
-                        comp_offset = hlsl_type_get_component_offset(ctx, var->data_type, k, &regset);
+                        comp_index = get_component_index_from_default_initializer_index(var->data_type, k);
+                        comp_offset = hlsl_type_get_component_offset(ctx, var->data_type, comp_index, &regset);
                         if (regset == HLSL_REGSET_NUMERIC)
                         {
                             if (comp_type->e.numeric.type == HLSL_TYPE_DOUBLE)
