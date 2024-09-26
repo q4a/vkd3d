@@ -6824,7 +6824,6 @@ static uint32_t generate_vsir_get_src_swizzle(uint32_t src_writemask, uint32_t d
 
     swizzle = hlsl_swizzle_from_writemask(src_writemask);
     swizzle = hlsl_map_swizzle(swizzle, dst_writemask);
-    swizzle = vsir_swizzle_from_hlsl(swizzle);
     return swizzle;
 }
 
@@ -7895,7 +7894,6 @@ static void generate_vsir_instr_swizzle(struct hlsl_ctx *ctx,
     swizzle = hlsl_swizzle_from_writemask(val->reg.writemask);
     swizzle = hlsl_combine_swizzles(swizzle, swizzle_instr->u.vector, instr->data_type->dimx);
     swizzle = hlsl_map_swizzle(swizzle, ins->dst[0].write_mask);
-    swizzle = vsir_swizzle_from_hlsl(swizzle);
 
     src_param = &ins->src[0];
     VKD3D_ASSERT(val->type != HLSL_IR_CONSTANT);

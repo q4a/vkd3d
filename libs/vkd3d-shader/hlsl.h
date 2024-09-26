@@ -50,37 +50,17 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#define HLSL_SWIZZLE_X (0u)
-#define HLSL_SWIZZLE_Y (1u)
-#define HLSL_SWIZZLE_Z (2u)
-#define HLSL_SWIZZLE_W (3u)
-
-#define HLSL_SWIZZLE(x, y, z, w) \
-        (((HLSL_SWIZZLE_ ## x) << 0) \
-        | ((HLSL_SWIZZLE_ ## y) << 2) \
-        | ((HLSL_SWIZZLE_ ## z) << 4) \
-        | ((HLSL_SWIZZLE_ ## w) << 6))
-
-#define HLSL_SWIZZLE_MASK (0x3u)
-#define HLSL_SWIZZLE_SHIFT(idx) (2u * (idx))
+#define HLSL_SWIZZLE VKD3D_SHADER_SWIZZLE
 
 static inline unsigned int hlsl_swizzle_get_component(uint32_t swizzle, unsigned int idx)
 {
-    return (swizzle >> HLSL_SWIZZLE_SHIFT(idx)) & HLSL_SWIZZLE_MASK;
-}
-
-static inline uint32_t vsir_swizzle_from_hlsl(uint32_t swizzle)
-{
-    return vkd3d_shader_create_swizzle(hlsl_swizzle_get_component(swizzle, 0),
-            hlsl_swizzle_get_component(swizzle, 1),
-            hlsl_swizzle_get_component(swizzle, 2),
-            hlsl_swizzle_get_component(swizzle, 3));
+    return vsir_swizzle_get_component(swizzle, idx);
 }
 
 static inline void hlsl_swizzle_set_component(uint32_t *swizzle, unsigned int idx, unsigned int component)
 {
-    *swizzle &= ~(HLSL_SWIZZLE_MASK << HLSL_SWIZZLE_SHIFT(idx));
-    *swizzle |= component << HLSL_SWIZZLE_SHIFT(idx);
+    *swizzle &= ~(VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(idx));
+    *swizzle |= component << VKD3D_SHADER_SWIZZLE_SHIFT(idx);
 }
 
 enum hlsl_type_class
