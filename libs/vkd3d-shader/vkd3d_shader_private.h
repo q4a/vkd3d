@@ -1490,6 +1490,7 @@ enum vsir_asm_flags
 {
     VSIR_ASM_FLAG_NONE = 0,
     VSIR_ASM_FLAG_DUMP_TYPES = 0x1,
+    VSIR_ASM_FLAG_DUMP_ALL_INDICES = 0x2,
 };
 
 enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,

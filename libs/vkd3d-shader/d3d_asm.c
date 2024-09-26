@@ -1312,6 +1312,23 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
         }
         vkd3d_string_buffer_printf(buffer, ")");
     }
+    else if (compiler->flags & VSIR_ASM_FLAG_DUMP_ALL_INDICES)
+    {
+        unsigned int i = 0;
+
+        if (reg->idx_count == 0 || reg->idx[0].rel_addr)
+        {
+            vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.reset);
+        }
+        else
+        {
+            vkd3d_string_buffer_printf(buffer, "%u%s", offset, compiler->colours.reset);
+            i = 1;
+        }
+
+        for (; i < reg->idx_count; ++i)
+            shader_print_subscript(compiler, reg->idx[i].offset, reg->idx[i].rel_addr);
+    }
     else if (reg->type != VKD3DSPR_RASTOUT
             && reg->type != VKD3DSPR_MISCTYPE
             && reg->type != VKD3DSPR_NULL
@@ -2484,10 +2501,11 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
 
 void vkd3d_shader_trace(const struct vsir_program *program)
 {
-    const char *p, *q, *end;
+    const unsigned int flags = VSIR_ASM_FLAG_DUMP_TYPES | VSIR_ASM_FLAG_DUMP_ALL_INDICES;
     struct vkd3d_shader_code code;
+    const char *p, *q, *end;
 
-    if (d3d_asm_compile(program, NULL, &code, VSIR_ASM_FLAG_DUMP_TYPES) != VKD3D_OK)
+    if (d3d_asm_compile(program, NULL, &code, flags) != VKD3D_OK)
         return;
 
     end = (const char *)code.code + code.size;
