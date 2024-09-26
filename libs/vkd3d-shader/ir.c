@@ -7647,8 +7647,26 @@ static void vsir_validate_register(struct validation_context *ctx,
     for (i = 0; i < min(reg->idx_count, ARRAY_SIZE(reg->idx)); ++i)
     {
         const struct vkd3d_shader_src_param *param = reg->idx[i].rel_addr;
-        if (reg->idx[i].rel_addr)
+        if (param)
+        {
             vsir_validate_src_param(ctx, param);
+
+            switch (param->reg.type)
+            {
+                case VKD3DSPR_TEMP:
+                case VKD3DSPR_SSA:
+                case VKD3DSPR_ADDR:
+                case VKD3DSPR_LOOP:
+                case VKD3DSPR_OUTPOINTID:
+                    break;
+
+                default:
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                            "Invalid register type %#x for a relative address parameter.",
+                            param->reg.type);
+                    break;
+            }
+        }
     }
 
     switch (reg->type)
