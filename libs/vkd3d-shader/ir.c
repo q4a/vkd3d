@@ -191,7 +191,7 @@ static void vsir_src_param_init_resource(struct vkd3d_shader_src_param *src, uns
 
 static void vsir_src_param_init_sampler(struct vkd3d_shader_src_param *src, unsigned int id, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_SAMPLER, VKD3D_DATA_SAMPLER, 2);
+    vsir_src_param_init(src, VKD3DSPR_SAMPLER, VKD3D_DATA_UNUSED, 2);
     src->reg.idx[0].offset = id;
     src->reg.idx[1].offset = idx;
     src->reg.dimension = VSIR_DIMENSION_NONE;
