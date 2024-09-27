@@ -6186,6 +6186,18 @@ static void vsir_validate_register(struct validation_context *ctx,
             if (reg->dimension == VSIR_DIMENSION_SCALAR)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
                         "Invalid dimension SCALAR for a SAMPLER register.");
+
+            if (reg->idx_count != 2)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                        "Invalid index count %u for a SAMPLER register.",
+                        reg->idx_count);
+                break;
+            }
+
+            if (reg->idx[0].rel_addr)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "Non-NULL relative address for the descriptor index of a SAMPLER register.");
             break;
 
         case VKD3DSPR_RESOURCE:
