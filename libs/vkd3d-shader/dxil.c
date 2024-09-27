@@ -4864,8 +4864,10 @@ static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intr
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
     src_param_init_vector_from_reg(src_param, &buffer->u.handle.reg);
+    /* Differently from other descriptors, constant buffers require an
+     * additional index, used to index within the constant buffer itself. */
+    src_param->reg.idx_count = 3;
     register_index_address_init(&src_param->reg.idx[2], operands[1], sm6);
-    VKD3D_ASSERT(src_param->reg.idx_count == 3);
 
     type = sm6_type_get_scalar_type(dst->type, 0);
     VKD3D_ASSERT(type);
@@ -4964,8 +4966,7 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     dst->u.handle.d = d;
 
     reg = &dst->u.handle.reg;
-    /* Set idx_count to 3 for use with load/store instructions. */
-    vsir_register_init(reg, d->reg_type, d->reg_data_type, 3);
+    vsir_register_init(reg, d->reg_type, d->reg_data_type, 2);
     reg->dimension = VSIR_DIMENSION_VEC4;
     reg->idx[0].offset = id;
     register_index_address_init(&reg->idx[1], operands[2], sm6);
