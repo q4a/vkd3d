@@ -1352,9 +1352,6 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
     for (i = 0; i < ARRAY_SIZE(program->flat_constant_count); ++i)
         program->flat_constant_count[i] = get_external_constant_count(&sm1, i);
 
-    if (!sm1.p.failed)
-        ret = vkd3d_shader_parser_validate(&sm1.p, config_flags);
-
     if (sm1.p.failed && ret >= 0)
         ret = VKD3D_ERROR_INVALID_SHADER;
 
@@ -1365,7 +1362,18 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
         return ret;
     }
 
-    return ret;
+    if ((ret = vkd3d_shader_parser_validate(&sm1.p, config_flags)) < 0)
+    {
+        WARN("Failed to validate shader after parsing, ret %d.\n", ret);
+
+        if (TRACE_ON())
+            vkd3d_shader_trace(program);
+
+        vsir_program_cleanup(program);
+        return ret;
+    }
+
+    return VKD3D_OK;
 }
 
 bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version, const char *semantic_name,
