@@ -3232,19 +3232,37 @@ static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
         ctx->result = buffer->status;
 }
 
+static int signature_element_pointer_compare(const void *x, const void *y)
+{
+    const struct signature_element *e = *(const struct signature_element **)x;
+    const struct signature_element *f = *(const struct signature_element **)y;
+    int ret;
+
+    if ((ret = vkd3d_u32_compare(e->register_index, f->register_index)))
+        return ret;
+    return vkd3d_u32_compare(e->mask, f->mask);
+}
+
 static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_signature *signature, uint32_t tag)
 {
     bool output = tag == TAG_OSGN || (tag == TAG_PCSG
             && tpf->program->shader_version.type == VKD3D_SHADER_TYPE_HULL);
+    const struct signature_element **sorted_elements;
     struct vkd3d_bytecode_buffer buffer = {0};
     unsigned int i;
 
     put_u32(&buffer, signature->element_count);
     put_u32(&buffer, 8); /* unknown */
 
+    if (!(sorted_elements = vkd3d_calloc(signature->element_count, sizeof(*sorted_elements))))
+        return;
+    for (i = 0; i < signature->element_count; ++i)
+        sorted_elements[i] = &signature->elements[i];
+    qsort(sorted_elements, signature->element_count, sizeof(*sorted_elements), signature_element_pointer_compare);
+
     for (i = 0; i < signature->element_count; ++i)
     {
-        const struct signature_element *element = &signature->elements[i];
+        const struct signature_element *element = sorted_elements[i];
         enum vkd3d_shader_sysval_semantic sysval;
         uint32_t used_mask = element->used_mask;
 
@@ -3265,7 +3283,7 @@ static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_si
 
     for (i = 0; i < signature->element_count; ++i)
     {
-        const struct signature_element *element = &signature->elements[i];
+        const struct signature_element *element = sorted_elements[i];
         size_t string_offset;
 
         string_offset = put_string(&buffer, element->semantic_name);
@@ -3273,6 +3291,7 @@ static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_si
     }
 
     add_section(tpf->ctx, &tpf->dxbc, tag, &buffer);
+    vkd3d_free(sorted_elements);
 }
 
 static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
