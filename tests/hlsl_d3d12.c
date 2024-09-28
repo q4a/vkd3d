@@ -2295,6 +2295,121 @@ static void test_signature_reflection(void)
         {"sv_position",    0, 2, D3D_NAME_POSITION,      D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
     };
 
+    /* Array elements are aligned and placed in consecutive registers.
+     * Other elements can be allocated in this padding space. */
+    static const char ps10_source[] =
+        "struct input\n"
+        "{\n"
+        "    float2 f1 : FOO1;\n"
+        "    float2 f2 : FOO2;\n"
+        "    float3 f3 : FOO3;\n"
+        "    float2 arr[3] : TEXCOORD0;\n"
+        "    float t3 : TEXCOORD3;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps10_inputs[] =
+    {
+        {"FOO",            1, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"FOO",            2, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0xc},
+        {"FOO",            3, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"TEXCOORD",       0, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"TEXCOORD",       3, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x4},
+        {"TEXCOORD",       1, 3, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"TEXCOORD",       2, 4, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+    };
+
+    /* Note how t3 prefers to be allocated as v1.yz instead of v0.zw. */
+    static const char ps11_source[] =
+        "struct input\n"
+        "{\n"
+        "    float2 foo : FOO;\n"
+        "    float1 arr[3] : TEXCOORD0;\n"
+        "    float2 t3 : TEXCOORD3;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps11_inputs[] =
+    {
+        {"FOO",            0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"TEXCOORD",       0, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"TEXCOORD",       3, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x6},
+        {"TEXCOORD",       1, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"TEXCOORD",       2, 3, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
+    static const char vs4_source[] =
+        "struct st\n"
+        "{\n"
+        "    float2 t0 : TEXCOORD0;\n"
+        "    float2 t1 : TEXCOORD1;\n"
+        "    float3 t2 : TEXCOORD2;\n"
+        "    nointerpolation float t3 : TEXCOORD3;\n"
+        "    nointerpolation float2 t4 : TEXCOORD4;\n"
+        "    uint t5 : TEXCOORD5;\n"
+        "    float4 position : SV_Position;\n"
+        "    float2 t6[2] : TEXCOORD6;\n"
+        "    float t8 : TEXCOORD8;\n"
+        "};\n"
+        "\n"
+        "void main(out struct st s_out)\n"
+        "{\n"
+        "    s_out = (struct st)0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs4_inputs[] =
+    {
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs4_outputs[] =
+    {
+        {"TEXCOORD",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+        {"TEXCOORD",       1, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0xc, 0x3},
+        {"TEXCOORD",       2, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7, 0x8},
+        {"TEXCOORD",       3, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"TEXCOORD",       4, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x6, 0x9},
+        {"TEXCOORD",       5, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_UINT32,  0x8, 0x7},
+        {"SV_Position",    0, 3, D3D_NAME_POSITION,      D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+        {"TEXCOORD",       6, 4, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+        {"TEXCOORD",       8, 4, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x4, 0xb},
+        {"TEXCOORD",       7, 5, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+    };
+
+    static const char vs5_source[] =
+        "struct output\n"
+        "{\n"
+        "    nointerpolation float m1 : ALPHA;\n"
+        "    float3 m2 : BRAVO;\n"
+        "    float2 m3[2] : CHARLIE;\n"
+        "    float m4 : DELTA;\n"
+        "};\n"
+        "\n"
+        "void main(out struct output s, inout float4 p : sv_position)\n"
+        "{\n"
+        "    s.m1 = 0;\n"
+        "    s.m2 = 0;\n"
+        "    s.m3[0] = 0;\n"
+        "    s.m3[1] = 0;\n"
+        "    s.m4 = 0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs5_inputs[] =
+    {
+        {"sv_position",    0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs5_outputs[] =
+    {
+        {"ALPHA",          0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"BRAVO",          0, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7, 0x8},
+        {"CHARLIE",        0, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+        {"DELTA",          0, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x4, 0xb},
+        {"CHARLIE",        1, 3, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+        {"sv_position",    0, 4, D3D_NAME_POSITION,      D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+    };
+
     static const struct
     {
         const char *source;
@@ -2323,6 +2438,10 @@ static void test_signature_reflection(void)
         {ps8_source,  "ps_4_0", false, ps8_inputs, ARRAY_SIZE(ps8_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
         {ps9_source,  "ps_4_0", false, ps9_inputs, ARRAY_SIZE(ps9_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
         {vs3_source,  "vs_4_0", false, vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs), true},
+        {ps10_source, "ps_4_0", false, ps10_inputs, ARRAY_SIZE(ps10_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {ps11_source, "ps_4_0", false, ps11_inputs, ARRAY_SIZE(ps11_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {vs4_source,  "vs_4_0", false, vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs), true},
+        {vs5_source,  "vs_4_0", false, vs5_inputs, ARRAY_SIZE(vs5_inputs), vs5_outputs, ARRAY_SIZE(vs5_outputs), true},
     };
 
     for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
