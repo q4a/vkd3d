@@ -1976,19 +1976,26 @@ static void test_default_values_reflection(void)
 }
 
 static void check_signature_element_(int line, const D3D12_SIGNATURE_PARAMETER_DESC *desc,
-        const D3D12_SIGNATURE_PARAMETER_DESC *expect)
+        const D3D12_SIGNATURE_PARAMETER_DESC *expect, bool is_todo)
 {
-    ok_(line)(!strcmp(desc->SemanticName, expect->SemanticName), "Got name \"%s\".\n", desc->SemanticName);
-    ok_(line)(desc->SemanticIndex == expect->SemanticIndex, "Got index %u.\n", desc->SemanticIndex);
-    ok_(line)(desc->Register == expect->Register, "Got register %u.\n", desc->Register);
-    ok_(line)(desc->SystemValueType == expect->SystemValueType, "Got sysval %u.\n", desc->SystemValueType);
-    ok_(line)(desc->ComponentType == expect->ComponentType, "Got data type %u.\n", desc->ComponentType);
-    ok_(line)(desc->Mask == expect->Mask, "Got mask %#x.\n", desc->Mask);
+    todo_if(is_todo && strcmp(desc->SemanticName, expect->SemanticName))
+        ok_(line)(!strcmp(desc->SemanticName, expect->SemanticName), "Got name \"%s\".\n", desc->SemanticName);
+    todo_if(is_todo && desc->SemanticIndex != expect->SemanticIndex)
+        ok_(line)(desc->SemanticIndex == expect->SemanticIndex, "Got index %u.\n", desc->SemanticIndex);
+    todo_if(is_todo && desc->Register != expect->Register)
+        ok_(line)(desc->Register == expect->Register, "Got register %u.\n", desc->Register);
+    todo_if(is_todo && desc->SystemValueType != expect->SystemValueType)
+        ok_(line)(desc->SystemValueType == expect->SystemValueType, "Got sysval %u.\n", desc->SystemValueType);
+    todo_if(is_todo && desc->ComponentType != expect->ComponentType)
+        ok_(line)(desc->ComponentType == expect->ComponentType, "Got data type %u.\n", desc->ComponentType);
+    todo_if(is_todo && desc->Mask != expect->Mask)
+        ok_(line)(desc->Mask == expect->Mask, "Got mask %#x.\n", desc->Mask);
     todo_if(desc->ReadWriteMask != expect->ReadWriteMask)
         ok_(line)(desc->ReadWriteMask == expect->ReadWriteMask, "Got used mask %#x.\n", desc->ReadWriteMask);
-    ok_(line)(desc->Stream == expect->Stream, "Got stream %u.\n", desc->Stream);
+    todo_if(is_todo && desc->Stream != expect->Stream)
+        ok_(line)(desc->Stream == expect->Stream, "Got stream %u.\n", desc->Stream);
 }
-#define check_signature_element(a, b) check_signature_element_(__LINE__, a, b)
+#define check_signature_element(a, b, c) check_signature_element_(__LINE__, a, b, c)
 
 static void test_signature_reflection(void)
 {
@@ -2112,6 +2119,182 @@ static void test_signature_reflection(void)
         "{\n"
         "}";
 
+    /* The two floats share the same register */
+    static const char ps3_source[] =
+        "struct input\n"
+        "{\n"
+        "    float t0 : TEXCOORD0;\n"
+        "    uint t1 : TEXCOORD1;\n"
+        "    float t2 : TEXCOORD2;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps3_inputs[] =
+    {
+        {"TEXCOORD",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"TEXCOORD",       2, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x2},
+        {"TEXCOORD",       1, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_UINT32,  0x1},
+    };
+
+    /* The "uint" shares register with the "nointerpolation float", but not with the
+     * "float" because it has a different interpolation mode. */
+    static const char ps4_source[] =
+        "struct input\n"
+        "{\n"
+        "    nointerpolation float t0 : TEXCOORD0;\n"
+        "    float t1 : TEXCOORD1;\n"
+        "    uint t2 : TEXCOORD2;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps4_inputs[] =
+    {
+        {"TEXCOORD",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"TEXCOORD",       2, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_UINT32,  0x2},
+        {"TEXCOORD",       1, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
+    static const char ps5_source[] =
+        "struct input\n"
+        "{\n"
+        "    uint2 t0 : TEXCOORD0;\n"
+        "    float3 t1 : TEXCOORD1;\n"
+        "    float t2 : TEXCOORD2;\n"
+        "    float t3: TEXCOORD3;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps5_inputs[] =
+    {
+        {"TEXCOORD",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_UINT32,  0x3},
+        {"TEXCOORD",       1, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"TEXCOORD",       2, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x8},
+        {"TEXCOORD",       3, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
+    /* Semantic names don't affect ordering, declaration order does. */
+    static const char ps6_source[] =
+        "struct input\n"
+        "{\n"
+        "    float2 t2 : TEXCOORD2;\n"
+        "    float3 t3 : TEXCOORD3;\n"
+        "    float foobar : FOOBAR;\n"
+        "    nointerpolation float t0: TEXCOORD0;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps6_inputs[] =
+    {
+        {"TEXCOORD",       2, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"FOOBAR",         0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x4},
+        {"TEXCOORD",       3, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"TEXCOORD",       0, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
+    static const char ps7_source[] =
+        "struct input\n"
+        "{\n"
+        "    float3 t0 : TEXCOORD0;\n"
+        "    float3 t1 : TEXCOORD1;\n"
+        "    float3 t2 : TEXCOORD2;\n"
+        "    float t3 : TEXCOORD3;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps7_inputs[] =
+    {
+        {"TEXCOORD",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"TEXCOORD",       3, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x8},
+        {"TEXCOORD",       1, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"TEXCOORD",       2, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+    };
+
+    /* Note how TEXCOORD2 prefers allocation on v2.z over v1.w. */
+    static const char ps8_source[] =
+        "struct input\n"
+        "{\n"
+        "    float3 t0 : TEXCOORD0;\n"
+        "    float2 t1 : TEXCOORD1;\n"
+        "    float t2 : TEXCOORD2;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps8_inputs[] =
+    {
+        {"TEXCOORD",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"TEXCOORD",       1, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"TEXCOORD",       2, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x4},
+    };
+
+    static const char ps9_source[] =
+        "struct input\n"
+        "{\n"
+        "    float2 t0 : FOO;\n"
+        "    float2 t1 : TEXCOORD1;\n"
+        "    float3 t2 : TEXCOORD2;\n"
+        "    nointerpolation float CCC : TEXCOORD3;\n"
+        "    float4 position : SV_Position;\n"
+        "    float3 t4 : BAR;\n"
+        "    float2 t5 : BUZZ;\n"
+        "    float t6 : TEXCOORD4;\n"
+        "    uint2 t7 : FIZZ;\n"
+        "};\n"
+        "\n"
+        "float4 main(in struct input s) : sv_target { return 0; }\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps9_inputs[] =
+    {
+        {"FOO",            0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"TEXCOORD",       1, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0xc},
+        {"TEXCOORD",       2, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"TEXCOORD",       3, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"FIZZ",           0, 2, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_UINT32,  0x6},
+        {"SV_Position",    0, 3, D3D_NAME_POSITION,      D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"BAR",            0, 4, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x7},
+        {"BUZZ",           0, 5, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"TEXCOORD",       4, 5, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x4},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps_outputs_simple[] =
+    {
+        {"sv_target",      0, 0, D3D_NAME_TARGET,        D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const char vs3_source[] =
+        "struct st\n"
+        "{\n"
+        "    float t0 : TEXCOORD0;\n"
+        "    uint t1 : TEXCOORD1;\n"
+        "    float t2 : TEXCOORD2;\n"
+        "};\n"
+        "\n"
+        "void main(float4 pos : position, out struct st s, out float4 out_pos : sv_position)\n"
+        "{\n"
+        "    out_pos = pos;\n"
+        "    s.t0 = 1;\n"
+        "    s.t1 = 11;\n"
+        "    s.t2 = 21;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs3_inputs[] =
+    {
+        {"position",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs3_outputs[] =
+    {
+        {"TEXCOORD",       0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"TEXCOORD",       2, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x2, 0xd},
+        {"TEXCOORD",       1, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"sv_position",    0, 2, D3D_NAME_POSITION,      D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+    };
+
     static const struct
     {
         const char *source;
@@ -2121,6 +2304,7 @@ static void test_signature_reflection(void)
         unsigned int input_count;
         const D3D12_SIGNATURE_PARAMETER_DESC *outputs;
         unsigned int output_count;
+        bool signature_elements_todo;
     }
     tests[] =
     {
@@ -2131,6 +2315,14 @@ static void test_signature_reflection(void)
         {ps1_source,  "ps_4_1", false, ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
         {ps2_source,  "ps_4_0", true,  ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
         {cs1_source,  "cs_5_0", false, NULL, 0, NULL, 0},
+        {ps3_source,  "ps_4_0", false, ps3_inputs, ARRAY_SIZE(ps3_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {ps4_source,  "ps_4_0", false, ps4_inputs, ARRAY_SIZE(ps4_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {ps5_source,  "ps_4_0", false, ps5_inputs, ARRAY_SIZE(ps5_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {ps6_source,  "ps_4_0", false, ps6_inputs, ARRAY_SIZE(ps6_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {ps7_source,  "ps_4_0", false, ps7_inputs, ARRAY_SIZE(ps7_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {ps8_source,  "ps_4_0", false, ps8_inputs, ARRAY_SIZE(ps8_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {ps9_source,  "ps_4_0", false, ps9_inputs, ARRAY_SIZE(ps9_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
+        {vs3_source,  "vs_4_0", false, vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs), true},
     };
 
     for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
@@ -2156,7 +2348,7 @@ static void test_signature_reflection(void)
             vkd3d_test_push_context("Input %u", j);
             hr = reflection->lpVtbl->GetInputParameterDesc(reflection, j, &desc);
             ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
-            check_signature_element(&desc, &tests[i].inputs[j]);
+            check_signature_element(&desc, &tests[i].inputs[j], tests[i].signature_elements_todo);
             vkd3d_test_pop_context();
         }
 
@@ -2168,7 +2360,7 @@ static void test_signature_reflection(void)
             vkd3d_test_push_context("Output %u", j);
             hr = reflection->lpVtbl->GetOutputParameterDesc(reflection, j, &desc);
             ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
-            check_signature_element(&desc, &tests[i].outputs[j]);
+            check_signature_element(&desc, &tests[i].outputs[j], tests[i].signature_elements_todo);
             vkd3d_test_pop_context();
         }
 
