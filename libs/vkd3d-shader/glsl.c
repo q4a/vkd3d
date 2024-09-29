@@ -822,6 +822,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_IF:
             shader_glsl_if(gen, ins);
             break;
+        case VKD3DSIH_MAD:
+            shader_glsl_intrinsic(gen, ins, "fma");
+            break;
         case VKD3DSIH_LTO:
             shader_glsl_relop(gen, ins, "<", "lessThan");
             break;
