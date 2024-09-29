@@ -727,6 +727,87 @@ static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    const struct glsl_resource_type_info *resource_type_info;
+    unsigned int resource_id, resource_idx, resource_space;
+    unsigned int sampler_id, sampler_idx, sampler_space;
+    const struct vkd3d_shader_descriptor_info1 *d;
+    enum vkd3d_shader_component_type sampled_type;
+    enum vkd3d_shader_resource_type resource_type;
+    struct vkd3d_string_buffer *sample;
+    enum vkd3d_data_type data_type;
+    struct glsl_src coord;
+    struct glsl_dst dst;
+    uint32_t coord_mask;
+
+    if (vkd3d_shader_instruction_has_texel_offset(ins))
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Unhandled texel sample offset.");
+
+    if (ins->src[1].reg.idx[0].rel_addr || ins->src[1].reg.idx[1].rel_addr
+            || ins->src[2].reg.idx[0].rel_addr || ins->src[2].reg.idx[1].rel_addr)
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_UNSUPPORTED,
+                "Descriptor indexing is not supported.");
+
+    resource_id = ins->src[1].reg.idx[0].offset;
+    resource_idx = ins->src[1].reg.idx[1].offset;
+    if ((d = shader_glsl_get_descriptor_by_id(gen, VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, resource_id)))
+    {
+        resource_type = d->resource_type;
+        resource_space = d->register_space;
+        sampled_type = vkd3d_component_type_from_resource_data_type(d->resource_data_type);
+        data_type = vkd3d_data_type_from_component_type(sampled_type);
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Undeclared resource descriptor %u.", resource_id);
+        resource_space = 0;
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+        data_type = VKD3D_DATA_FLOAT;
+    }
+
+    if ((resource_type_info = shader_glsl_get_resource_type_info(resource_type)))
+    {
+        coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->coord_size);
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Unhandled resource type %#x.", resource_type);
+        coord_mask = vkd3d_write_mask_from_component_count(2);
+    }
+
+    sampler_id = ins->src[2].reg.idx[0].offset;
+    sampler_idx = ins->src[2].reg.idx[1].offset;
+    if ((d = shader_glsl_get_descriptor_by_id(gen, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, sampler_id)))
+    {
+        sampler_space = d->register_space;
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Undeclared sampler descriptor %u.", sampler_id);
+        sampler_space = 0;
+    }
+
+    glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&coord, gen, &ins->src[0], coord_mask);
+    sample = vkd3d_string_buffer_get(&gen->string_buffers);
+
+    vkd3d_string_buffer_printf(sample, "texture(");
+    shader_glsl_print_combined_sampler_name(sample, gen, resource_idx, resource_space, sampler_idx, sampler_space);
+    vkd3d_string_buffer_printf(sample, ", %s)", coord.str->buffer);
+    shader_glsl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
+
+    shader_glsl_print_assignment_ext(gen, &dst, data_type, "%s", sample->buffer);
+
+    vkd3d_string_buffer_release(&gen->string_buffers, sample);
+    glsl_src_cleanup(&coord, &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_unary_op(struct vkd3d_glsl_generator *gen,
         const struct vkd3d_shader_instruction *ins, const char *op)
 {
@@ -1053,6 +1134,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_RSQ:
             shader_glsl_intrinsic(gen, ins, "inversesqrt");
+            break;
+        case VKD3DSIH_SAMPLE:
+            shader_glsl_sample(gen, ins);
             break;
         case VKD3DSIH_SQRT:
             shader_glsl_intrinsic(gen, ins, "sqrt");
