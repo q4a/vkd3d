@@ -918,6 +918,13 @@ static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, st
             }
             break;
 
+        case VKD3D_SHADER_SV_VERTEX_ID:
+            if (version->type != VKD3D_SHADER_TYPE_VERTEX)
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled SV_VERTEX_ID in shader type #%x.", version->type);
+            vkd3d_string_buffer_printf(buffer, "intBitsToFloat(ivec4(gl_VertexID, 0, 0, 0))");
+            break;
+
         case VKD3D_SHADER_SV_IS_FRONT_FACE:
             if (version->type != VKD3D_SHADER_TYPE_PIXEL)
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -1057,6 +1064,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DCL_INPUT:
         case VKD3DSIH_DCL_INPUT_PS:
         case VKD3DSIH_DCL_INPUT_PS_SIV:
+        case VKD3DSIH_DCL_INPUT_SGV:
         case VKD3DSIH_DCL_OUTPUT:
         case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
@@ -1512,15 +1520,8 @@ static void shader_glsl_generate_input_declarations(struct vkd3d_glsl_generator 
         {
             e = &signature->elements[i];
 
-            if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
+            if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED || e->sysval_semantic)
                 continue;
-
-            if (e->sysval_semantic)
-            {
-                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                        "Internal compiler error: Unhandled system value %#x.", e->sysval_semantic);
-                continue;
-            }
 
             if (e->component_type != VKD3D_SHADER_COMPONENT_FLOAT)
             {
