@@ -942,7 +942,7 @@ HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID
             sections[section_count++] = *src_section;
     }
 
-    if ((ret = vkd3d_shader_serialize_dxbc(section_count, sections, &dst_dxbc, NULL) < 0))
+    if ((ret = vkd3d_shader_serialize_dxbc(section_count, sections, &dst_dxbc, NULL)) < 0)
     {
         WARN("Failed to serialise DXBC, ret %d.\n", ret);
         hr = hresult_from_vkd3d_result(ret);
