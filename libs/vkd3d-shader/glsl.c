@@ -829,6 +829,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             shader_glsl_binop(gen, ins, "<<");
             break;
         case VKD3DSIH_ISHR:
+        case VKD3DSIH_USHR:
             shader_glsl_binop(gen, ins, ">>");
             break;
         case VKD3DSIH_LTO:
