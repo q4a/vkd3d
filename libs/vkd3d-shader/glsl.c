@@ -1079,6 +1079,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_ENDIF:
             shader_glsl_endif(gen);
             break;
+        case VKD3DSIH_EQO:
         case VKD3DSIH_IEQ:
             shader_glsl_relop(gen, ins, "==", "equal");
             break;
