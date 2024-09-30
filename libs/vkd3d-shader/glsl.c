@@ -62,6 +62,9 @@ struct vkd3d_glsl_generator
     const struct vkd3d_shader_scan_combined_resource_sampler_info *combined_sampler_info;
 };
 
+static void shader_glsl_print_subscript(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_src_param *rel_addr, unsigned int offset);
+
 static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
         struct vkd3d_glsl_generator *generator,
         enum vkd3d_shader_error error, const char *fmt, ...)
@@ -263,6 +266,11 @@ static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
                     gen->prefix, reg->idx[0].offset, reg->idx[2].offset);
             break;
 
+        case VKD3DSPR_IDXTEMP:
+            vkd3d_string_buffer_printf(buffer, "x%u", reg->idx[0].offset);
+            shader_glsl_print_subscript(buffer, gen, reg->idx[1].rel_addr, reg->idx[1].offset);
+            break;
+
         default:
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                     "Internal compiler error: Unhandled register type %#x.", reg->type);
@@ -436,6 +444,26 @@ static uint32_t glsl_dst_init(struct glsl_dst *glsl_dst, struct vkd3d_glsl_gener
     shader_glsl_print_write_mask(glsl_dst->mask, write_mask);
 
     return write_mask;
+}
+
+static void shader_glsl_print_subscript(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_src_param *rel_addr, unsigned int offset)
+{
+    struct glsl_src r;
+
+    if (!rel_addr)
+    {
+        vkd3d_string_buffer_printf(buffer, "[%u]", offset);
+        return;
+    }
+
+    glsl_src_init(&r, gen, rel_addr, VKD3DSP_WRITEMASK_0);
+    vkd3d_string_buffer_printf(buffer, "[%s", r.str->buffer);
+    if (offset)
+        vkd3d_string_buffer_printf(buffer, " + %u", offset);
+    else
+        vkd3d_string_buffer_printf(buffer, "]");
+    glsl_src_cleanup(&r, &gen->string_buffers);
 }
 
 static void VKD3D_PRINTF_FUNC(4, 0) shader_glsl_vprint_assignment(struct vkd3d_glsl_generator *gen,
@@ -1048,6 +1076,15 @@ static void shader_glsl_ret(struct vkd3d_glsl_generator *gen, const struct vkd3d
     }
 }
 
+static void shader_glsl_dcl_indexable_temp(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_instruction *ins)
+{
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "vec4 x%u[%u];\n",
+            ins->declaration.indexable_temp.register_idx,
+            ins->declaration.indexable_temp.register_size);
+}
+
 static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         const struct vkd3d_shader_instruction *ins)
 {
@@ -1061,6 +1098,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_AND:
             shader_glsl_binop(gen, ins, "&");
+            break;
+        case VKD3DSIH_DCL_INDEXABLE_TEMP:
+            shader_glsl_dcl_indexable_temp(gen, ins);
             break;
         case VKD3DSIH_DCL_INPUT:
         case VKD3DSIH_DCL_INPUT_PS:
