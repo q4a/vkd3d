@@ -482,7 +482,9 @@ static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
         if (e->sysval_semantic == VKD3D_SHADER_SV_NONE)
         {
             msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
+            msl_print_write_mask(buffer, e->mask);
             vkd3d_string_buffer_printf(buffer, " = input.shader_in_%u", i);
+            msl_print_write_mask(buffer, e->mask);
         }
         else
         {
@@ -513,8 +515,11 @@ static void msl_generate_entrypoint_epilogue(struct msl_generator *gen)
             case VKD3D_SHADER_SV_NONE:
             case VKD3D_SHADER_SV_TARGET:
             case VKD3D_SHADER_SV_POSITION:
-                vkd3d_string_buffer_printf(buffer, "    output.shader_out_%u = %s_out", i, gen->prefix);
+                vkd3d_string_buffer_printf(buffer, "    output.shader_out_%u", i);
+                msl_print_write_mask(buffer, e->mask);
+                vkd3d_string_buffer_printf(buffer, " = %s_out", gen->prefix);
                 msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
+                msl_print_write_mask(buffer, e->mask);
                 break;
             default:
                 vkd3d_string_buffer_printf(buffer, "    <unhandled sysval %#x>", e->sysval_semantic);
