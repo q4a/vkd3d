@@ -6206,6 +6206,103 @@ static void vsir_validate_register_without_indices(struct validation_context *ct
                 reg->idx_count, reg->type);
 }
 
+static void vsir_validate_io_register(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg)
+{
+    const struct shader_signature *signature;
+    bool has_control_point = false;
+
+    switch (reg->type)
+    {
+        case VKD3DSPR_INPUT:
+            signature = &ctx->program->input_signature;
+
+            switch (ctx->program->shader_version.type)
+            {
+                case VKD3D_SHADER_TYPE_GEOMETRY:
+                case VKD3D_SHADER_TYPE_HULL:
+                case VKD3D_SHADER_TYPE_DOMAIN:
+                    has_control_point = true;
+                    break;
+
+                default:
+                    break;
+            }
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    if (!ctx->program->normalised_io)
+    {
+        /* Indices are [register] or [control point, register]. Both are
+         * allowed to have a relative address. */
+        unsigned int expected_idx_count = 1 + !!has_control_point;
+
+        if (reg->idx_count != expected_idx_count)
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                    "Invalid index count %u for a register of type %#x.",
+                    reg->idx_count, reg->type);
+            return;
+        }
+    }
+    else
+    {
+        struct signature_element *element;
+        unsigned int expected_idx_count;
+        unsigned int signature_idx;
+        bool is_array = false;
+
+        /* If the signature element is not an array, indices are
+         * [signature] or [control point, signature]. If the signature
+         * element is an array, indices are [array, signature] or
+         * [control point, array, signature]. In any case `signature' is
+         * not allowed to have a relative address, while the others are.
+         */
+        if (reg->idx_count < 1)
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                    "Invalid index count %u for a register of type %#x.",
+                    reg->idx_count, reg->type);
+            return;
+        }
+
+        if (reg->idx[reg->idx_count - 1].rel_addr)
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                    "Non-NULL relative address for the signature index of a register of type %#x.",
+                    reg->type);
+            return;
+        }
+
+        signature_idx = reg->idx[reg->idx_count - 1].offset;
+
+        if (signature_idx >= signature->element_count)
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                    "Signature index %u exceeds the signature size %u in a register of type %#x.",
+                    signature_idx, signature->element_count, reg->type);
+            return;
+        }
+
+        element = &signature->elements[signature_idx];
+        if (element->register_count > 1)
+            is_array = true;
+
+        expected_idx_count = 1 + !!has_control_point + !!is_array;
+
+        if (reg->idx_count != expected_idx_count)
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                    "Invalid index count %u for a register of type %#x.",
+                    reg->idx_count, reg->type);
+            return;
+        }
+    }
+}
+
 static void vsir_validate_temp_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
@@ -6517,6 +6614,10 @@ static void vsir_validate_register(struct validation_context *ctx,
     {
         case VKD3DSPR_TEMP:
             vsir_validate_temp_register(ctx, reg);
+            break;
+
+        case VKD3DSPR_INPUT:
+            vsir_validate_io_register(ctx, reg);
             break;
 
         case VKD3DSPR_RASTOUT:
