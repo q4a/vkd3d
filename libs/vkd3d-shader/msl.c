@@ -38,6 +38,7 @@ struct msl_generator
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
     unsigned int indent;
+    const char *prefix;
 };
 
 static void VKD3D_PRINTF_FUNC(3, 4) msl_compiler_error(struct msl_generator *gen,
@@ -48,6 +49,27 @@ static void VKD3D_PRINTF_FUNC(3, 4) msl_compiler_error(struct msl_generator *gen
     va_start(args, fmt);
     vkd3d_shader_verror(gen->message_context, &gen->location, error, fmt, args);
     va_end(args);
+}
+
+static const char *msl_get_prefix(enum vkd3d_shader_type type)
+{
+    switch (type)
+    {
+        case VKD3D_SHADER_TYPE_VERTEX:
+            return "vs";
+        case VKD3D_SHADER_TYPE_HULL:
+            return "hs";
+        case VKD3D_SHADER_TYPE_DOMAIN:
+            return "ds";
+        case VKD3D_SHADER_TYPE_GEOMETRY:
+            return "gs";
+        case VKD3D_SHADER_TYPE_PIXEL:
+            return "ps";
+        case VKD3D_SHADER_TYPE_COMPUTE:
+            return "cs";
+        default:
+            return NULL;
+    }
 }
 
 static void msl_print_indent(struct vkd3d_string_buffer *buffer, unsigned int indent)
@@ -244,6 +266,117 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
     }
 }
 
+static void msl_generate_vertex_output_element_attribute(struct msl_generator *gen, const struct signature_element *e)
+{
+    switch (e->sysval_semantic)
+    {
+        case VKD3D_SHADER_SV_POSITION:
+            vkd3d_string_buffer_printf(gen->buffer, "[[position]]");
+            break;
+        case VKD3D_SHADER_SV_NONE:
+            vkd3d_string_buffer_printf(gen->buffer, "[[user(locn%u)]]", e->target_location);
+            break;
+        default:
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled vertex shader system value %#x.", e->sysval_semantic);
+            break;
+    }
+}
+
+static void msl_generate_pixel_output_element_attribute(struct msl_generator *gen, const struct signature_element *e)
+{
+    switch (e->sysval_semantic)
+    {
+        case VKD3D_SHADER_SV_TARGET:
+            vkd3d_string_buffer_printf(gen->buffer, "[[color(%u)]]", e->target_location);
+            break;
+        default:
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled pixel shader system value %#x.", e->sysval_semantic);
+            break;
+    }
+}
+
+static void msl_generate_output_struct_declarations(struct msl_generator *gen)
+{
+    const struct shader_signature *signature = &gen->program->output_signature;
+    enum vkd3d_shader_type type = gen->program->shader_version.type;
+    struct vkd3d_string_buffer *buffer = gen->buffer;
+    const struct signature_element *e;
+    unsigned int i;
+
+    vkd3d_string_buffer_printf(buffer, "struct vkd3d_%s_out\n{\n", gen->prefix);
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        e = &signature->elements[i];
+
+        if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
+            continue;
+
+        if (e->min_precision != VKD3D_SHADER_MINIMUM_PRECISION_NONE)
+        {
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled minimum precision %#x.", e->min_precision);
+            continue;
+        }
+
+        if (e->interpolation_mode != VKD3DSIM_NONE)
+        {
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled interpolation mode %#x.", e->interpolation_mode);
+            continue;
+        }
+
+        if(e->register_count > 1)
+        {
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled register count %u.", e->register_count);
+            continue;
+        }
+
+        msl_print_indent(gen->buffer, 1);
+
+        switch(e->component_type)
+        {
+            case VKD3D_SHADER_COMPONENT_FLOAT:
+                vkd3d_string_buffer_printf(buffer, "float4 ");
+                break;
+            case VKD3D_SHADER_COMPONENT_INT:
+                vkd3d_string_buffer_printf(buffer, "int4 ");
+                break;
+            case VKD3D_SHADER_COMPONENT_UINT:
+                vkd3d_string_buffer_printf(buffer, "uint4 ");
+                break;
+            default:
+                vkd3d_string_buffer_printf(buffer, "<unhandled component type %#x> ", e->component_type);
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled component type %#x.", e->component_type);
+                break;
+        }
+
+        vkd3d_string_buffer_printf(buffer, "shader_out_%u ", i);
+
+        switch (type)
+        {
+            case VKD3D_SHADER_TYPE_VERTEX:
+                msl_generate_vertex_output_element_attribute(gen, e);
+                break;
+            case VKD3D_SHADER_TYPE_PIXEL:
+                msl_generate_pixel_output_element_attribute(gen, e);
+                break;
+            default:
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled shader type %#x.", type);
+                break;
+        }
+
+        vkd3d_string_buffer_printf(buffer, ";\n");
+    }
+
+    vkd3d_string_buffer_printf(buffer, "};\n\n");
+}
+
 static void msl_generator_generate(struct msl_generator *gen)
 {
     const struct vkd3d_shader_instruction_array *instructions = &gen->program->instructions;
@@ -258,7 +391,9 @@ static void msl_generator_generate(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "    int4 i;\n");
     vkd3d_string_buffer_printf(gen->buffer, "    float4 f;\n};\n\n");
 
-    vkd3d_string_buffer_printf(gen->buffer, "void shader_main()\n{\n");
+    msl_generate_output_struct_declarations(gen);
+
+    vkd3d_string_buffer_printf(gen->buffer, "void %s_main()\n{\n", gen->prefix);
 
     ++gen->indent;
 
@@ -288,6 +423,8 @@ static void msl_generator_cleanup(struct msl_generator *gen)
 static int msl_generator_init(struct msl_generator *gen, struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context)
 {
+    enum vkd3d_shader_type type = program->shader_version.type;
+
     memset(gen, 0, sizeof(*gen));
     gen->program = program;
     vkd3d_string_buffer_cache_init(&gen->string_buffers);
@@ -297,6 +434,12 @@ static int msl_generator_init(struct msl_generator *gen, struct vsir_program *pr
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
     gen->message_context = message_context;
+    if (!(gen->prefix = msl_get_prefix(type)))
+    {
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                "Internal compiler error: Unhandled shader type %#x.", type);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
 
     return VKD3D_OK;
 }
