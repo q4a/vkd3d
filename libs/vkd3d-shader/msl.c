@@ -464,6 +464,36 @@ static void msl_generate_output_struct_declarations(struct msl_generator *gen)
     vkd3d_string_buffer_printf(buffer, "};\n\n");
 }
 
+static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
+{
+    const struct shader_signature *signature = &gen->program->input_signature;
+    struct vkd3d_string_buffer *buffer = gen->buffer;
+    const struct signature_element *e;
+    unsigned int i;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        e = &signature->elements[i];
+
+        if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
+            continue;
+
+        vkd3d_string_buffer_printf(buffer, "    %s_in[%u]", gen->prefix, e->register_index);
+        if (e->sysval_semantic == VKD3D_SHADER_SV_NONE)
+        {
+            msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
+            vkd3d_string_buffer_printf(buffer, " = input.shader_in_%u", i);
+        }
+        else
+        {
+            vkd3d_string_buffer_printf(buffer, " = <unhandled sysval %#x>", e->sysval_semantic);
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled system value %#x input.", e->sysval_semantic);
+        }
+        vkd3d_string_buffer_printf(buffer, ";\n");
+    }
+}
+
 static void msl_generate_entrypoint_epilogue(struct msl_generator *gen)
 {
     const struct shader_signature *signature = &gen->program->output_signature;
@@ -525,7 +555,7 @@ static void msl_generate_entrypoint(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_out[%u];\n", gen->prefix, 32);
     vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_%s_out output;\n", gen->prefix);
 
-    /* TODO: prologue */
+    msl_generate_entrypoint_prologue(gen);
 
     vkd3d_string_buffer_printf(gen->buffer, "    %s_main(%s_in, %s_out);\n", gen->prefix, gen->prefix, gen->prefix);
 
