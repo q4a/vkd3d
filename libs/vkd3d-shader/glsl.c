@@ -1056,6 +1056,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
     switch (ins->opcode)
     {
         case VKD3DSIH_ADD:
+        case VKD3DSIH_IADD:
             shader_glsl_binop(gen, ins, "+");
             break;
         case VKD3DSIH_AND:
