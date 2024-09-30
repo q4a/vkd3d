@@ -464,6 +464,45 @@ static void msl_generate_output_struct_declarations(struct msl_generator *gen)
     vkd3d_string_buffer_printf(buffer, "};\n\n");
 }
 
+static void msl_generate_entrypoint(struct msl_generator *gen)
+{
+    enum vkd3d_shader_type type = gen->program->shader_version.type;
+
+    switch (type)
+    {
+        case VKD3D_SHADER_TYPE_VERTEX:
+            vkd3d_string_buffer_printf(gen->buffer, "vertex ");
+            break;
+        case VKD3D_SHADER_TYPE_PIXEL:
+            vkd3d_string_buffer_printf(gen->buffer, "fragment ");
+            break;
+        default:
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled shader type %#x.", type);
+            return;
+    }
+
+    vkd3d_string_buffer_printf(gen->buffer, "vkd3d_%s_out shader_entry(\n", gen->prefix);
+
+    /* TODO: descriptor declaration */
+
+    msl_print_indent(gen->buffer, 1);
+    vkd3d_string_buffer_printf(gen->buffer, "vkd3d_%s_in input [[stage_in]])\n{\n", gen->prefix);
+
+    /* TODO: declare #maximum_register + 1 */
+    vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_in[%u];\n", gen->prefix, 32);
+    vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_out[%u];\n", gen->prefix, 32);
+    vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_%s_out output;\n", gen->prefix);
+
+    /* TODO: prologue */
+
+    vkd3d_string_buffer_printf(gen->buffer, "    %s_main(%s_in, %s_out);\n", gen->prefix, gen->prefix, gen->prefix);
+
+    /* TODO: epilogue */
+
+    vkd3d_string_buffer_printf(gen->buffer, "    return output;\n}\n");
+}
+
 static void msl_generator_generate(struct msl_generator *gen)
 {
     const struct vkd3d_shader_instruction_array *instructions = &gen->program->instructions;
@@ -481,7 +520,10 @@ static void msl_generator_generate(struct msl_generator *gen)
     msl_generate_input_struct_declarations(gen);
     msl_generate_output_struct_declarations(gen);
 
-    vkd3d_string_buffer_printf(gen->buffer, "void %s_main()\n{\n", gen->prefix);
+    vkd3d_string_buffer_printf(gen->buffer,
+            "void %s_main(thread vkd3d_vec4 *v, "
+            "thread vkd3d_vec4 *o)\n{\n",
+            gen->prefix);
 
     ++gen->indent;
 
@@ -496,7 +538,11 @@ static void msl_generator_generate(struct msl_generator *gen)
         msl_handle_instruction(gen, &instructions->elements[i]);
     }
 
-    vkd3d_string_buffer_printf(gen->buffer, "}\n");
+    --gen->indent;
+
+    vkd3d_string_buffer_printf(gen->buffer, "}\n\n");
+
+    msl_generate_entrypoint(gen);
 
     if (TRACE_ON())
         vkd3d_string_buffer_trace(gen->buffer);
