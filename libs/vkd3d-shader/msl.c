@@ -78,10 +78,10 @@ static void msl_print_indent(struct vkd3d_string_buffer *buffer, unsigned int in
 }
 
 static void msl_print_register_datatype(struct vkd3d_string_buffer *buffer,
-        struct msl_generator *gen, const struct vkd3d_shader_register *reg)
+        struct msl_generator *gen, enum vkd3d_data_type data_type)
 {
     vkd3d_string_buffer_printf(buffer, ".");
-    switch (reg->data_type)
+    switch (data_type)
     {
         case VKD3D_DATA_FLOAT:
             vkd3d_string_buffer_printf(buffer, "f");
@@ -94,8 +94,8 @@ static void msl_print_register_datatype(struct vkd3d_string_buffer *buffer,
             break;
         default:
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-                    "Internal compiler error: Unhandled register datatype %#x.", reg->data_type);
-            vkd3d_string_buffer_printf(buffer, "<unrecognised register datatype %#x>", reg->data_type);
+                    "Internal compiler error: Unhandled register datatype %#x.", data_type);
+            vkd3d_string_buffer_printf(buffer, "<unrecognised register datatype %#x>", data_type);
             break;
     }
 }
@@ -107,7 +107,7 @@ static void msl_print_register_name(struct vkd3d_string_buffer *buffer,
     {
         case VKD3DSPR_TEMP:
             vkd3d_string_buffer_printf(buffer, "r[%u]", reg->idx[0].offset);
-            msl_print_register_datatype(buffer, gen, reg);
+            msl_print_register_datatype(buffer, gen, reg->data_type);
             break;
         default:
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
@@ -464,6 +464,37 @@ static void msl_generate_output_struct_declarations(struct msl_generator *gen)
     vkd3d_string_buffer_printf(buffer, "};\n\n");
 }
 
+static void msl_generate_entrypoint_epilogue(struct msl_generator *gen)
+{
+    const struct shader_signature *signature = &gen->program->output_signature;
+    struct vkd3d_string_buffer *buffer = gen->buffer;
+    const struct signature_element *e;
+    unsigned int i;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        e = &signature->elements[i];
+
+        if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
+            continue;
+
+        switch (e->sysval_semantic)
+        {
+            case VKD3D_SHADER_SV_NONE:
+            case VKD3D_SHADER_SV_TARGET:
+            case VKD3D_SHADER_SV_POSITION:
+                vkd3d_string_buffer_printf(buffer, "    output.shader_out_%u = %s_out", i, gen->prefix);
+                msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
+                break;
+            default:
+                vkd3d_string_buffer_printf(buffer, "    <unhandled sysval %#x>", e->sysval_semantic);
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled system value %#x input.", e->sysval_semantic);
+        }
+        vkd3d_string_buffer_printf(buffer, ";\n");
+    }
+}
+
 static void msl_generate_entrypoint(struct msl_generator *gen)
 {
     enum vkd3d_shader_type type = gen->program->shader_version.type;
@@ -498,7 +529,7 @@ static void msl_generate_entrypoint(struct msl_generator *gen)
 
     vkd3d_string_buffer_printf(gen->buffer, "    %s_main(%s_in, %s_out);\n", gen->prefix, gen->prefix, gen->prefix);
 
-    /* TODO: epilogue */
+    msl_generate_entrypoint_epilogue(gen);
 
     vkd3d_string_buffer_printf(gen->buffer, "    return output;\n}\n");
 }
