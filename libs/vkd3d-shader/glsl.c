@@ -1494,15 +1494,62 @@ static void shader_glsl_generate_descriptor_declarations(struct vkd3d_glsl_gener
         vkd3d_string_buffer_printf(gen->buffer, "\n");
 }
 
-static void shader_glsl_generate_interface_block(struct vkd3d_string_buffer *buffer,
-        const char *type, unsigned int count)
+static const struct signature_element *signature_get_element_by_location(
+        const struct shader_signature *signature, unsigned int location)
 {
+    const struct signature_element *e;
+    unsigned int i;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        e = &signature->elements[i];
+
+        if (e->target_location != location)
+            continue;
+
+        return e;
+    }
+
+    return NULL;
+}
+
+static const char *shader_glsl_get_interpolation(struct vkd3d_glsl_generator *gen,
+        const struct shader_signature *signature, const char *type, unsigned int location)
+{
+    enum vkd3d_shader_interpolation_mode m;
+    const struct signature_element *e;
+
+    if ((e = signature_get_element_by_location(signature, location)))
+        m = e->interpolation_mode;
+    else
+        m = VKD3DSIM_NONE;
+
+    switch (m)
+    {
+        case VKD3DSIM_NONE:
+        case VKD3DSIM_LINEAR:
+            return "";
+        case VKD3DSIM_CONSTANT:
+            return "flat ";
+        default:
+            vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                    "Internal compiler error: Unhandled interpolation mode %#x for %s location %u.", m, type, location);
+            return "";
+    }
+}
+
+static void shader_glsl_generate_interface_block(struct vkd3d_glsl_generator *gen,
+        const struct shader_signature *signature, const char *type, unsigned int count)
+{
+    struct vkd3d_string_buffer *buffer = gen->buffer;
+    const char *interpolation;
     unsigned int i;
 
     vkd3d_string_buffer_printf(buffer, "%s shader_in_out\n{\n", type);
     for (i = 0; i < count; ++i)
     {
-        vkd3d_string_buffer_printf(buffer, "    vec4 reg_%u;\n", i);
+        interpolation = shader_glsl_get_interpolation(gen, signature, type, i);
+        vkd3d_string_buffer_printf(buffer, "    %svec4 reg_%u;\n", interpolation, i);
     }
     vkd3d_string_buffer_printf(buffer, "} shader_%s;\n", type);
 }
@@ -1550,7 +1597,7 @@ static void shader_glsl_generate_input_declarations(struct vkd3d_glsl_generator 
     }
     else if (gen->limits.input_count)
     {
-        shader_glsl_generate_interface_block(buffer, "in", gen->limits.input_count);
+        shader_glsl_generate_interface_block(gen, signature, "in", gen->limits.input_count);
     }
     vkd3d_string_buffer_printf(buffer, "\n");
 }
@@ -1605,7 +1652,7 @@ static void shader_glsl_generate_output_declarations(struct vkd3d_glsl_generator
     }
     else if (gen->limits.output_count)
     {
-        shader_glsl_generate_interface_block(buffer, "out", gen->limits.output_count);
+        shader_glsl_generate_interface_block(gen, signature, "out", gen->limits.output_count);
     }
     vkd3d_string_buffer_printf(buffer, "\n");
 }
