@@ -7282,9 +7282,6 @@ static void sm1_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
     }
 }
 
-/* OBJECTIVE: Translate all the information from ctx and entry_func to the
- * vsir_program and ctab blob, so they can be used as input to d3dbc_compile()
- * without relying on ctx and entry_func. */
 static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         uint64_t config_flags, struct vsir_program *program, struct vkd3d_shader_code *ctab)
 {
@@ -7319,6 +7316,25 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     list_move_head(&entry_func->body.instrs, &block.instrs);
 
     sm1_generate_vsir_block(ctx, &entry_func->body, program);
+}
+
+/* OBJECTIVE: Translate all the information from ctx and entry_func to the
+ * vsir_program, so it can be used as input to tpf_compile() without relying
+ * on ctx and entry_func. */
+static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        uint64_t config_flags, struct vsir_program *program)
+{
+    struct vkd3d_shader_version version = {0};
+
+    version.major = ctx->profile->major_version;
+    version.minor = ctx->profile->minor_version;
+    version.type = ctx->profile->type;
+
+    if (!vsir_program_init(program, NULL, &version, 0, VSIR_CF_STRUCTURED))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,
@@ -7850,7 +7866,22 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         }
 
         case VKD3D_SHADER_TARGET_DXBC_TPF:
-            return hlsl_sm4_write(ctx, entry_func, out);
+        {
+            uint32_t config_flags = vkd3d_shader_init_config_flags();
+            struct vsir_program program;
+            int result;
+
+            sm4_generate_vsir(ctx, entry_func, config_flags, &program);
+            if (ctx->result)
+            {
+                vsir_program_cleanup(&program);
+                return ctx->result;
+            }
+
+            result = tpf_compile(&program, config_flags, out, ctx->message_context, ctx, entry_func);
+            vsir_program_cleanup(&program);
+            return result;
+        }
 
         default:
             ERR("Unsupported shader target type %#x.\n", target_type);

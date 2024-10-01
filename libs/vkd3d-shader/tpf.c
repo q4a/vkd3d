@@ -1405,6 +1405,7 @@ struct sm4_stat
 
 struct tpf_writer
 {
+    /* OBJECTIVE: We want to get rid of this HLSL IR specific field. */
     struct hlsl_ctx *ctx;
     struct vkd3d_bytecode_buffer *buffer;
     struct vkd3d_sm4_lookup_tables lookup;
@@ -6564,7 +6565,12 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
     add_section(ctx, dxbc, TAG_STAT, &buffer);
 }
 
-int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
+/* OBJECTIVE: Stop relying on ctx and entry_func on this function, receiving
+ * data from the other parameters instead, so they can be removed from the
+ * arguments and this function can be independent of HLSL structs.  */
+int tpf_compile(struct vsir_program *program, uint64_t config_flags,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
+        struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct sm4_stat stat = {0};
     struct dxbc_writer dxbc;
