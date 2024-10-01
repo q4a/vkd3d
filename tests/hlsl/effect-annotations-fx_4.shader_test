@@ -86,7 +86,7 @@ technique10
 // Without initializer
 technique10 < int a; > {}
 
-[effect fail todo]
+[effect fail]
 // Only numeric types and strings are allowed
 technique10 < DepthStencilState ds = { 0 }; > {}
 

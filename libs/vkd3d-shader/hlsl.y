@@ -2366,9 +2366,9 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
         {
             struct hlsl_default_value default_value = {0};
 
-            if (hlsl_is_numeric_type(dst_comp_type))
+            if (src->type == HLSL_IR_COMPILE || src->type == HLSL_IR_SAMPLER_STATE)
             {
-                if (src->type == HLSL_IR_COMPILE || src->type == HLSL_IR_SAMPLER_STATE)
+                if (hlsl_is_numeric_type(dst_comp_type))
                 {
                     /* Default values are discarded if they contain an object
                      * literal expression for a numeric component. */
@@ -2381,17 +2381,17 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
                         dst->default_values = NULL;
                     }
                 }
-                else
-                {
-                    if (!hlsl_clone_block(ctx, &block, instrs))
-                        return;
-                    default_value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
+            }
+            else
+            {
+                if (!hlsl_clone_block(ctx, &block, instrs))
+                    return;
+                default_value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
 
-                    if (dst->default_values)
-                        dst->default_values[*store_index] = default_value;
+                if (dst->default_values)
+                    dst->default_values[*store_index] = default_value;
 
-                    hlsl_block_cleanup(&block);
-                }
+                hlsl_block_cleanup(&block);
             }
         }
         else
