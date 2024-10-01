@@ -24,6 +24,17 @@ messages, you may also consider VKD3D_NO_TRACE_MESSAGES and
 VKD3D_NO_DEBUG_MESSAGES. For example, you can pass `CPPFLAGS="-DNDEBUG
 -DVKD3D_NO_TRACE_MESSAGES"' to configure.
 
+================
+Developing vkd3d
+================
+
+Development of vkd3d happens on the Wine GitLab instance
+(https://gitlab.winehq.org/wine/vkd3d/). Contributors are encouraged
+to submit their patches using the merge request tool.
+
+Each merge request is automatically tested with the GitLab CI
+system. See gitlab/README in the Git tree for more details.
+
 ===========
 Using vkd3d
 ===========
@@ -104,17 +115,6 @@ test shaders only in earlier shader models. The DXC source does not contain
 code for adding DXBC checksums, so the official release should be installed
 from:
 https://github.com/microsoft/DirectXShaderCompiler/releases
-
-================
-Developing vkd3d
-================
-
-Development of vkd3d happens on the Wine GitLab instance
-(https://gitlab.winehq.org/wine/vkd3d/). Contributors are encouraged
-to submit their patches using the merge request tool.
-
-Each merge request is automatically tested with the GitLab CI
-system. See gitlab/README in the Git tree for more details.
 
 ============================
 Testing with the Agility SDK
