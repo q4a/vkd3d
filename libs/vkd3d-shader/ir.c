@@ -1864,13 +1864,13 @@ static bool use_flat_interpolation(const struct vsir_program *program,
     if (parameter->type != VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)
     {
         vkd3d_shader_error(message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                "Unsupported flat interpolation parameter type %#x.\n", parameter->type);
+                "Unsupported flat interpolation parameter type %#x.", parameter->type);
         return false;
     }
     if (parameter->data_type != VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32)
     {
         vkd3d_shader_error(message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
-                "Invalid flat interpolation parameter data type %#x.\n", parameter->data_type);
+                "Invalid flat interpolation parameter data type %#x.", parameter->data_type);
         return false;
     }
 
@@ -5652,13 +5652,13 @@ static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *pro
     if (func->type != VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)
     {
         vkd3d_shader_error(message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                "Unsupported alpha test function parameter type %#x.\n", func->type);
+                "Unsupported alpha test function parameter type %#x.", func->type);
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
     if (func->data_type != VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32)
     {
         vkd3d_shader_error(message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
-                "Invalid alpha test function parameter data type %#x.\n", func->data_type);
+                "Invalid alpha test function parameter data type %#x.", func->data_type);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
     compare_func = func->u.immediate_constant.u.u32;
