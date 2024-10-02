@@ -2213,6 +2213,8 @@ int glsl_compile(struct vsir_program *program, uint64_t config_flags,
     if ((ret = vsir_program_transform(program, config_flags, compile_info, message_context)) < 0)
         return ret;
 
+    VKD3D_ASSERT(program->normalised_io);
+
     vkd3d_glsl_generator_init(&generator, program, compile_info,
             descriptor_info, combined_sampler_info, message_context);
     ret = vkd3d_glsl_generator_generate(&generator, out);

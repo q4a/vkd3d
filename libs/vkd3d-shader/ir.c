@@ -74,7 +74,8 @@ static int convert_parameter_info(const struct vkd3d_shader_compile_info *compil
 }
 
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
-        const struct vkd3d_shader_version *version, unsigned int reserve, enum vsir_control_flow_type cf_type)
+        const struct vkd3d_shader_version *version, unsigned int reserve, enum vsir_control_flow_type cf_type,
+        bool normalised_io)
 {
     memset(program, 0, sizeof(*program));
 
@@ -97,6 +98,7 @@ bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_c
 
     program->shader_version = *version;
     program->cf_type = cf_type;
+    program->normalised_io = normalised_io;
     return shader_instruction_array_init(&program->instructions, reserve);
 }
 
@@ -1903,6 +1905,8 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
     struct vkd3d_shader_instruction *ins;
     unsigned int i;
 
+    VKD3D_ASSERT(!program->normalised_io);
+
     normaliser.phase = VKD3DSIH_INVALID;
     normaliser.shader_type = program->shader_version.type;
     normaliser.major = program->shader_version.major;
@@ -1959,6 +1963,7 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
 
     program->instructions = normaliser.instructions;
     program->use_vocp = normaliser.use_vocp;
+    program->normalised_io = true;
     return VKD3D_OK;
 }
 

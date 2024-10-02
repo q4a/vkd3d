@@ -2792,7 +2792,8 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, struct vsir_pro
     version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
 
     /* Estimate instruction count to avoid reallocation in most shaders. */
-    if (!vsir_program_init(program, compile_info, &version, token_count / 7u + 20, VSIR_CF_STRUCTURED))
+    if (!vsir_program_init(program, compile_info,
+            &version, token_count / 7u + 20, VSIR_CF_STRUCTURED, false))
         return false;
     vkd3d_shader_parser_init(&sm4->p, program, message_context, compile_info->source_name);
     sm4->ptr = sm4->start;
