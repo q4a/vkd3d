@@ -1403,7 +1403,7 @@ struct sm4_stat
     uint32_t fields[VKD3D_STAT_COUNT];
 };
 
-struct tpf_writer
+struct tpf_compiler
 {
     /* OBJECTIVE: We want to get rid of this HLSL IR specific field. */
     struct hlsl_ctx *ctx;
@@ -1917,7 +1917,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
     }
 }
 
-static void tpf_writer_init(struct tpf_writer *tpf, struct hlsl_ctx *ctx, struct sm4_stat *stat,
+static void tpf_compiler_init(struct tpf_compiler *tpf, struct hlsl_ctx *ctx, struct sm4_stat *stat,
         struct vkd3d_bytecode_buffer *buffer)
 {
     tpf->ctx = ctx;
@@ -2987,7 +2987,7 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
     return VKD3D_OK;
 }
 
-static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_block *block);
+static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_block *block);
 
 static bool type_is_integer(const struct hlsl_type *type)
 {
@@ -4252,7 +4252,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
     }
 }
 
-static void sm4_src_from_deref(const struct tpf_writer *tpf, struct vkd3d_shader_src_param *src,
+static void sm4_src_from_deref(const struct tpf_compiler *tpf, struct vkd3d_shader_src_param *src,
         const struct hlsl_deref *deref, unsigned int map_writemask, struct sm4_instruction *sm4_instr)
 {
     unsigned int hlsl_swizzle;
@@ -4296,7 +4296,7 @@ static void sm4_src_from_constant_value(struct vkd3d_shader_src_param *src,
     }
 }
 
-static void sm4_src_from_node(const struct tpf_writer *tpf, struct vkd3d_shader_src_param *src,
+static void sm4_src_from_node(const struct tpf_compiler *tpf, struct vkd3d_shader_src_param *src,
         const struct hlsl_ir_node *instr, uint32_t map_writemask)
 {
     unsigned int hlsl_swizzle;
@@ -4332,7 +4332,7 @@ static unsigned int sm4_get_index_addressing_from_reg(const struct vkd3d_shader_
     return 0;
 }
 
-static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct vkd3d_shader_register *reg,
+static uint32_t sm4_encode_register(const struct tpf_compiler *tpf, const struct vkd3d_shader_register *reg,
         enum vkd3d_sm4_swizzle_type sm4_swizzle_type, uint32_t sm4_swizzle)
 {
     const struct vkd3d_sm4_register_type_info *register_type_info;
@@ -4392,7 +4392,7 @@ static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct v
     return token;
 }
 
-static void sm4_write_register_index(const struct tpf_writer *tpf, const struct vkd3d_shader_register *reg,
+static void sm4_write_register_index(const struct tpf_compiler *tpf, const struct vkd3d_shader_register *reg,
         unsigned int j)
 {
     unsigned int addressing = sm4_get_index_addressing_from_reg(reg, j);
@@ -4422,7 +4422,7 @@ static void sm4_write_register_index(const struct tpf_writer *tpf, const struct 
     }
 }
 
-static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct vkd3d_shader_dst_param *dst)
+static void sm4_write_dst_register(const struct tpf_compiler *tpf, const struct vkd3d_shader_dst_param *dst)
 {
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
     uint32_t token = 0;
@@ -4435,7 +4435,7 @@ static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct vk
         sm4_write_register_index(tpf, &dst->reg, j);
 }
 
-static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vkd3d_shader_src_param *src)
+static void sm4_write_src_register(const struct tpf_compiler *tpf, const struct vkd3d_shader_src_param *src)
 {
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
     uint32_t token = 0, mod_token = 0;
@@ -4496,7 +4496,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vk
     }
 }
 
-static void sm4_update_stat_counters(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
+static void sm4_update_stat_counters(const struct tpf_compiler *tpf, const struct sm4_instruction *instr)
 {
     enum vkd3d_shader_type shader_type = tpf->ctx->profile->type;
     enum vkd3d_sm4_stat_field stat_field;
@@ -4541,7 +4541,7 @@ static void sm4_update_stat_counters(const struct tpf_writer *tpf, const struct 
     }
 }
 
-static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
+static void write_sm4_instruction(const struct tpf_compiler *tpf, const struct sm4_instruction *instr)
 {
     uint32_t token = instr->opcode | instr->extra_bits;
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
@@ -4608,7 +4608,7 @@ static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
     return true;
 }
 
-static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const struct hlsl_buffer *cbuffer)
+static void write_sm4_dcl_constant_buffer(const struct tpf_compiler *tpf, const struct hlsl_buffer *cbuffer)
 {
     size_t size = (cbuffer->used_size + 3) / 4;
 
@@ -4643,7 +4643,7 @@ static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const st
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct extern_resource *resource)
+static void write_sm4_dcl_samplers(const struct tpf_compiler *tpf, const struct extern_resource *resource)
 {
     unsigned int i;
     struct sm4_instruction instr =
@@ -4684,7 +4684,7 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
     }
 }
 
-static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct extern_resource *resource,
+static void write_sm4_dcl_textures(const struct tpf_compiler *tpf, const struct extern_resource *resource,
         bool uav)
 {
     enum hlsl_regset regset = uav ? HLSL_REGSET_UAVS : HLSL_REGSET_TEXTURES;
@@ -4769,7 +4769,7 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
     }
 }
 
-static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hlsl_ir_var *var)
+static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct hlsl_ir_var *var)
 {
     const struct hlsl_profile_info *profile = tpf->ctx->profile;
     const bool output = var->is_output_semantic;
@@ -4898,7 +4898,7 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_temps(const struct tpf_writer *tpf, uint32_t temp_count)
+static void write_sm4_dcl_temps(const struct tpf_compiler *tpf, uint32_t temp_count)
 {
     struct sm4_instruction instr =
     {
@@ -4911,7 +4911,7 @@ static void write_sm4_dcl_temps(const struct tpf_writer *tpf, uint32_t temp_coun
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_indexable_temp(const struct tpf_writer *tpf, uint32_t idx,
+static void write_sm4_dcl_indexable_temp(const struct tpf_compiler *tpf, uint32_t idx,
         uint32_t size, uint32_t comp_count)
 {
     struct sm4_instruction instr =
@@ -4925,7 +4925,7 @@ static void write_sm4_dcl_indexable_temp(const struct tpf_writer *tpf, uint32_t 
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_thread_group(const struct tpf_writer *tpf, const uint32_t thread_count[3])
+static void write_sm4_dcl_thread_group(const struct tpf_compiler *tpf, const uint32_t thread_count[3])
 {
     struct sm4_instruction instr =
     {
@@ -4940,7 +4940,7 @@ static void write_sm4_dcl_thread_group(const struct tpf_writer *tpf, const uint3
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_global_flags(const struct tpf_writer *tpf, uint32_t flags)
+static void write_sm4_dcl_global_flags(const struct tpf_compiler *tpf, uint32_t flags)
 {
     struct sm4_instruction instr =
     {
@@ -4951,7 +4951,7 @@ static void write_sm4_dcl_global_flags(const struct tpf_writer *tpf, uint32_t fl
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_ret(const struct tpf_writer *tpf)
+static void write_sm4_ret(const struct tpf_compiler *tpf)
 {
     struct sm4_instruction instr =
     {
@@ -4961,7 +4961,7 @@ static void write_sm4_ret(const struct tpf_writer *tpf)
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_unary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src, enum vkd3d_shader_src_modifier src_mod)
 {
     struct sm4_instruction instr;
@@ -4979,7 +4979,7 @@ static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opco
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_unary_op_with_two_destinations(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, unsigned int dst_idx, const struct hlsl_ir_node *src)
 {
     struct sm4_instruction instr;
@@ -5000,7 +5000,7 @@ static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tp
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_binary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_binary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
     struct sm4_instruction instr;
@@ -5019,7 +5019,7 @@ static void write_sm4_binary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opc
 }
 
 /* dp# instructions don't map the swizzle. */
-static void write_sm4_binary_op_dot(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_binary_op_dot(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
     struct sm4_instruction instr;
@@ -5037,7 +5037,7 @@ static void write_sm4_binary_op_dot(const struct tpf_writer *tpf, enum vkd3d_sm4
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *tpf,
+static void write_sm4_binary_op_with_two_destinations(const struct tpf_compiler *tpf,
         enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned int dst_idx,
         const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
@@ -5060,7 +5060,7 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *t
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_ternary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_ternary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2,
         const struct hlsl_ir_node *src3)
 {
@@ -5080,7 +5080,7 @@ static void write_sm4_ternary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_op
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst,
+static void write_sm4_ld(const struct tpf_compiler *tpf, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
         const struct hlsl_ir_node *sample_index, const struct hlsl_ir_node *texel_offset,
         enum hlsl_sampler_dim dim)
@@ -5158,7 +5158,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_sample(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
+static void write_sm4_sample(const struct tpf_compiler *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
@@ -5238,7 +5238,7 @@ static void write_sm4_sample(const struct tpf_writer *tpf, const struct hlsl_ir_
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
+static void write_sm4_sampleinfo(const struct tpf_compiler *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_deref *resource = &load->resource;
     const struct hlsl_ir_node *dst = &load->node;
@@ -5260,7 +5260,7 @@ static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
+static void write_sm4_resinfo(const struct tpf_compiler *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_deref *resource = &load->resource;
     const struct hlsl_ir_node *dst = &load->node;
@@ -5295,7 +5295,7 @@ static bool type_is_float(const struct hlsl_type *type)
     return type->e.numeric.type == HLSL_TYPE_FLOAT || type->e.numeric.type == HLSL_TYPE_HALF;
 }
 
-static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr,
+static void write_sm4_cast_from_bool(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr,
         const struct hlsl_ir_node *arg, uint32_t mask)
 {
     struct sm4_instruction instr;
@@ -5315,7 +5315,7 @@ static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct 
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_cast(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr)
+static void write_sm4_cast(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
 {
     static const union
     {
@@ -5424,7 +5424,7 @@ static void write_sm4_cast(const struct tpf_writer *tpf, const struct hlsl_ir_ex
     }
 }
 
-static void write_sm4_store_uav_typed(const struct tpf_writer *tpf, const struct hlsl_deref *dst,
+static void write_sm4_store_uav_typed(const struct tpf_compiler *tpf, const struct hlsl_deref *dst,
         const struct hlsl_ir_node *coords, const struct hlsl_ir_node *value)
 {
     struct sm4_instruction instr;
@@ -5442,7 +5442,7 @@ static void write_sm4_store_uav_typed(const struct tpf_writer *tpf, const struct
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_rasterizer_sample_count(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst)
+static void write_sm4_rasterizer_sample_count(const struct tpf_compiler *tpf, const struct hlsl_ir_node *dst)
 {
     struct sm4_instruction instr;
 
@@ -5461,7 +5461,7 @@ static void write_sm4_rasterizer_sample_count(const struct tpf_writer *tpf, cons
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr)
+static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
 {
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
     const struct hlsl_ir_node *arg2 = expr->operands[1].node;
@@ -5976,7 +5976,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
     hlsl_release_string_buffer(tpf->ctx, dst_type_string);
 }
 
-static void write_sm4_if(const struct tpf_writer *tpf, const struct hlsl_ir_if *iff)
+static void write_sm4_if(const struct tpf_compiler *tpf, const struct hlsl_ir_if *iff)
 {
     struct sm4_instruction instr =
     {
@@ -6005,7 +6005,7 @@ static void write_sm4_if(const struct tpf_writer *tpf, const struct hlsl_ir_if *
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_jump(const struct tpf_writer *tpf, const struct hlsl_ir_jump *jump)
+static void write_sm4_jump(const struct tpf_compiler *tpf, const struct hlsl_ir_jump *jump)
 {
     struct sm4_instruction instr = {0};
 
@@ -6052,7 +6052,7 @@ static bool var_is_user_input(struct hlsl_ctx *ctx, const struct hlsl_ir_var *va
     return var->is_input_semantic && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX;
 }
 
-static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_load *load)
+static void write_sm4_load(const struct tpf_compiler *tpf, const struct hlsl_ir_load *load)
 {
     const struct hlsl_type *type = load->node.data_type;
     struct sm4_instruction instr;
@@ -6091,7 +6091,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_loop(const struct tpf_writer *tpf, const struct hlsl_ir_loop *loop)
+static void write_sm4_loop(const struct tpf_compiler *tpf, const struct hlsl_ir_loop *loop)
 {
     struct sm4_instruction instr =
     {
@@ -6106,7 +6106,7 @@ static void write_sm4_loop(const struct tpf_writer *tpf, const struct hlsl_ir_lo
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst,
+static void write_sm4_gather(const struct tpf_compiler *tpf, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
         const struct hlsl_ir_node *coords, uint32_t swizzle, const struct hlsl_ir_node *texel_offset)
 {
@@ -6147,7 +6147,7 @@ static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_resource_load(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
+static void write_sm4_resource_load(const struct tpf_compiler *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *sample_index = load->sample_index.node;
@@ -6216,7 +6216,7 @@ static void write_sm4_resource_load(const struct tpf_writer *tpf, const struct h
     }
 }
 
-static void write_sm4_resource_store(const struct tpf_writer *tpf, const struct hlsl_ir_resource_store *store)
+static void write_sm4_resource_store(const struct tpf_compiler *tpf, const struct hlsl_ir_resource_store *store)
 {
     struct hlsl_type *resource_type = hlsl_deref_get_type(tpf->ctx, &store->resource);
 
@@ -6235,7 +6235,7 @@ static void write_sm4_resource_store(const struct tpf_writer *tpf, const struct 
     write_sm4_store_uav_typed(tpf, &store->resource, store->coords.node, store->value.node);
 }
 
-static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_store *store)
+static void write_sm4_store(const struct tpf_compiler *tpf, const struct hlsl_ir_store *store)
 {
     const struct hlsl_ir_node *rhs = store->rhs.node;
     struct sm4_instruction instr;
@@ -6254,7 +6254,7 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_switch(const struct tpf_writer *tpf, const struct hlsl_ir_switch *s)
+static void write_sm4_switch(const struct tpf_compiler *tpf, const struct hlsl_ir_switch *s)
 {
     const struct hlsl_ir_node *selector = s->selector.node;
     struct hlsl_ir_switch_case *c;
@@ -6294,7 +6294,7 @@ static void write_sm4_switch(const struct tpf_writer *tpf, const struct hlsl_ir_
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir_swizzle *swizzle)
+static void write_sm4_swizzle(const struct tpf_compiler *tpf, const struct hlsl_ir_swizzle *swizzle)
 {
     unsigned int hlsl_swizzle;
     struct sm4_instruction instr;
@@ -6315,7 +6315,7 @@ static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_block *block)
+static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_block *block)
 {
     const struct hlsl_ir_node *instr;
 
@@ -6400,7 +6400,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *e
     const struct hlsl_scope *scope;
     const struct hlsl_ir_var *var;
     size_t token_count_position;
-    struct tpf_writer tpf;
+    struct tpf_compiler tpf;
     uint32_t temp_count;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
@@ -6421,7 +6421,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *e
     if (ctx->result)
         return;
 
-    tpf_writer_init(&tpf, ctx, stat, &buffer);
+    tpf_compiler_init(&tpf, ctx, stat, &buffer);
 
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
 
