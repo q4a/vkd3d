@@ -6245,6 +6245,18 @@ static void vsir_validate_register(struct validation_context *ctx,
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
                         "Invalid dimension %#x for a UAV register.",
                         reg->dimension);
+
+            if (reg->idx_count != 2)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                        "Invalid index count %u for a UAV register.",
+                        reg->idx_count);
+                break;
+            }
+
+            if (reg->idx[0].rel_addr)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "Non-NULL relative address for the descriptor index of a UAV register.");
             break;
 
         case VKD3DSPR_DEPTHOUT:
