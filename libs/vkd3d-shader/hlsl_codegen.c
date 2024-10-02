@@ -5181,24 +5181,25 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     };
 
     enum vkd3d_shader_register_type type;
+    struct vkd3d_shader_version version;
     uint32_t reg;
     bool builtin;
 
     VKD3D_ASSERT(var->semantic.name);
 
-    if (ctx->profile->major_version < 4)
+    version.major = ctx->profile->major_version;
+    version.minor = ctx->profile->minor_version;
+    version.type = ctx->profile->type;
+
+    if (version.major < 4)
     {
-        struct vkd3d_shader_version version;
         enum vkd3d_decl_usage usage;
         uint32_t usage_idx;
 
         /* ps_1_* outputs are special and go in temp register 0. */
-        if (ctx->profile->major_version == 1 && output && ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+        if (version.major == 1 && output && version.type == VKD3D_SHADER_TYPE_PIXEL)
             return;
 
-        version.major = ctx->profile->major_version;
-        version.minor = ctx->profile->minor_version;
-        version.type = ctx->profile->type;
         builtin = sm1_register_from_semantic_name(&version,
                 var->semantic.name, var->semantic.index, output, &type, &reg);
         if (!builtin && !sm1_usage_from_semantic_name(var->semantic.name, var->semantic.index, &usage, &usage_idx))
@@ -5216,19 +5217,20 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         enum vkd3d_shader_sysval_semantic semantic;
         bool has_idx;
 
-        if (!sysval_semantic_from_hlsl(&semantic, ctx, &var->semantic, output))
+        if (!sysval_semantic_from_hlsl(&semantic, &version, ctx->semantic_compat_mapping, &var->semantic, output))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
             return;
         }
-        if ((builtin = hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &has_idx)))
+
+        if ((builtin = hlsl_sm4_register_from_semantic(&version, &var->semantic, output, &type, &has_idx)))
             reg = has_idx ? var->semantic.index : 0;
     }
 
     if (builtin)
     {
-        TRACE("%s %s semantic %s[%u] matches predefined register %#x[%u].\n", shader_names[ctx->profile->type],
+        TRACE("%s %s semantic %s[%u] matches predefined register %#x[%u].\n", shader_names[version.type],
                 output ? "output" : "input", var->semantic.name, var->semantic.index, type, reg);
     }
     else
@@ -6297,12 +6299,13 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx,
         struct vkd3d_string_buffer *string;
         bool has_idx, ret;
 
-        ret = sysval_semantic_from_hlsl(&sysval, ctx, &var->semantic, output);
+        ret = sysval_semantic_from_hlsl(&sysval, &program->shader_version,
+                ctx->semantic_compat_mapping, &var->semantic, output);
         VKD3D_ASSERT(ret);
         if (sysval == ~0u)
             return;
 
-        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &has_idx))
+        if (hlsl_sm4_register_from_semantic(&program->shader_version, &var->semantic, output, &type, &has_idx))
         {
             register_index = has_idx ? var->semantic.index : ~0u;
         }
