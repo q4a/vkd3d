@@ -702,6 +702,37 @@ static void shader_glsl_break(struct vkd3d_glsl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "break;\n");
 }
 
+static void shader_glsl_switch(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    struct glsl_src src;
+
+    glsl_src_init(&src, gen, &ins->src[0], VKD3DSP_WRITEMASK_0);
+
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "switch (%s)\n", src.str->buffer);
+    shader_glsl_begin_block(gen);
+
+    glsl_src_cleanup(&src, &gen->string_buffers);
+}
+
+static void shader_glsl_case(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    struct glsl_src src;
+
+    glsl_src_init(&src, gen, &ins->src[0], VKD3DSP_WRITEMASK_0);
+
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "case %s:\n", src.str->buffer);
+
+    glsl_src_cleanup(&src, &gen->string_buffers);
+}
+
+static void shader_glsl_default(struct vkd3d_glsl_generator *gen)
+{
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "default:\n");
+}
+
 static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const struct glsl_resource_type_info *resource_type_info;
@@ -1152,6 +1183,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_BREAK:
             shader_glsl_break(gen);
             break;
+        case VKD3DSIH_CASE:
+            shader_glsl_case(gen, ins);
+            break;
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             shader_glsl_dcl_indexable_temp(gen, ins);
             break;
@@ -1162,6 +1196,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DCL_OUTPUT:
         case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
+            break;
+        case VKD3DSIH_DEFAULT:
+            shader_glsl_default(gen);
             break;
         case VKD3DSIH_DIV:
             shader_glsl_binop(gen, ins, "/");
@@ -1180,6 +1217,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_ENDIF:
         case VKD3DSIH_ENDLOOP:
+        case VKD3DSIH_ENDSWITCH:
             shader_glsl_end_block(gen);
             break;
         case VKD3DSIH_EQO:
@@ -1287,6 +1325,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_SQRT:
             shader_glsl_intrinsic(gen, ins, "sqrt");
+            break;
+        case VKD3DSIH_SWITCH:
+            shader_glsl_switch(gen, ins);
             break;
         default:
             shader_glsl_unhandled(gen, ins);
