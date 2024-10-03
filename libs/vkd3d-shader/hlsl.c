@@ -1621,7 +1621,6 @@ struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_exp
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg1, arg2};
 
-    VKD3D_ASSERT(hlsl_types_are_equal(arg1->data_type, arg2->data_type));
     return hlsl_new_expr(ctx, op, operands, arg1->data_type, &arg1->loc);
 }
 
