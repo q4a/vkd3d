@@ -488,6 +488,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
 
     hr = IDirect3DDevice9_SetRenderState(device, D3DRS_POINTSIZE, float_to_int(runner->r.point_size));
     ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_POINTSIZE_MIN, float_to_int(runner->r.point_size_min));
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_POINTSIZE_MAX, float_to_int(runner->r.point_size_max));
+    ok(hr == D3D_OK, "Failed to set render state, hr %#lx.\n", hr);
 
     hr = IDirect3DDevice9_CreateVertexDeclaration(device, decl_elements, &vertex_declaration);
     ok(hr == D3D_OK, "Failed to create vertex declaration, hr %#lx.\n", hr);

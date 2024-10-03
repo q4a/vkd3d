@@ -1326,6 +1326,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     else if (match_string(line, "point-size", &line))
     {
         runner->point_size = strtof(line, &rest);
+        line = rest;
+        runner->point_size_min = strtof(line, &rest);
+        line = rest;
+        runner->point_size_max = strtof(line, &rest);
     }
     else
     {
@@ -1706,6 +1710,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     runner->maximum_shader_model = caps->maximum_shader_model;
     runner->alpha_test_func = VKD3D_SHADER_COMPARISON_FUNC_ALWAYS;
     runner->point_size = 1.0f;
+    runner->point_size_min = 1.0f;
+    runner->point_size_max = FLT_MAX;
 
     runner->sample_mask = ~0u;
     runner->depth_bounds = false;

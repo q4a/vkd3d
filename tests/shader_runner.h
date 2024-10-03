@@ -221,7 +221,7 @@ struct shader_runner
     bool flat_shading;
     uint8_t clip_plane_mask;
     struct vec4 clip_planes[8];
-    float point_size;
+    float point_size, point_size_min, point_size_max;
 };
 
 struct shader_runner_ops

@@ -21,6 +21,7 @@ float4 main() : color
 }
 
 [test]
+clear rtv 0  0 0 0 0
 draw point list 2
 
 probe (149, 240) rgba (0, 0, 0, 0)
@@ -32,3 +33,22 @@ probe (459, 240) rgba (0, 0, 0, 0)
 probe (461, 240) rgba (0, 1, 0, 1)
 probe (499, 240) rgba (0, 1, 0, 1)
 probe (501, 240) rgba (0, 0, 0, 0)
+
+[require]
+shader model < 4.0
+point-size
+
+[test]
+clear rtv 0  0 0 0 0
+point-size 1.0 24.0 36.0
+draw point list 2
+
+probe (147, 240) rgba (0, 0, 0, 0)
+probe (149, 240) rgba (0, 1, 0, 1)
+probe (171, 240) rgba (0, 1, 0, 1)
+probe (173, 240) rgba (0, 0, 0, 0)
+
+probe (461, 240) rgba (0, 0, 0, 0)
+probe (463, 240) rgba (0, 1, 0, 1)
+probe (497, 240) rgba (0, 1, 0, 1)
+probe (499, 240) rgba (0, 0, 0, 0)

@@ -274,7 +274,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     enum vkd3d_shader_spirv_extension spirv_extensions[2];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_compile_option options[3];
-    struct vkd3d_shader_parameter1 parameters[14];
+    struct vkd3d_shader_parameter1 parameters[16];
     struct vkd3d_shader_compile_option *option;
     unsigned int i, compile_options;
     char profile[7];
@@ -461,6 +461,16 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     parameters[13].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
     parameters[13].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32;
     parameters[13].u.immediate_constant.u.f32 = runner->r.point_size;
+
+    parameters[14].name = VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MIN;
+    parameters[14].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[14].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32;
+    parameters[14].u.immediate_constant.u.f32 = runner->r.point_size_min;
+
+    parameters[15].name = VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MAX;
+    parameters[15].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[15].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32;
+    parameters[15].u.immediate_constant.u.f32 = runner->r.point_size_max;
 
     parameter_info.parameter_count = ARRAY_SIZE(parameters);
     parameter_info.parameters = parameters;
