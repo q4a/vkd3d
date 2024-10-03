@@ -300,6 +300,9 @@ static D3DDECLTYPE vertex_decl_type_from_format(DXGI_FORMAT format)
 {
     switch (format)
     {
+        case DXGI_FORMAT_R32_FLOAT:
+            return D3DDECLTYPE_FLOAT1;
+
         case DXGI_FORMAT_R32G32_FLOAT:
             return D3DDECLTYPE_FLOAT2;
 
@@ -315,6 +318,8 @@ static D3DDECLUSAGE vertex_decl_usage_from_name(const char *name)
 {
     if (!strcasecmp(name, "position") || !strcasecmp(name, "sv_position"))
         return D3DDECLUSAGE_POSITION;
+    if (!strcasecmp(name, "psize"))
+        return D3DDECLUSAGE_PSIZE;
     if (!strcasecmp(name, "texcoord"))
         return D3DDECLUSAGE_TEXCOORD;
     fatal_error("Cannot translate usage \"%s\" to a d3d9 usage.\n", name);
@@ -501,6 +506,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
 
     switch (primitive_topology)
     {
+        case D3D_PRIMITIVE_TOPOLOGY_POINTLIST:
+            hr = IDirect3DDevice9_DrawPrimitive(device, D3DPT_POINTLIST, 0, vertex_count);
+            break;
+
         case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST:
             hr = IDirect3DDevice9_DrawPrimitive(device, D3DPT_TRIANGLELIST, 0, vertex_count / 3);
             break;
