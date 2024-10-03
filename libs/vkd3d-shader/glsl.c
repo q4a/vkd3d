@@ -651,6 +651,20 @@ static void shader_glsl_cast(struct vkd3d_glsl_generator *gen, const struct vkd3
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_end_block(struct vkd3d_glsl_generator *gen)
+{
+    --gen->indent;
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "}\n");
+}
+
+static void shader_glsl_begin_block(struct vkd3d_glsl_generator *gen)
+{
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "{\n");
+    ++gen->indent;
+}
+
 static void shader_glsl_if(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const char *condition;
@@ -664,23 +678,28 @@ static void shader_glsl_if(struct vkd3d_glsl_generator *gen, const struct vkd3d_
 
     glsl_src_cleanup(&src, &gen->string_buffers);
 
-    shader_glsl_print_indent(gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(gen->buffer, "{\n");
-    ++gen->indent;
+    shader_glsl_begin_block(gen);
 }
 
 static void shader_glsl_else(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
-    unsigned int i = 4 * (gen->indent - 1);
-
-    vkd3d_string_buffer_printf(gen->buffer, "%*s}\n%*selse\n%*s{\n", i, "", i, "", i, "");
+    shader_glsl_end_block(gen);
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "else\n");
+    shader_glsl_begin_block(gen);
 }
 
-static void shader_glsl_endif(struct vkd3d_glsl_generator *gen)
+static void shader_glsl_loop(struct vkd3d_glsl_generator *gen)
 {
-    --gen->indent;
     shader_glsl_print_indent(gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(gen->buffer, "}\n");
+    vkd3d_string_buffer_printf(gen->buffer, "for (;;)\n");
+    shader_glsl_begin_block(gen);
+}
+
+static void shader_glsl_break(struct vkd3d_glsl_generator *gen)
+{
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "break;\n");
 }
 
 static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
@@ -1130,6 +1149,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_AND:
             shader_glsl_binop(gen, ins, "&");
             break;
+        case VKD3DSIH_BREAK:
+            shader_glsl_break(gen);
+            break;
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             shader_glsl_dcl_indexable_temp(gen, ins);
             break;
@@ -1157,7 +1179,8 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             shader_glsl_else(gen, ins);
             break;
         case VKD3DSIH_ENDIF:
-            shader_glsl_endif(gen);
+        case VKD3DSIH_ENDLOOP:
+            shader_glsl_end_block(gen);
             break;
         case VKD3DSIH_EQO:
         case VKD3DSIH_IEQ:
@@ -1222,6 +1245,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_LOG:
             shader_glsl_intrinsic(gen, ins, "log2");
+            break;
+        case VKD3DSIH_LOOP:
+            shader_glsl_loop(gen);
             break;
         case VKD3DSIH_MOV:
             shader_glsl_mov(gen, ins);
