@@ -702,6 +702,12 @@ static void shader_glsl_break(struct vkd3d_glsl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "break;\n");
 }
 
+static void shader_glsl_continue(struct vkd3d_glsl_generator *gen)
+{
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "continue;\n");
+}
+
 static void shader_glsl_switch(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct glsl_src src;
@@ -1185,6 +1191,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_CASE:
             shader_glsl_case(gen, ins);
+            break;
+        case VKD3DSIH_CONTINUE:
+            shader_glsl_continue(gen);
             break;
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             shader_glsl_dcl_indexable_temp(gen, ins);
