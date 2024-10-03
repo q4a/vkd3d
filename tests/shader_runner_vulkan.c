@@ -274,7 +274,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     enum vkd3d_shader_spirv_extension spirv_extensions[2];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_compile_option options[3];
-    struct vkd3d_shader_parameter1 parameters[13];
+    struct vkd3d_shader_parameter1 parameters[14];
     struct vkd3d_shader_compile_option *option;
     unsigned int i, compile_options;
     char profile[7];
@@ -456,6 +456,11 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
         parameters[5 + i].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32_VEC4;
         memcpy(parameters[5 + i].u.immediate_constant.u.f32_vec4, &runner->r.clip_planes[i], 4 * sizeof(float));
     }
+
+    parameters[13].name = VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE;
+    parameters[13].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
+    parameters[13].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32;
+    parameters[13].u.immediate_constant.u.f32 = runner->r.point_size;
 
     parameter_info.parameter_count = ARRAY_SIZE(parameters);
     parameter_info.parameters = parameters;
@@ -1540,6 +1545,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     ret_features = &device_info.features2.features;
 
     runner->caps.clip_planes = true;
+    runner->caps.point_size = true;
 
     device_desc.pEnabledFeatures = &features;
     memset(&features, 0, sizeof(features));

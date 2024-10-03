@@ -148,6 +148,7 @@ struct shader_runner_caps
     bool wave_ops;
     bool depth_bounds;
     bool clip_planes;
+    bool point_size;
 
     uint32_t format_caps[DXGI_FORMAT_COUNT];
 };
@@ -186,6 +187,7 @@ struct shader_runner
     bool require_wave_ops;
     bool require_depth_bounds;
     bool require_clip_planes;
+    bool require_point_size;
     uint32_t require_format_caps[DXGI_FORMAT_COUNT];
 
     bool last_render_failed;
@@ -219,6 +221,7 @@ struct shader_runner
     bool flat_shading;
     uint8_t clip_plane_mask;
     struct vec4 clip_planes[8];
+    float point_size;
 };
 
 struct shader_runner_ops

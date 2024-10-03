@@ -92,6 +92,18 @@ struct resource_readback
     void *data;
 };
 
+static inline uint32_t float_to_int(float f)
+{
+    union
+    {
+        uint32_t u;
+        float f;
+    } u;
+
+    u.f = f;
+    return u.u;
+}
+
 static inline bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t element_count, size_t element_size)
 {
     size_t new_capacity, max_capacity;

@@ -1,0 +1,35 @@
+[require]
+point-size
+
+[input layout]
+0 r32g32-float position
+
+[vb 0]
+-0.5 0
+ 0.5 0
+
+[vertex shader]
+float4 main(float4 pos : position) : sv_position
+{
+    return pos;
+}
+
+[pixel shader]
+float4 main() : sv_target
+{
+    return float4(0, 1, 0, 1);
+}
+
+[test]
+point-size 40.0
+draw point list 2
+
+probe (139, 240) rgba (0, 0, 0, 0)
+probe (141, 240) rgba (0, 1, 0, 1)
+probe (179, 240) rgba (0, 1, 0, 1)
+probe (181, 240) rgba (0, 0, 0, 0)
+
+probe (459, 240) rgba (0, 0, 0, 0)
+probe (461, 240) rgba (0, 1, 0, 1)
+probe (499, 240) rgba (0, 1, 0, 1)
+probe (501, 240) rgba (0, 0, 0, 0)

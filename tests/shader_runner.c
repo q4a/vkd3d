@@ -410,6 +410,10 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     {
         runner->require_clip_planes = true;
     }
+    else if (match_string(line, "point-size", &line))
+    {
+        runner->require_point_size = true;
+    }
     else
     {
         fatal_error("Unknown require directive '%s'.\n", line);
@@ -1319,6 +1323,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             runner->clip_plane_mask |= (1u << index);
         }
     }
+    else if (match_string(line, "point-size", &line))
+    {
+        runner->point_size = strtof(line, &rest);
+    }
     else
     {
         fatal_error("Unknown test directive '%s'.\n", line);
@@ -1563,6 +1571,8 @@ static bool check_capabilities(const struct shader_runner *runner, const struct 
         return false;
     if (runner->require_clip_planes && !caps->clip_planes)
         return false;
+    if (runner->require_point_size && !caps->point_size)
+        return false;
 
     for (i = 0; i < ARRAY_SIZE(runner->require_format_caps); ++i)
     {
@@ -1680,6 +1690,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     trace("      wave-ops: %u.\n", caps->wave_ops);
     trace("  depth-bounds: %u.\n", caps->depth_bounds);
     trace("   clip-planes: %u.\n", caps->clip_planes);
+    trace("    point-size: %u.\n", caps->point_size);
     trace_format_cap(caps, FORMAT_CAP_UAV_LOAD, "uav-load");
 
     if (!test_options.filename)
@@ -1694,6 +1705,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     runner->minimum_shader_model = caps->minimum_shader_model;
     runner->maximum_shader_model = caps->maximum_shader_model;
     runner->alpha_test_func = VKD3D_SHADER_COMPARISON_FUNC_ALWAYS;
+    runner->point_size = 1.0f;
 
     runner->sample_mask = ~0u;
     runner->depth_bounds = false;
@@ -1944,6 +1956,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 runner->require_wave_ops = false;
                 runner->require_depth_bounds = false;
                 runner->require_clip_planes = false;
+                runner->require_point_size = false;
                 memset(runner->require_format_caps, 0, sizeof(runner->require_format_caps));
                 runner->compile_options = 0;
                 test_action = TEST_ACTION_RUN;
