@@ -36,7 +36,7 @@ shader model < 6.0
 
 [test]
 uniform 0 uint4 0 0 0 0
-todo(glsl) draw quad
+draw quad
 probe (0, 0) rgbaui (0x7fff, 0xffff, 0, 0)
 
 [require]

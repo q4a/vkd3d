@@ -1025,6 +1025,7 @@ static void shader_glsl_shader_epilogue(struct vkd3d_glsl_generator *gen)
 {
     const struct shader_signature *signature = &gen->program->output_signature;
     struct vkd3d_string_buffer *buffer = gen->buffer;
+    enum vkd3d_shader_component_type type;
     const struct signature_element *e;
     unsigned int i;
 
@@ -1035,11 +1036,13 @@ static void shader_glsl_shader_epilogue(struct vkd3d_glsl_generator *gen)
         if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
             continue;
 
+        type = e->component_type;
         shader_glsl_print_indent(buffer, gen->indent);
         if (e->sysval_semantic == VKD3D_SHADER_SV_NONE)
         {
             if (gen->interstage_output)
             {
+                type = VKD3D_SHADER_COMPONENT_FLOAT;
                 vkd3d_string_buffer_printf(buffer, "shader_out.reg_%u", e->target_location);
                 if (e->target_location >= gen->limits.output_count)
                     vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -1059,7 +1062,19 @@ static void shader_glsl_shader_epilogue(struct vkd3d_glsl_generator *gen)
             shader_glsl_print_sysval_name(buffer, gen, e->sysval_semantic, e->semantic_index);
         }
         shader_glsl_print_write_mask(buffer, e->mask);
-        vkd3d_string_buffer_printf(buffer, " = %s_out[%u]", gen->prefix, e->register_index);
+        switch (type)
+        {
+            case VKD3D_SHADER_COMPONENT_UINT:
+                vkd3d_string_buffer_printf(buffer, " = floatBitsToUint(%s_out[%u])", gen->prefix, e->register_index);
+                break;
+            default:
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled output component type %#x.", e->component_type);
+                /* fall through */
+            case VKD3D_SHADER_COMPONENT_FLOAT:
+                vkd3d_string_buffer_printf(buffer, " = %s_out[%u]", gen->prefix, e->register_index);
+                break;
+        }
         shader_glsl_print_write_mask(buffer, e->mask);
         vkd3d_string_buffer_printf(buffer, ";\n");
     }
@@ -1649,11 +1664,11 @@ static void shader_glsl_generate_output_declarations(struct vkd3d_glsl_generator
     const struct shader_signature *signature = &gen->program->output_signature;
     struct vkd3d_string_buffer *buffer = gen->buffer;
     const struct signature_element *e;
-    unsigned int i;
+    unsigned int i, count;
 
     if (!gen->interstage_output)
     {
-        for (i = 0; i < signature->element_count; ++i)
+        for (i = 0, count = 0; i < signature->element_count; ++i)
         {
             e = &signature->elements[i];
 
@@ -1664,13 +1679,6 @@ static void shader_glsl_generate_output_declarations(struct vkd3d_glsl_generator
             {
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                         "Internal compiler error: Unhandled system value %#x.", e->sysval_semantic);
-                continue;
-            }
-
-            if (e->component_type != VKD3D_SHADER_COMPONENT_FLOAT)
-            {
-                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                        "Internal compiler error: Unhandled component type %#x.", e->component_type);
                 continue;
             }
 
@@ -1688,15 +1696,32 @@ static void shader_glsl_generate_output_declarations(struct vkd3d_glsl_generator
                 continue;
             }
 
-            vkd3d_string_buffer_printf(buffer,
-                    "layout(location = %u) out vec4 shader_out_%u;\n", e->target_location, i);
+            vkd3d_string_buffer_printf(buffer, "layout(location = %u) out ", e->target_location);
+            switch (e->component_type)
+            {
+                case VKD3D_SHADER_COMPONENT_UINT:
+                    vkd3d_string_buffer_printf(buffer, "uvec4");
+                    break;
+                case VKD3D_SHADER_COMPONENT_FLOAT:
+                    vkd3d_string_buffer_printf(buffer, "vec4");
+                    break;
+                default:
+                    vkd3d_string_buffer_printf(buffer, "<unhandled type %#x>", e->component_type);
+                    vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                            "Internal compiler error: Unhandled output component type %#x.", e->component_type);
+                    break;
+            }
+            vkd3d_string_buffer_printf(buffer, " shader_out_%u;\n", i);
+            ++count;
         }
+        if (count)
+            vkd3d_string_buffer_printf(buffer, "\n");
     }
     else if (gen->limits.output_count)
     {
         shader_glsl_generate_interface_block(gen, signature, "out", gen->limits.output_count);
+        vkd3d_string_buffer_printf(buffer, "\n");
     }
-    vkd3d_string_buffer_printf(buffer, "\n");
 }
 
 static void shader_glsl_generate_declarations(struct vkd3d_glsl_generator *gen)
