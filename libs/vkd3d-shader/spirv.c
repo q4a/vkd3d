@@ -4863,6 +4863,10 @@ static const struct vkd3d_spirv_builtin vkd3d_pixel_shader_position_builtin =
 {
     VKD3D_SHADER_COMPONENT_FLOAT, 4, SpvBuiltInFragCoord, frag_coord_fixup,
 };
+static const struct vkd3d_spirv_builtin vkd3d_output_point_size_builtin =
+{
+    VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInPointSize,
+};
 static const struct
 {
     enum vkd3d_shader_register_type reg_type;
@@ -5452,7 +5456,11 @@ static void spirv_compiler_emit_output_register(struct spirv_compiler *compiler,
     VKD3D_ASSERT(!reg->idx_count || !reg->idx[0].rel_addr);
     VKD3D_ASSERT(reg->idx_count < 2);
 
-    if (!(builtin = get_spirv_builtin_for_register(reg->type)))
+    if (reg->type == VKD3DSPR_RASTOUT && reg->idx[0].offset == VSIR_RASTOUT_POINT_SIZE)
+    {
+        builtin = &vkd3d_output_point_size_builtin;
+    }
+    else if (!(builtin = get_spirv_builtin_for_register(reg->type)))
     {
         FIXME("Unhandled register %#x.\n", reg->type);
         return;
@@ -6749,7 +6757,8 @@ static void spirv_compiler_emit_dcl_input_primitive(struct spirv_compiler *compi
 
 static void spirv_compiler_emit_point_size(struct spirv_compiler *compiler)
 {
-    static const struct vkd3d_spirv_builtin point_size = {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInPointSize};
+    if (compiler->program->has_point_size)
+        return;
 
     /* Set the point size. Point sprites are not supported in d3d10+, but
      * point primitives can still be used with e.g. stream output. Vulkan
@@ -6763,7 +6772,8 @@ static void spirv_compiler_emit_point_size(struct spirv_compiler *compiler)
             || compiler->write_tess_geom_point_size)
     {
         vkd3d_spirv_build_op_store(&compiler->spirv_builder,
-                spirv_compiler_emit_builtin_variable(compiler, &point_size, SpvStorageClassOutput, 0),
+                spirv_compiler_emit_builtin_variable(compiler,
+                        &vkd3d_output_point_size_builtin, SpvStorageClassOutput, 0),
                 spirv_compiler_get_constant_float(compiler, 1.0f), SpvMemoryAccessMaskNone);
     }
 }
@@ -10576,6 +10586,15 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
             spirv_compiler_emit_output(compiler, VKD3DSPR_PATCHCONST, i);
         else
             spirv_compiler_emit_input(compiler, VKD3DSPR_PATCHCONST, i);
+    }
+
+    if (compiler->program->has_point_size)
+    {
+        struct vkd3d_shader_dst_param dst;
+
+        vsir_dst_param_init(&dst, VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+        dst.reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
+        spirv_compiler_emit_output_register(compiler, &dst);
     }
 }
 

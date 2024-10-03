@@ -650,6 +650,13 @@ enum vkd3d_shader_register_type
     VKD3DSPR_INVALID = ~0u,
 };
 
+enum vsir_rastout_register
+{
+    VSIR_RASTOUT_POSITION   = 0x0,
+    VSIR_RASTOUT_FOG        = 0x1,
+    VSIR_RASTOUT_POINT_SIZE = 0x2,
+};
+
 enum vkd3d_shader_register_precision
 {
     VKD3D_SHADER_REGISTER_PRECISION_DEFAULT,
@@ -1402,6 +1409,7 @@ struct vsir_program
     unsigned int temp_count;
     unsigned int ssa_count;
     bool use_vocp;
+    bool has_point_size;
     enum vsir_control_flow_type cf_type;
 
     const char **block_names;

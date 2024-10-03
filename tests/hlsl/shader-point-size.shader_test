@@ -24,11 +24,11 @@ float4 main() : color
 draw point list 2
 
 probe (149, 240) rgba (0, 0, 0, 0)
-todo probe (151, 240) rgba (0, 1, 0, 1)
-todo probe (169, 240) rgba (0, 1, 0, 1)
+probe (151, 240) rgba (0, 1, 0, 1)
+probe (169, 240) rgba (0, 1, 0, 1)
 probe (171, 240) rgba (0, 0, 0, 0)
 
 probe (459, 240) rgba (0, 0, 0, 0)
-todo probe (461, 240) rgba (0, 1, 0, 1)
-todo probe (499, 240) rgba (0, 1, 0, 1)
+probe (461, 240) rgba (0, 1, 0, 1)
+probe (499, 240) rgba (0, 1, 0, 1)
 probe (501, 240) rgba (0, 0, 0, 0)
