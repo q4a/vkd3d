@@ -1189,13 +1189,6 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_IMUL:
             shader_glsl_mul_extended(gen, ins);
             break;
-        case VKD3DSIH_ISHL:
-            shader_glsl_binop(gen, ins, "<<");
-            break;
-        case VKD3DSIH_ISHR:
-        case VKD3DSIH_USHR:
-            shader_glsl_binop(gen, ins, ">>");
-            break;
         case VKD3DSIH_MAX:
             shader_glsl_intrinsic(gen, ins, "max");
             break;
@@ -1205,6 +1198,16 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:
             shader_glsl_relop(gen, ins, "!=", "notEqual");
+            break;
+        case VKD3DSIH_INEG:
+            shader_glsl_unary_op(gen, ins, "-");
+            break;
+        case VKD3DSIH_ISHL:
+            shader_glsl_binop(gen, ins, "<<");
+            break;
+        case VKD3DSIH_ISHR:
+        case VKD3DSIH_USHR:
+            shader_glsl_binop(gen, ins, ">>");
             break;
         case VKD3DSIH_ITOF:
         case VKD3DSIH_UTOF:
