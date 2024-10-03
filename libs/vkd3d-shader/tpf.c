@@ -1407,9 +1407,11 @@ struct tpf_compiler
 {
     /* OBJECTIVE: We want to get rid of this HLSL IR specific field. */
     struct hlsl_ctx *ctx;
-    struct vkd3d_bytecode_buffer *buffer;
     struct vkd3d_sm4_lookup_tables lookup;
     struct sm4_stat *stat;
+
+    struct vkd3d_bytecode_buffer *buffer;
+    struct dxbc_writer dxbc;
 };
 
 static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
@@ -1915,15 +1917,6 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
 
         lookup->stat_field_from_sm4[info->opcode] = info;
     }
-}
-
-static void tpf_compiler_init(struct tpf_compiler *tpf, struct hlsl_ctx *ctx, struct sm4_stat *stat,
-        struct vkd3d_bytecode_buffer *buffer)
-{
-    tpf->ctx = ctx;
-    tpf->buffer = buffer;
-    tpf->stat = stat;
-    init_sm4_lookup_tables(&tpf->lookup);
 }
 
 static const struct vkd3d_sm4_opcode_info *get_info_from_sm4_opcode(
@@ -3134,11 +3127,11 @@ static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
         ctx->result = buffer->status;
 }
 
-static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
-        const struct hlsl_ir_function_decl *func, bool output)
+static void tpf_write_signature(struct tpf_compiler *tpf, const struct hlsl_ir_function_decl *func, bool output)
 {
     struct vkd3d_bytecode_buffer buffer = {0};
     struct vkd3d_string_buffer *string;
+    struct hlsl_ctx *ctx = tpf->ctx;
     const struct hlsl_ir_var *var;
     size_t count_position;
     unsigned int i;
@@ -3238,7 +3231,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
 
     set_u32(&buffer, count_position, i);
 
-    add_section(ctx, dxbc, output ? TAG_OSGN : TAG_ISGN, &buffer);
+    add_section(ctx, &tpf->dxbc, output ? TAG_OSGN : TAG_ISGN, &buffer);
 }
 
 static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
@@ -6389,18 +6382,17 @@ static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_bl
     }
 }
 
-static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
-        struct sm4_stat *stat, struct dxbc_writer *dxbc)
+static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *entry_func)
 {
-    const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
     struct extern_resource *extern_resources;
+    const struct hlsl_profile_info *profile;
     unsigned int extern_resources_count, i;
     const struct hlsl_buffer *cbuffer;
+    struct hlsl_ctx *ctx = tpf->ctx;
     const struct hlsl_scope *scope;
     const struct hlsl_ir_var *var;
     size_t token_count_position;
-    struct tpf_compiler tpf;
     uint32_t temp_count;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
@@ -6421,7 +6413,8 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *e
     if (ctx->result)
         return;
 
-    tpf_compiler_init(&tpf, ctx, stat, &buffer);
+    tpf->buffer = &buffer;
+    profile = ctx->profile;
 
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
 
@@ -6431,7 +6424,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *e
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (cbuffer->reg.allocated)
-            write_sm4_dcl_constant_buffer(&tpf, cbuffer);
+            write_sm4_dcl_constant_buffer(tpf, cbuffer);
     }
 
     for (i = 0; i < extern_resources_count; ++i)
@@ -6439,27 +6432,27 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *e
         const struct extern_resource *resource = &extern_resources[i];
 
         if (resource->regset == HLSL_REGSET_SAMPLERS)
-            write_sm4_dcl_samplers(&tpf, resource);
+            write_sm4_dcl_samplers(tpf, resource);
         else if (resource->regset == HLSL_REGSET_TEXTURES)
-            write_sm4_dcl_textures(&tpf, resource, false);
+            write_sm4_dcl_textures(tpf, resource, false);
         else if (resource->regset == HLSL_REGSET_UAVS)
-            write_sm4_dcl_textures(&tpf, resource, true);
+            write_sm4_dcl_textures(tpf, resource, true);
     }
 
     if (entry_func->early_depth_test && profile->major_version >= 5)
-        write_sm4_dcl_global_flags(&tpf, VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL);
+        write_sm4_dcl_global_flags(tpf, VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL);
 
     LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if ((var->is_input_semantic && var->last_read) || (var->is_output_semantic && var->first_write))
-            write_sm4_dcl_semantic(&tpf, var);
+            write_sm4_dcl_semantic(tpf, var);
     }
 
     if (profile->type == VKD3D_SHADER_TYPE_COMPUTE)
-        write_sm4_dcl_thread_group(&tpf, ctx->thread_count);
+        write_sm4_dcl_thread_group(tpf, ctx->thread_count);
 
     if (temp_count)
-        write_sm4_dcl_temps(&tpf, temp_count);
+        write_sm4_dcl_temps(tpf, temp_count);
 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
     {
@@ -6475,26 +6468,28 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *e
                 unsigned int id = var->regs[HLSL_REGSET_NUMERIC].id;
                 unsigned int size = align(var->data_type->reg_size[HLSL_REGSET_NUMERIC], 4) / 4;
 
-                write_sm4_dcl_indexable_temp(&tpf, id, size, 4);
+                write_sm4_dcl_indexable_temp(tpf, id, size, 4);
             }
         }
     }
 
-    write_sm4_block(&tpf, &entry_func->body);
+    write_sm4_block(tpf, &entry_func->body);
 
-    write_sm4_ret(&tpf);
+    write_sm4_ret(tpf);
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
-    add_section(ctx, dxbc, TAG_SHDR, &buffer);
+    add_section(ctx, &tpf->dxbc, TAG_SHDR, &buffer);
+    tpf->buffer = NULL;
 
     sm4_free_extern_resources(extern_resources, extern_resources_count);
 }
 
-static void write_sm4_sfi0(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
+static void tpf_write_sfi0(struct tpf_compiler *tpf)
 {
     struct extern_resource *extern_resources;
     unsigned int extern_resources_count;
+    struct hlsl_ctx *ctx = tpf->ctx;
     uint64_t *flags;
 
     flags = vkd3d_calloc(1, sizeof(*flags));
@@ -6511,14 +6506,16 @@ static void write_sm4_sfi0(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
      * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
 
     if (*flags)
-        dxbc_writer_add_section(dxbc, TAG_SFI0, flags, sizeof(*flags));
+        dxbc_writer_add_section(&tpf->dxbc, TAG_SFI0, flags, sizeof(*flags));
     else
         vkd3d_free(flags);
 }
 
-static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, struct dxbc_writer *dxbc)
+static void tpf_write_stat(struct tpf_compiler *tpf)
 {
     struct vkd3d_bytecode_buffer buffer = {0};
+    const struct sm4_stat *stat = tpf->stat;
+    struct hlsl_ctx *ctx = tpf->ctx;
 
     put_u32(&buffer, stat->fields[VKD3D_STAT_INSTR_COUNT]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_TEMPS]);
@@ -6562,7 +6559,7 @@ static void write_sm4_stat(struct hlsl_ctx *ctx, const struct sm4_stat *stat, st
         put_u32(&buffer, stat->fields[VKD3D_STAT_STORE]);
     }
 
-    add_section(ctx, dxbc, TAG_STAT, &buffer);
+    add_section(ctx, &tpf->dxbc, TAG_STAT, &buffer);
 }
 
 /* OBJECTIVE: Stop relying on ctx and entry_func on this function, receiving
@@ -6572,23 +6569,27 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
+    struct tpf_compiler tpf = {0};
     struct sm4_stat stat = {0};
-    struct dxbc_writer dxbc;
     size_t i;
     int ret;
 
-    dxbc_writer_init(&dxbc);
+    tpf.ctx = ctx;
+    tpf.buffer = NULL;
+    tpf.stat = &stat;
+    init_sm4_lookup_tables(&tpf.lookup);
+    dxbc_writer_init(&tpf.dxbc);
 
-    write_sm4_signature(ctx, &dxbc, entry_func, false);
-    write_sm4_signature(ctx, &dxbc, entry_func, true);
-    write_sm4_rdef(ctx, &dxbc);
-    write_sm4_shdr(ctx, entry_func, &stat, &dxbc);
-    write_sm4_sfi0(ctx, &dxbc);
-    write_sm4_stat(ctx, &stat, &dxbc);
+    tpf_write_signature(&tpf, entry_func, false);
+    tpf_write_signature(&tpf, entry_func, true);
+    write_sm4_rdef(ctx, &tpf.dxbc);
+    tpf_write_shdr(&tpf, entry_func);
+    tpf_write_sfi0(&tpf);
+    tpf_write_stat(&tpf);
 
     if (!(ret = ctx->result))
-        ret = dxbc_writer_write(&dxbc, out);
-    for (i = 0; i < dxbc.section_count; ++i)
-        vkd3d_shader_free_shader_code(&dxbc.sections[i].data);
+        ret = dxbc_writer_write(&tpf.dxbc, out);
+    for (i = 0; i < tpf.dxbc.section_count; ++i)
+        vkd3d_shader_free_shader_code(&tpf.dxbc.sections[i].data);
     return ret;
 }
