@@ -648,6 +648,25 @@ enum vkd3d_shader_parameter_name
     VKD3D_SHADER_PARAMETER_NAME_CLIP_PLANE_5,
     VKD3D_SHADER_PARAMETER_NAME_CLIP_PLANE_6,
     VKD3D_SHADER_PARAMETER_NAME_CLIP_PLANE_7,
+    /**
+     * Point size.
+     *
+     * When this parameter is provided to a vertex, tessellation, or geometry
+     * shader, and the source shader does not write point size, it specifies a
+     * uniform value which will be written to point size.
+     * If the source shader writes point size, this parameter is ignored.
+     *
+     * This parameter can be used to implement fixed function point size, as
+     * present in Direct3D versions 8 and 9, if the target environment does not
+     * support point size as part of its own fixed-function API (as Vulkan and
+     * core OpenGL).
+     *
+     * The data type for this parameter must be
+     * VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32.
+     *
+     * \since 1.14
+     */
+    VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_PARAMETER_NAME),
 };

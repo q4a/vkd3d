@@ -5919,6 +5919,81 @@ static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *pr
     return VKD3D_OK;
 }
 
+static enum vkd3d_result insert_point_size_before_ret(struct vsir_program *program,
+        const struct vkd3d_shader_instruction *ret, size_t *ret_pos)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    size_t pos = ret - instructions->elements;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!shader_instruction_array_insert_at(&program->instructions, pos, 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    ins = &program->instructions.elements[pos];
+
+    vsir_instruction_init_with_params(program, ins, &ret->location, VKD3DSIH_MOV, 1, 1);
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+    ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
+    src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE, VKD3D_DATA_FLOAT);
+
+    *ret_pos = pos + 1;
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_program_insert_point_size(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    const struct vkd3d_shader_parameter1 *size_parameter = NULL;
+    static const struct vkd3d_shader_location no_loc;
+
+    if (program->has_point_size)
+        return VKD3D_OK;
+
+    if (program->shader_version.type != VKD3D_SHADER_TYPE_VERTEX
+            && program->shader_version.type != VKD3D_SHADER_TYPE_GEOMETRY
+            && program->shader_version.type != VKD3D_SHADER_TYPE_HULL
+            && program->shader_version.type != VKD3D_SHADER_TYPE_DOMAIN)
+        return VKD3D_OK;
+
+    for (unsigned int i = 0; i < program->parameter_count; ++i)
+    {
+        const struct vkd3d_shader_parameter1 *parameter = &program->parameters[i];
+
+        if (parameter->name == VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE)
+            size_parameter = parameter;
+    }
+
+    if (!size_parameter)
+        return VKD3D_OK;
+
+    if (size_parameter->data_type != VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32)
+    {
+        vkd3d_shader_error(ctx->message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid point size parameter data type %#x.", size_parameter->data_type);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    program->has_point_size = true;
+
+    /* Append a point size write before each ret. */
+    for (size_t i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        if (ins->opcode == VKD3DSIH_RET)
+        {
+            size_t new_pos;
+            int ret;
+
+            if ((ret = insert_point_size_before_ret(program, ins, &new_pos)) < 0)
+                return ret;
+            i = new_pos;
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 struct validation_context
 {
     struct vkd3d_shader_message_context *message_context;
@@ -7290,6 +7365,7 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
 
     vsir_transform(&ctx, vsir_program_insert_alpha_test);
     vsir_transform(&ctx, vsir_program_insert_clip_planes);
+    vsir_transform(&ctx, vsir_program_insert_point_size);
 
     if (TRACE_ON())
         vsir_program_trace(program);
