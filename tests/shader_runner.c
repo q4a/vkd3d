@@ -2367,6 +2367,7 @@ START_TEST(shader_runner)
     print_dll_version("d3d11.dll");
     print_dll_version("d3d12.dll");
     print_dll_version("d3d12core.dll");
+    print_dll_version("d3d10warp.dll");
     if (test_options.enable_debug_layer)
         print_dll_version("d3d12sdklayers.dll");
 
