@@ -931,19 +931,20 @@ static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, st
     switch (sysval)
     {
         case VKD3D_SHADER_SV_POSITION:
-            if (version->type == VKD3D_SHADER_TYPE_PIXEL || version->type == VKD3D_SHADER_TYPE_COMPUTE)
+            if (version->type == VKD3D_SHADER_TYPE_COMPUTE)
             {
                 vkd3d_string_buffer_printf(buffer, "<unhandled sysval %#x>", sysval);
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                        "Internal compiler error: Unhandled system value %#x.", sysval);
+                        "Internal compiler error: Unhandled SV_POSITION in shader type #%x.", version->type);
+                break;
             }
+            if (idx)
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled SV_POSITION index %u.", idx);
+            if (version->type == VKD3D_SHADER_TYPE_PIXEL)
+                vkd3d_string_buffer_printf(buffer, "gl_FragCoord");
             else
-            {
                 vkd3d_string_buffer_printf(buffer, "gl_Position");
-                if (idx)
-                    vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                            "Internal compiler error: Unhandled SV_POSITION index %u.", idx);
-            }
             break;
 
         case VKD3D_SHADER_SV_VERTEX_ID:
