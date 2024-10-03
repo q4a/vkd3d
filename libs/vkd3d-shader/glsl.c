@@ -1248,6 +1248,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_ILT:
         case VKD3DSIH_LTO:
+        case VKD3DSIH_ULT:
             shader_glsl_relop(gen, ins, "<", "lessThan");
             break;
         case VKD3DSIH_IMAX:
