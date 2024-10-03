@@ -203,6 +203,12 @@ static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned
     src->reg.idx[0].offset = idx;
 }
 
+static void src_param_init_ssa_float(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_FLOAT, 1);
+    src->reg.idx[0].offset = idx;
+}
+
 static void src_param_init_temp_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
     vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
@@ -244,6 +250,12 @@ static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned
     dst->reg.idx[0].offset = idx;
 }
 
+static void dst_param_init_ssa_float(struct vkd3d_shader_dst_param *dst, unsigned int idx)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_FLOAT, 1);
+    dst->reg.idx[0].offset = idx;
+}
+
 static void dst_param_init_temp_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
     vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
@@ -254,7 +266,6 @@ static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigne
 {
     vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
     dst->reg.idx[0].offset = idx;
-    dst->write_mask = VKD3DSP_WRITEMASK_0;
 }
 
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
@@ -5773,11 +5784,12 @@ static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *prog
     return VKD3D_OK;
 }
 
-static bool find_position_signature_idx(const struct shader_signature *signature, uint32_t *idx)
+static bool find_sysval_signature_idx(const struct shader_signature *signature,
+        enum vkd3d_shader_sysval_semantic sysval, uint32_t *idx)
 {
     for (unsigned int i = 0; i < signature->element_count; ++i)
     {
-        if (signature->elements[i].sysval_semantic == VKD3D_SHADER_SV_POSITION)
+        if (signature->elements[i].sysval_semantic == sysval)
         {
             *idx = i;
             return true;
@@ -5842,7 +5854,7 @@ static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *pr
         }
     }
 
-    if (!find_position_signature_idx(signature, &position_signature_idx))
+    if (!find_sysval_signature_idx(signature, VKD3D_SHADER_SV_POSITION, &position_signature_idx))
     {
         vkd3d_shader_error(ctx->message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_MISSING_SEMANTIC,
                 "Shader does not write position.");
@@ -5988,6 +6000,116 @@ static enum vkd3d_result vsir_program_insert_point_size(struct vsir_program *pro
             if ((ret = insert_point_size_before_ret(program, ins, &new_pos)) < 0)
                 return ret;
             i = new_pos;
+        }
+    }
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    const struct vkd3d_shader_parameter1 *min_parameter = NULL, *max_parameter = NULL;
+    static const struct vkd3d_shader_location no_loc;
+
+    if (!program->has_point_size)
+        return VKD3D_OK;
+
+    if (program->shader_version.type != VKD3D_SHADER_TYPE_VERTEX
+            && program->shader_version.type != VKD3D_SHADER_TYPE_GEOMETRY
+            && program->shader_version.type != VKD3D_SHADER_TYPE_HULL
+            && program->shader_version.type != VKD3D_SHADER_TYPE_DOMAIN)
+        return VKD3D_OK;
+
+    for (unsigned int i = 0; i < program->parameter_count; ++i)
+    {
+        const struct vkd3d_shader_parameter1 *parameter = &program->parameters[i];
+
+        if (parameter->name == VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MIN)
+            min_parameter = parameter;
+        else if (parameter->name == VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MAX)
+            max_parameter = parameter;
+    }
+
+    if (!min_parameter && !max_parameter)
+        return VKD3D_OK;
+
+    if (min_parameter && min_parameter->data_type != VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32)
+    {
+        vkd3d_shader_error(ctx->message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid minimum point size parameter data type %#x.", min_parameter->data_type);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (max_parameter && max_parameter->data_type != VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32)
+    {
+        vkd3d_shader_error(ctx->message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid maximum point size parameter data type %#x.", max_parameter->data_type);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    /* Replace writes to the point size by inserting a clamp before each write. */
+
+    for (size_t i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+        const struct vkd3d_shader_location *loc;
+        unsigned int ssa_value;
+        bool clamp = false;
+
+        if (vsir_instruction_is_dcl(ins))
+            continue;
+
+        for (size_t j = 0; j < ins->dst_count; ++j)
+        {
+            struct vkd3d_shader_dst_param *dst = &ins->dst[j];
+
+            /* Note we run after I/O normalization. */
+            if (dst->reg.type == VKD3DSPR_RASTOUT)
+            {
+                dst_param_init_ssa_float(dst, program->ssa_count);
+                ssa_value = program->ssa_count++;
+                clamp = true;
+            }
+        }
+
+        if (!clamp)
+            continue;
+
+        if (!shader_instruction_array_insert_at(&program->instructions, i + 1, !!min_parameter + !!max_parameter))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        loc = &program->instructions.elements[i].location;
+        ins = &program->instructions.elements[i + 1];
+
+        if (min_parameter)
+        {
+            vsir_instruction_init_with_params(program, ins, loc, VKD3DSIH_MAX, 1, 2);
+            src_param_init_ssa_float(&ins->src[0], ssa_value);
+            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MIN, VKD3D_DATA_FLOAT);
+            if (max_parameter)
+            {
+                dst_param_init_ssa_float(&ins->dst[0], program->ssa_count);
+                ssa_value = program->ssa_count++;
+            }
+            else
+            {
+                vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+                ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
+            }
+            ++ins;
+            ++i;
+        }
+
+        if (max_parameter)
+        {
+            vsir_instruction_init_with_params(program, ins, loc, VKD3DSIH_MIN, 1, 2);
+            src_param_init_ssa_float(&ins->src[0], ssa_value);
+            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MAX, VKD3D_DATA_FLOAT);
+            vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+            ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
+
+            ++i;
         }
     }
 
@@ -7366,6 +7488,7 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
     vsir_transform(&ctx, vsir_program_insert_alpha_test);
     vsir_transform(&ctx, vsir_program_insert_clip_planes);
     vsir_transform(&ctx, vsir_program_insert_point_size);
+    vsir_transform(&ctx, vsir_program_insert_point_size_clamp);
 
     if (TRACE_ON())
         vsir_program_trace(program);
