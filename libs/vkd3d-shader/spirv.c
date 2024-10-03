@@ -2662,8 +2662,6 @@ static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *p
     if ((shader_interface = vkd3d_find_struct(compile_info->next, INTERFACE_INFO)))
     {
         compiler->xfb_info = vkd3d_find_struct(compile_info->next, TRANSFORM_FEEDBACK_INFO);
-        compiler->emit_point_size = compiler->xfb_info && compiler->xfb_info->element_count
-                && compiler->shader_type != VKD3D_SHADER_TYPE_GEOMETRY;
 
         compiler->shader_interface = *shader_interface;
         if (shader_interface->push_constant_buffer_count)
@@ -2689,6 +2687,11 @@ static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *p
             }
         }
     }
+
+    if (compiler->shader_type == VKD3D_SHADER_TYPE_VERTEX)
+        compiler->emit_point_size = true;
+    else if (compiler->shader_type != VKD3D_SHADER_TYPE_GEOMETRY)
+        compiler->emit_point_size = compiler->xfb_info && compiler->xfb_info->element_count;
 
     compiler->scan_descriptor_info = scan_descriptor_info;
 
