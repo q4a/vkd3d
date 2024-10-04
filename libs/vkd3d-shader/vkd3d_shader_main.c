@@ -680,6 +680,37 @@ static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
+        struct vkd3d_shader_message_context *message_context, struct vsir_program *program)
+{
+    enum vkd3d_result ret;
+
+    switch (compile_info->source_type)
+    {
+        case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
+            ret = d3dbc_parse(compile_info, config_flags, message_context, program);
+            break;
+
+        case VKD3D_SHADER_SOURCE_DXBC_TPF:
+            ret = tpf_parse(compile_info, config_flags, message_context, program);
+            break;
+
+        case VKD3D_SHADER_SOURCE_DXBC_DXIL:
+            ret = dxil_parse(compile_info, config_flags, message_context, program);
+            break;
+
+        default:
+            ERR("Unsupported source type %#x.\n", compile_info->source_type);
+            ret = VKD3D_ERROR_INVALID_ARGUMENT;
+            break;
+    }
+
+    if (ret < 0)
+        WARN("Failed to parse shader.\n");
+
+    return ret;
+}
+
 void vkd3d_shader_free_messages(char *messages)
 {
     TRACE("messages %p.\n", messages);
@@ -1578,31 +1609,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
         uint64_t config_flags = vkd3d_shader_init_config_flags();
         struct vsir_program program;
 
-        switch (compile_info->source_type)
-        {
-            case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
-                ret = d3dbc_parse(compile_info, config_flags, &message_context, &program);
-                break;
-
-            case VKD3D_SHADER_SOURCE_DXBC_TPF:
-                ret = tpf_parse(compile_info, config_flags, &message_context, &program);
-                break;
-
-            case VKD3D_SHADER_SOURCE_DXBC_DXIL:
-                ret = dxil_parse(compile_info, config_flags, &message_context, &program);
-                break;
-
-            default:
-                ERR("Unsupported source type %#x.\n", compile_info->source_type);
-                ret = VKD3D_ERROR_INVALID_ARGUMENT;
-                break;
-        }
-
-        if (ret < 0)
-        {
-            WARN("Failed to parse shader.\n");
-        }
-        else
+        if (!(ret = vsir_parse(compile_info, config_flags, &message_context, &program)))
         {
             ret = vsir_program_scan(&program, compile_info, &message_context, NULL);
             vsir_program_cleanup(&program);
@@ -1719,31 +1726,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
         uint64_t config_flags = vkd3d_shader_init_config_flags();
         struct vsir_program program;
 
-        switch (compile_info->source_type)
-        {
-            case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
-                ret = d3dbc_parse(compile_info, config_flags, &message_context, &program);
-                break;
-
-            case VKD3D_SHADER_SOURCE_DXBC_TPF:
-                ret = tpf_parse(compile_info, config_flags, &message_context, &program);
-                break;
-
-            case VKD3D_SHADER_SOURCE_DXBC_DXIL:
-                ret = dxil_parse(compile_info, config_flags, &message_context, &program);
-                break;
-
-            default:
-                ERR("Unsupported source type %#x.\n", compile_info->source_type);
-                ret = VKD3D_ERROR_INVALID_ARGUMENT;
-                break;
-        }
-
-        if (ret < 0)
-        {
-            WARN("Failed to parse shader.\n");
-        }
-        else
+        if (!(ret = vsir_parse(compile_info, config_flags, &message_context, &program)))
         {
             ret = vsir_program_compile(&program, config_flags, compile_info, out, &message_context);
             vsir_program_cleanup(&program);
