@@ -5199,9 +5199,9 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         version.major = ctx->profile->major_version;
         version.minor = ctx->profile->minor_version;
         version.type = ctx->profile->type;
-        builtin = hlsl_sm1_register_from_semantic(&version,
+        builtin = sm1_register_from_semantic_name(&version,
                 var->semantic.name, var->semantic.index, output, &type, &reg);
-        if (!builtin && !hlsl_sm1_usage_from_semantic(var->semantic.name, var->semantic.index, &usage, &usage_idx))
+        if (!builtin && !sm1_usage_from_semantic_name(var->semantic.name, var->semantic.index, &usage, &usage_idx))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
@@ -6301,7 +6301,7 @@ static void sm1_generate_vsir_signature_entry(struct hlsl_ctx *ctx,
     }
     element = &signature->elements[signature->element_count++];
 
-    if (!hlsl_sm1_register_from_semantic(&program->shader_version,
+    if (!sm1_register_from_semantic_name(&program->shader_version,
             var->semantic.name, var->semantic.index, output, &type, &register_index))
     {
         enum vkd3d_decl_usage usage;
@@ -6310,7 +6310,7 @@ static void sm1_generate_vsir_signature_entry(struct hlsl_ctx *ctx,
 
         register_index = var->regs[HLSL_REGSET_NUMERIC].id;
 
-        ret = hlsl_sm1_usage_from_semantic(var->semantic.name, var->semantic.index, &usage, &usage_idx);
+        ret = sm1_usage_from_semantic_name(var->semantic.name, var->semantic.index, &usage, &usage_idx);
         VKD3D_ASSERT(ret);
         /* With the exception of vertex POSITION output, none of these are
          * system values. Pixel POSITION input is not equivalent to
@@ -6922,7 +6922,7 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
             type = VKD3DSPR_TEMP;
             register_index = 0;
         }
-        else if (!hlsl_sm1_register_from_semantic(&version, deref->var->semantic.name,
+        else if (!sm1_register_from_semantic_name(&version, deref->var->semantic.name,
                 deref->var->semantic.index, true, &type, &register_index))
         {
             VKD3D_ASSERT(reg.allocated);
@@ -6977,7 +6977,7 @@ static void sm1_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx,
         version.major = ctx->profile->major_version;
         version.minor = ctx->profile->minor_version;
         version.type = ctx->profile->type;
-        if (hlsl_sm1_register_from_semantic(&version, deref->var->semantic.name,
+        if (sm1_register_from_semantic_name(&version, deref->var->semantic.name,
                 deref->var->semantic.index, false, &type, &register_index))
         {
             writemask = (1 << deref->var->data_type->dimx) - 1;

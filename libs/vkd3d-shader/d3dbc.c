@@ -1395,7 +1395,7 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
     return VKD3D_OK;
 }
 
-bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version, const char *semantic_name,
+bool sm1_register_from_semantic_name(const struct vkd3d_shader_version *version, const char *semantic_name,
         unsigned int semantic_index, bool output, enum vkd3d_shader_register_type *type, unsigned int *reg)
 {
     unsigned int i;
@@ -1463,7 +1463,7 @@ bool hlsl_sm1_register_from_semantic(const struct vkd3d_shader_version *version,
     return false;
 }
 
-bool hlsl_sm1_usage_from_semantic(const char *semantic_name,
+bool sm1_usage_from_semantic_name(const char *semantic_name,
         uint32_t semantic_index, enum vkd3d_decl_usage *usage, uint32_t *usage_idx)
 {
     static const struct
@@ -2289,7 +2289,7 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
     uint32_t token, usage_idx;
     bool ret;
 
-    if (hlsl_sm1_register_from_semantic(version, element->semantic_name,
+    if (sm1_register_from_semantic_name(version, element->semantic_name,
             element->semantic_index, output, &reg.type, &reg.reg))
     {
         usage = 0;
@@ -2297,7 +2297,7 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
     }
     else
     {
-        ret = hlsl_sm1_usage_from_semantic(element->semantic_name, element->semantic_index, &usage, &usage_idx);
+        ret = sm1_usage_from_semantic_name(element->semantic_name, element->semantic_index, &usage, &usage_idx);
         VKD3D_ASSERT(ret);
         reg.type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
         reg.reg = element->register_index;

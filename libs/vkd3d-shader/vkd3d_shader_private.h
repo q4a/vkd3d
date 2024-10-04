@@ -1602,6 +1602,11 @@ void vkd3d_shader_trace_text_(const char *text, size_t size, const char *functio
 #define vkd3d_shader_trace_text(text, size) \
         vkd3d_shader_trace_text_(text, size, __FUNCTION__)
 
+bool sm1_register_from_semantic_name(const struct vkd3d_shader_version *version, const char *semantic_name,
+        unsigned int semantic_index, bool output, enum vkd3d_shader_register_type *type, unsigned int *reg);
+bool sm1_usage_from_semantic_name(const char *semantic_name,
+        uint32_t semantic_index, enum vkd3d_decl_usage *usage, uint32_t *usage_idx);
+
 int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
 int dxil_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
