@@ -1407,6 +1407,7 @@ struct tpf_compiler
 {
     /* OBJECTIVE: We want to get rid of this HLSL IR specific field. */
     struct hlsl_ctx *ctx;
+    struct vsir_program *program;
     struct vkd3d_sm4_lookup_tables lookup;
     struct sm4_stat *stat;
 
@@ -3127,109 +3128,50 @@ static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
         ctx->result = buffer->status;
 }
 
-static void tpf_write_signature(struct tpf_compiler *tpf, const struct hlsl_ir_function_decl *func, bool output)
+static void tpf_write_signature(struct tpf_compiler *tpf, bool output)
 {
     struct vkd3d_bytecode_buffer buffer = {0};
-    struct vkd3d_string_buffer *string;
+    struct shader_signature *signature;
     struct hlsl_ctx *ctx = tpf->ctx;
-    const struct hlsl_ir_var *var;
-    size_t count_position;
     unsigned int i;
-    bool ret;
 
-    count_position = put_u32(&buffer, 0);
+    if (output)
+        signature = &tpf->program->output_signature;
+    else
+        signature = &tpf->program->input_signature;
+
+    put_u32(&buffer, signature->element_count);
     put_u32(&buffer, 8); /* unknown */
 
-    LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
+    for (i = 0; i < signature->element_count; ++i)
     {
-        unsigned int width = (1u << var->data_type->dimx) - 1, use_mask;
-        enum vkd3d_shader_sysval_semantic semantic;
-        uint32_t usage_idx, reg_idx;
-        bool has_idx;
+        const struct signature_element *element = &signature->elements[i];
+        enum vkd3d_shader_sysval_semantic sysval;
+        uint32_t used_mask = element->used_mask;
 
-        if ((output && !var->is_output_semantic) || (!output && !var->is_input_semantic))
-            continue;
-
-        ret = sysval_semantic_from_hlsl(&semantic, ctx, &var->semantic, output);
-        VKD3D_ASSERT(ret);
-        if (semantic == ~0u)
-            continue;
-        usage_idx = var->semantic.index;
-
-        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, NULL, &has_idx))
-        {
-            reg_idx = has_idx ? var->semantic.index : ~0u;
-        }
-        else
-        {
-            VKD3D_ASSERT(var->regs[HLSL_REGSET_NUMERIC].allocated);
-            reg_idx = var->regs[HLSL_REGSET_NUMERIC].id;
-        }
-
-        use_mask = width; /* FIXME: accurately report use mask */
         if (output)
-            use_mask = 0xf ^ use_mask;
+            used_mask = 0xf ^ used_mask;
 
-        /* Special pixel shader semantics (TARGET, DEPTH, COVERAGE). */
-        if (semantic >= VKD3D_SHADER_SV_TARGET)
-            semantic = VKD3D_SHADER_SV_NONE;
+        sysval = element->sysval_semantic;
+        if (sysval >= VKD3D_SHADER_SV_TARGET)
+            sysval = VKD3D_SHADER_SV_NONE;
 
         put_u32(&buffer, 0); /* name */
-        put_u32(&buffer, usage_idx);
-        put_u32(&buffer, semantic);
-        switch (var->data_type->e.numeric.type)
-        {
-            case HLSL_TYPE_FLOAT:
-            case HLSL_TYPE_HALF:
-                put_u32(&buffer, VKD3D_SHADER_COMPONENT_FLOAT);
-                break;
-
-            case HLSL_TYPE_INT:
-                put_u32(&buffer, VKD3D_SHADER_COMPONENT_INT);
-                break;
-
-            case HLSL_TYPE_BOOL:
-            case HLSL_TYPE_UINT:
-                put_u32(&buffer, VKD3D_SHADER_COMPONENT_UINT);
-                break;
-
-            default:
-                if ((string = hlsl_type_to_string(ctx, var->data_type)))
-                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "Invalid data type %s for semantic variable %s.", string->buffer, var->name);
-                hlsl_release_string_buffer(ctx, string);
-                put_u32(&buffer, VKD3D_SHADER_COMPONENT_VOID);
-        }
-        put_u32(&buffer, reg_idx);
-        put_u32(&buffer, vkd3d_make_u16(width, use_mask));
+        put_u32(&buffer, element->semantic_index);
+        put_u32(&buffer, sysval);
+        put_u32(&buffer, element->component_type);
+        put_u32(&buffer, element->register_index);
+        put_u32(&buffer, vkd3d_make_u16(element->mask, used_mask));
     }
 
-    i = 0;
-    LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
+    for (i = 0; i < signature->element_count; ++i)
     {
-        enum vkd3d_shader_sysval_semantic semantic;
-        const char *name = var->semantic.name;
+        const struct signature_element *element = &signature->elements[i];
         size_t string_offset;
 
-        if ((output && !var->is_output_semantic) || (!output && !var->is_input_semantic))
-            continue;
-
-        sysval_semantic_from_hlsl(&semantic, ctx, &var->semantic, output);
-        if (semantic == ~0u)
-            continue;
-
-        if (semantic == VKD3D_SHADER_SV_TARGET && !ascii_strcasecmp(name, "color"))
-            string_offset = put_string(&buffer, "SV_Target");
-        else if (semantic == VKD3D_SHADER_SV_DEPTH && !ascii_strcasecmp(name, "depth"))
-            string_offset = put_string(&buffer, "SV_Depth");
-        else if (semantic == VKD3D_SHADER_SV_POSITION && !ascii_strcasecmp(name, "position"))
-            string_offset = put_string(&buffer, "SV_Position");
-        else
-            string_offset = put_string(&buffer, name);
-        set_u32(&buffer, (2 + i++ * 6) * sizeof(uint32_t), string_offset);
+        string_offset = put_string(&buffer, element->semantic_name);
+        set_u32(&buffer, (2 + i * 6) * sizeof(uint32_t), string_offset);
     }
-
-    set_u32(&buffer, count_position, i);
 
     add_section(ctx, &tpf->dxbc, output ? TAG_OSGN : TAG_ISGN, &buffer);
 }
@@ -6575,13 +6517,14 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
     int ret;
 
     tpf.ctx = ctx;
+    tpf.program = program;
     tpf.buffer = NULL;
     tpf.stat = &stat;
     init_sm4_lookup_tables(&tpf.lookup);
     dxbc_writer_init(&tpf.dxbc);
 
-    tpf_write_signature(&tpf, entry_func, false);
-    tpf_write_signature(&tpf, entry_func, true);
+    tpf_write_signature(&tpf, false);
+    tpf_write_signature(&tpf, true);
     write_sm4_rdef(ctx, &tpf.dxbc);
     tpf_write_shdr(&tpf, entry_func);
     tpf_write_sfi0(&tpf);
