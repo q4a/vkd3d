@@ -1959,6 +1959,60 @@ void sm1_generate_ctab(struct hlsl_ctx *ctx, struct vkd3d_shader_code *ctab)
     ctab->size = buffer.size;
 }
 
+static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir(
+        struct d3dbc_compiler *d3dbc, enum vkd3d_shader_opcode vkd3d_opcode)
+{
+    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
+    const struct vkd3d_sm1_opcode_info *info;
+    unsigned int i = 0;
+
+    for (;;)
+    {
+        info = &d3dbc->opcode_table[i++];
+        if (info->vkd3d_opcode == VKD3DSIH_INVALID)
+            return NULL;
+
+        if (vkd3d_opcode == info->vkd3d_opcode
+                && vkd3d_shader_ver_ge(version, info->min_version.major, info->min_version.minor)
+                && (vkd3d_shader_ver_le(version, info->max_version.major, info->max_version.minor)
+                        || !info->max_version.major))
+            return info;
+    }
+}
+
+static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir_instruction(
+        struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
+{
+    const struct vkd3d_sm1_opcode_info *info;
+
+    if (!(info = shader_sm1_get_opcode_info_from_vsir(d3dbc, ins->opcode)))
+    {
+        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
+                "Opcode %#x not supported for shader profile.", ins->opcode);
+        d3dbc->failed = true;
+        return NULL;
+    }
+
+    if (ins->dst_count != info->dst_count)
+    {
+        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_REGISTER_COUNT,
+                "Invalid destination count %u for vsir instruction %#x (expected %u).",
+                ins->dst_count, ins->opcode, info->dst_count);
+        d3dbc->failed = true;
+        return NULL;
+    }
+    if (ins->src_count != info->src_count)
+    {
+        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_REGISTER_COUNT,
+                "Invalid source count %u for vsir instruction %#x (expected %u).",
+                ins->src_count, ins->opcode, info->src_count);
+        d3dbc->failed = true;
+        return NULL;
+    }
+
+    return info;
+}
+
 static uint32_t sm1_encode_register_type(enum vkd3d_shader_register_type type)
 {
     return ((type << VKD3D_SM1_REGISTER_TYPE_SHIFT) & VKD3D_SM1_REGISTER_TYPE_MASK)
@@ -1981,26 +2035,13 @@ static uint32_t swizzle_from_vsir(uint32_t swizzle)
             | ((w & 0x3) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(3));
 }
 
-struct sm1_instruction
+static bool is_inconsequential_instr(const struct vkd3d_shader_instruction *ins)
 {
-    enum vkd3d_sm1_opcode opcode;
-    unsigned int flags;
-
-    struct vkd3d_shader_dst_param dst;
-
-    struct vkd3d_shader_src_param srcs[4];
-    unsigned int src_count;
-
-    unsigned int has_dst;
-};
-
-static bool is_inconsequential_instr(const struct sm1_instruction *instr)
-{
-    const struct vkd3d_shader_dst_param *dst = &instr->dst;
-    const struct vkd3d_shader_src_param *src = &instr->srcs[0];
+    const struct vkd3d_shader_dst_param *dst = &ins->dst[0];
+    const struct vkd3d_shader_src_param *src = &ins->src[0];
     unsigned int i;
 
-    if (instr->opcode != VKD3D_SM1_OP_MOV)
+    if (ins->opcode != VKD3DSIH_MOV)
         return false;
     if (dst->modifiers != VKD3DSPDM_NONE)
         return false;
@@ -2037,66 +2078,49 @@ static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer, const s
             | (swizzle_from_vsir(reg->swizzle) << VKD3D_SM1_SWIZZLE_SHIFT) | reg->reg.idx[0].offset);
 }
 
-static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc,
-        const struct sm1_instruction *instr, const struct vkd3d_shader_location *loc)
+static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
-    uint32_t token = instr->opcode;
+    const struct vkd3d_sm1_opcode_info *info;
     unsigned int i;
+    uint32_t token;
 
-    if (is_inconsequential_instr(instr))
+    if (!(info = shader_sm1_get_opcode_info_from_vsir_instruction(d3dbc, ins)))
         return;
 
-    token |= VKD3D_SM1_INSTRUCTION_FLAGS_MASK & (instr->flags << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT);
+    if (is_inconsequential_instr(ins))
+        return;
+
+    token = info->sm1_opcode;
+    token |= VKD3D_SM1_INSTRUCTION_FLAGS_MASK & (ins->flags << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT);
 
     if (version->major > 1)
-        token |= (instr->has_dst + instr->src_count) << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
+        token |= (ins->dst_count + ins->src_count) << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
     put_u32(buffer, token);
 
-    if (instr->has_dst)
+    for (i = 0; i < ins->dst_count; ++i)
     {
-        if (instr->dst.reg.idx[0].rel_addr)
+        if (ins->dst[i].reg.idx[0].rel_addr)
         {
-            vkd3d_shader_error(d3dbc->message_context, loc, VKD3D_SHADER_ERROR_D3DBC_NOT_IMPLEMENTED,
+            vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_NOT_IMPLEMENTED,
                     "Unhandled relative addressing on destination register.");
             d3dbc->failed = true;
         }
-        write_sm1_dst_register(buffer, &instr->dst);
+        write_sm1_dst_register(buffer, &ins->dst[i]);
     }
 
-    for (i = 0; i < instr->src_count; ++i)
+    for (i = 0; i < ins->src_count; ++i)
     {
-        if (instr->srcs[i].reg.idx[0].rel_addr)
+        if (ins->src[i].reg.idx[0].rel_addr)
         {
-            vkd3d_shader_error(d3dbc->message_context, loc, VKD3D_SHADER_ERROR_D3DBC_NOT_IMPLEMENTED,
+            vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_NOT_IMPLEMENTED,
                     "Unhandled relative addressing on source register.");
             d3dbc->failed = true;
         }
-        write_sm1_src_register(buffer, &instr->srcs[i]);
+        write_sm1_src_register(buffer, &ins->src[i]);
     }
 };
-
-static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir(
-        struct d3dbc_compiler *d3dbc, enum vkd3d_shader_opcode vkd3d_opcode)
-{
-    const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
-    const struct vkd3d_sm1_opcode_info *info;
-    unsigned int i = 0;
-
-    for (;;)
-    {
-        info = &d3dbc->opcode_table[i++];
-        if (info->vkd3d_opcode == VKD3DSIH_INVALID)
-            return NULL;
-
-        if (vkd3d_opcode == info->vkd3d_opcode
-                && vkd3d_shader_ver_ge(version, info->min_version.major, info->min_version.minor)
-                && (vkd3d_shader_ver_le(version, info->max_version.major, info->max_version.minor)
-                        || !info->max_version.major))
-            return info;
-    }
-}
 
 static void d3dbc_write_vsir_def(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
 {
@@ -2186,60 +2210,6 @@ static void d3dbc_write_vsir_dcl(struct d3dbc_compiler *d3dbc, const struct vkd3
     }
 }
 
-static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir_instruction(
-        struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
-{
-    const struct vkd3d_sm1_opcode_info *info;
-
-    if (!(info = shader_sm1_get_opcode_info_from_vsir(d3dbc, ins->opcode)))
-    {
-        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
-                "Opcode %#x not supported for shader profile.", ins->opcode);
-        d3dbc->failed = true;
-        return NULL;
-    }
-
-    if (ins->dst_count != info->dst_count)
-    {
-        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_REGISTER_COUNT,
-                "Invalid destination count %u for vsir instruction %#x (expected %u).",
-                ins->dst_count, ins->opcode, info->dst_count);
-        d3dbc->failed = true;
-        return NULL;
-    }
-    if (ins->src_count != info->src_count)
-    {
-        vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_REGISTER_COUNT,
-                "Invalid source count %u for vsir instruction %#x (expected %u).",
-                ins->src_count, ins->opcode, info->src_count);
-        d3dbc->failed = true;
-        return NULL;
-    }
-
-    return info;
-}
-
-static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
-        const struct vkd3d_shader_instruction *ins)
-{
-    struct sm1_instruction instr = {0};
-    const struct vkd3d_sm1_opcode_info *info;
-
-    if (!(info = shader_sm1_get_opcode_info_from_vsir_instruction(d3dbc, ins)))
-        return;
-
-    instr.opcode = info->sm1_opcode;
-    instr.flags = ins->flags;
-    instr.has_dst = info->dst_count;
-    instr.src_count = info->src_count;
-
-    instr.dst = ins->dst[0];
-    for (unsigned int i = 0; i < instr.src_count; ++i)
-        instr.srcs[i] = ins->src[i];
-
-    d3dbc_write_instruction(d3dbc, &instr, &ins->location);
-}
-
 static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
 {
     uint32_t writemask;
@@ -2276,7 +2246,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_TEX:
         case VKD3DSIH_TEXKILL:
         case VKD3DSIH_TEXLDD:
-            d3dbc_write_vsir_simple_instruction(d3dbc, ins);
+            d3dbc_write_instruction(d3dbc, ins);
             break;
 
         case VKD3DSIH_EXP:
@@ -2293,7 +2263,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
                         writemask, ins->opcode);
                 d3dbc->failed = true;
             }
-            d3dbc_write_vsir_simple_instruction(d3dbc, ins);
+            d3dbc_write_instruction(d3dbc, ins);
             break;
 
         default:
