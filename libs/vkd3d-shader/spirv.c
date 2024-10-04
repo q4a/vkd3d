@@ -5510,7 +5510,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
     const struct shader_signature *shader_signature;
     const struct vkd3d_spirv_builtin *builtin;
     enum vkd3d_shader_sysval_semantic sysval;
-    uint32_t write_mask, reg_write_mask;
+    uint32_t write_mask;
     bool use_private_variable = false;
     struct vkd3d_symbol reg_symbol;
     SpvStorageClass storage_class;
@@ -5561,7 +5561,6 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
         use_private_variable = true;
     }
 
-    reg_write_mask = write_mask >> component_idx;
     vkd3d_symbol_make_io(&reg_symbol, reg_type, element_idx);
 
     if (rb_get(&compiler->symbol_table, &reg_symbol))
@@ -5639,7 +5638,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
 
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
             use_private_variable ? VKD3D_SHADER_COMPONENT_FLOAT : component_type,
-            use_private_variable ? VKD3DSP_WRITEMASK_ALL : reg_write_mask);
+            use_private_variable ? VKD3DSP_WRITEMASK_ALL : write_mask);
     reg_symbol.info.reg.is_aggregate = array_sizes[0] || array_sizes[1];
     VKD3D_ASSERT(!builtin || !builtin->spirv_array_size || use_private_variable || array_sizes[0] || array_sizes[1]);
 
@@ -5650,7 +5649,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
     if (use_private_variable)
     {
         compiler->private_output_variable[element_idx] = var_id;
-        compiler->private_output_variable_write_mask[element_idx] |= reg_write_mask;
+        compiler->private_output_variable_write_mask[element_idx] |= write_mask >> component_idx;
         if (!compiler->epilogue_function_id)
             compiler->epilogue_function_id = vkd3d_spirv_alloc_id(builder);
     }

@@ -1667,7 +1667,6 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
         vkd3d_unreachable();
     e = &signature->elements[element_idx];
 
-    dst_param->write_mask >>= vsir_write_mask_get_component_idx(e->mask);
     if (is_io_dcl)
     {
         /* Validated in the TPF reader. */
