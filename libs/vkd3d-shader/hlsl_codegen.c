@@ -5217,7 +5217,8 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         enum vkd3d_shader_sysval_semantic semantic;
         bool has_idx;
 
-        if (!sysval_semantic_from_hlsl(&semantic, &version, ctx->semantic_compat_mapping, &var->semantic, output))
+        if (!sm4_sysval_semantic_from_semantic_name(&semantic, &version,
+                ctx->semantic_compat_mapping, var->semantic.name, output))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
@@ -6299,8 +6300,8 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx,
         struct vkd3d_string_buffer *string;
         bool has_idx, ret;
 
-        ret = sysval_semantic_from_hlsl(&sysval, &program->shader_version,
-                ctx->semantic_compat_mapping, &var->semantic, output);
+        ret = sm4_sysval_semantic_from_semantic_name(&sysval, &program->shader_version,
+                ctx->semantic_compat_mapping, var->semantic.name, output);
         VKD3D_ASSERT(ret);
         if (sysval == ~0u)
             return;

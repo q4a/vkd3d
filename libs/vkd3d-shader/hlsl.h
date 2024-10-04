@@ -1629,9 +1629,6 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, const struct vkd3d_shader_code *ctab,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
-bool sysval_semantic_from_hlsl(enum vkd3d_shader_sysval_semantic *semantic,
-        const struct vkd3d_shader_version *version, bool semantic_compat_mapping,
-        const struct hlsl_semantic *hlsl_semantic, bool output);
 bool hlsl_sm4_register_from_semantic(const struct vkd3d_shader_version *version,
         const struct hlsl_semantic *semantic, bool output, enum vkd3d_shader_register_type *type, bool *has_idx);
 

@@ -3044,9 +3044,9 @@ bool hlsl_sm4_register_from_semantic(const struct vkd3d_shader_version *version,
     return false;
 }
 
-bool sysval_semantic_from_hlsl(enum vkd3d_shader_sysval_semantic *semantic,
-        const struct vkd3d_shader_version *version, bool semantic_compat_mapping,
-        const struct hlsl_semantic *hlsl_semantic, bool output)
+bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *sysval_semantic,
+        const struct vkd3d_shader_version *version,
+        bool semantic_compat_mapping, const char *semantic_name, bool output)
 {
     unsigned int i;
 
@@ -3094,16 +3094,16 @@ bool sysval_semantic_from_hlsl(enum vkd3d_shader_sysval_semantic *semantic,
         {"sv_rendertargetarrayindex",   true,  VKD3D_SHADER_TYPE_VERTEX,    VKD3D_SHADER_SV_RENDER_TARGET_ARRAY_INDEX},
         {"sv_viewportarrayindex",       true,  VKD3D_SHADER_TYPE_VERTEX,    VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX},
     };
-    bool needs_compat_mapping = ascii_strncasecmp(hlsl_semantic->name, "sv_", 3);
+    bool needs_compat_mapping = ascii_strncasecmp(semantic_name, "sv_", 3);
 
     for (i = 0; i < ARRAY_SIZE(semantics); ++i)
     {
-        if (!ascii_strcasecmp(hlsl_semantic->name, semantics[i].name)
+        if (!ascii_strcasecmp(semantic_name, semantics[i].name)
                 && output == semantics[i].output
                 && (semantic_compat_mapping == needs_compat_mapping || !needs_compat_mapping)
                 && version->type == semantics[i].shader_type)
         {
-            *semantic = semantics[i].semantic;
+            *sysval_semantic = semantics[i].semantic;
             return true;
         }
     }
@@ -3111,7 +3111,7 @@ bool sysval_semantic_from_hlsl(enum vkd3d_shader_sysval_semantic *semantic,
     if (!needs_compat_mapping)
         return false;
 
-    *semantic = VKD3D_SHADER_SV_NONE;
+    *sysval_semantic = VKD3D_SHADER_SV_NONE;
     return true;
 }
 
@@ -4745,7 +4745,8 @@ static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct 
     if (instr.dsts[0].reg.type == VKD3DSPR_DEPTHOUT)
         instr.dsts[0].reg.dimension = VSIR_DIMENSION_SCALAR;
 
-    sysval_semantic_from_hlsl(&semantic, version, tpf->ctx->semantic_compat_mapping, &var->semantic, output);
+    sm4_sysval_semantic_from_semantic_name(&semantic, version,
+            tpf->ctx->semantic_compat_mapping, var->semantic.name, output);
     if (semantic == ~0u)
         semantic = VKD3D_SHADER_SV_NONE;
 
