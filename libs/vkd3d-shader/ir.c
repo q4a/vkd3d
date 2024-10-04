@@ -763,7 +763,7 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
     }
 
     for (i = 0; i < ins->dst_count; ++i)
-        shader_register_eliminate_phase_addressing((struct vkd3d_shader_register *)&ins->dst[i].reg, instance_id);
+        shader_register_eliminate_phase_addressing(&ins->dst[i].reg, instance_id);
 }
 
 static const struct vkd3d_shader_varying_map *find_varying_map(
