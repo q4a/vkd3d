@@ -143,7 +143,7 @@ static bool match_tag(struct shader_runner *runner, const char *tag)
 static bool check_qualifier_args_conjunction(struct shader_runner *runner,
         const char *line, const char **const rest, uint32_t *model_mask)
 {
-    static const char *const valid_tags[] = {"d3d12", "glsl", "msl", "mvk", "vulkan"};
+    static const char *const valid_tags[] = {"d3d12", "glsl", "llvmpipe", "msl", "mvk", "vulkan"};
     bool holds = true;
 
     *model_mask = ~0u;

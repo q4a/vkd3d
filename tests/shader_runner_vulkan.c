@@ -1685,16 +1685,6 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
         DXGI_FORMAT_R8_UINT,
         DXGI_FORMAT_R8_SINT,
     };
-    static const char *const tags[] =
-    {
-        "vulkan",
-    };
-
-    static const char *const mvk_tags[] =
-    {
-        "vulkan",
-        "mvk",
-    };
 
     if (!vulkan_test_context_init_instance(context, instance_extensions, ARRAY_SIZE(instance_extensions)))
         return false;
@@ -1728,16 +1718,13 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     get_physical_device_info(runner, &device_info);
     ret_features = &device_info.features2.features;
 
+    runner->caps.tag_count = 0;
+    runner->caps.tags[runner->caps.tag_count++] = "vulkan";
+
     if (device_info.driver_properties.driverID == VK_DRIVER_ID_MOLTENVK)
-    {
-        runner->caps.tags = mvk_tags;
-        runner->caps.tag_count = ARRAY_SIZE(mvk_tags);
-    }
-    else
-    {
-        runner->caps.tags = tags;
-        runner->caps.tag_count = ARRAY_SIZE(tags);
-    }
+        runner->caps.tags[runner->caps.tag_count++] = "mvk";
+    else if (device_info.driver_properties.driverID == VK_DRIVER_ID_MESA_LLVMPIPE)
+        runner->caps.tags[runner->caps.tag_count++] = "llvmpipe";
 
     runner->caps.shader_caps[SHADER_CAP_CLIP_PLANES] = true;
     runner->caps.shader_caps[SHADER_CAP_FOG] = true;

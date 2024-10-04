@@ -675,11 +675,6 @@ static bool metal_runner_init(struct metal_runner *runner)
     NSArray<id<MTLDevice>> *devices;
     id<MTLDevice> device;
 
-    static const char *const tags[] =
-    {
-        "msl",
-    };
-
     if (!check_msl_support())
     {
         skip("MSL support is not enabled. If this is unintentional, "
@@ -717,8 +712,8 @@ static bool metal_runner_init(struct metal_runner *runner)
     }
 
     runner->caps.runner = "Metal";
-    runner->caps.tags = tags;
-    runner->caps.tag_count = ARRAY_SIZE(tags);
+    runner->caps.tags[0] = "msl";
+    runner->caps.tag_count = 1;
     runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_5_0;
 

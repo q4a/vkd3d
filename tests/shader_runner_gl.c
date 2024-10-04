@@ -237,11 +237,6 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
     EGLBoolean ret;
     GLuint vao;
 
-    static const char *const tags[] =
-    {
-        "glsl",
-    };
-
     static const EGLint attributes[] =
     {
         EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
@@ -347,11 +342,15 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
             continue;
         }
         runner->caps.runner = language == SPIR_V ? "OpenGL/SPIR-V" : "OpenGL/GLSL";
-        runner->caps.tags = tags;
-        runner->caps.tag_count = runner->language == GLSL;
         runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
         runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
         runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;
+
+        runner->caps.tag_count = 0;
+        if (runner->language == GLSL)
+            runner->caps.tags[runner->caps.tag_count++] = "glsl";
+        if (strncmp((const char *)glGetString(GL_RENDERER), "llvmpipe ", 9) == 0)
+            runner->caps.tags[runner->caps.tag_count++] = "llvmpipe";
 
         glGetIntegerv(GL_NUM_EXTENSIONS, &extension_count);
         if (check_gl_extension("GL_ARB_internalformat_query2", extension_count))

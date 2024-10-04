@@ -991,17 +991,6 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     D3D12_FEATURE_DATA_D3D12_OPTIONS options;
     HRESULT hr;
 
-    static const char *const tags[] =
-    {
-        "d3d12",
-    };
-
-    static const char *const mvk_tags[] =
-    {
-        "d3d12",
-        "mvk",
-    };
-
     static const enum DXGI_FORMAT formats[] =
     {
         DXGI_FORMAT_R32_FLOAT,
@@ -1046,16 +1035,13 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     runner->caps.shader_caps[SHADER_CAP_ROV] = options.ROVsSupported;
     runner->caps.shader_caps[SHADER_CAP_WAVE_OPS] = options1.WaveOps;
 
+    runner->caps.tag_count = 0;
+    runner->caps.tags[runner->caps.tag_count++] = "d3d12";
+
     if (is_mvk_device(device))
-    {
-        runner->caps.tags = mvk_tags;
-        runner->caps.tag_count = ARRAY_SIZE(mvk_tags);
-    }
-    else
-    {
-        runner->caps.tags = tags;
-        runner->caps.tag_count = ARRAY_SIZE(tags);
-    }
+        runner->caps.tags[runner->caps.tag_count++] = "mvk";
+    else if (is_llvmpipe_device(device))
+        runner->caps.tags[runner->caps.tag_count++] = "llvmpipe";
 
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
     {
