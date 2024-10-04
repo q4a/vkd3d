@@ -1477,12 +1477,6 @@ void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_pr
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 
-static inline enum vkd3d_result vkd3d_shader_parser_validate(struct vkd3d_shader_parser *parser, uint64_t config_flags)
-{
-    return vsir_program_validate(parser->program, config_flags,
-            parser->location.source_name, parser->message_context);
-}
-
 struct vkd3d_shader_descriptor_info1
 {
     enum vkd3d_shader_descriptor_type type;

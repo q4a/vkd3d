@@ -10603,22 +10603,7 @@ int dxil_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t co
     vkd3d_free(byte_code);
 
     if (ret < 0)
-    {
-        WARN("Failed to parse shader.\n");
         return ret;
-    }
-
-    if ((ret = vkd3d_shader_parser_validate(&sm6.p, config_flags)) < 0)
-    {
-        WARN("Failed to validate shader after parsing, ret %d.\n", ret);
-
-        if (TRACE_ON())
-            vsir_program_trace(program);
-
-        sm6_parser_cleanup(&sm6);
-        vsir_program_cleanup(program);
-        return ret;
-    }
 
     sm6_parser_cleanup(&sm6);
 

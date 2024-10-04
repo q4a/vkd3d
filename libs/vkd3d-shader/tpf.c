@@ -2964,20 +2964,8 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
 
     if (sm4.p.failed)
     {
-        WARN("Failed to parse shader.\n");
         vsir_program_cleanup(program);
         return VKD3D_ERROR_INVALID_SHADER;
-    }
-
-    if ((ret = vkd3d_shader_parser_validate(&sm4.p, config_flags)) < 0)
-    {
-        WARN("Failed to validate shader after parsing, ret %d.\n", ret);
-
-        if (TRACE_ON())
-            vsir_program_trace(program);
-
-        vsir_program_cleanup(program);
-        return ret;
     }
 
     return VKD3D_OK;

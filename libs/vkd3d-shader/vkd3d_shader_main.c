@@ -706,7 +706,20 @@ static enum vkd3d_result vsir_parse(const struct vkd3d_shader_compile_info *comp
     }
 
     if (ret < 0)
+    {
         WARN("Failed to parse shader.\n");
+        return ret;
+    }
+
+    if ((ret = vsir_program_validate(program, config_flags, compile_info->source_name, message_context)) < 0)
+    {
+        WARN("Failed to validate shader after parsing, ret %d.\n", ret);
+
+        if (TRACE_ON())
+            vsir_program_trace(program);
+
+        vsir_program_cleanup(program);
+    }
 
     return ret;
 }
