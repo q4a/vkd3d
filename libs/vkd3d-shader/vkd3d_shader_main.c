@@ -1710,6 +1710,10 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     {
         ret = compile_hlsl(compile_info, out, &message_context);
     }
+    else if (compile_info->source_type == VKD3D_SHADER_SOURCE_FX)
+    {
+        ret = fx_parse(compile_info, out, &message_context);
+    }
     else
     {
         uint64_t config_flags = vkd3d_shader_init_config_flags();
@@ -1942,6 +1946,7 @@ const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(uns
 #ifdef VKD3D_SHADER_UNSUPPORTED_DXIL
         VKD3D_SHADER_SOURCE_DXBC_DXIL,
 #endif
+        VKD3D_SHADER_SOURCE_FX,
     };
 
     TRACE("count %p.\n", count);
@@ -2000,6 +2005,11 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
     };
 #endif
 
+    static const enum vkd3d_shader_target_type fx_types[] =
+    {
+        VKD3D_SHADER_TARGET_D3D_ASM,
+    };
+
     TRACE("source_type %#x, count %p.\n", source_type, count);
 
     switch (source_type)
@@ -2021,6 +2031,10 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
             *count = ARRAY_SIZE(dxbc_dxil_types);
             return dxbc_dxil_types;
 #endif
+
+        case VKD3D_SHADER_SOURCE_FX:
+            *count = ARRAY_SIZE(fx_types);
+            return fx_types;
 
         default:
             *count = 0;

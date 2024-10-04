@@ -813,6 +813,8 @@ int main(int argc, char **argv)
             }
             else if ((token & 0xfffe0000) == 0xfffe0000)
                 options.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+            else if ((token & 0xffff0000) == 0xfeff0000)
+                options.source_type = VKD3D_SHADER_SOURCE_FX;
             else
                 options.source_type = VKD3D_SHADER_SOURCE_HLSL;
         }

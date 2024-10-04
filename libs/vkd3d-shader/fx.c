@@ -2814,3 +2814,270 @@ int hlsl_emit_effect_binary(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
         vkd3d_unreachable();
     }
 }
+
+struct fx_parser
+{
+    const uint8_t *ptr, *start, *end;
+    struct vkd3d_shader_message_context *message_context;
+    struct vkd3d_string_buffer buffer;
+    struct
+    {
+        const uint8_t *ptr;
+        const uint8_t *end;
+        uint32_t size;
+    } unstructured;
+    uint32_t buffer_count;
+    bool failed;
+};
+
+static uint32_t fx_parser_read_u32(struct fx_parser *parser)
+{
+    uint32_t ret;
+
+    if ((parser->end - parser->ptr) < sizeof(uint32_t))
+    {
+        parser->failed = true;
+        return 0;
+    }
+
+    ret = *(uint32_t *)parser->ptr;
+    parser->ptr += sizeof(uint32_t);
+
+    return ret;
+}
+
+static void fx_parser_read_u32s(struct fx_parser *parser, void *dst, size_t size)
+{
+    uint32_t *ptr = dst;
+    size_t i;
+
+    for (i = 0; i < size / sizeof(uint32_t); ++i)
+        ptr[i] = fx_parser_read_u32(parser);
+}
+
+static void fx_parser_skip(struct fx_parser *parser, size_t size)
+{
+    if ((parser->end - parser->ptr) < size)
+    {
+        parser->ptr = parser->end;
+        parser->failed = true;
+        return;
+    }
+    parser->ptr += size;
+}
+
+static void VKD3D_PRINTF_FUNC(3, 4) fx_parser_error(struct fx_parser *parser, enum vkd3d_shader_error error,
+        const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_verror(parser->message_context, NULL, error, format, args);
+    va_end(args);
+
+    parser->failed = true;
+}
+
+static int fx_2_parse(struct fx_parser *parser)
+{
+    fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing fx_2_0 binaries is not implemented.\n");
+
+    return -1;
+}
+
+static const char *fx_4_get_string(struct fx_parser *parser, uint32_t offset)
+{
+    const uint8_t *ptr = parser->unstructured.ptr;
+    const uint8_t *end = parser->unstructured.end;
+
+    if (offset >= parser->unstructured.size)
+    {
+        parser->failed = true;
+        return "<invalid>";
+    }
+
+    ptr += offset;
+
+    while (ptr < end && *ptr)
+        ++ptr;
+
+    if (*ptr)
+    {
+        parser->failed = true;
+        return "<invalid>";
+    }
+
+    return (const char *)(parser->unstructured.ptr + offset);
+}
+
+static int fx_parse_buffers(struct fx_parser *parser)
+{
+    struct fx_buffer
+    {
+        uint32_t name;
+        uint32_t size;
+        uint32_t flags;
+        uint32_t count;
+        uint32_t bind_point;
+    } buffer;
+    const char *name;
+    uint32_t i;
+
+    for (i = 0; i < parser->buffer_count; ++i)
+    {
+        fx_parser_read_u32s(parser, &buffer, sizeof(buffer));
+
+        name = fx_4_get_string(parser, buffer.name);
+
+        vkd3d_string_buffer_printf(&parser->buffer, "cbuffer %s\n", name);
+        vkd3d_string_buffer_printf(&parser->buffer, "{\n");
+
+        if (fx_parser_read_u32(parser))
+        {
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing annotations is not implemented.\n");
+            return -1;
+        }
+
+        if (buffer.count)
+        {
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
+                    "Parsing constant buffer elements is not implemented.\n");
+            return -1;
+        }
+
+        vkd3d_string_buffer_printf(&parser->buffer, "}\n\n");
+    }
+
+    return 0;
+}
+
+static int fx_4_parse(struct fx_parser *parser)
+{
+    struct fx_4_header
+    {
+        uint32_t version;
+        uint32_t buffer_count;
+        uint32_t numeric_variable_count;
+        uint32_t object_variable_count;
+        uint32_t shared_buffer_count;
+        uint32_t shared_numeric_variable_count;
+        uint32_t shared_object_count;
+        uint32_t technique_count;
+        uint32_t unstructured_size;
+        uint32_t string_count;
+        uint32_t texture_count;
+        uint32_t depth_stencil_state_count;
+        uint32_t blend_state_count;
+        uint32_t rasterizer_state_count;
+        uint32_t sampler_state_count;
+        uint32_t rtv_count;
+        uint32_t dsv_count;
+        uint32_t shader_count;
+        uint32_t inline_shader_count;
+    } header;
+
+    fx_parser_read_u32s(parser, &header, sizeof(header));
+    parser->buffer_count = header.buffer_count;
+
+    if (parser->end - parser->ptr < header.unstructured_size)
+    {
+        parser->failed = true;
+        return -1;
+    }
+
+    parser->unstructured.ptr = parser->ptr;
+    parser->unstructured.end = parser->ptr + header.unstructured_size;
+    parser->unstructured.size = header.unstructured_size;
+    fx_parser_skip(parser, header.unstructured_size);
+
+    return fx_parse_buffers(parser);
+}
+
+static int fx_5_parse(struct fx_parser *parser)
+{
+    struct fx_5_header
+    {
+        uint32_t version;
+        uint32_t buffer_count;
+        uint32_t numeric_variable_count;
+        uint32_t object_variable_count;
+        uint32_t shared_buffer_count;
+        uint32_t shared_numeric_variable_count;
+        uint32_t shared_object_count;
+        uint32_t technique_count;
+        uint32_t unstructured_size;
+        uint32_t string_count;
+        uint32_t texture_count;
+        uint32_t depth_stencil_state_count;
+        uint32_t blend_state_count;
+        uint32_t rasterizer_state_count;
+        uint32_t sampler_state_count;
+        uint32_t rtv_count;
+        uint32_t dsv_count;
+        uint32_t shader_count;
+        uint32_t inline_shader_count;
+        uint32_t group_count;
+        uint32_t uav_count;
+        uint32_t interface_variable_count;
+        uint32_t interface_variable_element_count;
+        uint32_t class_instance_element_count;
+    } header;
+
+    fx_parser_read_u32s(parser, &header, sizeof(header));
+    parser->buffer_count = header.buffer_count;
+
+    if (parser->end - parser->ptr < header.unstructured_size)
+    {
+        parser->failed = true;
+        return -1;
+    }
+
+    parser->unstructured.ptr = parser->ptr;
+    parser->unstructured.end = parser->ptr + header.unstructured_size;
+    parser->unstructured.size = header.unstructured_size;
+    fx_parser_skip(parser, header.unstructured_size);
+
+    return fx_parse_buffers(parser);
+}
+
+int fx_parse(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+{
+    struct fx_parser parser =
+    {
+        .start = compile_info->source.code,
+        .ptr = compile_info->source.code,
+        .end = (uint8_t *)compile_info->source.code + compile_info->source.size,
+        .message_context = message_context,
+    };
+    uint32_t version;
+    int ret;
+
+    vkd3d_string_buffer_init(&parser.buffer);
+
+    if (parser.end - parser.start < sizeof(version))
+        return -1;
+    version = *(uint32_t *)parser.ptr;
+
+    switch (version)
+    {
+        case 0xfeff0901:
+            ret = fx_2_parse(&parser);
+            break;
+        case 0xfeff1001:
+        case 0xfeff1011:
+            ret = fx_4_parse(&parser);
+            break;
+        case 0xfeff2001:
+            ret = fx_5_parse(&parser);
+            break;
+        default:
+            fx_parser_error(&parser, VKD3D_SHADER_ERROR_FX_INVALID_VERSION,
+                    "Invalid effect binary version value 0x%08x.", version);
+            ret = -1;
+    }
+
+    vkd3d_shader_code_from_string_buffer(out, &parser.buffer);
+
+    return ret;
+}

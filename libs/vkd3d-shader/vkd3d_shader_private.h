@@ -252,6 +252,9 @@ enum vkd3d_shader_error
 
     VKD3D_SHADER_ERROR_MSL_INTERNAL                     = 10000,
     VKD3D_SHADER_ERROR_MSL_BINDING_NOT_FOUND            = 10001,
+
+    VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED               = 11000,
+    VKD3D_SHADER_ERROR_FX_INVALID_VERSION               = 11001,
 };
 
 enum vkd3d_shader_opcode
@@ -1605,6 +1608,8 @@ int dxil_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t co
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
 int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
+int fx_parse(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
 void free_dxbc_shader_desc(struct dxbc_shader_desc *desc);
 

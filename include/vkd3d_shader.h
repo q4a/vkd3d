@@ -1181,6 +1181,11 @@ enum vkd3d_shader_source_type
      * the format used for Direct3D shader model 6 shaders. \since 1.9
      */
     VKD3D_SHADER_SOURCE_DXBC_DXIL,
+    /**
+     * Binary format used by Direct3D 9/10.x/11 effects.
+     * Input is a raw FX section without container. \since 1.14
+     */
+    VKD3D_SHADER_SOURCE_FX,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SOURCE_TYPE),
 };
