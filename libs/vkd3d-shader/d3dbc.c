@@ -1965,6 +1965,22 @@ static uint32_t sm1_encode_register_type(enum vkd3d_shader_register_type type)
             | ((type << VKD3D_SM1_REGISTER_TYPE_SHIFT2) & VKD3D_SM1_REGISTER_TYPE_MASK2);
 }
 
+static uint32_t swizzle_from_vsir(uint32_t swizzle)
+{
+    uint32_t x = vsir_swizzle_get_component(swizzle, 0);
+    uint32_t y = vsir_swizzle_get_component(swizzle, 1);
+    uint32_t z = vsir_swizzle_get_component(swizzle, 2);
+    uint32_t w = vsir_swizzle_get_component(swizzle, 3);
+
+    if (x & ~0x3u || y & ~0x3u || z & ~0x3u || w & ~0x3u)
+        ERR("Unexpected vsir swizzle: 0x%08x.\n", swizzle);
+
+    return ((x & 0x3u) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(0))
+            | ((y & 0x3) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(1))
+            | ((z & 0x3) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(2))
+            | ((w & 0x3) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(3));
+}
+
 struct sm1_instruction
 {
     enum vkd3d_sm1_opcode opcode;
@@ -1972,13 +1988,7 @@ struct sm1_instruction
 
     struct vkd3d_shader_dst_param dst;
 
-    struct sm1_src_register
-    {
-        enum vkd3d_shader_register_type type;
-        enum vkd3d_shader_src_modifier mod;
-        unsigned int swizzle;
-        uint32_t reg;
-    } srcs[4];
+    struct vkd3d_shader_src_param srcs[4];
     unsigned int src_count;
 
     unsigned int has_dst;
@@ -1987,18 +1997,18 @@ struct sm1_instruction
 static bool is_inconsequential_instr(const struct sm1_instruction *instr)
 {
     const struct vkd3d_shader_dst_param *dst = &instr->dst;
-    const struct sm1_src_register *src = &instr->srcs[0];
+    const struct vkd3d_shader_src_param *src = &instr->srcs[0];
     unsigned int i;
 
     if (instr->opcode != VKD3D_SM1_OP_MOV)
         return false;
     if (dst->modifiers != VKD3DSPDM_NONE)
         return false;
-    if (src->mod != VKD3DSPSM_NONE)
+    if (src->modifiers != VKD3DSPSM_NONE)
         return false;
-    if (src->type != dst->reg.type)
+    if (src->reg.type != dst->reg.type)
         return false;
-    if (src->reg != dst->reg.idx[0].offset)
+    if (src->reg.idx[0].offset != dst->reg.idx[0].offset)
         return false;
 
     for (i = 0; i < 4; ++i)
@@ -2019,13 +2029,12 @@ static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const s
             | (reg->write_mask << VKD3D_SM1_WRITEMASK_SHIFT) | reg->reg.idx[0].offset);
 }
 
-static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer,
-        const struct sm1_src_register *reg)
+static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer, const struct vkd3d_shader_src_param *reg)
 {
     put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
-            | sm1_encode_register_type(reg->type)
-            | (reg->mod << VKD3D_SM1_SRC_MODIFIER_SHIFT)
-            | (reg->swizzle << VKD3D_SM1_SWIZZLE_SHIFT) | reg->reg);
+            | sm1_encode_register_type(reg->reg.type)
+            | (reg->modifiers << VKD3D_SM1_SRC_MODIFIER_SHIFT)
+            | (swizzle_from_vsir(reg->swizzle) << VKD3D_SM1_SWIZZLE_SHIFT) | reg->reg.idx[0].offset);
 }
 
 static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc,
@@ -2057,7 +2066,15 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc,
     }
 
     for (i = 0; i < instr->src_count; ++i)
+    {
+        if (instr->srcs[i].reg.idx[0].rel_addr)
+        {
+            vkd3d_shader_error(d3dbc->message_context, loc, VKD3D_SHADER_ERROR_D3DBC_NOT_IMPLEMENTED,
+                    "Unhandled relative addressing on source register.");
+            d3dbc->failed = true;
+        }
         write_sm1_src_register(buffer, &instr->srcs[i]);
+    }
 };
 
 static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir(
@@ -2078,38 +2095,6 @@ static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir(
                 && (vkd3d_shader_ver_le(version, info->max_version.major, info->max_version.minor)
                         || !info->max_version.major))
             return info;
-    }
-}
-
-static uint32_t swizzle_from_vsir(uint32_t swizzle)
-{
-    uint32_t x = vsir_swizzle_get_component(swizzle, 0);
-    uint32_t y = vsir_swizzle_get_component(swizzle, 1);
-    uint32_t z = vsir_swizzle_get_component(swizzle, 2);
-    uint32_t w = vsir_swizzle_get_component(swizzle, 3);
-
-    if (x & ~0x3u || y & ~0x3u || z & ~0x3u || w & ~0x3u)
-        ERR("Unexpected vsir swizzle: 0x%08x.\n", swizzle);
-
-    return ((x & 0x3u) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(0))
-            | ((y & 0x3) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(1))
-            | ((z & 0x3) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(2))
-            | ((w & 0x3) << VKD3D_SM1_SWIZZLE_COMPONENT_SHIFT(3));
-}
-
-static void sm1_src_reg_from_vsir(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_src_param *param,
-        struct sm1_src_register *src, const struct vkd3d_shader_location *loc)
-{
-    src->mod = param->modifiers;
-    src->reg = param->reg.idx[0].offset;
-    src->type = param->reg.type;
-    src->swizzle = swizzle_from_vsir(param->swizzle);
-
-    if (param->reg.idx[0].rel_addr)
-    {
-        vkd3d_shader_error(d3dbc->message_context, loc, VKD3D_SHADER_ERROR_D3DBC_NOT_IMPLEMENTED,
-                "Unhandled relative addressing on source register.");
-        d3dbc->failed = true;
     }
 }
 
@@ -2250,7 +2235,7 @@ static void d3dbc_write_vsir_simple_instruction(struct d3dbc_compiler *d3dbc,
 
     instr.dst = ins->dst[0];
     for (unsigned int i = 0; i < instr.src_count; ++i)
-        sm1_src_reg_from_vsir(d3dbc, &ins->src[i], &instr.srcs[i], &ins->location);
+        instr.srcs[i] = ins->src[i];
 
     d3dbc_write_instruction(d3dbc, &instr, &ins->location);
 }
