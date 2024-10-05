@@ -2271,6 +2271,10 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
         indent_str = "    ";
     else
         indent_str = "";
+    /* The signatures we emit only make sense for DXBC shaders. d3dbc doesn't
+     * even have an explicit concept of signature. */
+    if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES && shader_version->major >= 4)
+        compiler.flags |= VSIR_ASM_FLAG_DUMP_SIGNATURES;
 
     buffer = &compiler.buffer;
     vkd3d_string_buffer_init(buffer);
@@ -2281,15 +2285,11 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);
 
-    /* The signatures we emit only make sense for DXBC shaders. D3DBC
-     * doesn't even have an explicit concept of signature. */
-    if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES && shader_version->major >= 4)
+    if (compiler.flags & VSIR_ASM_FLAG_DUMP_SIGNATURES
+            && (result = dump_dxbc_signatures(&compiler, program)) < 0)
     {
-        if ((result = dump_dxbc_signatures(&compiler, program)) < 0)
-        {
-            vkd3d_string_buffer_cleanup(buffer);
-            return result;
-        }
+        vkd3d_string_buffer_cleanup(buffer);
+        return result;
     }
 
     indent = 0;
@@ -2417,7 +2417,8 @@ static void trace_io_declarations(const struct vsir_program *program)
 
 void vsir_program_trace(const struct vsir_program *program)
 {
-    const unsigned int flags = VSIR_ASM_FLAG_DUMP_TYPES | VSIR_ASM_FLAG_DUMP_ALL_INDICES;
+    const unsigned int flags = VSIR_ASM_FLAG_DUMP_TYPES | VSIR_ASM_FLAG_DUMP_ALL_INDICES
+            | VSIR_ASM_FLAG_DUMP_SIGNATURES;
     struct vkd3d_shader_code code;
     const char *p, *q, *end;
 
