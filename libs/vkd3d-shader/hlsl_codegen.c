@@ -7621,18 +7621,23 @@ static bool lower_f16tof32(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
     return true;
 }
 
-static void process_entry_function(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static void process_entry_function(struct hlsl_ctx *ctx,
+        const struct hlsl_block *global_uniform_block, struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
+    struct hlsl_block static_initializers, global_uniforms;
     struct hlsl_block *const body = &entry_func->body;
     struct recursive_call_ctx recursive_call_ctx;
-    struct hlsl_block static_initializers;
     struct hlsl_ir_var *var;
     unsigned int i;
 
     if (!hlsl_clone_block(ctx, &static_initializers, &ctx->static_initializers))
         return;
     list_move_head(&body->instrs, &static_initializers.instrs);
+
+    if (!hlsl_clone_block(ctx, &global_uniforms, global_uniform_block))
+        return;
+    list_move_head(&body->instrs, &global_uniforms.instrs);
 
     memset(&recursive_call_ctx, 0, sizeof(recursive_call_ctx));
     hlsl_transform_ir(ctx, find_recursive_calls, body, &recursive_call_ctx);
@@ -7652,12 +7657,6 @@ static void process_entry_function(struct hlsl_ctx *ctx, struct hlsl_ir_function
 
     lower_ir(ctx, lower_matrix_swizzles, body);
     lower_ir(ctx, lower_index_loads, body);
-
-    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
-    {
-        if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
-            prepend_uniform_copy(ctx, body, var);
-    }
 
     for (i = 0; i < entry_func->parameters.count; ++i)
     {
@@ -7780,6 +7779,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
+    struct hlsl_block global_uniform_block;
+    struct hlsl_ir_var *var;
 
     parse_entry_function_attributes(ctx, entry_func);
     if (ctx->result)
@@ -7791,9 +7792,19 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
                 "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
 
-    process_entry_function(ctx, entry_func);
+    hlsl_block_init(&global_uniform_block);
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
+    {
+        if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
+            prepend_uniform_copy(ctx, &global_uniform_block, var);
+    }
+
+    process_entry_function(ctx, &global_uniform_block, entry_func);
     if (ctx->result)
         return ctx->result;
+
+    hlsl_block_cleanup(&global_uniform_block);
 
     if (profile->major_version < 4)
     {
