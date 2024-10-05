@@ -1415,7 +1415,7 @@ static void shader_glsl_generate_cbv_declaration(struct vkd3d_glsl_generator *ge
 
     if (cbv->count != 1)
     {
-        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_UNSUPPORTED,
                 "Constant buffer %u has unsupported descriptor array size %u.", cbv->register_id, cbv->count);
         return;
     }
