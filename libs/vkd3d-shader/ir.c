@@ -1932,6 +1932,8 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
     const struct shader_signature *signature;
     const struct signature_element *e;
 
+    write_mask = dst_param->write_mask;
+
     switch (reg->type)
     {
         case VKD3DSPR_OUTPUT:
@@ -1987,6 +1989,10 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
             signature = normaliser->output_signature;
             reg->type = VKD3DSPR_OUTPUT;
             dcl_params = normaliser->output_dcl_params;
+            /* Fog and point size are scalar, but fxc/d3dcompiler emits a full
+             * write mask when writing to them. */
+            if (reg->idx[0].offset > 0)
+                write_mask = VKD3DSP_WRITEMASK_0;
             break;
 
         default:
@@ -1994,7 +2000,6 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
     }
 
     id_idx = reg->idx_count - 1;
-    write_mask = dst_param->write_mask;
     if (!shader_signature_find_element_for_reg(signature, reg_idx, write_mask, &element_idx))
         vkd3d_unreachable();
     e = &signature->elements[element_idx];
