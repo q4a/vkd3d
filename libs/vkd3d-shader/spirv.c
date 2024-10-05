@@ -10538,7 +10538,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
         case VKD3DSIH_DCL_UAV_RAW:
         case VKD3DSIH_DCL_UAV_STRUCTURED:
-        case VKD3DSIH_DCL_UAV_TYPED:
         case VKD3DSIH_HS_DECLS:
         case VKD3DSIH_NOP:
             /* nothing to do */
