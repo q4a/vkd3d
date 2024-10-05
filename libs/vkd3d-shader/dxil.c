@@ -9637,6 +9637,7 @@ static enum vkd3d_result sm6_parser_emit_thread_group(struct sm6_parser *sm6, co
     ins->declaration.thread_group_size.x = group_sizes[0];
     ins->declaration.thread_group_size.y = group_sizes[1];
     ins->declaration.thread_group_size.z = group_sizes[2];
+    sm6->p.program->thread_group_size = ins->declaration.thread_group_size;
 
     return VKD3D_OK;
 }

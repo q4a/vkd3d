@@ -1289,11 +1289,14 @@ static void shader_sm5_read_dcl_hs_max_tessfactor(struct vkd3d_shader_instructio
 }
 
 static void shader_sm5_read_dcl_thread_group(struct vkd3d_shader_instruction *ins, uint32_t opcode,
-        uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
+        uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *sm4)
 {
+    struct vsir_program *program = sm4->p.program;
+
     ins->declaration.thread_group_size.x = *tokens++;
     ins->declaration.thread_group_size.y = *tokens++;
     ins->declaration.thread_group_size.z = *tokens++;
+    program->thread_group_size = ins->declaration.thread_group_size;
 }
 
 static void shader_sm5_read_dcl_uav_raw(struct vkd3d_shader_instruction *ins, uint32_t opcode, uint32_t opcode_token,

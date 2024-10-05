@@ -6890,10 +6890,9 @@ static void spirv_compiler_emit_tessellator_partitioning(struct spirv_compiler *
     spirv_compiler_emit_execution_mode(compiler, mode, NULL, 0);
 }
 
-static void spirv_compiler_emit_dcl_thread_group(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
+static void spirv_compiler_emit_thread_group_size(struct spirv_compiler *compiler,
+        const struct vsir_thread_group_size *group_size)
 {
-    const struct vkd3d_shader_thread_group_size *group_size = &instruction->declaration.thread_group_size;
     const uint32_t local_size[] = {group_size->x, group_size->y, group_size->z};
 
     spirv_compiler_emit_execution_mode(compiler,
@@ -10227,9 +10226,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             spirv_compiler_emit_tessellator_partitioning(compiler,
                     instruction->declaration.tessellator_partitioning);
             break;
-        case VKD3DSIH_DCL_THREAD_GROUP:
-            spirv_compiler_emit_dcl_thread_group(compiler, instruction);
-            break;
         case VKD3DSIH_HS_CONTROL_POINT_PHASE:
         case VKD3DSIH_HS_FORK_PHASE:
         case VKD3DSIH_HS_JOIN_PHASE:
@@ -10649,6 +10645,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
         spirv_compiler_emit_temps(compiler, program->temp_count);
     if (program->ssa_count)
         spirv_compiler_allocate_ssa_register_ids(compiler, program->ssa_count);
+    if (compiler->shader_type == VKD3D_SHADER_TYPE_COMPUTE)
+        spirv_compiler_emit_thread_group_size(compiler, &program->thread_group_size);
 
     spirv_compiler_emit_descriptor_declarations(compiler);
 

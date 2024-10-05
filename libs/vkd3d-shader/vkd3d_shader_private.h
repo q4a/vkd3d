@@ -1164,7 +1164,7 @@ struct vkd3d_shader_tgsm_structured
     bool zero_init;
 };
 
-struct vkd3d_shader_thread_group_size
+struct vsir_thread_group_size
 {
     unsigned int x, y, z;
 };
@@ -1243,7 +1243,7 @@ struct vkd3d_shader_instruction
         struct vkd3d_shader_structured_resource structured_resource;
         struct vkd3d_shader_tgsm_raw tgsm_raw;
         struct vkd3d_shader_tgsm_structured tgsm_structured;
-        struct vkd3d_shader_thread_group_size thread_group_size;
+        struct vsir_thread_group_size thread_group_size;
         enum vkd3d_tessellator_domain tessellator_domain;
         enum vkd3d_shader_tessellator_output_primitive tessellator_output_primitive;
         enum vkd3d_shader_tessellator_partitioning tessellator_partitioning;
@@ -1390,6 +1390,7 @@ struct vsir_program
     bool free_parameters;
 
     unsigned int input_control_point_count, output_control_point_count;
+    struct vsir_thread_group_size thread_group_size;
     unsigned int flat_constant_count[3];
     unsigned int block_count;
     unsigned int temp_count;
