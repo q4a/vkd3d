@@ -22,7 +22,7 @@ struct glsl_resource_type_info
 {
     size_t coord_size;
     bool shadow;
-    const char *sampler_type;
+    const char *type_suffix;
 };
 
 struct glsl_src
@@ -102,17 +102,17 @@ static const struct glsl_resource_type_info *shader_glsl_get_resource_type_info(
 {
     static const struct glsl_resource_type_info info[] =
     {
-        {0, 0, "samplerNone"},      /* VKD3D_SHADER_RESOURCE_NONE */
-        {1, 0, "samplerBuffer"},    /* VKD3D_SHADER_RESOURCE_BUFFER */
-        {1, 1, "sampler1D"},        /* VKD3D_SHADER_RESOURCE_TEXTURE_1D */
-        {2, 1, "sampler2D"},        /* VKD3D_SHADER_RESOURCE_TEXTURE_2D */
-        {2, 0, "sampler2DMS"},      /* VKD3D_SHADER_RESOURCE_TEXTURE_2DMS */
-        {3, 0, "sampler3D"},        /* VKD3D_SHADER_RESOURCE_TEXTURE_3D */
-        {3, 1, "samplerCube"},      /* VKD3D_SHADER_RESOURCE_TEXTURE_CUBE */
-        {2, 1, "sampler1DArray"},   /* VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY */
-        {3, 1, "sampler2DArray"},   /* VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY */
-        {3, 0, "sampler2DMSArray"}, /* VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY */
-        {4, 1, "samplerCubeArray"}, /* VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY */
+        {0, 0, "None"},      /* VKD3D_SHADER_RESOURCE_NONE */
+        {1, 0, "Buffer"},    /* VKD3D_SHADER_RESOURCE_BUFFER */
+        {1, 1, "1D"},        /* VKD3D_SHADER_RESOURCE_TEXTURE_1D */
+        {2, 1, "2D"},        /* VKD3D_SHADER_RESOURCE_TEXTURE_2D */
+        {2, 0, "2DMS"},      /* VKD3D_SHADER_RESOURCE_TEXTURE_2DMS */
+        {3, 0, "3D"},        /* VKD3D_SHADER_RESOURCE_TEXTURE_3D */
+        {3, 1, "Cube"},      /* VKD3D_SHADER_RESOURCE_TEXTURE_CUBE */
+        {2, 1, "1DArray"},   /* VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY */
+        {3, 1, "2DArray"},   /* VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY */
+        {3, 0, "2DMSArray"}, /* VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY */
+        {4, 1, "CubeArray"}, /* VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY */
     };
 
     if (!t || t >= ARRAY_SIZE(info))
@@ -171,6 +171,14 @@ static void shader_glsl_print_combined_sampler_name(struct vkd3d_string_buffer *
         if (sampler_space)
             vkd3d_string_buffer_printf(buffer, "_%u", sampler_space);
     }
+}
+
+static void shader_glsl_print_image_name(struct vkd3d_string_buffer *buffer,
+        struct vkd3d_glsl_generator *gen, unsigned int idx, unsigned int space)
+{
+    vkd3d_string_buffer_printf(buffer, "%s_image_%u", gen->prefix, idx);
+    if (space)
+        vkd3d_string_buffer_printf(buffer, "_%u", space);
 }
 
 static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
@@ -363,15 +371,14 @@ static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vk
     vkd3d_string_buffer_printf(dst, "%s", src);
 }
 
-static void glsl_src_init(struct glsl_src *glsl_src, struct vkd3d_glsl_generator *gen,
-        const struct vkd3d_shader_src_param *vsir_src, uint32_t mask)
+static void shader_glsl_print_src(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_src_param *vsir_src, uint32_t mask, enum vkd3d_data_type data_type)
 {
     const struct vkd3d_shader_register *reg = &vsir_src->reg;
     struct vkd3d_string_buffer *register_name, *str;
     enum vkd3d_data_type src_data_type;
     unsigned int size;
 
-    glsl_src->str = vkd3d_string_buffer_get(&gen->string_buffers);
     register_name = vkd3d_string_buffer_get(&gen->string_buffers);
 
     if (reg->non_uniform)
@@ -386,12 +393,12 @@ static void glsl_src_init(struct glsl_src *glsl_src, struct vkd3d_glsl_generator
     shader_glsl_print_register_name(register_name, gen, reg);
 
     if (!vsir_src->modifiers)
-        str = glsl_src->str;
+        str = buffer;
     else
         str = vkd3d_string_buffer_get(&gen->string_buffers);
 
     size = reg->dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
-    shader_glsl_print_bitcast(str, gen, register_name->buffer, reg->data_type, src_data_type, size);
+    shader_glsl_print_bitcast(str, gen, register_name->buffer, data_type, src_data_type, size);
     if (reg->dimension == VSIR_DIMENSION_VEC4)
         shader_glsl_print_swizzle(str, vsir_src->swizzle, mask);
 
@@ -400,22 +407,29 @@ static void glsl_src_init(struct glsl_src *glsl_src, struct vkd3d_glsl_generator
         case VKD3DSPSM_NONE:
             break;
         case VKD3DSPSM_NEG:
-            vkd3d_string_buffer_printf(glsl_src->str, "-%s", str->buffer);
+            vkd3d_string_buffer_printf(buffer, "-%s", str->buffer);
             break;
         case VKD3DSPSM_ABS:
-            vkd3d_string_buffer_printf(glsl_src->str, "abs(%s)", str->buffer);
+            vkd3d_string_buffer_printf(buffer, "abs(%s)", str->buffer);
             break;
         default:
-            vkd3d_string_buffer_printf(glsl_src->str, "<unhandled modifier %#x>(%s)",
+            vkd3d_string_buffer_printf(buffer, "<unhandled modifier %#x>(%s)",
                     vsir_src->modifiers, str->buffer);
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                     "Internal compiler error: Unhandled source modifier(s) %#x.", vsir_src->modifiers);
             break;
     }
 
-    if (str != glsl_src->str)
+    if (str != buffer)
         vkd3d_string_buffer_release(&gen->string_buffers, str);
     vkd3d_string_buffer_release(&gen->string_buffers, register_name);
+}
+
+static void glsl_src_init(struct glsl_src *glsl_src, struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_src_param *vsir_src, uint32_t mask)
+{
+    glsl_src->str = vkd3d_string_buffer_get(&gen->string_buffers);
+    shader_glsl_print_src(glsl_src->str, gen, vsir_src, mask, vsir_src->reg.data_type);
 }
 
 static void glsl_dst_cleanup(struct glsl_dst *dst, struct vkd3d_string_buffer_cache *cache)
@@ -892,6 +906,85 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_store_uav_typed(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    const struct glsl_resource_type_info *resource_type_info;
+    enum vkd3d_shader_component_type component_type;
+    const struct vkd3d_shader_descriptor_info1 *d;
+    enum vkd3d_shader_resource_type resource_type;
+    unsigned int uav_id, uav_idx, uav_space;
+    struct vkd3d_string_buffer *image_data;
+    struct glsl_src image_coord;
+    uint32_t coord_mask;
+
+    if (ins->dst[0].reg.idx[0].rel_addr || ins->dst[0].reg.idx[1].rel_addr)
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_UNSUPPORTED,
+                "Descriptor indexing is not supported.");
+
+    uav_id = ins->dst[0].reg.idx[0].offset;
+    uav_idx = ins->dst[0].reg.idx[1].offset;
+    if ((d = shader_glsl_get_descriptor_by_id(gen, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, uav_id)))
+    {
+        resource_type = d->resource_type;
+        uav_space = d->register_space;
+        component_type = vkd3d_component_type_from_resource_data_type(d->resource_data_type);
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Undeclared UAV descriptor %u.", uav_id);
+        uav_space = 0;
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+        component_type = VKD3D_SHADER_COMPONENT_FLOAT;
+    }
+
+    if ((resource_type_info = shader_glsl_get_resource_type_info(resource_type)))
+    {
+        coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->coord_size);
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Unhandled UAV type %#x.", resource_type);
+        coord_mask = vkd3d_write_mask_from_component_count(2);
+    }
+
+    glsl_src_init(&image_coord, gen, &ins->src[0], coord_mask);
+    image_data = vkd3d_string_buffer_get(&gen->string_buffers);
+
+    if (ins->src[1].reg.dimension == VSIR_DIMENSION_SCALAR)
+    {
+        switch (component_type)
+        {
+            case VKD3D_SHADER_COMPONENT_UINT:
+                vkd3d_string_buffer_printf(image_data, "uvec4(");
+                break;
+            case VKD3D_SHADER_COMPONENT_INT:
+                vkd3d_string_buffer_printf(image_data, "ivec4(");
+                break;
+            default:
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled component type %#x.", component_type);
+                /* fall through */
+            case VKD3D_SHADER_COMPONENT_FLOAT:
+                vkd3d_string_buffer_printf(image_data, "vec4(");
+                break;
+        }
+    }
+    shader_glsl_print_src(image_data, gen, &ins->src[1], VKD3DSP_WRITEMASK_ALL,
+            vkd3d_data_type_from_component_type(component_type));
+    if (ins->src[1].reg.dimension == VSIR_DIMENSION_SCALAR)
+        vkd3d_string_buffer_printf(image_data, ", 0, 0, 0)");
+
+    shader_glsl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "imageStore(");
+    shader_glsl_print_image_name(gen->buffer, gen, uav_idx, uav_space);
+    vkd3d_string_buffer_printf(gen->buffer, ", %s, %s);\n", image_coord.str->buffer, image_data->buffer);
+
+    vkd3d_string_buffer_release(&gen->string_buffers, image_data);
+    glsl_src_cleanup(&image_coord, &gen->string_buffers);
+}
+
 static void shader_glsl_unary_op(struct vkd3d_glsl_generator *gen,
         const struct vkd3d_shader_instruction *ins, const char *op)
 {
@@ -1336,6 +1429,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_SQRT:
             shader_glsl_intrinsic(gen, ins, "sqrt");
             break;
+        case VKD3DSIH_STORE_UAV_TYPED:
+            shader_glsl_store_uav_typed(gen, ins);
+            break;
         case VKD3DSIH_SWITCH:
             shader_glsl_switch(gen, ins);
             break;
@@ -1370,6 +1466,137 @@ static bool shader_glsl_check_shader_visibility(const struct vkd3d_glsl_generato
             WARN("Invalid shader visibility %#x.\n", visibility);
             return false;
     }
+}
+
+static bool shader_glsl_get_uav_binding(const struct vkd3d_glsl_generator *gen, unsigned int register_space,
+        unsigned int register_idx, enum vkd3d_shader_resource_type resource_type, unsigned int *binding_idx)
+{
+    const struct vkd3d_shader_interface_info *interface_info = gen->interface_info;
+    const struct vkd3d_shader_resource_binding *binding;
+    enum vkd3d_shader_binding_flag resource_type_flag;
+    unsigned int i;
+
+    if (!interface_info)
+        return false;
+
+    resource_type_flag = resource_type == VKD3D_SHADER_RESOURCE_BUFFER
+            ? VKD3D_SHADER_BINDING_FLAG_BUFFER : VKD3D_SHADER_BINDING_FLAG_IMAGE;
+
+    for (i = 0; i < interface_info->binding_count; ++i)
+    {
+        binding = &interface_info->bindings[i];
+
+        if (binding->type != VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
+            continue;
+        if (binding->register_space != register_space)
+            continue;
+        if (binding->register_index != register_idx)
+            continue;
+        if (!shader_glsl_check_shader_visibility(gen, binding->shader_visibility))
+            continue;
+        if (!(binding->flags & resource_type_flag))
+            continue;
+        *binding_idx = i;
+        return true;
+    }
+
+    return false;
+}
+
+static void shader_glsl_generate_uav_declaration(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_descriptor_info1 *uav)
+{
+    const struct glsl_resource_type_info *resource_type_info;
+    const char *image_type_prefix, *image_type, *read_format;
+    const struct vkd3d_shader_descriptor_binding *binding;
+    const struct vkd3d_shader_descriptor_offset *offset;
+    struct vkd3d_string_buffer *buffer = gen->buffer;
+    enum vkd3d_shader_component_type component_type;
+    unsigned int binding_idx;
+
+    if (uav->count != 1)
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_UNSUPPORTED,
+                "UAV %u has unsupported descriptor array size %u.", uav->register_id, uav->count);
+        return;
+    }
+
+    if (!shader_glsl_get_uav_binding(gen, uav->register_space,
+            uav->register_index, uav->resource_type, &binding_idx))
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+                "No descriptor binding specified for UAV %u.", uav->register_id);
+        return;
+    }
+
+    binding = &gen->interface_info->bindings[binding_idx].binding;
+
+    if (binding->set != 0)
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+                "Unsupported binding set %u specified for UAV %u.", binding->set, uav->register_id);
+        return;
+    }
+
+    if (binding->count != 1)
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
+                "Unsupported binding count %u specified for UAV %u.", binding->count, uav->register_id);
+        return;
+    }
+
+    if (gen->offset_info && gen->offset_info->binding_offsets)
+    {
+        offset = &gen->offset_info->binding_offsets[binding_idx];
+        if (offset->static_offset || offset->dynamic_offset_index != ~0u)
+        {
+            vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                    "Internal compiler error: Unhandled descriptor offset specified for UAV %u.",
+                    uav->register_id);
+            return;
+        }
+    }
+
+    if ((resource_type_info = shader_glsl_get_resource_type_info(uav->resource_type)))
+    {
+        image_type = resource_type_info->type_suffix;
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Unhandled UAV type %#x.", uav->resource_type);
+        image_type = "<unhandled image type>";
+    }
+
+    switch ((component_type = vkd3d_component_type_from_resource_data_type(uav->resource_data_type)))
+    {
+        case VKD3D_SHADER_COMPONENT_UINT:
+            image_type_prefix = "u";
+            read_format = "r32ui";
+            break;
+        case VKD3D_SHADER_COMPONENT_INT:
+            image_type_prefix = "i";
+            read_format = "r32i";
+            break;
+        default:
+            vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                    "Internal compiler error: Unhandled component type %#x for UAV %u.",
+                    component_type, uav->register_id);
+            /* fall through */
+        case VKD3D_SHADER_COMPONENT_FLOAT:
+            image_type_prefix = "";
+            read_format = "r32f";
+            break;
+    }
+
+    vkd3d_string_buffer_printf(buffer, "layout(binding = %u", binding->binding);
+    if (uav->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ)
+        vkd3d_string_buffer_printf(buffer, ", %s) ", read_format);
+    else
+        vkd3d_string_buffer_printf(buffer, ") writeonly ");
+    vkd3d_string_buffer_printf(buffer, "uniform %simage%s ", image_type_prefix, image_type);
+    shader_glsl_print_image_name(buffer, gen, uav->register_index, uav->register_space);
+    vkd3d_string_buffer_printf(buffer, ";\n");
 }
 
 static bool shader_glsl_get_cbv_binding(const struct vkd3d_glsl_generator *gen,
@@ -1540,7 +1767,7 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
 
     if ((resource_type_info = shader_glsl_get_resource_type_info(srv->resource_type)))
     {
-        sampler_type = resource_type_info->sampler_type;
+        sampler_type = resource_type_info->type_suffix;
         if (shadow && !resource_type_info->shadow)
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_UNSUPPORTED,
                     "Comparison samplers are not supported with resource type %#x.", srv->resource_type);
@@ -1603,7 +1830,7 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
         return;
     }
 
-    vkd3d_string_buffer_printf(buffer, "layout(binding = %u) uniform %s%s%s ",
+    vkd3d_string_buffer_printf(buffer, "layout(binding = %u) uniform %ssampler%s%s ",
             binding->binding, sampler_type_prefix, sampler_type, shadow ? "Shadow" : "");
     shader_glsl_print_combined_sampler_name(buffer, gen, crs->resource_index,
             crs->resource_space, crs->sampler_index, crs->sampler_space);
@@ -1626,6 +1853,10 @@ static void shader_glsl_generate_descriptor_declarations(struct vkd3d_glsl_gener
             case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
             case VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER:
                 /* GLSL uses combined resource/sampler descriptors.*/
+                break;
+
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
+                shader_glsl_generate_uav_declaration(gen, descriptor);
                 break;
 
             case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
