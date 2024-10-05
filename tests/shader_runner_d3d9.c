@@ -293,6 +293,8 @@ static D3DDECLTYPE vertex_decl_type_from_format(DXGI_FORMAT format)
 
 static D3DDECLUSAGE vertex_decl_usage_from_name(const char *name)
 {
+    if (!strcasecmp(name, "color"))
+        return D3DDECLUSAGE_COLOR;
     if (!strcasecmp(name, "position") || !strcasecmp(name, "sv_position"))
         return D3DDECLUSAGE_POSITION;
     if (!strcasecmp(name, "psize"))
