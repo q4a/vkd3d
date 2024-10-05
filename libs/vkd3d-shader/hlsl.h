@@ -488,6 +488,8 @@ struct hlsl_ir_var
      *   range). The IR instructions are numerated starting from 2, because 0 means unused, and 1
      *   means function entry. */
     unsigned int first_write, last_read;
+    /* Whether the variable is read in any entry function. */
+    bool is_read;
     /* Offset where the variable's value is stored within its buffer in numeric register components.
      * This in case the variable is uniform. */
     unsigned int buffer_offset;

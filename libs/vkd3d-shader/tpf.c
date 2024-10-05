@@ -3864,7 +3864,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
             {
                 uint32_t flags = 0;
 
-                if (var->last_read)
+                if (var->is_read)
                     flags |= D3D_SVF_USED;
 
                 put_u32(&buffer, 0); /* name */

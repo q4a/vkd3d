@@ -4383,6 +4383,21 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     compute_liveness_recurse(&entry_func->body, 0, 0);
 }
 
+static void mark_vars_usage(struct hlsl_ctx *ctx)
+{
+    struct hlsl_scope *scope;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+        {
+            if (var->last_read)
+                var->is_read = true;
+        }
+    }
+}
+
 struct register_allocator
 {
     struct allocation
@@ -5286,7 +5301,7 @@ static void hlsl_calculate_buffer_offset(struct hlsl_ctx *ctx, struct hlsl_ir_va
 
     TRACE("Allocated buffer offset %u to %s.\n", var->buffer_offset, var->name);
     buffer->size = max(buffer->size, var->buffer_offset + var_reg_size);
-    if (var->last_read)
+    if (var->is_read)
         buffer->used_size = max(buffer->used_size, var->buffer_offset + var_reg_size);
 }
 
@@ -7726,6 +7741,7 @@ static void process_entry_function(struct hlsl_ctx *ctx, struct hlsl_ir_function
     while (hlsl_transform_ir(ctx, dce, body, NULL));
 
     compute_liveness(ctx, entry_func);
+    mark_vars_usage(ctx);
 
     transform_derefs(ctx, mark_indexable_vars, body);
 
