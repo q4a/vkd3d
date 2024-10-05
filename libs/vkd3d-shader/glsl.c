@@ -1820,7 +1820,7 @@ static void shader_glsl_generate_output_declarations(struct vkd3d_glsl_generator
                             "Internal compiler error: Unhandled output component type %#x.", e->component_type);
                     break;
             }
-            vkd3d_string_buffer_printf(buffer, " shader_out_%u;\n", i);
+            vkd3d_string_buffer_printf(buffer, " shader_out_%u;\n", e->semantic_index);
             ++count;
         }
         if (count)
