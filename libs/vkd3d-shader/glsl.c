@@ -2068,6 +2068,14 @@ static void shader_glsl_generate_declarations(struct vkd3d_glsl_generator *gen)
 {
     const struct vsir_program *program = gen->program;
     struct vkd3d_string_buffer *buffer = gen->buffer;
+    const struct vsir_thread_group_size *group_size;
+
+    if (program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
+    {
+        group_size = &program->thread_group_size;
+        vkd3d_string_buffer_printf(buffer, "layout(local_size_x = %u, local_size_y = %u, local_size_z = %u) in;\n\n",
+                group_size->x, group_size->y, group_size->z);
+    }
 
     shader_glsl_generate_descriptor_declarations(gen);
     shader_glsl_generate_input_declarations(gen);
@@ -2149,6 +2157,10 @@ static void shader_glsl_init_limits(struct vkd3d_glsl_generator *gen, const stru
             limits->input_count = 32;
             limits->output_count = 8;
             break;
+        case VKD3D_SHADER_TYPE_COMPUTE:
+            limits->input_count = 0;
+            limits->output_count = 0;
+            break;
         default:
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                     "Internal compiler error: Unhandled shader type %#x.", version->type);
@@ -2179,8 +2191,8 @@ static void vkd3d_glsl_generator_init(struct vkd3d_glsl_generator *gen,
         gen->prefix = "unknown";
     }
     shader_glsl_init_limits(gen, &program->shader_version);
-    gen->interstage_input = type != VKD3D_SHADER_TYPE_VERTEX;
-    gen->interstage_output = type != VKD3D_SHADER_TYPE_PIXEL;
+    gen->interstage_input = type != VKD3D_SHADER_TYPE_VERTEX && type != VKD3D_SHADER_TYPE_COMPUTE;
+    gen->interstage_output = type != VKD3D_SHADER_TYPE_PIXEL && type != VKD3D_SHADER_TYPE_COMPUTE;
 
     gen->interface_info = vkd3d_find_struct(compile_info->next, INTERFACE_INFO);
     gen->offset_info = vkd3d_find_struct(compile_info->next, DESCRIPTOR_OFFSET_INFO);

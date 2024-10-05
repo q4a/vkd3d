@@ -18,5 +18,5 @@ void main()
 }
 
 [test]
-todo(glsl) dispatch 1 1 1
+dispatch 1 1 1
 probe uav 0 (0, 0) r (-123.0)
