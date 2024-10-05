@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Zebediah Figura for CodeWeavers
+ * Copyright 2021-2024 Elizabeth Figura for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -135,6 +135,19 @@ enum format_cap
     FORMAT_CAP_UAV_LOAD = 0x00000001,
 };
 
+enum shader_cap
+{
+    SHADER_CAP_CLIP_PLANES,
+    SHADER_CAP_DEPTH_BOUNDS,
+    SHADER_CAP_FLOAT64,
+    SHADER_CAP_GEOMETRY_SHADER,
+    SHADER_CAP_INT64,
+    SHADER_CAP_POINT_SIZE,
+    SHADER_CAP_ROV,
+    SHADER_CAP_WAVE_OPS,
+    SHADER_CAP_COUNT,
+};
+
 struct shader_runner_caps
 {
     const char *runner;
@@ -142,14 +155,7 @@ struct shader_runner_caps
     size_t tag_count;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
-    bool geometry_shader;
-    bool float64;
-    bool int64;
-    bool rov;
-    bool wave_ops;
-    bool depth_bounds;
-    bool clip_planes;
-    bool point_size;
+    bool shader_caps[SHADER_CAP_COUNT];
 
     uint32_t format_caps[DXGI_FORMAT_COUNT];
 };
@@ -158,9 +164,9 @@ static inline unsigned int shader_runner_caps_get_feature_flags(const struct sha
 {
     unsigned int flags = 0;
 
-    if (caps->int64)
+    if (caps->shader_caps[SHADER_CAP_INT64])
         flags |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64;
-    if (caps->float64)
+    if (caps->shader_caps[SHADER_CAP_FLOAT64])
         flags |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64;
 
     return flags;
@@ -182,14 +188,7 @@ struct shader_runner
     char *gs_source;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
-    bool require_geometry_shader;
-    bool require_float64;
-    bool require_int64;
-    bool require_rov;
-    bool require_wave_ops;
-    bool require_depth_bounds;
-    bool require_clip_planes;
-    bool require_point_size;
+    bool require_shader_caps[SHADER_CAP_COUNT];
     uint32_t require_format_caps[DXGI_FORMAT_COUNT];
 
     bool last_render_failed;

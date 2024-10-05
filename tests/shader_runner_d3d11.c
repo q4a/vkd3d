@@ -316,13 +316,13 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
     hr = ID3D11Device_CheckFeatureSupport(runner->device, D3D11_FEATURE_DOUBLES,
             &doubles, sizeof(doubles));
     ok(hr == S_OK, "Failed to check double precision feature support, hr %#lx.\n", hr);
-    runner->caps.float64 = doubles.DoublePrecisionFloatShaderOps;
+    runner->caps.shader_caps[SHADER_CAP_FLOAT64] = doubles.DoublePrecisionFloatShaderOps;
 
     hr = ID3D11Device_CheckFeatureSupport(runner->device,
             D3D11_FEATURE_D3D11_OPTIONS2, &options2, sizeof(options2));
     ok(hr == S_OK, "Failed to check feature options2 support, hr %#lx.\n", hr);
 
-    runner->caps.rov = options2.ROVsSupported;
+    runner->caps.shader_caps[SHADER_CAP_ROV] = options2.ROVsSupported;
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
     {
         runner->caps.format_caps[formats[i]] = get_format_support(runner->device, formats[i]);

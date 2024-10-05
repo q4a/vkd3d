@@ -131,11 +131,11 @@ static bool check_gl_extensions(struct gl_runner *runner)
     }
 
     if (check_gl_extension("GL_ARB_gpu_shader_fp64", count))
-        runner->caps.float64 = true;
+        runner->caps.shader_caps[SHADER_CAP_FLOAT64] = true;
     if (check_gl_extension("GL_ARB_gpu_shader_int64", count))
-        runner->caps.int64 = true;
+        runner->caps.shader_caps[SHADER_CAP_INT64] = true;
     if (check_gl_extension("GL_EXT_depth_bounds_test", count))
-        runner->caps.depth_bounds = true;
+        runner->caps.shader_caps[SHADER_CAP_DEPTH_BOUNDS] = true;
 
     return true;
 }
@@ -346,7 +346,7 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
         runner->caps.tag_count = runner->language == GLSL;
         runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
         runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
-        runner->caps.geometry_shader = true;
+        runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;
 
         glGetIntegerv(GL_NUM_EXTENSIONS, &extension_count);
         if (check_gl_extension("GL_ARB_internalformat_query2", extension_count))

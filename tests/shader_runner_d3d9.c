@@ -152,8 +152,8 @@ static bool init_test_context(struct d3d9_shader_runner *runner)
     runner->caps.runner = "d3d9.dll";
     runner->caps.minimum_shader_model = SHADER_MODEL_2_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_3_0;
-    runner->caps.clip_planes = true;
-    runner->caps.point_size = true;
+    runner->caps.shader_caps[SHADER_CAP_CLIP_PLANES] = true;
+    runner->caps.shader_caps[SHADER_CAP_POINT_SIZE] = true;
 
     return true;
 }

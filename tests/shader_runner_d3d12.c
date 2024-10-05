@@ -1028,12 +1028,12 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
 #endif
     runner->caps.minimum_shader_model = minimum_shader_model;
     runner->caps.maximum_shader_model = maximum_shader_model;
-    runner->caps.geometry_shader = true;
-    runner->caps.float64 = options.DoublePrecisionFloatShaderOps;
-    runner->caps.int64 = options1.Int64ShaderOps;
-    runner->caps.rov = options.ROVsSupported;
-    runner->caps.wave_ops = options1.WaveOps;
-    runner->caps.depth_bounds = options2.DepthBoundsTestSupported;
+    runner->caps.shader_caps[SHADER_CAP_DEPTH_BOUNDS] = options2.DepthBoundsTestSupported;
+    runner->caps.shader_caps[SHADER_CAP_FLOAT64] = options.DoublePrecisionFloatShaderOps;
+    runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;
+    runner->caps.shader_caps[SHADER_CAP_INT64] = options1.Int64ShaderOps;
+    runner->caps.shader_caps[SHADER_CAP_ROV] = options.ROVsSupported;
+    runner->caps.shader_caps[SHADER_CAP_WAVE_OPS] = options1.WaveOps;
 
     if (is_mvk_device(device))
     {

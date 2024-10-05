@@ -365,7 +365,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     spirv_info.extensions = spirv_extensions;
     spirv_info.extension_count = 0;
 
-    if (runner->caps.rov)
+    if (runner->caps.shader_caps[SHADER_CAP_ROV])
         spirv_extensions[spirv_info.extension_count++] = VKD3D_SHADER_SPIRV_EXTENSION_EXT_FRAGMENT_SHADER_INTERLOCK;
     if (runner->demote_to_helper_invocation)
         spirv_extensions[spirv_info.extension_count++] = VKD3D_SHADER_SPIRV_EXTENSION_EXT_DEMOTE_TO_HELPER_INVOCATION;
@@ -1433,7 +1433,7 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner,
         {
             enabled_extensions->names[enabled_extensions->count++] = name;
             if (!strcmp(name, VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME))
-                runner->caps.rov = true;
+                runner->caps.shader_caps[SHADER_CAP_ROV] = true;
             if (!strcmp(name, VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME))
                 runner->demote_to_helper_invocation = true;
             if (!strcmp(name, VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME))
@@ -1460,7 +1460,7 @@ static void get_physical_device_info(struct vulkan_shader_runner *runner, struct
     memset(info, 0, sizeof(*info));
 
     info->features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    if (runner->caps.rov)
+    if (runner->caps.shader_caps[SHADER_CAP_ROV])
     {
         info->features2.pNext = &info->interlock_features;
         info->interlock_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
@@ -1602,8 +1602,8 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
         runner->caps.tag_count = ARRAY_SIZE(tags);
     }
 
-    runner->caps.clip_planes = true;
-    runner->caps.point_size = true;
+    runner->caps.shader_caps[SHADER_CAP_CLIP_PLANES] = true;
+    runner->caps.shader_caps[SHADER_CAP_POINT_SIZE] = true;
 
     device_desc.pEnabledFeatures = &features;
     memset(&features, 0, sizeof(features));
@@ -1626,25 +1626,25 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     if (ret_features->geometryShader)
     {
         features.geometryShader = VK_TRUE;
-        runner->caps.geometry_shader = true;
+        runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;
     }
 
     if (ret_features->shaderFloat64)
     {
         features.shaderFloat64 = VK_TRUE;
-        runner->caps.float64 = true;
+        runner->caps.shader_caps[SHADER_CAP_FLOAT64] = true;
     }
 
     if (ret_features->shaderInt64)
     {
         features.shaderInt64 = VK_TRUE;
-        runner->caps.int64 = true;
+        runner->caps.shader_caps[SHADER_CAP_INT64] = true;
     }
 
     if (ret_features->depthBounds)
     {
         features.depthBounds = VK_TRUE;
-        runner->caps.depth_bounds = true;
+        runner->caps.shader_caps[SHADER_CAP_DEPTH_BOUNDS] = true;
     }
 
     if (device_info.interlock_features.fragmentShaderSampleInterlock
@@ -1659,7 +1659,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     }
     else
     {
-        runner->caps.rov = false;
+        runner->caps.shader_caps[SHADER_CAP_ROV] = false;
     }
 
     if (device_info.demote_to_helper_invocation_features.shaderDemoteToHelperInvocation)

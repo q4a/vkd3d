@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Zebediah Figura for CodeWeavers
+ * Copyright 2020-2024 Elizabeth Figura for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -329,8 +329,34 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     fatal_error("Unknown format '%s'.\n", line);
 }
 
+static const char *const shader_cap_strings[] =
+{
+    [SHADER_CAP_CLIP_PLANES]     = "clip-planes",
+    [SHADER_CAP_DEPTH_BOUNDS]    = "depth-bounds",
+    [SHADER_CAP_FLOAT64]         = "float64",
+    [SHADER_CAP_GEOMETRY_SHADER] = "geometry-shader",
+    [SHADER_CAP_INT64]           = "int64",
+    [SHADER_CAP_POINT_SIZE]      = "point-size",
+    [SHADER_CAP_ROV]             = "rov",
+    [SHADER_CAP_WAVE_OPS]        = "wave-ops",
+};
+
+static bool match_shader_cap_string(const char *line, enum shader_cap *cap)
+{
+    for (enum shader_cap i = 0; i < SHADER_CAP_COUNT; ++i)
+    {
+        if (match_string(line, shader_cap_strings[i], &line))
+        {
+            *cap = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 static void parse_require_directive(struct shader_runner *runner, const char *line)
 {
+    enum shader_cap shader_cap;
     bool less_than = false;
     unsigned int i;
 
@@ -392,37 +418,9 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
                 fatal_error("Unknown format cap '%s'.\n", line);
         }
     }
-    else if (match_string(line, "geometry-shader", &line))
+    else if (match_shader_cap_string(line, &shader_cap))
     {
-        runner->require_geometry_shader = true;
-    }
-    else if (match_string(line, "float64", &line))
-    {
-        runner->require_float64 = true;
-    }
-    else if (match_string(line, "int64", &line))
-    {
-        runner->require_int64 = true;
-    }
-    else if (match_string(line, "rov", &line))
-    {
-        runner->require_rov = true;
-    }
-    else if (match_string(line, "wave ops", &line))
-    {
-        runner->require_wave_ops = true;
-    }
-    else if (match_string(line, "depth-bounds", &line))
-    {
-        runner->require_depth_bounds = true;
-    }
-    else if (match_string(line, "clip-planes", &line))
-    {
-        runner->require_clip_planes = true;
-    }
-    else if (match_string(line, "point-size", &line))
-    {
-        runner->require_point_size = true;
+        runner->require_shader_caps[shader_cap] = true;
     }
     else
     {
@@ -932,7 +930,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     {
         if (sscanf(line, "%f %f", &runner->depth_min, &runner->depth_max) != 2)
             fatal_error("Malformed depth-bounds arguments '%s'.\n", line);
-        if (!runner->caps->depth_bounds)
+        if (!runner->caps->shader_caps[SHADER_CAP_DEPTH_BOUNDS])
             fatal_error("depth-bounds set but runner does not support depth bounds testing.");
         runner->depth_bounds = true;
     }
@@ -1591,22 +1589,11 @@ static bool check_capabilities(const struct shader_runner *runner, const struct 
 {
     unsigned int i;
 
-    if (runner->require_geometry_shader && !caps->geometry_shader)
-        return false;
-    if (runner->require_float64 && !caps->float64)
-        return false;
-    if (runner->require_int64 && !caps->int64)
-        return false;
-    if (runner->require_rov && !caps->rov)
-        return false;
-    if (runner->require_wave_ops && !caps->wave_ops)
-        return false;
-    if (runner->require_depth_bounds && !caps->depth_bounds)
-        return false;
-    if (runner->require_clip_planes && !caps->clip_planes)
-        return false;
-    if (runner->require_point_size && !caps->point_size)
-        return false;
+    for (i = 0; i < SHADER_CAP_COUNT; ++i)
+    {
+        if (runner->require_shader_caps[i] && !caps->shader_caps[i])
+            return false;
+    }
 
     for (i = 0; i < ARRAY_SIZE(runner->require_format_caps); ++i)
     {
@@ -1624,7 +1611,7 @@ static void trace_tags(const struct shader_runner_caps *caps)
 
     p = tags;
     rem = ARRAY_SIZE(tags);
-    rc = snprintf(p, rem, "           tags:");
+    rc = snprintf(p, rem, "%8s:", "tags");
     p += rc;
     rem -= rc;
 
@@ -1638,13 +1625,47 @@ static void trace_tags(const struct shader_runner_caps *caps)
 
             p = tags;
             rem = ARRAY_SIZE(tags);
-            rc = snprintf(p, rem, "                ");
+            rc = snprintf(p, rem, "%8s ", "");
             --i;
         }
         p += rc;
         rem -= rc;
     }
     trace("%s.\n", tags);
+}
+
+static void trace_shader_caps(const bool *caps)
+{
+    char buffer[80], *p;
+    size_t rem;
+    int rc;
+
+    p = buffer;
+    rem = ARRAY_SIZE(buffer);
+    rc = snprintf(p, rem, "%8s:", "caps");
+    p += rc;
+    rem -= rc;
+
+    for (size_t i = 0; i < SHADER_CAP_COUNT; ++i)
+    {
+        if (!caps[i])
+            continue;
+
+        rc = snprintf(p, rem, " %s", shader_cap_strings[i]);
+        if (!(rc >= 0 && (size_t)rc < rem))
+        {
+            *p = 0;
+            trace("%s\n", buffer);
+
+            p = buffer;
+            rem = ARRAY_SIZE(buffer);
+            rc = snprintf(p, rem, "%8s ", "");
+            --i;
+        }
+        p += rc;
+        rem -= rc;
+    }
+    trace("%s.\n", buffer);
 }
 
 static void trace_format_cap(const struct shader_runner_caps *caps, enum format_cap cap, const char *cap_name)
@@ -1656,7 +1677,7 @@ static void trace_format_cap(const struct shader_runner_caps *caps, enum format_
 
     p = buffer;
     rem = ARRAY_SIZE(buffer);
-    rc = snprintf(p, rem, "%15s:", cap_name);
+    rc = snprintf(p, rem, "%8s:", cap_name);
     p += rc;
     rem -= rc;
 
@@ -1672,7 +1693,7 @@ static void trace_format_cap(const struct shader_runner_caps *caps, enum format_
 
                 p = buffer;
                 rem = ARRAY_SIZE(buffer);
-                rc = snprintf(p, rem, "                ");
+                rc = snprintf(p, rem, "%8s ", "");
                 --i;
             }
             p += rc;
@@ -1718,14 +1739,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             dxc_compiler ? "dxcompiler" : HLSL_COMPILER, caps->runner);
     if (caps->tag_count)
         trace_tags(caps);
-    trace("geometry-shader: %u.\n", caps->geometry_shader);
-    trace("        float64: %u.\n", caps->float64);
-    trace("          int64: %u.\n", caps->int64);
-    trace("            rov: %u.\n", caps->rov);
-    trace("       wave-ops: %u.\n", caps->wave_ops);
-    trace("   depth-bounds: %u.\n", caps->depth_bounds);
-    trace("    clip-planes: %u.\n", caps->clip_planes);
-    trace("     point-size: %u.\n", caps->point_size);
+    trace_shader_caps(caps->shader_caps);
     trace_format_cap(caps, FORMAT_CAP_UAV_LOAD, "uav-load");
 
     if (!test_options.filename)
@@ -1987,14 +2001,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 state = STATE_REQUIRE;
                 runner->minimum_shader_model = caps->minimum_shader_model;
                 runner->maximum_shader_model = caps->maximum_shader_model;
-                runner->require_geometry_shader = false;
-                runner->require_float64 = false;
-                runner->require_int64 = false;
-                runner->require_rov = false;
-                runner->require_wave_ops = false;
-                runner->require_depth_bounds = false;
-                runner->require_clip_planes = false;
-                runner->require_point_size = false;
+                memset(runner->require_shader_caps, 0, sizeof(runner->require_shader_caps));
                 memset(runner->require_format_caps, 0, sizeof(runner->require_format_caps));
                 runner->compile_options = 0;
                 test_action = TEST_ACTION_RUN;
