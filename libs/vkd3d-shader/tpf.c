@@ -6387,7 +6387,7 @@ static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_bloc
     }
 }
 
-static void write_sm4_shdr(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *entry_func,
+static void write_sm4_shdr(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         struct sm4_stat *stat, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -6399,6 +6399,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, const struct hlsl_ir_function_d
     const struct hlsl_ir_var *var;
     size_t token_count_position;
     struct tpf_writer tpf;
+    uint32_t temp_count;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
     {
@@ -6412,6 +6413,11 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, const struct hlsl_ir_function_d
         0, /* TEXTURE */
         VKD3D_SM4_LIB,
     };
+
+    mark_indexable_vars(ctx, entry_func);
+    temp_count = allocate_temp_registers(ctx, entry_func);
+    if (ctx->result)
+        return;
 
     tpf_writer_init(&tpf, ctx, stat, &buffer);
 
@@ -6450,8 +6456,8 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, const struct hlsl_ir_function_d
     if (profile->type == VKD3D_SHADER_TYPE_COMPUTE)
         write_sm4_dcl_thread_group(&tpf, ctx->thread_count);
 
-    if (ctx->temp_count)
-        write_sm4_dcl_temps(&tpf, ctx->temp_count);
+    if (temp_count)
+        write_sm4_dcl_temps(&tpf, temp_count);
 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
     {

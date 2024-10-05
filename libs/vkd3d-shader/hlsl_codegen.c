@@ -4114,7 +4114,7 @@ static void dump_function(struct rb_entry *entry, void *context)
     }
 }
 
-static bool mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
+static bool mark_indexable_var(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
         struct hlsl_ir_node *instr)
 {
     if (!deref->rel_offset.node)
@@ -4125,6 +4125,20 @@ static bool mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
     deref->var->indexable = true;
 
     return true;
+}
+
+void mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+{
+    struct hlsl_scope *scope;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+            var->indexable = false;
+    }
+
+    transform_derefs(ctx, mark_indexable_var, &entry_func->body);
 }
 
 static char get_regset_name(enum hlsl_regset regset)
@@ -5116,9 +5130,21 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
  * index to all (simultaneously live) variables or intermediate values. Agnostic
  * as to how many registers are actually available for the current backend, and
  * does not handle constants. */
-static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct register_allocator allocator = {0};
+    struct hlsl_scope *scope;
+    struct hlsl_ir_var *var;
+
+    /* Reset variable temp register allocations. */
+    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+        {
+            if (!(var->is_input_semantic || var->is_output_semantic || var->is_uniform))
+                memset(var->regs, 0, sizeof(var->regs));
+        }
+    }
 
     /* ps_1_* outputs are special and go in temp register 0. */
     if (ctx->profile->major_version == 1 && ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
@@ -5127,8 +5153,7 @@ static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functio
 
         for (i = 0; i < entry_func->parameters.count; ++i)
         {
-            const struct hlsl_ir_var *var = entry_func->parameters.vars[i];
-
+            var = entry_func->parameters.vars[i];
             if (var->is_output_semantic)
             {
                 record_allocation(ctx, &allocator, 0, VKD3DSP_WRITEMASK_ALL, var->first_write, var->last_read);
@@ -5138,8 +5163,9 @@ static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functio
     }
 
     allocate_temp_registers_recurse(ctx, &entry_func->body, &allocator);
-    ctx->temp_count = allocator.reg_count;
     vkd3d_free(allocator.allocations);
+
+    return allocator.reg_count;
 }
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
@@ -7743,13 +7769,10 @@ static void process_entry_function(struct hlsl_ctx *ctx, struct hlsl_ir_function
     compute_liveness(ctx, entry_func);
     mark_vars_usage(ctx);
 
-    transform_derefs(ctx, mark_indexable_vars, body);
-
     calculate_resource_register_counts(ctx);
 
     allocate_register_reservations(ctx, &ctx->extern_vars);
     allocate_register_reservations(ctx, &entry_func->extern_vars);
-    allocate_temp_registers(ctx, entry_func);
     allocate_semantic_registers(ctx, entry_func);
 }
 
@@ -7774,6 +7797,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     if (profile->major_version < 4)
     {
+        mark_indexable_vars(ctx, entry_func);
+        allocate_temp_registers(ctx, entry_func);
         allocate_const_registers(ctx, entry_func);
     }
     else
