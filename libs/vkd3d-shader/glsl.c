@@ -906,6 +906,67 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void shader_glsl_load_uav_typed(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    const struct glsl_resource_type_info *resource_type_info;
+    enum vkd3d_shader_component_type component_type;
+    const struct vkd3d_shader_descriptor_info1 *d;
+    enum vkd3d_shader_resource_type resource_type;
+    unsigned int uav_id, uav_idx, uav_space;
+    struct vkd3d_string_buffer *load;
+    struct glsl_src coord;
+    struct glsl_dst dst;
+    uint32_t coord_mask;
+
+    if (ins->src[1].reg.idx[0].rel_addr || ins->src[1].reg.idx[1].rel_addr)
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_UNSUPPORTED,
+                "Descriptor indexing is not supported.");
+
+    uav_id = ins->src[1].reg.idx[0].offset;
+    uav_idx = ins->src[1].reg.idx[1].offset;
+    if ((d = shader_glsl_get_descriptor_by_id(gen, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, uav_id)))
+    {
+        resource_type = d->resource_type;
+        uav_space = d->register_space;
+        component_type = vkd3d_component_type_from_resource_data_type(d->resource_data_type);
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Undeclared UAV descriptor %u.", uav_id);
+        uav_space = 0;
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+        component_type = VKD3D_SHADER_COMPONENT_FLOAT;
+    }
+
+    if ((resource_type_info = shader_glsl_get_resource_type_info(resource_type)))
+    {
+        coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->coord_size);
+    }
+    else
+    {
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Unhandled UAV type %#x.", resource_type);
+        coord_mask = vkd3d_write_mask_from_component_count(2);
+    }
+
+    glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    glsl_src_init(&coord, gen, &ins->src[0], coord_mask);
+    load = vkd3d_string_buffer_get(&gen->string_buffers);
+
+    vkd3d_string_buffer_printf(load, "imageLoad(");
+    shader_glsl_print_image_name(load, gen, uav_idx, uav_space);
+    vkd3d_string_buffer_printf(load, ", %s)", coord.str->buffer);
+    shader_glsl_print_swizzle(load, ins->src[1].swizzle, ins->dst[0].write_mask);
+
+    shader_glsl_print_assignment_ext(gen, &dst,
+            vkd3d_data_type_from_component_type(component_type), "%s", load->buffer);
+
+    vkd3d_string_buffer_release(&gen->string_buffers, load);
+    glsl_src_cleanup(&coord, &gen->string_buffers);
+    glsl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void shader_glsl_store_uav_typed(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const struct glsl_resource_type_info *resource_type_info;
@@ -1384,6 +1445,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_LD:
             shader_glsl_ld(gen, ins);
+            break;
+        case VKD3DSIH_LD_UAV_TYPED:
+            shader_glsl_load_uav_typed(gen, ins);
             break;
         case VKD3DSIH_LOG:
             shader_glsl_intrinsic(gen, ins, "log2");
