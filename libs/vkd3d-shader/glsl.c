@@ -274,6 +274,10 @@ static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
                     gen->prefix, reg->idx[0].offset, reg->idx[2].offset);
             break;
 
+        case VKD3DSPR_THREADID:
+            vkd3d_string_buffer_printf(buffer, "gl_GlobalInvocationID");
+            break;
+
         case VKD3DSPR_IDXTEMP:
             vkd3d_string_buffer_printf(buffer, "x%u", reg->idx[0].offset);
             shader_glsl_print_subscript(buffer, gen, reg->idx[1].rel_addr, reg->idx[1].offset);
@@ -385,7 +389,7 @@ static void shader_glsl_print_src(struct vkd3d_string_buffer *buffer, struct vkd
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                 "Internal compiler error: Unhandled 'non-uniform' modifier.");
 
-    if (reg->type == VKD3DSPR_IMMCONST)
+    if (reg->type == VKD3DSPR_IMMCONST || reg->type == VKD3DSPR_THREADID)
         src_data_type = VKD3D_DATA_UINT;
     else
         src_data_type = VKD3D_DATA_FLOAT;
