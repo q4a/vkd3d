@@ -5225,7 +5225,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
             return;
         }
 
-        if ((builtin = hlsl_sm4_register_from_semantic(&version, &var->semantic, output, &type, &has_idx)))
+        if ((builtin = sm4_register_from_semantic_name(&version, var->semantic.name, output, &type, &has_idx)))
             reg = has_idx ? var->semantic.index : 0;
     }
 
@@ -6306,7 +6306,7 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx,
         if (sysval == ~0u)
             return;
 
-        if (hlsl_sm4_register_from_semantic(&program->shader_version, &var->semantic, output, &type, &has_idx))
+        if (sm4_register_from_semantic_name(&program->shader_version, var->semantic.name, output, &type, &has_idx))
         {
             register_index = has_idx ? var->semantic.index : ~0u;
         }

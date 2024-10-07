@@ -2997,8 +2997,8 @@ static bool type_is_integer(const struct hlsl_type *type)
     }
 }
 
-bool hlsl_sm4_register_from_semantic(const struct vkd3d_shader_version *version,
-        const struct hlsl_semantic *semantic, bool output, enum vkd3d_shader_register_type *type, bool *has_idx)
+bool sm4_register_from_semantic_name(const struct vkd3d_shader_version *version,
+        const char *semantic_name, bool output, enum vkd3d_shader_register_type *type, bool *has_idx)
 {
     unsigned int i;
 
@@ -3030,7 +3030,7 @@ bool hlsl_sm4_register_from_semantic(const struct vkd3d_shader_version *version,
 
     for (i = 0; i < ARRAY_SIZE(register_table); ++i)
     {
-        if (!ascii_strcasecmp(semantic->name, register_table[i].semantic)
+        if (!ascii_strcasecmp(semantic_name, register_table[i].semantic)
                 && output == register_table[i].output
                 && version->type == register_table[i].shader_type)
         {
@@ -4125,7 +4125,7 @@ static void sm4_register_from_deref(const struct tpf_compiler *tpf, struct vkd3d
     {
         bool has_idx;
 
-        if (hlsl_sm4_register_from_semantic(version, &var->semantic, false, &reg->type, &has_idx))
+        if (sm4_register_from_semantic_name(version, var->semantic.name, false, &reg->type, &has_idx))
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
@@ -4154,7 +4154,7 @@ static void sm4_register_from_deref(const struct tpf_compiler *tpf, struct vkd3d
     {
         bool has_idx;
 
-        if (hlsl_sm4_register_from_semantic(version, &var->semantic, true, &reg->type, &has_idx))
+        if (sm4_register_from_semantic_name(version, var->semantic.name, true, &reg->type, &has_idx))
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
@@ -4721,7 +4721,7 @@ static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct 
         .dst_count = 1,
     };
 
-    if (hlsl_sm4_register_from_semantic(version, &var->semantic, output, &instr.dsts[0].reg.type, &has_idx))
+    if (sm4_register_from_semantic_name(version, var->semantic.name, output, &instr.dsts[0].reg.type, &has_idx))
     {
         if (has_idx)
         {
