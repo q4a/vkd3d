@@ -1061,6 +1061,9 @@ enum vkd3d_shader_input_sysval_semantic
 
 struct signature_element
 {
+    /* sort_index is not a property of the signature element, it is just a
+     * convenience field used to retain the original order in a signature and
+     * recover it after having permuted the signature itself. */
     unsigned int sort_index;
     const char *semantic_name;
     unsigned int semantic_index;

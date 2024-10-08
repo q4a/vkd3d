@@ -1471,6 +1471,9 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
         return false;
     memcpy(elements, s->elements, element_count * sizeof(*elements));
 
+    for (i = 0; i < element_count; ++i)
+        elements[i].sort_index = i;
+
     qsort(elements, element_count, sizeof(elements[0]), signature_element_register_compare);
 
     for (i = 0, new_count = 0; i < element_count; i = j, elements[new_count++] = *e)
