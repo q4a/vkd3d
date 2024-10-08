@@ -7075,6 +7075,7 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
     }
 
     vsir_validate_signature(&ctx, &program->input_signature, "input");
+    vsir_validate_signature(&ctx, &program->output_signature, "output");
 
     if (!(ctx.temps = vkd3d_calloc(ctx.program->temp_count, sizeof(*ctx.temps))))
         goto fail;
