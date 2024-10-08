@@ -3267,18 +3267,6 @@ static void spirv_compiler_emit_register_debug_name(struct vkd3d_spirv_builder *
         vkd3d_spirv_build_op_name(builder, id, "%s", debug_name);
 }
 
-static uint32_t spirv_compiler_emit_variable(struct spirv_compiler *compiler,
-        struct vkd3d_spirv_stream *stream, SpvStorageClass storage_class,
-        enum vkd3d_shader_component_type component_type, unsigned int component_count)
-{
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    uint32_t type_id, ptr_type_id;
-
-    type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
-    ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
-    return vkd3d_spirv_build_op_variable(builder, stream, ptr_type_id, storage_class, 0);
-}
-
 static uint32_t spirv_compiler_emit_array_variable(struct spirv_compiler *compiler,
         struct vkd3d_spirv_stream *stream, SpvStorageClass storage_class,
         enum vkd3d_shader_component_type component_type, unsigned int component_count,
@@ -3287,10 +3275,6 @@ static uint32_t spirv_compiler_emit_array_variable(struct spirv_compiler *compil
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id, length_id, ptr_type_id;
     unsigned int i;
-
-    if (!length_count)
-        return spirv_compiler_emit_variable(compiler,
-                stream, storage_class, component_type, component_count);
 
     type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
     for (i = 0; i < length_count; ++i)
@@ -3303,6 +3287,14 @@ static uint32_t spirv_compiler_emit_array_variable(struct spirv_compiler *compil
 
     ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
     return vkd3d_spirv_build_op_variable(builder, stream, ptr_type_id, storage_class, 0);
+}
+
+static uint32_t spirv_compiler_emit_variable(struct spirv_compiler *compiler,
+        struct vkd3d_spirv_stream *stream, SpvStorageClass storage_class,
+        enum vkd3d_shader_component_type component_type, unsigned int component_count)
+{
+    return spirv_compiler_emit_array_variable(compiler, stream, storage_class,
+            component_type, component_count, NULL, 0);
 }
 
 static const struct vkd3d_spec_constant_info
