@@ -6514,6 +6514,10 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
     if (element->register_count == 0)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid zero register count.", idx, signature_type);
+
+    if (element->mask == 0 || (element->mask & ~0xf))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid mask %#x.", idx, signature_type, element->mask);
 }
 
 static void vsir_validate_signature(struct validation_context *ctx,
