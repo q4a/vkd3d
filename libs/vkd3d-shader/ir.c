@@ -6505,6 +6505,26 @@ static bool vsir_validate_src_max_count(struct validation_context *ctx,
     return true;
 }
 
+static void vsir_validate_signature_element(struct validation_context *ctx,
+        const struct shader_signature *signature, const char *signature_type,
+        unsigned int idx)
+{
+    const struct signature_element *element = &signature->elements[idx];
+
+    if (element->register_count == 0)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid zero register count.", idx, signature_type);
+}
+
+static void vsir_validate_signature(struct validation_context *ctx,
+        const struct shader_signature *signature, const char *signature_type)
+{
+    unsigned int i;
+
+    for (i = 0; i < signature->element_count; ++i)
+        vsir_validate_signature_element(ctx, signature, signature_type, i);
+}
+
 static const char *name_from_cf_type(enum vsir_control_flow_type type)
 {
     switch (type)
@@ -7053,6 +7073,8 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
                 validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                         "Patch constant signature is only valid for hull and domain shaders.");
     }
+
+    vsir_validate_signature(&ctx, &program->input_signature, "input");
 
     if (!(ctx.temps = vkd3d_calloc(ctx.program->temp_count, sizeof(*ctx.temps))))
         goto fail;
