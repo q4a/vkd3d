@@ -1475,7 +1475,7 @@ struct vkd3d_shader_scan_descriptor_info1
     unsigned int descriptor_count;
 };
 
-void vkd3d_shader_trace(const struct vsir_program *program);
+void vsir_program_trace(const struct vsir_program *program);
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type);
 

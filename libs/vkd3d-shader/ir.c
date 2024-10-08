@@ -7149,7 +7149,7 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
     vsir_transform(&ctx, vsir_program_insert_clip_planes);
 
     if (TRACE_ON())
-        vkd3d_shader_trace(program);
+        vsir_program_trace(program);
 
     return ctx.result;
 }

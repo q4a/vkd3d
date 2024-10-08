@@ -2962,7 +2962,7 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
         WARN("Failed to validate shader after parsing, ret %d.\n", ret);
 
         if (TRACE_ON())
-            vkd3d_shader_trace(program);
+            vsir_program_trace(program);
 
         vsir_program_cleanup(program);
         return ret;

@@ -2499,7 +2499,7 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
     return result;
 }
 
-void vkd3d_shader_trace(const struct vsir_program *program)
+void vsir_program_trace(const struct vsir_program *program)
 {
     const unsigned int flags = VSIR_ASM_FLAG_DUMP_TYPES | VSIR_ASM_FLAG_DUMP_ALL_INDICES;
     struct vkd3d_shader_code code;

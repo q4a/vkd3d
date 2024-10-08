@@ -1489,7 +1489,7 @@ static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_sh
             descriptor_info1, combined_sampler_info, message_context);
 
     if (TRACE_ON())
-        vkd3d_shader_trace(program);
+        vsir_program_trace(program);
 
     for (i = 0; i < program->instructions.count; ++i)
     {
