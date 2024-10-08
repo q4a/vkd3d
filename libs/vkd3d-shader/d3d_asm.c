@@ -2268,7 +2268,7 @@ static const char *get_semantic_register_name(enum vkd3d_shader_sysval_semantic 
     }
 }
 
-static enum vkd3d_result dump_signature(struct vkd3d_d3d_asm_compiler *compiler,
+static enum vkd3d_result dump_dxbc_signature(struct vkd3d_d3d_asm_compiler *compiler,
         const char *name, const char *register_name, const struct shader_signature *signature)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
@@ -2340,16 +2340,16 @@ static enum vkd3d_result dump_signatures(struct vkd3d_d3d_asm_compiler *compiler
 {
     enum vkd3d_result ret;
 
-    if ((ret = dump_signature(compiler, ".input",
+    if ((ret = dump_dxbc_signature(compiler, ".input",
             program->shader_version.type == VKD3D_SHADER_TYPE_DOMAIN ? "vicp" : "v",
             &program->input_signature)) < 0)
         return ret;
 
-    if ((ret = dump_signature(compiler, ".output", "o",
+    if ((ret = dump_dxbc_signature(compiler, ".output", "o",
             &program->output_signature)) < 0)
         return ret;
 
-    if ((ret = dump_signature(compiler, ".patch_constant",
+    if ((ret = dump_dxbc_signature(compiler, ".patch_constant",
             program->shader_version.type == VKD3D_SHADER_TYPE_DOMAIN ? "vpc" : "o",
             &program->patch_constant_signature)) < 0)
         return ret;
