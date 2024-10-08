@@ -2335,7 +2335,7 @@ static enum vkd3d_result dump_dxbc_signature(struct vkd3d_d3d_asm_compiler *comp
     return VKD3D_OK;
 }
 
-static enum vkd3d_result dump_signatures(struct vkd3d_d3d_asm_compiler *compiler,
+static enum vkd3d_result dump_dxbc_signatures(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vsir_program *program)
 {
     enum vkd3d_result ret;
@@ -2437,7 +2437,7 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
      * doesn't even have an explicit concept of signature. */
     if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES && shader_version->major >= 4)
     {
-        if ((result = dump_signatures(&compiler, program)) < 0)
+        if ((result = dump_dxbc_signatures(&compiler, program)) < 0)
         {
             vkd3d_string_buffer_cleanup(buffer);
             return result;
