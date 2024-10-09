@@ -6590,6 +6590,11 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
                     idx, signature_type, element->component_type);
             break;
     }
+
+    if (element->min_precision >= VKD3D_SHADER_MINIMUM_PRECISION_COUNT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid minimum precision %#x.",
+                idx, signature_type, element->min_precision);
 }
 
 static void vsir_validate_signature(struct validation_context *ctx,
