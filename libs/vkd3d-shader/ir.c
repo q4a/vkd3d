@@ -7060,6 +7060,7 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
         .null_location = {.source_name = source_name},
         .status = VKD3D_OK,
         .phase = VKD3DSIH_INVALID,
+        .invalid_instruction_idx = true,
     };
     unsigned int i;
 
@@ -7087,6 +7088,8 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
 
     if (!(ctx.ssas = vkd3d_calloc(ctx.program->ssa_count, sizeof(*ctx.ssas))))
         goto fail;
+
+    ctx.invalid_instruction_idx = false;
 
     for (ctx.instruction_idx = 0; ctx.instruction_idx < program->instructions.count
             && ctx.status != VKD3D_ERROR_OUT_OF_MEMORY; ++ctx.instruction_idx)
