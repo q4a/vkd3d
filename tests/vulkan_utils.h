@@ -342,6 +342,16 @@ static inline bool get_vulkan_queue_index(const struct vulkan_test_context *cont
     return false;
 }
 
+static inline void vulkan_test_context_destroy_device(const struct vulkan_test_context *context)
+{
+    VkDevice device = context->device;
+
+    VK_CALL(vkDestroyDescriptorPool(device, context->descriptor_pool, NULL));
+    VK_CALL(vkFreeCommandBuffers(device, context->command_pool, 1, &context->cmd_buffer));
+    VK_CALL(vkDestroyCommandPool(device, context->command_pool, NULL));
+    VK_CALL(vkDestroyDevice(device, NULL));
+}
+
 static inline bool vulkan_test_context_init_device(struct vulkan_test_context *context,
         const VkDeviceCreateInfo *device_desc, uint32_t queue_index,
         uint32_t max_resource_count, uint32_t max_sampler_count)
@@ -402,12 +412,8 @@ static inline bool vulkan_test_context_init_device(struct vulkan_test_context *c
 
 static inline void vulkan_test_context_destroy(const struct vulkan_test_context *context)
 {
-    VkDevice device = context->device;
-
-    VK_CALL(vkDestroyDescriptorPool(device, context->descriptor_pool, NULL));
-    VK_CALL(vkFreeCommandBuffers(device, context->command_pool, 1, &context->cmd_buffer));
-    VK_CALL(vkDestroyCommandPool(device, context->command_pool, NULL));
-    VK_CALL(vkDestroyDevice(device, NULL));
+    if (context->device)
+        vulkan_test_context_destroy_device(context);
     VK_CALL(vkDestroyInstance(context->instance, NULL));
 }
 
