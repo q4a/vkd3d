@@ -6436,6 +6436,13 @@ static void vsir_validate_src_param(struct validation_context *ctx,
                     "Invalid NULL register used as source parameter.");
             break;
 
+        case VKD3DSPR_OUTPUT:
+            if (ctx->program->shader_version.type != VKD3D_SHADER_TYPE_HULL
+                    || (ctx->phase != VKD3DSIH_HS_FORK_PHASE && ctx->phase != VKD3DSIH_HS_JOIN_PHASE))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                        "Invalid OUTPUT register used as source parameter.");
+            break;
+
         default:
             break;
     }
