@@ -47,7 +47,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
 probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
@@ -71,7 +71,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
 probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
@@ -88,7 +88,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
 probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
@@ -140,7 +140,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.5, 0.7, 0.6, 0.8)
 probe (0, 1) rgba (0.6, 0.5, 0.2, 0.1)
@@ -187,14 +187,14 @@ float4 main(float4 position : sv_position) : sv_target
 
 [test]
 uniform 0 uint 0
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 todo(sm>=6) probe (32, 32) rgba(1.0, 0.25, 0.5, 1.0)
 uniform 0 uint 1
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 todo(sm>=6) probe (32, 32) rgba(2.0, 0.25, 0.5, 1.0)
 uniform 0 uint 2
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 todo(sm>=6) probe (32, 32) rgba(4.0, 0.25, 0.5, 1.0)
 uniform 0 uint 3
-todo(glsl | msl) draw quad
+todo(msl) draw quad
 todo(sm>=6) probe (32, 32) rgba(8.0, 0.25, 0.5, 1.0)

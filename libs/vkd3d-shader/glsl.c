@@ -786,14 +786,14 @@ static void shader_glsl_print_texel_offset(struct vkd3d_string_buffer *buffer, s
 
 static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
+    unsigned int resource_id, resource_idx, resource_space, sample_count;
     const struct glsl_resource_type_info *resource_type_info;
-    unsigned int resource_id, resource_idx, resource_space;
     const struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_component_type sampled_type;
     enum vkd3d_shader_resource_type resource_type;
     struct vkd3d_string_buffer *fetch;
     enum vkd3d_data_type data_type;
-    struct glsl_src coord, lod;
+    struct glsl_src coord;
     struct glsl_dst dst;
     uint32_t coord_mask;
 
@@ -811,6 +811,7 @@ static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_
     {
         resource_type = d->resource_type;
         resource_space = d->register_space;
+        sample_count = d->sample_count;
         sampled_type = vkd3d_component_type_from_resource_data_type(d->resource_data_type);
         data_type = vkd3d_data_type_from_component_type(sampled_type);
     }
@@ -820,6 +821,7 @@ static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_
                 "Internal compiler error: Undeclared resource descriptor %u.", resource_id);
         resource_space = 0;
         resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+        sample_count = 1;
         data_type = VKD3D_DATA_FLOAT;
     }
 
@@ -836,7 +838,6 @@ static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_
 
     glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
     glsl_src_init(&coord, gen, &ins->src[0], coord_mask);
-    glsl_src_init(&lod, gen, &ins->src[0], VKD3DSP_WRITEMASK_3);
     fetch = vkd3d_string_buffer_get(&gen->string_buffers);
 
     vkd3d_string_buffer_printf(fetch, "texelFetch(");
@@ -844,14 +845,23 @@ static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_
             resource_space, VKD3D_SHADER_DUMMY_SAMPLER_INDEX, 0);
     vkd3d_string_buffer_printf(fetch, ", %s", coord.str->buffer);
     if (resource_type != VKD3D_SHADER_RESOURCE_BUFFER)
-        vkd3d_string_buffer_printf(fetch, ", %s", lod.str->buffer);
+    {
+        vkd3d_string_buffer_printf(fetch, ", ");
+        if (ins->opcode != VKD3DSIH_LD2DMS)
+            shader_glsl_print_src(fetch, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, ins->src[0].reg.data_type);
+        else if (sample_count == 1)
+            /* If the resource isn't a true multisample resource, this is the
+             * "lod" parameter instead of the "sample" parameter. */
+            vkd3d_string_buffer_printf(fetch, "0");
+        else
+            shader_glsl_print_src(fetch, gen, &ins->src[2], VKD3DSP_WRITEMASK_0, ins->src[2].reg.data_type);
+    }
     vkd3d_string_buffer_printf(fetch, ")");
     shader_glsl_print_swizzle(fetch, ins->src[1].swizzle, ins->dst[0].write_mask);
 
     shader_glsl_print_assignment_ext(gen, &dst, data_type, "%s", fetch->buffer);
 
     vkd3d_string_buffer_release(&gen->string_buffers, fetch);
-    glsl_src_cleanup(&lod, &gen->string_buffers);
     glsl_src_cleanup(&coord, &gen->string_buffers);
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
@@ -1601,6 +1611,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             shader_glsl_cast(gen, ins, "float", "vec");
             break;
         case VKD3DSIH_LD:
+        case VKD3DSIH_LD2DMS:
             shader_glsl_ld(gen, ins);
             break;
         case VKD3DSIH_LD_UAV_TYPED:
@@ -1959,6 +1970,7 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
     struct vkd3d_string_buffer *buffer = gen->buffer;
     enum vkd3d_shader_component_type component_type;
     const char *sampler_type, *sampler_type_prefix;
+    enum vkd3d_shader_resource_type resource_type;
     unsigned int binding_idx;
     bool shadow = false;
 
@@ -1984,18 +1996,32 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
         return;
     }
 
-    if ((resource_type_info = shader_glsl_get_resource_type_info(srv->resource_type)))
+    resource_type = srv->resource_type;
+    if (srv->sample_count == 1)
+    {
+        /* The OpenGL API distinguishes between multi-sample textures with
+         * sample count 1 and single-sample textures. Direct3D and Vulkan
+         * don't make this distinction at the API level, but Direct3D shaders
+         * are capable of expressing both. We therefore map such multi-sample
+         * textures to their single-sample equivalents here. */
+        if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS)
+            resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+        else if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
+            resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY;
+    }
+
+    if ((resource_type_info = shader_glsl_get_resource_type_info(resource_type)))
     {
         sampler_type = resource_type_info->type_suffix;
         if (shadow && !resource_type_info->shadow)
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_UNSUPPORTED,
-                    "Comparison samplers are not supported with resource type %#x.", srv->resource_type);
+                    "Comparison samplers are not supported with resource type %#x.", resource_type);
     }
     else
     {
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                 "Internal compiler error: Unhandled resource type %#x for combined resource/sampler "
-                "for resource %u, space %u and sampler %u, space %u.", srv->resource_type,
+                "for resource %u, space %u and sampler %u, space %u.", resource_type,
                 crs->resource_index, crs->resource_space, crs->sampler_index, crs->sampler_space);
         sampler_type = "<unhandled sampler type>";
     }
@@ -2020,7 +2046,7 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
             break;
     }
 
-    if (!shader_glsl_get_combined_sampler_binding(gen, crs, srv->resource_type, &binding_idx))
+    if (!shader_glsl_get_combined_sampler_binding(gen, crs, resource_type, &binding_idx))
     {
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_BINDING_NOT_FOUND,
                 "No descriptor binding specified for combined resource/sampler "
