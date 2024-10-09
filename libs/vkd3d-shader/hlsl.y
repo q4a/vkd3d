@@ -4260,6 +4260,35 @@ static bool intrinsic_min(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, params->args[0], params->args[1], loc);
 }
 
+static bool intrinsic_modf(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_function_decl *func;
+    struct hlsl_type *type;
+    char *body;
+
+    static const char template[] =
+            "%s modf(%s x, out %s ip)\n"
+            "{\n"
+            "    ip = trunc(x);\n"
+            "    return x - ip;\n"
+            "}";
+
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
+        return false;
+    type = params->args[0]->data_type;
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template,
+            type->name, type->name, type->name)))
+        return false;
+    func = hlsl_compile_internal_function(ctx, "modf", body);
+    vkd3d_free(body);
+    if (!func)
+        return false;
+
+    return !!add_user_call(ctx, func, params, false, loc);
+}
+
 static bool intrinsic_mul(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -5147,6 +5176,7 @@ intrinsic_functions[] =
     {"mad",                                 3, true,  intrinsic_mad},
     {"max",                                 2, true,  intrinsic_max},
     {"min",                                 2, true,  intrinsic_min},
+    {"modf",                                2, true,  intrinsic_modf},
     {"mul",                                 2, true,  intrinsic_mul},
     {"normalize",                           1, true,  intrinsic_normalize},
     {"pow",                                 2, true,  intrinsic_pow},
