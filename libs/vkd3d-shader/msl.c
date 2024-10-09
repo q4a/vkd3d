@@ -111,6 +111,26 @@ static void msl_print_register_name(struct vkd3d_string_buffer *buffer,
             vkd3d_string_buffer_printf(buffer, "r[%u]", reg->idx[0].offset);
             msl_print_register_datatype(buffer, gen, reg->data_type);
             break;
+
+        case VKD3DSPR_CONSTBUFFER:
+            if (reg->idx_count != 3)
+            {
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled constant buffer register index count %u.", reg->idx_count);
+                vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
+                break;
+            }
+            if (reg->idx[0].rel_addr || reg->idx[2].rel_addr)
+            {
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled constant buffer register indirect addressing.");
+                vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
+                break;
+            }
+            vkd3d_string_buffer_printf(buffer, "descriptors.cb_%u[%u]", reg->idx[0].offset, reg->idx[2].offset);
+            msl_print_register_datatype(buffer, gen, reg->data_type);
+            break;
+
         default:
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                     "Internal compiler error: Unhandled register type %#x.", reg->type);
