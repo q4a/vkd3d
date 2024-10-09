@@ -15,7 +15,7 @@ float4 main(float2 color_xy : COLOR0, float2 color_zw : COLOR1) : SV_TARGET
 
 [test]
 draw quad
-todo(sm>=6) probe(320, 240) rgba(0.25, 0.5, 0.75, 1.0)
+probe(320, 240) rgba(0.25, 0.5, 0.75, 1.0)
 
 % Test handling of arrays in interface blocks
 
