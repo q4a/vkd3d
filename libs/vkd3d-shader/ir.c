@@ -6510,6 +6510,7 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         unsigned int idx)
 {
     const struct signature_element *element = &signature->elements[idx];
+    bool integer_type = false;
 
     if (element->register_count == 0)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
@@ -6581,6 +6582,9 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
     {
         case VKD3D_SHADER_COMPONENT_INT:
         case VKD3D_SHADER_COMPONENT_UINT:
+            integer_type = true;
+            break;
+
         case VKD3D_SHADER_COMPONENT_FLOAT:
             break;
 
@@ -6599,6 +6603,12 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
     if (element->interpolation_mode >= VKD3DSIM_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid interpolation mode %#x.",
+                idx, signature_type, element->interpolation_mode);
+
+    if (integer_type && element->interpolation_mode != VKD3DSIM_NONE
+            && element->interpolation_mode != VKD3DSIM_CONSTANT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid interpolation mode %#x for integer component type.",
                 idx, signature_type, element->interpolation_mode);
 }
 
