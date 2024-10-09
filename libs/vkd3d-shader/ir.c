@@ -6542,6 +6542,40 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid usage mask %#x.",
                 idx, signature_type, element->used_mask);
+
+    switch (element->sysval_semantic)
+    {
+        case VKD3D_SHADER_SV_NONE:
+        case VKD3D_SHADER_SV_POSITION:
+        case VKD3D_SHADER_SV_CLIP_DISTANCE:
+        case VKD3D_SHADER_SV_CULL_DISTANCE:
+        case VKD3D_SHADER_SV_RENDER_TARGET_ARRAY_INDEX:
+        case VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX:
+        case VKD3D_SHADER_SV_VERTEX_ID:
+        case VKD3D_SHADER_SV_PRIMITIVE_ID:
+        case VKD3D_SHADER_SV_INSTANCE_ID:
+        case VKD3D_SHADER_SV_IS_FRONT_FACE:
+        case VKD3D_SHADER_SV_SAMPLE_INDEX:
+        case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
+        case VKD3D_SHADER_SV_TESS_FACTOR_QUADINT:
+        case VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE:
+        case VKD3D_SHADER_SV_TESS_FACTOR_TRIINT:
+        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDET:
+        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
+        case VKD3D_SHADER_SV_TARGET:
+        case VKD3D_SHADER_SV_DEPTH:
+        case VKD3D_SHADER_SV_COVERAGE:
+        case VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL:
+        case VKD3D_SHADER_SV_DEPTH_LESS_EQUAL:
+        case VKD3D_SHADER_SV_STENCIL_REF:
+            break;
+
+        default:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                    "element %u of %s signature: Invalid system value semantic %#x.",
+                    idx, signature_type, element->sysval_semantic);
+            break;
+    }
 }
 
 static void vsir_validate_signature(struct validation_context *ctx,
