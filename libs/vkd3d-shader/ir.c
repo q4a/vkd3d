@@ -1221,7 +1221,7 @@ static bool shader_signature_find_element_for_reg(const struct shader_signature 
         unsigned int reg_idx, unsigned int write_mask, unsigned int *element_idx)
 {
     const struct signature_element *e;
-    unsigned int i, base_write_mask;
+    unsigned int i;
 
     for (i = 0; i < signature->element_count; ++i)
     {
@@ -1233,14 +1233,6 @@ static bool shader_signature_find_element_for_reg(const struct shader_signature 
             return true;
         }
     }
-
-    /* Validated in the TPF reader, but failure in signature_element_range_expand_mask()
-     * can land us here on an unmatched vector mask. */
-    FIXME("Failed to find signature element for register index %u, mask %#x; using scalar mask.\n",
-            reg_idx, write_mask);
-    base_write_mask = 1u << vsir_write_mask_get_component_idx(write_mask);
-    if (base_write_mask != write_mask)
-        return shader_signature_find_element_for_reg(signature, reg_idx, base_write_mask, element_idx);
 
     return false;
 }
