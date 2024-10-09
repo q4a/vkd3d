@@ -6576,6 +6576,20 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
                     idx, signature_type, element->sysval_semantic);
             break;
     }
+
+    switch (element->component_type)
+    {
+        case VKD3D_SHADER_COMPONENT_INT:
+        case VKD3D_SHADER_COMPONENT_UINT:
+        case VKD3D_SHADER_COMPONENT_FLOAT:
+            break;
+
+        default:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                    "element %u of %s signature: Invalid component type %#x.",
+                    idx, signature_type, element->component_type);
+            break;
+    }
 }
 
 static void vsir_validate_signature(struct validation_context *ctx,
