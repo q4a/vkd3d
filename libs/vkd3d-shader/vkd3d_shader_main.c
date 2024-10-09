@@ -1846,6 +1846,8 @@ void shader_signature_cleanup(struct shader_signature *signature)
     }
     vkd3d_free(signature->elements);
     signature->elements = NULL;
+    signature->elements_capacity = 0;
+    signature->element_count = 0;
 }
 
 int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,

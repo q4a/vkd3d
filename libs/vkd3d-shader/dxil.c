@@ -10315,6 +10315,21 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, struct vsir_pro
     sm6->ptr = &sm6->start[1];
     sm6->bitpos = 2;
 
+    switch (program->shader_version.type)
+    {
+        case VKD3D_SHADER_TYPE_HULL:
+        case VKD3D_SHADER_TYPE_DOMAIN:
+            break;
+
+        default:
+            if (program->patch_constant_signature.element_count != 0)
+            {
+                WARN("The patch constant signature only makes sense for Hull and Domain Shaders, ignoring it.\n");
+                shader_signature_cleanup(&program->patch_constant_signature);
+            }
+            break;
+    }
+
     input_signature = &program->input_signature;
     output_signature = &program->output_signature;
     patch_constant_signature = &program->patch_constant_signature;

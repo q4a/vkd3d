@@ -2914,6 +2914,21 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
     if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
         uninvert_used_masks(&program->patch_constant_signature);
 
+    switch (program->shader_version.type)
+    {
+        case VKD3D_SHADER_TYPE_HULL:
+        case VKD3D_SHADER_TYPE_DOMAIN:
+            break;
+
+        default:
+            if (program->patch_constant_signature.element_count != 0)
+            {
+                WARN("The patch constant signature only makes sense for Hull and Domain Shaders, ignoring it.\n");
+                shader_signature_cleanup(&program->patch_constant_signature);
+            }
+            break;
+    }
+
     if (!shader_sm4_parser_validate_signature(&sm4, &program->input_signature,
             sm4.input_register_masks, "Input")
             || !shader_sm4_parser_validate_signature(&sm4, &program->output_signature,
