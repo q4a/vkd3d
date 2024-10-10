@@ -470,26 +470,45 @@ static uint32_t get_fx_4_type_size(const struct hlsl_type *type)
     return type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float) * elements_count;
 }
 
-static const uint32_t fx_4_numeric_base_type[] =
+enum fx_4_type_constants
 {
-    [HLSL_TYPE_HALF]  = 1,
-    [HLSL_TYPE_FLOAT] = 1,
-    [HLSL_TYPE_INT  ] = 2,
-    [HLSL_TYPE_UINT ] = 3,
-    [HLSL_TYPE_BOOL ] = 4,
+    /* Numeric types encoding */
+    FX_4_NUMERIC_TYPE_FLOAT = 1,
+    FX_4_NUMERIC_TYPE_INT   = 2,
+    FX_4_NUMERIC_TYPE_UINT  = 3,
+    FX_4_NUMERIC_TYPE_BOOL  = 4,
+
+    FX_4_NUMERIC_CLASS_SCALAR = 1,
+    FX_4_NUMERIC_CLASS_VECTOR = 2,
+    FX_4_NUMERIC_CLASS_MATRIX = 3,
+
+    FX_4_NUMERIC_BASE_TYPE_SHIFT = 3,
+    FX_4_NUMERIC_ROWS_SHIFT = 8,
+    FX_4_NUMERIC_COLUMNS_SHIFT = 11,
+    FX_4_NUMERIC_COLUMN_MAJOR_MASK = 0x4000,
+
+    /* Types */
+    FX_4_TYPE_CLASS_NUMERIC = 1,
+    FX_4_TYPE_CLASS_OBJECT = 2,
+    FX_4_TYPE_CLASS_STRUCT = 3,
+};
+
+static const uint32_t fx_4_numeric_base_types[] =
+{
+    [HLSL_TYPE_HALF ] = FX_4_NUMERIC_TYPE_FLOAT,
+    [HLSL_TYPE_FLOAT] = FX_4_NUMERIC_TYPE_FLOAT,
+    [HLSL_TYPE_INT  ] = FX_4_NUMERIC_TYPE_INT,
+    [HLSL_TYPE_UINT ] = FX_4_NUMERIC_TYPE_UINT,
+    [HLSL_TYPE_BOOL ] = FX_4_NUMERIC_TYPE_BOOL,
 };
 
 static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, struct fx_write_context *fx)
 {
-    static const unsigned int NUMERIC_BASE_TYPE_SHIFT = 3;
-    static const unsigned int NUMERIC_ROWS_SHIFT = 8;
-    static const unsigned int NUMERIC_COLUMNS_SHIFT = 11;
-    static const unsigned int NUMERIC_COLUMN_MAJOR_MASK = 0x4000;
     static const uint32_t numeric_type_class[] =
     {
-        [HLSL_CLASS_SCALAR] = 1,
-        [HLSL_CLASS_VECTOR] = 2,
-        [HLSL_CLASS_MATRIX] = 3,
+        [HLSL_CLASS_SCALAR] = FX_4_NUMERIC_CLASS_SCALAR,
+        [HLSL_CLASS_VECTOR] = FX_4_NUMERIC_CLASS_VECTOR,
+        [HLSL_CLASS_MATRIX] = FX_4_NUMERIC_CLASS_MATRIX,
     };
     struct hlsl_ctx *ctx = fx->ctx;
     uint32_t value = 0;
@@ -513,17 +532,17 @@ static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, 
         case HLSL_TYPE_INT:
         case HLSL_TYPE_UINT:
         case HLSL_TYPE_BOOL:
-            value |= (fx_4_numeric_base_type[type->e.numeric.type] << NUMERIC_BASE_TYPE_SHIFT);
+            value |= (fx_4_numeric_base_types[type->e.numeric.type] << FX_4_NUMERIC_BASE_TYPE_SHIFT);
             break;
         default:
             hlsl_fixme(ctx, &ctx->location, "Not implemented for base type %u.", type->e.numeric.type);
             return 0;
     }
 
-    value |= (type->dimy & 0x7) << NUMERIC_ROWS_SHIFT;
-    value |= (type->dimx & 0x7) << NUMERIC_COLUMNS_SHIFT;
+    value |= (type->dimy & 0x7) << FX_4_NUMERIC_ROWS_SHIFT;
+    value |= (type->dimx & 0x7) << FX_4_NUMERIC_COLUMNS_SHIFT;
     if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
-        value |= NUMERIC_COLUMN_MAJOR_MASK;
+        value |= FX_4_NUMERIC_COLUMN_MAJOR_MASK;
 
     return value;
 }
@@ -651,7 +670,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_MATRIX:
-            put_u32_unaligned(buffer, 1);
+            put_u32_unaligned(buffer, FX_4_TYPE_CLASS_NUMERIC);
             break;
 
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
@@ -669,11 +688,11 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_GEOMETRY_SHADER:
         case HLSL_CLASS_BLEND_STATE:
         case HLSL_CLASS_STRING:
-            put_u32_unaligned(buffer, 2);
+            put_u32_unaligned(buffer, FX_4_TYPE_CLASS_OBJECT);
             break;
 
         case HLSL_CLASS_STRUCT:
-            put_u32_unaligned(buffer, 3);
+            put_u32_unaligned(buffer, FX_4_TYPE_CLASS_STRUCT);
             break;
 
         case HLSL_CLASS_ARRAY:
@@ -1543,7 +1562,7 @@ static uint32_t write_fx_4_state_numeric_value(struct hlsl_ir_constant *value, s
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
                 case HLSL_TYPE_BOOL:
-                    type = fx_4_numeric_base_type[data_type->e.numeric.type];
+                    type = fx_4_numeric_base_types[data_type->e.numeric.type];
                     break;
                 default:
                     type = 0;
@@ -2885,6 +2904,22 @@ static int fx_2_parse(struct fx_parser *parser)
     return -1;
 }
 
+static void fx_parser_read_unstructured(struct fx_parser *parser, void *dst, uint32_t offset, size_t size)
+{
+    const uint8_t *ptr = parser->unstructured.ptr;
+
+    memset(dst, 0, size);
+    if (offset >= parser->unstructured.size
+            || size > parser->unstructured.size - offset)
+    {
+        parser->failed = true;
+        return;
+    }
+
+    ptr += offset;
+    memcpy(dst, ptr, size);
+}
+
 static const char *fx_4_get_string(struct fx_parser *parser, uint32_t offset)
 {
     const uint8_t *ptr = parser->unstructured.ptr;
@@ -2908,6 +2943,92 @@ static const char *fx_4_get_string(struct fx_parser *parser, uint32_t offset)
     }
 
     return (const char *)(parser->unstructured.ptr + offset);
+}
+
+static void fx_parse_fx_4_numeric_variables(struct fx_parser *parser, uint32_t count)
+{
+    struct fx_4_variable
+    {
+        uint32_t name;
+        uint32_t type;
+        uint32_t semantic;
+        uint32_t offset;
+        uint32_t value;
+        uint32_t flags;
+    } var;
+    struct fx_4_type
+    {
+        uint32_t name;
+        uint32_t class;
+        uint32_t element_count;
+        uint32_t unpacked_size;
+        uint32_t stride;
+        uint32_t packed_size;
+        uint32_t typeinfo;
+    } type;
+    const char *name, *semantic, *type_name;
+    uint32_t i;
+
+    for (i = 0; i < count; ++i)
+    {
+        fx_parser_read_u32s(parser, &var, sizeof(var));
+        fx_parser_read_unstructured(parser, &type, var.type, sizeof(type));
+
+        name = fx_4_get_string(parser, var.name);
+        type_name = fx_4_get_string(parser, type.name);
+
+        vkd3d_string_buffer_printf(&parser->buffer, "    %s %s", type_name, name);
+        if (type.element_count)
+            vkd3d_string_buffer_printf(&parser->buffer, "[%u]", type.element_count);
+        if (var.semantic)
+        {
+            semantic = fx_4_get_string(parser, var.semantic);
+            vkd3d_string_buffer_printf(&parser->buffer, " : %s", semantic);
+        }
+        if (var.value)
+        {
+            unsigned int base_type, comp_count;
+            size_t j;
+
+            if (type.class == FX_4_TYPE_CLASS_NUMERIC)
+                base_type = (type.typeinfo >> FX_4_NUMERIC_BASE_TYPE_SHIFT) & 0xf;
+            else
+                base_type = 0;
+
+            vkd3d_string_buffer_printf(&parser->buffer, " = { ");
+
+            comp_count = type.unpacked_size / sizeof(uint32_t);
+            for (j = 0; j < comp_count; ++j)
+            {
+                union hlsl_constant_value_component value;
+
+                fx_parser_read_unstructured(parser, &value, var.value + j * sizeof(uint32_t), sizeof(uint32_t));
+
+                if (base_type == FX_4_NUMERIC_TYPE_FLOAT)
+                    vkd3d_string_buffer_printf(&parser->buffer, "%f", value.f);
+                else if (base_type == FX_4_NUMERIC_TYPE_INT)
+                    vkd3d_string_buffer_printf(&parser->buffer, "%d", value.i);
+                else if (base_type == FX_4_NUMERIC_TYPE_UINT)
+                    vkd3d_string_buffer_printf(&parser->buffer, "%u", value.u);
+                else if (base_type == FX_4_NUMERIC_TYPE_BOOL)
+                    vkd3d_string_buffer_printf(&parser->buffer, "%s", value.u ? "true" : "false" );
+                else
+                    vkd3d_string_buffer_printf(&parser->buffer, "%#x", value.u);
+
+                if (j < comp_count - 1)
+                    vkd3d_string_buffer_printf(&parser->buffer, ", ");
+            }
+
+            vkd3d_string_buffer_printf(&parser->buffer, " }");
+        }
+        vkd3d_string_buffer_printf(&parser->buffer, ";    // Offset: %u, size %u.\n", var.offset, type.unpacked_size);
+
+        if (fx_parser_read_u32(parser))
+        {
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing annotations is not implemented.\n");
+            return;
+        }
+    }
 }
 
 static int fx_parse_buffers(struct fx_parser *parser)
@@ -2938,12 +3059,7 @@ static int fx_parse_buffers(struct fx_parser *parser)
             return -1;
         }
 
-        if (buffer.count)
-        {
-            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
-                    "Parsing constant buffer elements is not implemented.\n");
-            return -1;
-        }
+        fx_parse_fx_4_numeric_variables(parser, buffer.count);
 
         vkd3d_string_buffer_printf(&parser->buffer, "}\n\n");
     }
