@@ -6782,7 +6782,8 @@ sysval_validation_data[] =
 {
     [VKD3D_SHADER_SV_POSITION] = {PS_BIT | GS_BIT | HS_BIT | DS_BIT, VS_BIT | GS_BIT | HS_BIT | DS_BIT, 0,
             VKD3D_SHADER_COMPONENT_FLOAT, 4},
-    [VKD3D_SHADER_SV_CLIP_DISTANCE] = {PS_BIT | GS_BIT | HS_BIT | DS_BIT, PS_BIT | VS_BIT | GS_BIT | HS_BIT | DS_BIT},
+    [VKD3D_SHADER_SV_CLIP_DISTANCE] = {PS_BIT | GS_BIT | HS_BIT | DS_BIT, PS_BIT | VS_BIT | GS_BIT | HS_BIT | DS_BIT, 0,
+            VKD3D_SHADER_COMPONENT_FLOAT, 4},
 };
 
 static void vsir_validate_signature_element(struct validation_context *ctx,
