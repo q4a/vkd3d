@@ -4877,20 +4877,20 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
             instr.opcode = VKD3D_SM4_OP_DCL_OUTPUT_SIV;
     }
 
-    switch (semantic)
+    if (instr.opcode == VKD3D_SM4_OP_DCL_OUTPUT)
     {
-        case VKD3D_SHADER_SV_COVERAGE:
-        case VKD3D_SHADER_SV_DEPTH:
-        case VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL:
-        case VKD3D_SHADER_SV_DEPTH_LESS_EQUAL:
-        case VKD3D_SHADER_SV_TARGET:
-        case VKD3D_SHADER_SV_NONE:
-            break;
-
-        default:
-            instr.idx_count = 1;
-            instr.idx[0] = semantic;
-            break;
+        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || semantic == VKD3D_SHADER_SV_TARGET
+                || instr.dsts[0].reg.type != VKD3DSPR_OUTPUT);
+    }
+    else if (instr.opcode == VKD3D_SM4_OP_DCL_INPUT || instr.opcode == VKD3D_SM4_OP_DCL_INPUT_PS)
+    {
+        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE);
+    }
+    else
+    {
+        VKD3D_ASSERT(semantic != VKD3D_SHADER_SV_NONE);
+        instr.idx_count = 1;
+        instr.idx[0] = semantic;
     }
 
     write_sm4_instruction(tpf, &instr);
