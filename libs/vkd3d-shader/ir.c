@@ -6786,6 +6786,7 @@ sysval_validation_data[] =
             VKD3D_SHADER_COMPONENT_FLOAT, 4},
     [VKD3D_SHADER_SV_CULL_DISTANCE] = {PS_BIT | GS_BIT | HS_BIT | DS_BIT, PS_BIT | VS_BIT | GS_BIT | HS_BIT | DS_BIT, 0,
             VKD3D_SHADER_COMPONENT_FLOAT, 4},
+    [VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE] = {0, 0, HS_BIT | DS_BIT, VKD3D_SHADER_COMPONENT_FLOAT, 1},
 };
 
 static void vsir_validate_signature_element(struct validation_context *ctx,
