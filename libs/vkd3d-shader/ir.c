@@ -6749,20 +6749,53 @@ static bool vsir_validate_src_max_count(struct validation_context *ctx,
     return true;
 }
 
+enum vsir_signature_type
+{
+    SIGNATURE_TYPE_INPUT,
+    SIGNATURE_TYPE_OUTPUT,
+    SIGNATURE_TYPE_PATCH_CONSTANT,
+};
+
+static const char * const signature_type_names[] =
+{
+    [SIGNATURE_TYPE_INPUT] = "input",
+    [SIGNATURE_TYPE_OUTPUT] = "output",
+    [SIGNATURE_TYPE_PATCH_CONSTANT] = "patch constant",
+};
+
+#define PS_BIT (1u << VKD3D_SHADER_TYPE_PIXEL)
+#define VS_BIT (1u << VKD3D_SHADER_TYPE_VERTEX)
+#define GS_BIT (1u << VKD3D_SHADER_TYPE_GEOMETRY)
+#define HS_BIT (1u << VKD3D_SHADER_TYPE_HULL)
+#define DS_BIT (1u << VKD3D_SHADER_TYPE_DOMAIN)
+#define CS_BIT (1u << VKD3D_SHADER_TYPE_COMPUTE)
+
+static const struct sysval_validation_data_element
+{
+    unsigned int input;
+    unsigned int output;
+    unsigned int patch_constant;
+}
+sysval_validation_data[] =
+{
+    [VKD3D_SHADER_SV_POSITION] = {PS_BIT | GS_BIT | HS_BIT | DS_BIT, VS_BIT | GS_BIT | HS_BIT | DS_BIT},
+};
+
 static void vsir_validate_signature_element(struct validation_context *ctx,
-        const struct shader_signature *signature, const char *signature_type,
+        const struct shader_signature *signature, enum vsir_signature_type signature_type,
         unsigned int idx)
 {
+    const char *signature_type_name = signature_type_names[signature_type];
     const struct signature_element *element = &signature->elements[idx];
     bool integer_type = false;
 
     if (element->register_count == 0)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
-                "element %u of %s signature: Invalid zero register count.", idx, signature_type);
+                "element %u of %s signature: Invalid zero register count.", idx, signature_type_name);
 
     if (element->mask == 0 || (element->mask & ~0xf))
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
-                "element %u of %s signature: Invalid mask %#x.", idx, signature_type, element->mask);
+                "element %u of %s signature: Invalid mask %#x.", idx, signature_type_name, element->mask);
 
     /* Here we'd likely want to validate that the usage mask is a subset of the
      * signature mask. Unfortunately the D3DBC parser sometimes violates this.
@@ -6786,7 +6819,7 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
     if (element->used_mask & ~0xf)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid usage mask %#x.",
-                idx, signature_type, element->used_mask);
+                idx, signature_type_name, element->used_mask);
 
     switch (element->sysval_semantic)
     {
@@ -6818,8 +6851,41 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         default:
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                     "element %u of %s signature: Invalid system value semantic %#x.",
-                    idx, signature_type, element->sysval_semantic);
+                    idx, signature_type_name, element->sysval_semantic);
             break;
+    }
+
+    if (element->sysval_semantic < ARRAY_SIZE(sysval_validation_data))
+    {
+        const struct sysval_validation_data_element *data = &sysval_validation_data[element->sysval_semantic];
+
+        if (data->input || data->output || data->patch_constant)
+        {
+            unsigned int mask;
+
+            switch (signature_type)
+            {
+                case SIGNATURE_TYPE_INPUT:
+                    mask = data->input;
+                    break;
+
+                case SIGNATURE_TYPE_OUTPUT:
+                    mask = data->output;
+                    break;
+
+                case SIGNATURE_TYPE_PATCH_CONSTANT:
+                    mask = data->patch_constant;
+                    break;
+
+                default:
+                    vkd3d_unreachable();
+            }
+
+            if (!(mask & (1u << ctx->program->shader_version.type)))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "element %u of %s signature: Invalid system value semantic %#x.",
+                        idx, signature_type_name, element->sysval_semantic);
+        }
     }
 
     switch (element->component_type)
@@ -6835,29 +6901,29 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         default:
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                     "element %u of %s signature: Invalid component type %#x.",
-                    idx, signature_type, element->component_type);
+                    idx, signature_type_name, element->component_type);
             break;
     }
 
     if (element->min_precision >= VKD3D_SHADER_MINIMUM_PRECISION_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid minimum precision %#x.",
-                idx, signature_type, element->min_precision);
+                idx, signature_type_name, element->min_precision);
 
     if (element->interpolation_mode >= VKD3DSIM_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid interpolation mode %#x.",
-                idx, signature_type, element->interpolation_mode);
+                idx, signature_type_name, element->interpolation_mode);
 
     if (integer_type && element->interpolation_mode != VKD3DSIM_NONE
             && element->interpolation_mode != VKD3DSIM_CONSTANT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid interpolation mode %#x for integer component type.",
-                idx, signature_type, element->interpolation_mode);
+                idx, signature_type_name, element->interpolation_mode);
 }
 
 static void vsir_validate_signature(struct validation_context *ctx,
-        const struct shader_signature *signature, const char *signature_type)
+        const struct shader_signature *signature, enum vsir_signature_type signature_type)
 {
     unsigned int i;
 
@@ -7415,9 +7481,9 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
                         "Patch constant signature is only valid for hull and domain shaders.");
     }
 
-    vsir_validate_signature(&ctx, &program->input_signature, "input");
-    vsir_validate_signature(&ctx, &program->output_signature, "output");
-    vsir_validate_signature(&ctx, &program->patch_constant_signature, "patch constant");
+    vsir_validate_signature(&ctx, &program->input_signature, SIGNATURE_TYPE_INPUT);
+    vsir_validate_signature(&ctx, &program->output_signature, SIGNATURE_TYPE_OUTPUT);
+    vsir_validate_signature(&ctx, &program->patch_constant_signature, SIGNATURE_TYPE_PATCH_CONSTANT);
 
     if (!(ctx.temps = vkd3d_calloc(ctx.program->temp_count, sizeof(*ctx.temps))))
         goto fail;
