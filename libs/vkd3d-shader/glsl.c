@@ -1293,6 +1293,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_DCL_INPUT:
         case VKD3DSIH_DCL_INPUT_PS:
+        case VKD3DSIH_DCL_INPUT_PS_SGV:
         case VKD3DSIH_DCL_INPUT_PS_SIV:
         case VKD3DSIH_DCL_INPUT_SGV:
         case VKD3DSIH_DCL_OUTPUT:

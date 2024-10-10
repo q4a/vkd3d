@@ -4819,9 +4819,10 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
                 break;
 
             case VKD3D_SHADER_SV_INSTANCE_ID:
+            case VKD3D_SHADER_SV_IS_FRONT_FACE:
             case VKD3D_SHADER_SV_PRIMITIVE_ID:
-            case VKD3D_SHADER_SV_VERTEX_ID:
             case VKD3D_SHADER_SV_SAMPLE_INDEX:
+            case VKD3D_SHADER_SV_VERTEX_ID:
                 instr.opcode = (profile->type == VKD3D_SHADER_TYPE_PIXEL)
                         ? VKD3D_SM4_OP_DCL_INPUT_PS_SGV : VKD3D_SM4_OP_DCL_INPUT_SGV;
                 break;
