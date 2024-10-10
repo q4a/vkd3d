@@ -6775,10 +6775,13 @@ static const struct sysval_validation_data_element
     unsigned int input;
     unsigned int output;
     unsigned int patch_constant;
+    enum vkd3d_shader_component_type data_type;
+    unsigned int component_count;
 }
 sysval_validation_data[] =
 {
-    [VKD3D_SHADER_SV_POSITION] = {PS_BIT | GS_BIT | HS_BIT | DS_BIT, VS_BIT | GS_BIT | HS_BIT | DS_BIT},
+    [VKD3D_SHADER_SV_POSITION] = {PS_BIT | GS_BIT | HS_BIT | DS_BIT, VS_BIT | GS_BIT | HS_BIT | DS_BIT, 0,
+            VKD3D_SHADER_COMPONENT_FLOAT, 4},
 };
 
 static void vsir_validate_signature_element(struct validation_context *ctx,
@@ -6885,6 +6888,19 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                         "element %u of %s signature: Invalid system value semantic %#x.",
                         idx, signature_type_name, element->sysval_semantic);
+        }
+
+        if (data->component_count != 0)
+        {
+            if (element->component_type != data->data_type)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "element %u of %s signature: Invalid data type %#x for system value semantic %#x.",
+                        idx, signature_type_name, element->component_type, element->sysval_semantic);
+
+            if (vsir_write_mask_component_count(element->mask) > data->component_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "element %u of %s signature: Invalid mask %#x for system value semantic %#x.",
+                        idx, signature_type_name, element->mask, element->sysval_semantic);
         }
     }
 
