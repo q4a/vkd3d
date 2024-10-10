@@ -1679,6 +1679,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     trace("           rov: %u.\n", caps->rov);
     trace("      wave-ops: %u.\n", caps->wave_ops);
     trace("  depth-bounds: %u.\n", caps->depth_bounds);
+    trace("   clip-planes: %u.\n", caps->clip_planes);
     trace_format_cap(caps, FORMAT_CAP_UAV_LOAD, "uav-load");
 
     if (!test_options.filename)
