@@ -7518,6 +7518,21 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
                         program->input_control_point_count);
     }
 
+    switch (program->shader_version.type)
+    {
+        case VKD3D_SHADER_TYPE_HULL:
+            if (program->output_control_point_count == 0)
+                validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "Invalid zero output control point count.");
+            break;
+
+        default:
+            if (program->output_control_point_count != 0)
+                validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "Invalid output control point count %u.",
+                        program->output_control_point_count);
+    }
+
     vsir_validate_signature(&ctx, &program->input_signature, SIGNATURE_TYPE_INPUT);
     vsir_validate_signature(&ctx, &program->output_signature, SIGNATURE_TYPE_OUTPUT);
     vsir_validate_signature(&ctx, &program->patch_constant_signature, SIGNATURE_TYPE_PATCH_CONSTANT);
