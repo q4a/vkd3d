@@ -561,6 +561,21 @@ static struct signature_element *find_signature_element_by_register_index(
     return NULL;
 }
 
+/* Add missing bits to a mask to make it contiguous. */
+static unsigned int make_mask_contiguous(unsigned int mask)
+{
+    static const unsigned int table[] =
+    {
+        0x0, 0x1, 0x2, 0x3,
+        0x4, 0x7, 0x6, 0x7,
+        0x8, 0xf, 0xe, 0xf,
+        0xc, 0xf, 0xe, 0xf,
+    };
+
+    VKD3D_ASSERT(mask < ARRAY_SIZE(table));
+    return table[mask];
+}
+
 static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool output,
         const char *name, unsigned int index, enum vkd3d_shader_sysval_semantic sysval,
         unsigned int register_index, bool is_dcl, unsigned int mask)
@@ -576,7 +591,7 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
 
     if ((element = find_signature_element(signature, name, index)))
     {
-        element->mask |= mask;
+        element->mask = make_mask_contiguous(element->mask | mask);
         if (!is_dcl)
             element->used_mask |= mask;
         return true;
@@ -596,7 +611,7 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
     element->register_index = register_index;
     element->target_location = register_index;
     element->register_count = 1;
-    element->mask = mask;
+    element->mask = make_mask_contiguous(mask);
     element->used_mask = is_dcl ? 0 : mask;
     if (program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL && !output)
         element->interpolation_mode = VKD3DSIM_LINEAR;
