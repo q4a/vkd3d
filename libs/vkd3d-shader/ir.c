@@ -6275,6 +6275,34 @@ static void vsir_validate_label_register(struct validation_context *ctx,
                 reg->idx[0].offset, ctx->program->block_count);
 }
 
+static void vsir_validate_sampler_register(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg)
+{
+    if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
+                "Invalid precision %#x for a SAMPLER register.", reg->precision);
+
+    if (reg->data_type != VKD3D_DATA_UNUSED)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid data type %#x for a SAMPLER register.", reg->data_type);
+
+    /* VEC4 is allowed in gather operations. */
+    if (reg->dimension == VSIR_DIMENSION_SCALAR)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                "Invalid dimension SCALAR for a SAMPLER register.");
+
+    if (reg->idx_count != 2)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid index count %u for a SAMPLER register.", reg->idx_count);
+        return;
+    }
+
+    if (reg->idx[0].rel_addr)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Non-NULL relative address for the descriptor index of a SAMPLER register.");
+}
+
 static void vsir_validate_ssa_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
@@ -6395,6 +6423,10 @@ static void vsir_validate_register(struct validation_context *ctx,
             vsir_validate_register_without_indices(ctx, reg);
             break;
 
+        case VKD3DSPR_SAMPLER:
+            vsir_validate_sampler_register(ctx, reg);
+            break;
+
         case VKD3DSPR_DEPTHOUTGE:
             vsir_validate_register_without_indices(ctx, reg);
             break;
@@ -6405,35 +6437,6 @@ static void vsir_validate_register(struct validation_context *ctx,
 
         case VKD3DSPR_SSA:
             vsir_validate_ssa_register(ctx, reg);
-            break;
-
-        case VKD3DSPR_SAMPLER:
-            if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
-                        "Invalid precision %#x for a SAMPLER register.",
-                        reg->precision);
-
-            if (reg->data_type != VKD3D_DATA_UNUSED)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
-                        "Invalid data type %#x for a SAMPLER register.",
-                        reg->data_type);
-
-            /* VEC4 is allowed in gather operations. */
-            if (reg->dimension == VSIR_DIMENSION_SCALAR)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
-                        "Invalid dimension SCALAR for a SAMPLER register.");
-
-            if (reg->idx_count != 2)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
-                        "Invalid index count %u for a SAMPLER register.",
-                        reg->idx_count);
-                break;
-            }
-
-            if (reg->idx[0].rel_addr)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
-                        "Non-NULL relative address for the descriptor index of a SAMPLER register.");
             break;
 
         case VKD3DSPR_RESOURCE:
