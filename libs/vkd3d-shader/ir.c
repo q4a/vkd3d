@@ -6180,6 +6180,57 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
         ctx->status = VKD3D_ERROR_INVALID_SHADER;
 }
 
+static void vsir_validate_temp_register(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg)
+{
+    struct validation_context_temp_data *data;
+
+    if (reg->idx_count != 1)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid index count %u for a TEMP register.",
+                reg->idx_count);
+        return;
+    }
+
+    if (reg->idx[0].rel_addr)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Non-NULL relative address for a TEMP register.");
+
+    if (reg->idx[0].offset >= ctx->program->temp_count)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "TEMP register index %u exceeds the maximum count %u.",
+                reg->idx[0].offset, ctx->program->temp_count);
+        return;
+    }
+
+    data = &ctx->temps[reg->idx[0].offset];
+
+    if (reg->dimension == VSIR_DIMENSION_NONE)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                "Invalid dimension NONE for a TEMP register.");
+        return;
+    }
+
+    /* TEMP registers can be scalar or vec4, provided that
+     * each individual register always appears with the same
+     * dimension. */
+    if (data->dimension == VSIR_DIMENSION_NONE)
+    {
+        data->dimension = reg->dimension;
+        data->first_seen = ctx->instruction_idx;
+    }
+    else if (data->dimension != reg->dimension)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                "Invalid dimension %#x for a TEMP register: "
+                "it has already been seen with dimension %#x at instruction %zu.",
+                reg->dimension, data->dimension, data->first_seen);
+    }
+}
+
 static void vsir_validate_src_param(struct validation_context *ctx,
         const struct vkd3d_shader_src_param *src);
 
@@ -6218,50 +6269,8 @@ static void vsir_validate_register(struct validation_context *ctx,
     switch (reg->type)
     {
         case VKD3DSPR_TEMP:
-        {
-            struct validation_context_temp_data *data;
-
-            if (reg->idx_count != 1)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a TEMP register.",
-                        reg->idx_count);
-                break;
-            }
-
-            if (reg->idx[0].rel_addr)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a TEMP register.");
-
-            if (reg->idx[0].offset >= ctx->program->temp_count)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the maximum count %u.",
-                        reg->idx[0].offset, ctx->program->temp_count);
-                break;
-            }
-
-            data = &ctx->temps[reg->idx[0].offset];
-
-            if (reg->dimension == VSIR_DIMENSION_NONE)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension NONE for a TEMP register.");
-                break;
-            }
-
-            /* TEMP registers can be scalar or vec4, provided that
-             * each individual register always appears with the same
-             * dimension. */
-            if (data->dimension == VSIR_DIMENSION_NONE)
-            {
-                data->dimension = reg->dimension;
-                data->first_seen = ctx->instruction_idx;
-            }
-            else if (data->dimension != reg->dimension)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension %#x for a TEMP register: "
-                        "it has already been seen with dimension %#x at instruction %zu.",
-                        reg->dimension, data->dimension, data->first_seen);
-            }
+            vsir_validate_temp_register(ctx, reg);
             break;
-        }
 
         case VKD3DSPR_SSA:
         {
