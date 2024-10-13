@@ -6231,6 +6231,65 @@ static void vsir_validate_temp_register(struct validation_context *ctx,
     }
 }
 
+static void vsir_validate_ssa_register(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg)
+{
+    struct validation_context_ssa_data *data;
+
+    if (reg->idx_count != 1)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid index count %u for a SSA register.",
+                reg->idx_count);
+        return;
+    }
+
+    if (reg->idx[0].rel_addr)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Non-NULL relative address for a SSA register.");
+
+    if (reg->idx[0].offset >= ctx->program->ssa_count)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "SSA register index %u exceeds the maximum count %u.",
+                reg->idx[0].offset, ctx->program->ssa_count);
+        return;
+    }
+
+    data = &ctx->ssas[reg->idx[0].offset];
+
+    if (reg->dimension == VSIR_DIMENSION_NONE)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                "Invalid dimension NONE for a SSA register.");
+        return;
+    }
+
+    /* SSA registers can be scalar or vec4, provided that each
+     * individual register always appears with the same
+     * dimension. */
+    if (data->dimension == VSIR_DIMENSION_NONE)
+    {
+        data->dimension = reg->dimension;
+        data->data_type = reg->data_type;
+        data->first_seen = ctx->instruction_idx;
+    }
+    else
+    {
+        if (data->dimension != reg->dimension)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                    "Invalid dimension %#x for a SSA register: "
+                    "it has already been seen with dimension %#x at instruction %zu.",
+                    reg->dimension, data->dimension, data->first_seen);
+
+        if (data_type_is_64_bit(data->data_type) != data_type_is_64_bit(reg->data_type))
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                    "Invalid data type %#x for a SSA register: "
+                    "it has already been seen with data type %#x at instruction %zu.",
+                    reg->data_type, data->data_type, data->first_seen);
+    }
+}
+
 static void vsir_validate_src_param(struct validation_context *ctx,
         const struct vkd3d_shader_src_param *src);
 
@@ -6273,58 +6332,8 @@ static void vsir_validate_register(struct validation_context *ctx,
             break;
 
         case VKD3DSPR_SSA:
-        {
-            struct validation_context_ssa_data *data;
-
-            if (reg->idx_count != 1)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a SSA register.",
-                        reg->idx_count);
-                break;
-            }
-
-            if (reg->idx[0].rel_addr)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a SSA register.");
-
-            if (reg->idx[0].offset >= ctx->program->ssa_count)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
-                        "SSA register index %u exceeds the maximum count %u.",
-                        reg->idx[0].offset, ctx->program->ssa_count);
-                break;
-            }
-
-            data = &ctx->ssas[reg->idx[0].offset];
-
-            if (reg->dimension == VSIR_DIMENSION_NONE)
-            {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension NONE for a SSA register.");
-                break;
-            }
-
-            /* SSA registers can be scalar or vec4, provided that each
-             * individual register always appears with the same
-             * dimension. */
-            if (data->dimension == VSIR_DIMENSION_NONE)
-            {
-                data->dimension = reg->dimension;
-                data->data_type = reg->data_type;
-                data->first_seen = ctx->instruction_idx;
-            }
-            else
-            {
-                if (data->dimension != reg->dimension)
-                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension %#x for a SSA register: "
-                            "it has already been seen with dimension %#x at instruction %zu.",
-                            reg->dimension, data->dimension, data->first_seen);
-
-                if (data_type_is_64_bit(data->data_type) != data_type_is_64_bit(reg->data_type))
-                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE, "Invalid data type %#x for a SSA register: "
-                            "it has already been seen with data type %#x at instruction %zu.",
-                            reg->data_type, data->data_type, data->first_seen);
-            }
+            vsir_validate_ssa_register(ctx, reg);
             break;
-        }
 
         case VKD3DSPR_LABEL:
             if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
