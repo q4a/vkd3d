@@ -6810,6 +6810,11 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid mask %#x.", idx, signature_type_name, element->mask);
 
+    if (!vkd3d_bitmask_is_contiguous(element->mask))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Non-contiguous mask %#x.",
+                idx, signature_type_name, element->mask);
+
     /* Here we'd likely want to validate that the usage mask is a subset of the
      * signature mask. Unfortunately the D3DBC parser sometimes violates this.
      * For example I've seen a shader like this:
