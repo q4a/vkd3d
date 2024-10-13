@@ -6180,6 +6180,15 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
         ctx->status = VKD3D_ERROR_INVALID_SHADER;
 }
 
+static void vsir_validate_register_without_indices(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg)
+{
+    if (reg->idx_count != 0)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid index count %u for a register of type %#x.",
+                reg->idx_count, reg->type);
+}
+
 static void vsir_validate_temp_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
@@ -6366,30 +6375,36 @@ static void vsir_validate_register(struct validation_context *ctx,
             vsir_validate_temp_register(ctx, reg);
             break;
 
+        case VKD3DSPR_DEPTHOUT:
+            vsir_validate_register_without_indices(ctx, reg);
+            break;
+
         case VKD3DSPR_LABEL:
             vsir_validate_label_register(ctx, reg);
             break;
 
-        case VKD3DSPR_SSA:
-            vsir_validate_ssa_register(ctx, reg);
-            break;
-
-        case VKD3DSPR_NULL:
-            if (reg->idx_count != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a NULL register.",
-                        reg->idx_count);
-            break;
-
         case VKD3DSPR_IMMCONST:
-            if (reg->idx_count != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a IMMCONST register.",
-                        reg->idx_count);
+            vsir_validate_register_without_indices(ctx, reg);
             break;
 
         case VKD3DSPR_IMMCONST64:
-            if (reg->idx_count != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a IMMCONST64 register.",
-                        reg->idx_count);
+            vsir_validate_register_without_indices(ctx, reg);
+            break;
+
+        case VKD3DSPR_NULL:
+            vsir_validate_register_without_indices(ctx, reg);
+            break;
+
+        case VKD3DSPR_DEPTHOUTGE:
+            vsir_validate_register_without_indices(ctx, reg);
+            break;
+
+        case VKD3DSPR_DEPTHOUTLE:
+            vsir_validate_register_without_indices(ctx, reg);
+            break;
+
+        case VKD3DSPR_SSA:
+            vsir_validate_ssa_register(ctx, reg);
             break;
 
         case VKD3DSPR_SAMPLER:
@@ -6478,27 +6493,6 @@ static void vsir_validate_register(struct validation_context *ctx,
             if (reg->idx[0].rel_addr)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
                         "Non-NULL relative address for the descriptor index of a UAV register.");
-            break;
-
-        case VKD3DSPR_DEPTHOUT:
-            if (reg->idx_count != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
-                        "Invalid index count %u for a DEPTHOUT register.",
-                        reg->idx_count);
-            break;
-
-        case VKD3DSPR_DEPTHOUTGE:
-            if (reg->idx_count != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
-                        "Invalid index count %u for a DEPTHOUTGE register.",
-                        reg->idx_count);
-            break;
-
-        case VKD3DSPR_DEPTHOUTLE:
-            if (reg->idx_count != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
-                        "Invalid index count %u for a DEPTHOUTLE register.",
-                        reg->idx_count);
             break;
 
         case VKD3DSPR_RASTOUT:
