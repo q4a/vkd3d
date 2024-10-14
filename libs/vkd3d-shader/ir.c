@@ -6256,6 +6256,10 @@ static void vsir_validate_io_register(struct validation_context *ctx,
             }
             break;
 
+        case VKD3DSPR_PATCHCONST:
+            signature = &ctx->program->patch_constant_signature;
+            break;
+
         default:
             vkd3d_unreachable();
     }
@@ -6314,7 +6318,7 @@ static void vsir_validate_io_register(struct validation_context *ctx,
         }
 
         element = &signature->elements[signature_idx];
-        if (element->register_count > 1)
+        if (element->register_count > 1 || vsir_sysval_semantic_is_tess_factor(element->sysval_semantic))
             is_array = true;
 
         expected_idx_count = 1 + !!has_control_point + !!is_array;
@@ -6688,6 +6692,10 @@ static void vsir_validate_register(struct validation_context *ctx,
 
         case VKD3DSPR_UAV:
             vsir_validate_uav_register(ctx, reg);
+            break;
+
+        case VKD3DSPR_PATCHCONST:
+            vsir_validate_io_register(ctx, reg);
             break;
 
         case VKD3DSPR_DEPTHOUTGE:
