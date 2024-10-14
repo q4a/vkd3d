@@ -6942,10 +6942,22 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
                 idx, signature_type_name, element->interpolation_mode);
 }
 
+static const unsigned int allowed_signature_phases[] =
+{
+    [SIGNATURE_TYPE_INPUT]          = PS_BIT | VS_BIT | GS_BIT | HS_BIT | DS_BIT,
+    [SIGNATURE_TYPE_OUTPUT]         = PS_BIT | VS_BIT | GS_BIT | HS_BIT | DS_BIT,
+    [SIGNATURE_TYPE_PATCH_CONSTANT] = HS_BIT | DS_BIT,
+};
+
 static void vsir_validate_signature(struct validation_context *ctx,
         const struct shader_signature *signature, enum vsir_signature_type signature_type)
 {
     unsigned int i;
+
+    if (signature->element_count != 0 && !(allowed_signature_phases[signature_type]
+            & (1u << ctx->program->shader_version.type)))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "Unexpected %s signature.", signature_type_names[signature_type]);
 
     for (i = 0; i < signature->element_count; ++i)
         vsir_validate_signature_element(ctx, signature, signature_type, i);
