@@ -9990,24 +9990,20 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     generate_vsir_scan_global_flags(ctx, program, func);
 }
 
-static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,
-        struct hlsl_block **found_block)
+static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_block **found_block)
 {
     struct hlsl_ir_node *node;
 
     LIST_FOR_EACH_ENTRY(node, &block->instrs, struct hlsl_ir_node, entry)
     {
-        if (node == stop_point)
-            return NULL;
-
         if (node->type == HLSL_IR_IF)
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(node);
             struct hlsl_ir_jump *jump = NULL;
 
-            if ((jump = loop_unrolling_find_jump(&iff->then_block, stop_point, found_block)))
+            if ((jump = loop_unrolling_find_jump(&iff->then_block, found_block)))
                 return jump;
-            if ((jump = loop_unrolling_find_jump(&iff->else_block, stop_point, found_block)))
+            if ((jump = loop_unrolling_find_jump(&iff->else_block, found_block)))
                 return jump;
         }
         else if (node->type == HLSL_IR_JUMP)
@@ -10043,10 +10039,48 @@ static unsigned int loop_unrolling_get_max_iterations(struct hlsl_ctx *ctx, stru
     return 1024;
 }
 
+static void loop_unrolling_simplify(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct copy_propagation_state *state, unsigned int *index)
+{
+    size_t scopes_depth = state->scope_count - 1;
+    unsigned int current_index;
+    bool progress;
+
+    do
+    {
+        state->stopped = false;
+        for (size_t i = state->scope_count; scopes_depth < i; --i)
+            copy_propagation_pop_scope(state);
+        copy_propagation_push_scope(state, ctx);
+
+        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, block, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_identities, block, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, block, NULL);
+
+        current_index = index_instructions(block, *index);
+        progress |= copy_propagation_transform_block(ctx, block, state);
+
+        progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, block, NULL);
+        progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, block, NULL);
+        progress |= hlsl_transform_ir(ctx, remove_trivial_conditional_branches, block, NULL);
+    } while (progress);
+
+    *index = current_index;
+}
+
 static bool loop_unrolling_unroll_loop(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_block *loop_parent, struct hlsl_ir_loop *loop)
 {
-    unsigned int max_iterations, i;
+    unsigned int max_iterations, i, index;
+    struct copy_propagation_state state;
+
+    copy_propagation_state_init(&state, ctx);
+
+    index = 2;
+    state.stop = &loop->node;
+    loop_unrolling_simplify(ctx, block, &state, &index);
+    state.stopped = false;
+    index = loop->node.index;
 
     max_iterations = loop_unrolling_get_max_iterations(ctx, loop);
 
@@ -10055,31 +10089,46 @@ static bool loop_unrolling_unroll_loop(struct hlsl_ctx *ctx, struct hlsl_block *
         struct hlsl_block tmp_dst, *jump_block;
         struct hlsl_ir_jump *jump = NULL;
 
+        copy_propagation_push_scope(&state, ctx);
+
         if (!hlsl_clone_block(ctx, &tmp_dst, &loop->body))
-            return false;
-        list_move_before(&loop->node.entry, &tmp_dst.instrs);
-        hlsl_block_cleanup(&tmp_dst);
+            goto fail;
 
-        hlsl_run_const_passes(ctx, block);
+        loop_unrolling_simplify(ctx, &tmp_dst, &state, &index);
 
-        if ((jump = loop_unrolling_find_jump(loop_parent, &loop->node, &jump_block)))
+        if ((jump = loop_unrolling_find_jump(&tmp_dst, &jump_block)))
         {
             enum hlsl_ir_jump_type type = jump->type;
+            struct hlsl_block dump;
 
-            if (jump_block != loop_parent)
+            if (jump_block != &tmp_dst)
             {
                 if (loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
                     hlsl_error(ctx, &jump->node.loc, VKD3D_SHADER_ERROR_HLSL_FAILED_FORCED_UNROLL,
                         "Unable to unroll loop, unrolling loops with conditional jumps is currently not supported.");
-                return false;
+                hlsl_block_cleanup(&tmp_dst);
+                goto fail;
             }
 
-            list_move_slice_tail(&tmp_dst.instrs, &jump->node.entry, list_prev(&loop_parent->instrs, &loop->node.entry));
-            hlsl_block_cleanup(&tmp_dst);
+            hlsl_block_init(&dump);
+            list_move_slice_tail(&dump.instrs, &jump->node.entry, list_tail(&tmp_dst.instrs));
+            hlsl_block_cleanup(&dump);
 
             if (type == HLSL_IR_JUMP_BREAK)
+            {
+                list_move_before(&loop->node.entry, &tmp_dst.instrs);
+                hlsl_block_cleanup(&tmp_dst);
                 break;
+            }
         }
+
+        /* We have to run copy propagation again as the state might have
+         * references to nodes that were deleted above. */
+        copy_propagation_pop_scope(&state);
+        copy_propagation_push_scope(&state, ctx);
+        loop_unrolling_simplify(ctx, &tmp_dst, &state, &index);
+        list_move_before(&loop->node.entry, &tmp_dst.instrs);
+        hlsl_block_cleanup(&tmp_dst);
     }
 
     /* Native will not emit an error if max_iterations has been reached with an
@@ -10090,13 +10139,19 @@ static bool loop_unrolling_unroll_loop(struct hlsl_ctx *ctx, struct hlsl_block *
         if (loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
             hlsl_error(ctx, &loop->node.loc, VKD3D_SHADER_ERROR_HLSL_FAILED_FORCED_UNROLL,
                 "Unable to unroll loop, maximum iterations reached (%u).", max_iterations);
-        return false;
+        goto fail;
     }
 
     list_remove(&loop->node.entry);
     hlsl_free_instr(&loop->node);
+    copy_propagation_state_destroy(&state);
 
     return true;
+
+fail:
+    copy_propagation_state_destroy(&state);
+
+    return false;
 }
 
 /*
@@ -10179,6 +10234,17 @@ static struct hlsl_ir_loop *loop_unrolling_find_unrollable_loop(struct hlsl_ctx 
 
 static void transform_unroll_loops(struct hlsl_ctx *ctx, struct hlsl_block *block)
 {
+    bool progress;
+
+    /* These are required by copy propagation, which in turn is required for
+     * unrolling. */
+    do
+    {
+        progress = hlsl_transform_ir(ctx, split_array_copies, block, NULL);
+        progress |= hlsl_transform_ir(ctx, split_struct_copies, block, NULL);
+    } while (progress);
+    hlsl_transform_ir(ctx, split_matrix_copies, block, NULL);
+
     while (true)
     {
         struct hlsl_block clone, *containing_block;
