@@ -1,8 +1,29 @@
+[vertex shader]
+void main(float4 pos : POSITION, out float2 color_xy : COLOR0,
+        out float2 color_zw : COLOR1, out float4 position : SV_POSITION)
+{
+    position = pos;
+    color_xy = float2(0.25, 0.5);
+    color_zw = float2(0.75, 1.0);
+}
+
+[pixel shader]
+float4 main(float2 color_xy : COLOR0, float2 color_zw : COLOR1) : SV_TARGET
+{
+    return float4(color_xy, color_zw);
+}
+
+[test]
+draw quad
+todo(sm>=6) probe(320, 240) rgba(0.25, 0.5, 0.75, 1.0)
+
 % Test handling of arrays in interface blocks
 
 [require]
 shader model >= 4.0
 shader model < 6.0
+
+[input layout]
 
 [vertex shader]
 // Rules:
