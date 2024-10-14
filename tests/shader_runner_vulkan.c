@@ -1571,11 +1571,15 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     features.x = VK_TRUE
 
     ENABLE_FEATURE(fragmentStoresAndAtomics);
-    /* For SV_PrimitiveID/SpvBuiltInPrimitiveId in fragment shaders. */
-    ENABLE_FEATURE(geometryShader);
     ENABLE_FEATURE(shaderClipDistance);
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
+
+    if (ret_features->geometryShader)
+    {
+        features.geometryShader = VK_TRUE;
+        runner->caps.geometry_shader = true;
+    }
 
     if (ret_features->shaderFloat64)
     {

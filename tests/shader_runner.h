@@ -142,6 +142,7 @@ struct shader_runner_caps
     size_t tag_count;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
+    bool geometry_shader;
     bool float64;
     bool int64;
     bool rov;
@@ -181,6 +182,7 @@ struct shader_runner
     char *gs_source;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
+    bool require_geometry_shader;
     bool require_float64;
     bool require_int64;
     bool require_rov;

@@ -346,6 +346,7 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
         runner->caps.tag_count = runner->language == GLSL;
         runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
         runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
+        runner->caps.geometry_shader = true;
 
         glGetIntegerv(GL_NUM_EXTENSIONS, &extension_count);
         if (check_gl_extension("GL_ARB_internalformat_query2", extension_count))

@@ -1,5 +1,7 @@
 [require]
 shader model >= 5.0
+% Used for SV_PrimitiveID/SpvBuiltInPrimitiveId.
+geometry-shader
 
 [rtv 0]
 format r32-uint
@@ -61,6 +63,7 @@ uint4 main(float4 pos : SV_Position, uint id : SV_PrimitiveID) : SV_Target
 
 [require]
 shader model >= 5.0
+geometry-shader
 rov
 
 [test]

@@ -386,6 +386,10 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
                 fatal_error("Unknown format cap '%s'.\n", line);
         }
     }
+    else if (match_string(line, "geometry-shader", &line))
+    {
+        runner->require_geometry_shader = true;
+    }
     else if (match_string(line, "float64", &line))
     {
         runner->require_float64 = true;
@@ -1563,6 +1567,8 @@ static bool check_capabilities(const struct shader_runner *runner, const struct 
 {
     unsigned int i;
 
+    if (runner->require_geometry_shader && !caps->geometry_shader)
+        return false;
     if (runner->require_float64 && !caps->float64)
         return false;
     if (runner->require_int64 && !caps->int64)
@@ -1594,7 +1600,7 @@ static void trace_tags(const struct shader_runner_caps *caps)
 
     p = tags;
     rem = ARRAY_SIZE(tags);
-    rc = snprintf(p, rem, "          tags:");
+    rc = snprintf(p, rem, "           tags:");
     p += rc;
     rem -= rc;
 
@@ -1608,7 +1614,7 @@ static void trace_tags(const struct shader_runner_caps *caps)
 
             p = tags;
             rem = ARRAY_SIZE(tags);
-            rc = snprintf(p, rem, "               ");
+            rc = snprintf(p, rem, "                ");
             --i;
         }
         p += rc;
@@ -1626,7 +1632,7 @@ static void trace_format_cap(const struct shader_runner_caps *caps, enum format_
 
     p = buffer;
     rem = ARRAY_SIZE(buffer);
-    rc = snprintf(p, rem, "%14s:", cap_name);
+    rc = snprintf(p, rem, "%15s:", cap_name);
     p += rc;
     rem -= rc;
 
@@ -1642,7 +1648,7 @@ static void trace_format_cap(const struct shader_runner_caps *caps, enum format_
 
                 p = buffer;
                 rem = ARRAY_SIZE(buffer);
-                rc = snprintf(p, rem, "               ");
+                rc = snprintf(p, rem, "                ");
                 --i;
             }
             p += rc;
@@ -1688,13 +1694,14 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             dxc_compiler ? "dxcompiler" : HLSL_COMPILER, caps->runner);
     if (caps->tag_count)
         trace_tags(caps);
-    trace("       float64: %u.\n", caps->float64);
-    trace("         int64: %u.\n", caps->int64);
-    trace("           rov: %u.\n", caps->rov);
-    trace("      wave-ops: %u.\n", caps->wave_ops);
-    trace("  depth-bounds: %u.\n", caps->depth_bounds);
-    trace("   clip-planes: %u.\n", caps->clip_planes);
-    trace("    point-size: %u.\n", caps->point_size);
+    trace("geometry-shader: %u.\n", caps->geometry_shader);
+    trace("        float64: %u.\n", caps->float64);
+    trace("          int64: %u.\n", caps->int64);
+    trace("            rov: %u.\n", caps->rov);
+    trace("       wave-ops: %u.\n", caps->wave_ops);
+    trace("   depth-bounds: %u.\n", caps->depth_bounds);
+    trace("    clip-planes: %u.\n", caps->clip_planes);
+    trace("     point-size: %u.\n", caps->point_size);
     trace_format_cap(caps, FORMAT_CAP_UAV_LOAD, "uav-load");
 
     if (!test_options.filename)
@@ -1956,6 +1963,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 state = STATE_REQUIRE;
                 runner->minimum_shader_model = caps->minimum_shader_model;
                 runner->maximum_shader_model = caps->maximum_shader_model;
+                runner->require_geometry_shader = false;
                 runner->require_float64 = false;
                 runner->require_int64 = false;
                 runner->require_rov = false;
