@@ -155,6 +155,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/initializer-static-array.shader_test \
 	tests/hlsl/initializer-struct.shader_test \
 	tests/hlsl/instance-id.shader_test \
+	tests/hlsl/interface-packing.shader_test \
 	tests/hlsl/intrinsic-override.shader_test \
 	tests/hlsl/invalid.shader_test \
 	tests/hlsl/inverse-trig.shader_test \
@@ -239,6 +240,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/swizzle-matrix.shader_test \
 	tests/hlsl/swizzles.shader_test \
 	tests/hlsl/ternary.shader_test \
+	tests/hlsl/tessellation-patch-vars.shader_test \
 	tests/hlsl/tessellation.shader_test \
 	tests/hlsl/texture-load-offset.shader_test \
 	tests/hlsl/texture-load-typed.shader_test \
