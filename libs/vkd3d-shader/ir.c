@@ -6230,6 +6230,32 @@ static void vsir_validate_io_register(struct validation_context *ctx,
             }
             break;
 
+        case VKD3DSPR_OUTPUT:
+            switch (ctx->program->shader_version.type)
+            {
+                case VKD3D_SHADER_TYPE_HULL:
+                    if (ctx->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE)
+                    {
+                        signature = &ctx->program->output_signature;
+                        has_control_point = ctx->program->normalised_hull_cp_io;
+                    }
+                    else if (ctx->program->normalised_io)
+                    {
+                        signature = &ctx->program->output_signature;
+                        has_control_point = true;
+                    }
+                    else
+                    {
+                        signature = &ctx->program->patch_constant_signature;
+                    }
+                    break;
+
+                default:
+                    signature = &ctx->program->output_signature;
+                    break;
+            }
+            break;
+
         default:
             vkd3d_unreachable();
     }
@@ -6622,6 +6648,10 @@ static void vsir_validate_register(struct validation_context *ctx,
 
         case VKD3DSPR_RASTOUT:
             vsir_validate_rastout_register(ctx, reg);
+            break;
+
+        case VKD3DSPR_OUTPUT:
+            vsir_validate_io_register(ctx, reg);
             break;
 
         case VKD3DSPR_DEPTHOUT:
