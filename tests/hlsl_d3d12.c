@@ -2410,6 +2410,129 @@ static void test_signature_reflection(void)
         {"sv_position",    0, 4, D3D_NAME_POSITION,      D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
     };
 
+    static const char hs1_source[] =
+        "struct hs_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "    float4 y : position;\n"
+        "};\n"
+        "struct patch_constant_data\n"
+        "{\n"
+        "    float edges[4] : sv_tessfactor;\n"
+        "    float inside[2] : sv_insidetessfactor;\n"
+        "    float4 x : sv_position;\n"
+        "    float4 y : position;\n"
+        "    float4 apple : apple;\n"
+        "};\n"
+        "patch_constant_data patch_constant(\n"
+        "        in uint a : sv_primitiveid,\n"
+        "        in float4 b : sv_position)\n"
+        "{\n"
+        "    return (patch_constant_data)0;\n"
+        "}\n"
+        "[domain(\"quad\")]\n"
+        "[outputcontrolpoints(1)]\n"
+        "[partitioning(\"integer\")]\n"
+        "[outputtopology(\"point\")]\n"
+        "[patchconstantfunc(\"patch_constant\")]\n"
+        "hs_data main(\n"
+        "        in uint a : sv_outputcontrolpointid,\n"
+        "        in uint b : sv_primitiveid,\n"
+        "        in float4 c : sv_position)\n"
+        "{\n"
+        "    return (hs_data)0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs1_outputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"position",    0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs1_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_tessfactor",       2, 2, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_tessfactor",       3, 3, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_insidetessfactor", 0, 4, D3D_NAME_FINAL_QUAD_INSIDE_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_insidetessfactor", 1, 5, D3D_NAME_FINAL_QUAD_INSIDE_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_position",         0, 6, D3D_NAME_UNDEFINED,                    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"position",            0, 7, D3D_NAME_UNDEFINED,                    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"apple",               0, 8, D3D_NAME_UNDEFINED,                    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const char hs2_source[] =
+        "struct hs_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "};\n"
+        "struct patch_constant_data\n"
+        "{\n"
+        "    float edges[3] : sv_tessfactor;\n"
+        "    float inside : sv_insidetessfactor;\n"
+        "};\n"
+        "patch_constant_data patch_constant(in uint a : sv_primitiveid)\n"
+        "{\n"
+        "    return (patch_constant_data)0;\n"
+        "}\n"
+        "[domain(\"tri\")]\n"
+        "[outputcontrolpoints(1)]\n"
+        "[partitioning(\"integer\")]\n"
+        "[outputtopology(\"point\")]\n"
+        "[patchconstantfunc(\"patch_constant\")]\n"
+        "hs_data main(in uint a : sv_outputcontrolpointid)\n"
+        "{\n"
+        "    return (hs_data)0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs2_outputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs2_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_TRI_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_TRI_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_tessfactor",       2, 2, D3D_NAME_FINAL_TRI_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_insidetessfactor", 0, 3, D3D_NAME_FINAL_TRI_INSIDE_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+    };
+
+    static const char hs3_source[] =
+        "struct hs_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "};\n"
+        "struct patch_constant_data\n"
+        "{\n"
+        "    float edges[2] : sv_tessfactor;\n"
+        "};\n"
+        "patch_constant_data patch_constant(in uint a : sv_primitiveid)\n"
+        "{\n"
+        "    return (patch_constant_data)0;\n"
+        "}\n"
+        "[domain(\"isoline\")]\n"
+        "[outputcontrolpoints(1)]\n"
+        "[partitioning(\"integer\")]\n"
+        "[outputtopology(\"point\")]\n"
+        "[patchconstantfunc(\"patch_constant\")]\n"
+        "hs_data main(in uint a : sv_outputcontrolpointid)\n"
+        "{\n"
+        "    return (hs_data)0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs3_outputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs3_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_LINE_DENSITY_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+    };
+
     static const struct
     {
         const char *source;
@@ -2419,6 +2542,8 @@ static void test_signature_reflection(void)
         unsigned int input_count;
         const D3D12_SIGNATURE_PARAMETER_DESC *outputs;
         unsigned int output_count;
+        const D3D12_SIGNATURE_PARAMETER_DESC *patch_constants;
+        unsigned int patch_constant_count;
         bool signature_elements_todo;
     }
     tests[] =
@@ -2429,19 +2554,22 @@ static void test_signature_reflection(void)
         {vs2_source,  "vs_4_0", true,  vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_legacy_outputs, ARRAY_SIZE(vs2_legacy_outputs)},
         {ps1_source,  "ps_4_1", false, ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
         {ps2_source,  "ps_4_0", true,  ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
-        {cs1_source,  "cs_5_0", false, NULL, 0, NULL, 0},
-        {ps3_source,  "ps_4_0", false, ps3_inputs, ARRAY_SIZE(ps3_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {ps4_source,  "ps_4_0", false, ps4_inputs, ARRAY_SIZE(ps4_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {ps5_source,  "ps_4_0", false, ps5_inputs, ARRAY_SIZE(ps5_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {ps6_source,  "ps_4_0", false, ps6_inputs, ARRAY_SIZE(ps6_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {ps7_source,  "ps_4_0", false, ps7_inputs, ARRAY_SIZE(ps7_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {ps8_source,  "ps_4_0", false, ps8_inputs, ARRAY_SIZE(ps8_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {ps9_source,  "ps_4_0", false, ps9_inputs, ARRAY_SIZE(ps9_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {vs3_source,  "vs_4_0", false, vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs), true},
-        {ps10_source, "ps_4_0", false, ps10_inputs, ARRAY_SIZE(ps10_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {ps11_source, "ps_4_0", false, ps11_inputs, ARRAY_SIZE(ps11_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), true},
-        {vs4_source,  "vs_4_0", false, vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs), true},
-        {vs5_source,  "vs_4_0", false, vs5_inputs, ARRAY_SIZE(vs5_inputs), vs5_outputs, ARRAY_SIZE(vs5_outputs), true},
+        {cs1_source,  "cs_5_0"},
+        {ps3_source,  "ps_4_0", false, ps3_inputs, ARRAY_SIZE(ps3_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps4_source,  "ps_4_0", false, ps4_inputs, ARRAY_SIZE(ps4_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps5_source,  "ps_4_0", false, ps5_inputs, ARRAY_SIZE(ps5_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps6_source,  "ps_4_0", false, ps6_inputs, ARRAY_SIZE(ps6_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps7_source,  "ps_4_0", false, ps7_inputs, ARRAY_SIZE(ps7_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps8_source,  "ps_4_0", false, ps8_inputs, ARRAY_SIZE(ps8_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps9_source,  "ps_4_0", false, ps9_inputs, ARRAY_SIZE(ps9_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {vs3_source,  "vs_4_0", false, vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs), NULL, 0, true},
+        {ps10_source, "ps_4_0", false, ps10_inputs, ARRAY_SIZE(ps10_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps11_source, "ps_4_0", false, ps11_inputs, ARRAY_SIZE(ps11_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {vs4_source,  "vs_4_0", false, vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs), NULL, 0, true},
+        {vs5_source,  "vs_4_0", false, vs5_inputs, ARRAY_SIZE(vs5_inputs), vs5_outputs, ARRAY_SIZE(vs5_outputs), NULL, 0, true},
+        {hs1_source,  "hs_5_0", false, NULL, 0, hs1_outputs, ARRAY_SIZE(hs1_outputs), hs1_patch_constants, ARRAY_SIZE(hs1_patch_constants)},
+        {hs2_source,  "hs_5_0", false, NULL, 0, hs2_outputs, ARRAY_SIZE(hs2_outputs), hs2_patch_constants, ARRAY_SIZE(hs2_patch_constants)},
+        {hs3_source,  "hs_5_0", false, NULL, 0, hs3_outputs, ARRAY_SIZE(hs3_outputs), hs3_patch_constants, ARRAY_SIZE(hs3_patch_constants)},
     };
 
     for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
@@ -2461,6 +2589,9 @@ static void test_signature_reflection(void)
                 "Got %u input parameters.\n", shader_desc.InputParameters);
         ok(shader_desc.OutputParameters == tests[i].output_count,
                 "Got %u output parameters.\n", shader_desc.OutputParameters);
+        todo_if(tests[i].patch_constant_count != 0)
+            ok(shader_desc.PatchConstantParameters == tests[i].patch_constant_count,
+                    "Got %u patch constant parameters.\n", shader_desc.PatchConstantParameters);
 
         for (unsigned int j = 0; j < shader_desc.InputParameters; ++j)
         {
@@ -2485,6 +2616,18 @@ static void test_signature_reflection(void)
 
         hr = reflection->lpVtbl->GetOutputParameterDesc(reflection, shader_desc.OutputParameters, &desc);
         ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+
+        for (unsigned int j = 0; j < shader_desc.PatchConstantParameters; ++j)
+        {
+            vkd3d_test_push_context("Patch constant %u", j);
+            hr = reflection->lpVtbl->GetPatchConstantParameterDesc(reflection, j, &desc);
+            todo ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+            check_signature_element(&desc, &tests[i].patch_constants[j], tests[i].signature_elements_todo);
+            vkd3d_test_pop_context();
+        }
+
+        hr = reflection->lpVtbl->GetPatchConstantParameterDesc(reflection, shader_desc.PatchConstantParameters, &desc);
+        todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
 
         ID3D10Blob_Release(code);
         refcount = reflection->lpVtbl->Release(reflection);
