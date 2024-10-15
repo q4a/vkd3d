@@ -2589,9 +2589,8 @@ static void test_signature_reflection(void)
                 "Got %u input parameters.\n", shader_desc.InputParameters);
         ok(shader_desc.OutputParameters == tests[i].output_count,
                 "Got %u output parameters.\n", shader_desc.OutputParameters);
-        todo_if(tests[i].patch_constant_count != 0)
-            ok(shader_desc.PatchConstantParameters == tests[i].patch_constant_count,
-                    "Got %u patch constant parameters.\n", shader_desc.PatchConstantParameters);
+        ok(shader_desc.PatchConstantParameters == tests[i].patch_constant_count,
+                "Got %u patch constant parameters.\n", shader_desc.PatchConstantParameters);
 
         for (unsigned int j = 0; j < shader_desc.InputParameters; ++j)
         {
@@ -2621,13 +2620,13 @@ static void test_signature_reflection(void)
         {
             vkd3d_test_push_context("Patch constant %u", j);
             hr = reflection->lpVtbl->GetPatchConstantParameterDesc(reflection, j, &desc);
-            todo ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+            ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
             check_signature_element(&desc, &tests[i].patch_constants[j], tests[i].signature_elements_todo);
             vkd3d_test_pop_context();
         }
 
         hr = reflection->lpVtbl->GetPatchConstantParameterDesc(reflection, shader_desc.PatchConstantParameters, &desc);
-        todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+        ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
 
         ID3D10Blob_Release(code);
         refcount = reflection->lpVtbl->Release(reflection);

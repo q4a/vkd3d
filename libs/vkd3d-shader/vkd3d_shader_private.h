@@ -1924,7 +1924,7 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define VKD3D_DXBC_HEADER_SIZE (8 * sizeof(uint32_t))
 #define VKD3D_DXBC_CHUNK_ALIGNMENT sizeof(uint32_t)
 
-#define DXBC_MAX_SECTION_COUNT 6
+#define DXBC_MAX_SECTION_COUNT 7
 
 struct dxbc_writer
 {

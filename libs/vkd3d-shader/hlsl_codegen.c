@@ -6281,21 +6281,15 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
     } while (progress);
 }
 
-static void generate_vsir_signature_entry(struct hlsl_ctx *ctx,
-        struct vsir_program *program, bool output, struct hlsl_ir_var *var)
+static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_program *program,
+        struct shader_signature *signature, bool output, struct hlsl_ir_var *var)
 {
     enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
     enum vkd3d_shader_component_type component_type;
     unsigned int register_index, mask, use_mask;
     const char *name = var->semantic.name;
     enum vkd3d_shader_register_type type;
-    struct shader_signature *signature;
     struct signature_element *element;
-
-    if (output)
-        signature = &program->output_signature;
-    else
-        signature = &program->input_signature;
 
     if (hlsl_version_ge(ctx, 4, 0))
     {
@@ -6303,7 +6297,8 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx,
         bool has_idx, ret;
 
         ret = sm4_sysval_semantic_from_semantic_name(&sysval, &program->shader_version,
-                ctx->semantic_compat_mapping, ctx->domain, var->semantic.name, var->semantic.index, output, false);
+                ctx->semantic_compat_mapping, ctx->domain, var->semantic.name, var->semantic.index,
+                        output, signature == &program->patch_constant_signature);
         VKD3D_ASSERT(ret);
         if (sysval == ~0u)
             return;
@@ -6419,10 +6414,18 @@ static void generate_vsir_signature(struct hlsl_ctx *ctx,
 
     LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->is_input_semantic)
-            generate_vsir_signature_entry(ctx, program, false, var);
-        if (var->is_output_semantic)
-            generate_vsir_signature_entry(ctx, program, true, var);
+        if (func == ctx->patch_constant_func)
+        {
+            generate_vsir_signature_entry(ctx, program,
+                    &program->patch_constant_signature, var->is_output_semantic, var);
+        }
+        else
+        {
+            if (var->is_input_semantic)
+                generate_vsir_signature_entry(ctx, program, &program->input_signature, false, var);
+            if (var->is_output_semantic)
+                generate_vsir_signature_entry(ctx, program, &program->output_signature, true, var);
+        }
     }
 }
 
@@ -7408,6 +7411,8 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     }
 
     generate_vsir_signature(ctx, program, entry_func);
+    if (version.type == VKD3D_SHADER_TYPE_HULL)
+        generate_vsir_signature(ctx, program, ctx->patch_constant_func);
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,

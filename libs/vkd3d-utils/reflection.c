@@ -512,9 +512,12 @@ static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetOutputParameterDesc(
 static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetPatchConstantParameterDesc(
         ID3D12ShaderReflection *iface, UINT index, D3D12_SIGNATURE_PARAMETER_DESC *desc)
 {
-    FIXME("iface %p, index %u, desc %p stub!\n", iface, index, desc);
+    struct d3d12_reflection *reflection = impl_from_ID3D12ShaderReflection(iface);
 
-    return E_NOTIMPL;
+    TRACE("iface %p, index %u, desc %p.\n", iface, index, desc);
+
+    return get_signature_parameter(&reflection->signature_info.patch_constant, index, desc,
+            /* FIXME: check shader type */true);
 }
 
 static struct ID3D12ShaderReflectionVariable * STDMETHODCALLTYPE d3d12_reflection_GetVariableByName(

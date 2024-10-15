@@ -3212,17 +3212,11 @@ static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
         ctx->result = buffer->status;
 }
 
-static void tpf_write_signature(struct tpf_compiler *tpf, bool output)
+static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_signature *signature, uint32_t tag)
 {
+    bool output = tag == TAG_OSGN || tag == TAG_PCSG;
     struct vkd3d_bytecode_buffer buffer = {0};
-    struct shader_signature *signature;
-    struct hlsl_ctx *ctx = tpf->ctx;
     unsigned int i;
-
-    if (output)
-        signature = &tpf->program->output_signature;
-    else
-        signature = &tpf->program->input_signature;
 
     put_u32(&buffer, signature->element_count);
     put_u32(&buffer, 8); /* unknown */
@@ -3257,7 +3251,7 @@ static void tpf_write_signature(struct tpf_compiler *tpf, bool output)
         set_u32(&buffer, (2 + i * 6) * sizeof(uint32_t), string_offset);
     }
 
-    add_section(ctx, &tpf->dxbc, output ? TAG_OSGN : TAG_ISGN, &buffer);
+    add_section(tpf->ctx, &tpf->dxbc, tag, &buffer);
 }
 
 static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
@@ -4794,7 +4788,8 @@ static void write_sm4_dcl_textures(const struct tpf_compiler *tpf, const struct 
     }
 }
 
-static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct hlsl_ir_var *var)
+static void tpf_write_dcl_semantic(const struct tpf_compiler *tpf,
+        const struct hlsl_ir_var *var, bool is_patch_constant_func)
 {
     const struct vkd3d_shader_version *version = &tpf->program->shader_version;
     const bool output = var->is_output_semantic;
@@ -4832,7 +4827,7 @@ static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct 
         instr.dsts[0].reg.dimension = VSIR_DIMENSION_SCALAR;
 
     sm4_sysval_semantic_from_semantic_name(&semantic, version, tpf->ctx->semantic_compat_mapping,
-            tpf->ctx->domain, var->semantic.name, var->semantic.index, output, false);
+            tpf->ctx->domain, var->semantic.name, var->semantic.index, output, is_patch_constant_func);
     if (semantic == ~0u)
         semantic = VKD3D_SHADER_SV_NONE;
 
@@ -4992,6 +4987,16 @@ static void tpf_write_hs_control_point_phase(const struct tpf_compiler *tpf)
     struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM5_OP_HS_CONTROL_POINT_PHASE,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_hs_fork_phase(const struct tpf_compiler *tpf)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_HS_FORK_PHASE,
     };
 
     write_sm4_instruction(tpf, &instr);
@@ -6513,7 +6518,7 @@ static void tpf_write_shader_function(struct tpf_compiler *tpf, struct hlsl_ir_f
     {
         if ((var->is_input_semantic && var->last_read)
                 || (var->is_output_semantic && var->first_write))
-            write_sm4_dcl_semantic(tpf, var);
+            tpf_write_dcl_semantic(tpf, var, func == ctx->patch_constant_func);
     }
 
     if (tpf->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
@@ -6612,6 +6617,12 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
         tpf_write_hs_control_point_phase(tpf);
 
     tpf_write_shader_function(tpf, entry_func);
+
+    if (version->type == VKD3D_SHADER_TYPE_HULL)
+    {
+        tpf_write_hs_fork_phase(tpf);
+        tpf_write_shader_function(tpf, ctx->patch_constant_func);
+    }
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
@@ -6717,8 +6728,10 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
     init_sm4_lookup_tables(&tpf.lookup);
     dxbc_writer_init(&tpf.dxbc);
 
-    tpf_write_signature(&tpf, false);
-    tpf_write_signature(&tpf, true);
+    tpf_write_signature(&tpf, &program->input_signature, TAG_ISGN);
+    tpf_write_signature(&tpf, &program->output_signature, TAG_OSGN);
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_HULL)
+        tpf_write_signature(&tpf, &program->patch_constant_signature, TAG_PCSG);
     write_sm4_rdef(ctx, &tpf.dxbc);
     tpf_write_shdr(&tpf, entry_func);
     tpf_write_sfi0(&tpf);
