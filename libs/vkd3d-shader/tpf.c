@@ -4891,6 +4891,83 @@ static void write_sm4_dcl_global_flags(const struct tpf_compiler *tpf, uint32_t 
     write_sm4_instruction(tpf, &instr);
 }
 
+static void tpf_write_hs_decls(const struct tpf_compiler *tpf)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_HS_DECLS,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_hs_control_point_phase(const struct tpf_compiler *tpf)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_HS_CONTROL_POINT_PHASE,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_dcl_input_control_point_count(const struct tpf_compiler *tpf, const uint32_t count)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_DCL_INPUT_CONTROL_POINT_COUNT,
+        .extra_bits = count << VKD3D_SM5_CONTROL_POINT_COUNT_SHIFT,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_dcl_output_control_point_count(const struct tpf_compiler *tpf, const uint32_t count)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_DCL_OUTPUT_CONTROL_POINT_COUNT,
+        .extra_bits = count << VKD3D_SM5_CONTROL_POINT_COUNT_SHIFT,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_dcl_tessellator_domain(const struct tpf_compiler *tpf, enum vkd3d_tessellator_domain domain)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_DCL_TESSELLATOR_DOMAIN,
+        .extra_bits = domain << VKD3D_SM5_TESSELLATOR_SHIFT,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_dcl_tessellator_partitioning(const struct tpf_compiler *tpf,
+        enum vkd3d_shader_tessellator_partitioning partitioning)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_DCL_TESSELLATOR_PARTITIONING,
+        .extra_bits = partitioning << VKD3D_SM5_TESSELLATOR_SHIFT,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_dcl_tessellator_output_primitive(const struct tpf_compiler *tpf,
+        enum vkd3d_shader_tessellator_output_primitive output_primitive)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_DCL_TESSELLATOR_OUTPUT_PRIMITIVE,
+        .extra_bits = output_primitive << VKD3D_SM5_TESSELLATOR_SHIFT,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
 static void write_sm4_ret(const struct tpf_compiler *tpf)
 {
     struct sm4_instruction instr =
@@ -6371,6 +6448,17 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
     put_u32(&buffer, vkd3d_make_u32((version->major << 4) | version->minor, shader_types[version->type]));
     token_count_position = put_u32(&buffer, 0);
 
+    if (version->type == VKD3D_SHADER_TYPE_HULL)
+    {
+        tpf_write_hs_decls(tpf);
+
+        tpf_write_dcl_input_control_point_count(tpf, 1); /* TODO: Obtain from InputPatch */
+        tpf_write_dcl_output_control_point_count(tpf, ctx->output_control_point_count);
+        tpf_write_dcl_tessellator_domain(tpf, ctx->domain);
+        tpf_write_dcl_tessellator_partitioning(tpf, ctx->partitioning);
+        tpf_write_dcl_tessellator_output_primitive(tpf, ctx->output_primitive);
+    }
+
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (cbuffer->reg.allocated)
@@ -6391,6 +6479,9 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
 
     if (entry_func->early_depth_test && vkd3d_shader_ver_ge(version, 5, 0))
         write_sm4_dcl_global_flags(tpf, VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL);
+
+    if (version->type == VKD3D_SHADER_TYPE_HULL)
+        tpf_write_hs_control_point_phase(tpf);
 
     LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
