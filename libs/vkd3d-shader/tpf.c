@@ -3018,6 +3018,9 @@ bool sm4_register_from_semantic_name(const struct vkd3d_shader_version *version,
 
         {"sv_primitiveid",      false, VKD3D_SHADER_TYPE_GEOMETRY, VKD3DSPR_PRIMID,        false},
 
+        {"sv_outputcontrolpointid", false, VKD3D_SHADER_TYPE_HULL, VKD3DSPR_OUTPOINTID,    false},
+        {"sv_primitiveid",          false, VKD3D_SHADER_TYPE_HULL, VKD3DSPR_PRIMID,        false},
+
         /* Put sv_target in this table, instead of letting it fall through to
          * default varying allocation, so that the register index matches the
          * usage index. */
@@ -3070,6 +3073,12 @@ bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *s
         {"position",                    true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_POSITION},
         {"sv_position",                 true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_POSITION},
         {"sv_primitiveid",              true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_PRIMITIVE_ID},
+
+        {"sv_outputcontrolpointid",     false, VKD3D_SHADER_TYPE_HULL,      ~0u},
+        {"sv_position",                 false, VKD3D_SHADER_TYPE_HULL,      ~0u},
+        {"sv_primitiveid",              false, VKD3D_SHADER_TYPE_HULL,      ~0u},
+
+        {"sv_position",                 true,  VKD3D_SHADER_TYPE_HULL,      VKD3D_SHADER_SV_POSITION},
 
         {"position",                    false, VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_POSITION},
         {"sv_position",                 false, VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SHADER_SV_POSITION},
@@ -4135,7 +4144,10 @@ static void sm4_register_from_deref(const struct tpf_compiler *tpf, struct vkd3d
                 reg->idx_count = 1;
             }
 
-            reg->dimension = VSIR_DIMENSION_VEC4;
+            if (shader_sm4_is_scalar_register(reg))
+                reg->dimension = VSIR_DIMENSION_SCALAR;
+            else
+                reg->dimension = VSIR_DIMENSION_VEC4;
             *writemask = ((1u << data_type->dimx) - 1) << (offset % 4);
         }
         else
@@ -4164,7 +4176,7 @@ static void sm4_register_from_deref(const struct tpf_compiler *tpf, struct vkd3d
                 reg->idx_count = 1;
             }
 
-            if (reg->type == VKD3DSPR_DEPTHOUT)
+            if (shader_sm4_is_scalar_register(reg))
                 reg->dimension = VSIR_DIMENSION_SCALAR;
             else
                 reg->dimension = VSIR_DIMENSION_VEC4;
@@ -4742,7 +4754,7 @@ static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct 
         instr.dsts[0].write_mask = var->regs[HLSL_REGSET_NUMERIC].writemask;
     }
 
-    if (instr.dsts[0].reg.type == VKD3DSPR_DEPTHOUT)
+    if (shader_sm4_is_scalar_register(&instr.dsts[0].reg))
         instr.dsts[0].reg.dimension = VSIR_DIMENSION_SCALAR;
 
     sm4_sysval_semantic_from_semantic_name(&semantic, version,
