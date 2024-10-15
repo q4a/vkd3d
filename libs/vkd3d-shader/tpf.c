@@ -6496,6 +6496,56 @@ static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_bl
     }
 }
 
+static void tpf_write_shader_function(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *func)
+{
+    struct hlsl_ctx *ctx = tpf->ctx;
+    const struct hlsl_scope *scope;
+    const struct hlsl_ir_var *var;
+    uint32_t temp_count;
+
+    compute_liveness(ctx, func);
+    mark_indexable_vars(ctx, func);
+    temp_count = allocate_temp_registers(ctx, func);
+    if (ctx->result)
+        return;
+
+    LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if ((var->is_input_semantic && var->last_read)
+                || (var->is_output_semantic && var->first_write))
+            write_sm4_dcl_semantic(tpf, var);
+    }
+
+    if (tpf->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
+        write_sm4_dcl_thread_group(tpf, ctx->thread_count);
+
+    if (temp_count)
+        write_sm4_dcl_temps(tpf, temp_count);
+
+    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+        {
+            if (var->is_uniform || var->is_input_semantic || var->is_output_semantic)
+                continue;
+            if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
+                continue;
+
+            if (var->indexable)
+            {
+                unsigned int id = var->regs[HLSL_REGSET_NUMERIC].id;
+                unsigned int size = align(var->data_type->reg_size[HLSL_REGSET_NUMERIC], 4) / 4;
+
+                write_sm4_dcl_indexable_temp(tpf, id, size, 4);
+            }
+        }
+    }
+
+    write_sm4_block(tpf, &func->body);
+
+    write_sm4_ret(tpf);
+}
+
 static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *entry_func)
 {
     const struct vkd3d_shader_version *version = &tpf->program->shader_version;
@@ -6504,10 +6554,7 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
     unsigned int extern_resources_count, i;
     const struct hlsl_buffer *cbuffer;
     struct hlsl_ctx *ctx = tpf->ctx;
-    const struct hlsl_scope *scope;
-    const struct hlsl_ir_var *var;
     size_t token_count_position;
-    uint32_t temp_count;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
     {
@@ -6521,11 +6568,6 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
         0, /* TEXTURE */
         VKD3D_SM4_LIB,
     };
-
-    mark_indexable_vars(ctx, entry_func);
-    temp_count = allocate_temp_registers(ctx, entry_func);
-    if (ctx->result)
-        return;
 
     tpf->buffer = &buffer;
 
@@ -6569,40 +6611,7 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
     if (version->type == VKD3D_SHADER_TYPE_HULL)
         tpf_write_hs_control_point_phase(tpf);
 
-    LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        if ((var->is_input_semantic && var->last_read) || (var->is_output_semantic && var->first_write))
-            write_sm4_dcl_semantic(tpf, var);
-    }
-
-    if (version->type == VKD3D_SHADER_TYPE_COMPUTE)
-        write_sm4_dcl_thread_group(tpf, ctx->thread_count);
-
-    if (temp_count)
-        write_sm4_dcl_temps(tpf, temp_count);
-
-    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
-    {
-        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
-        {
-            if (var->is_uniform || var->is_input_semantic || var->is_output_semantic)
-                continue;
-            if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
-                continue;
-
-            if (var->indexable)
-            {
-                unsigned int id = var->regs[HLSL_REGSET_NUMERIC].id;
-                unsigned int size = align(var->data_type->reg_size[HLSL_REGSET_NUMERIC], 4) / 4;
-
-                write_sm4_dcl_indexable_temp(tpf, id, size, 4);
-            }
-        }
-    }
-
-    write_sm4_block(tpf, &entry_func->body);
-
-    write_sm4_ret(tpf);
+    tpf_write_shader_function(tpf, entry_func);
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 

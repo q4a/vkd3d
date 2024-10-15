@@ -4375,7 +4375,7 @@ static void init_var_liveness(struct hlsl_ir_var *var)
         var->last_read = UINT_MAX;
 }
 
-static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
