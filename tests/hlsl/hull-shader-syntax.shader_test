@@ -110,3 +110,56 @@ float4 main() : POSITION
 {
     return 0;
 }
+
+%% Test uniform input parameters.
+
+[hull shader fail(sm>=6)]
+// SM6 requires all function paramaters to have semantics.
+
+struct patch_constant_data
+{
+    float edges[2] : SV_TessFactor;
+};
+
+uniform float4 a;
+Texture2D<float> tex;
+
+patch_constant_data patch_constant()
+{
+    return (patch_constant_data)tex[uint2(1, 1)];
+}
+
+    [domain("isoline")]
+    [outputcontrolpoints(3)]
+    [partitioning("integer")]
+    [outputtopology("point")]
+    [patchconstantfunc("patch_constant")]
+float4 main(uniform float4 b) : POSITION
+{
+    return a + b + tex[uint2(0, 0)];
+}
+
+% Patch constant function can't have uniform parameters.
+[hull shader fail todo]
+struct patch_constant_data
+{
+    float edges[2] : SV_TessFactor;
+};
+
+uniform float4 a;
+Texture2D<float> tex;
+
+patch_constant_data patch_constant(uniform float4 c)
+{
+    return (patch_constant_data)tex[uint2(1, 1)];
+}
+
+    [domain("isoline")]
+    [outputcontrolpoints(3)]
+    [partitioning("integer")]
+    [outputtopology("point")]
+    [patchconstantfunc("patch_constant")]
+float4 main(uniform float4 b) : POSITION
+{
+    return a + b + tex[uint2(0, 0)];
+}
