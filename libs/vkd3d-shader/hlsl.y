@@ -1208,6 +1208,32 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
     return true;
 }
 
+static bool add_record_access_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const char *name, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *record = node_from_block(block);
+    const struct hlsl_type *type = record->data_type;
+    const struct hlsl_struct_field *field, *base;
+
+    if ((field = get_struct_field(type->e.record.fields, type->e.record.field_count, name)))
+    {
+        unsigned int field_idx = field - type->e.record.fields;
+
+        return add_record_access(ctx, block, record, field_idx, loc);
+    }
+    else if ((base = get_struct_field(type->e.record.fields, type->e.record.field_count, "$super")))
+    {
+        unsigned int base_idx = base - type->e.record.fields;
+
+        if (!add_record_access(ctx, block, record, base_idx, loc))
+            return false;
+        return add_record_access_recurse(ctx, block, name, loc);
+    }
+
+    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Field \"%s\" is not defined.", name);
+    return false;
+}
+
 static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type, struct list *list)
 {
     struct parse_variable_def *v, *v_next;
@@ -6590,6 +6616,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 
 %type <switch_case> switch_case
 
+%type <type> base_optional
 %type <type> field_type
 %type <type> named_struct_spec
 %type <type> unnamed_struct_spec
@@ -6804,11 +6831,28 @@ struct_spec:
     | unnamed_struct_spec
 
 named_struct_spec:
-      KW_STRUCT any_identifier '{' fields_list '}'
+      KW_STRUCT any_identifier base_optional '{' fields_list '}'
         {
             bool ret;
 
-            $$ = hlsl_new_struct_type(ctx, $2, $4.fields, $4.count);
+            if ($3)
+            {
+                char *name;
+
+                if (!(name = hlsl_strdup(ctx, "$super")))
+                    YYABORT;
+                if (!hlsl_array_reserve(ctx, (void **)&$5.fields, &$5.capacity, 1 + $5.count, sizeof(*$5.fields)))
+                    YYABORT;
+                memmove(&$5.fields[1], $5.fields, $5.count * sizeof(*$5.fields));
+                ++$5.count;
+
+                memset(&$5.fields[0], 0, sizeof($5.fields[0]));
+                $5.fields[0].type = $3;
+                $5.fields[0].loc = @3;
+                $5.fields[0].name = name;
+            }
+
+            $$ = hlsl_new_struct_type(ctx, $2, $5.fields, $5.count);
 
             if (hlsl_get_var(ctx->cur_scope, $2))
             {
@@ -6834,6 +6878,23 @@ any_identifier:
       VAR_IDENTIFIER
     | TYPE_IDENTIFIER
     | NEW_IDENTIFIER
+
+/* TODO: Multiple inheritance support for interfaces. */
+base_optional:
+      %empty
+        {
+            $$ = NULL;
+        }
+    | ':' TYPE_IDENTIFIER
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, $2, true, true);
+            if ($$->class != HLSL_CLASS_STRUCT)
+            {
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Base type \"%s\" is not a struct.", $2);
+                YYABORT;
+            }
+            vkd3d_free($2);
+        }
 
 fields_list:
       %empty
@@ -8825,19 +8886,7 @@ postfix_expr:
 
             if (node->data_type->class == HLSL_CLASS_STRUCT)
             {
-                struct hlsl_type *type = node->data_type;
-                const struct hlsl_struct_field *field;
-                unsigned int field_idx = 0;
-
-                if (!(field = get_struct_field(type->e.record.fields, type->e.record.field_count, $3)))
-                {
-                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Field \"%s\" is not defined.", $3);
-                    vkd3d_free($3);
-                    YYABORT;
-                }
-
-                field_idx = field - type->e.record.fields;
-                if (!add_record_access(ctx, $1, node, field_idx, &@2))
+                if (!add_record_access_recurse(ctx, $1, $3, &@2))
                 {
                     vkd3d_free($3);
                     YYABORT;
