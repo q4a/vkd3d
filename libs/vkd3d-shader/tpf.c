@@ -3047,9 +3047,57 @@ bool sm4_register_from_semantic_name(const struct vkd3d_shader_version *version,
     return false;
 }
 
+static bool get_tessfactor_sysval_semantic(enum vkd3d_shader_sysval_semantic *semantic,
+        enum vkd3d_tessellator_domain domain, uint32_t index)
+{
+    switch (domain)
+    {
+        case VKD3D_TESSELLATOR_DOMAIN_LINE:
+            if (index == 0)
+                *semantic = VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN;
+            else if (index == 1)
+                *semantic = VKD3D_SHADER_SV_TESS_FACTOR_LINEDET;
+            else
+                return false;
+            return true;
+
+        case VKD3D_TESSELLATOR_DOMAIN_TRIANGLE:
+            *semantic = VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE;
+            return index < 3;
+
+        case VKD3D_TESSELLATOR_DOMAIN_QUAD:
+            *semantic = VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE;
+            return index < 4;
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static bool get_insidetessfactor_sysval_semantic(enum vkd3d_shader_sysval_semantic *semantic,
+        enum vkd3d_tessellator_domain domain, uint32_t index)
+{
+    switch (domain)
+    {
+        case VKD3D_TESSELLATOR_DOMAIN_LINE:
+            return false;
+
+        case VKD3D_TESSELLATOR_DOMAIN_TRIANGLE:
+            *semantic = VKD3D_SHADER_SV_TESS_FACTOR_TRIINT;
+            return index == 0;
+
+        case VKD3D_TESSELLATOR_DOMAIN_QUAD:
+            *semantic = VKD3D_SHADER_SV_TESS_FACTOR_QUADINT;
+            return index < 2;
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
 bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *sysval_semantic,
-        const struct vkd3d_shader_version *version,
-        bool semantic_compat_mapping, const char *semantic_name, bool output)
+        const struct vkd3d_shader_version *version, bool semantic_compat_mapping, enum vkd3d_tessellator_domain domain,
+        const char *semantic_name, unsigned int semantic_idx, bool output, bool is_patch_constant_func)
 {
     unsigned int i;
 
@@ -3104,6 +3152,32 @@ bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *s
         {"sv_viewportarrayindex",       true,  VKD3D_SHADER_TYPE_VERTEX,    VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX},
     };
     bool needs_compat_mapping = ascii_strncasecmp(semantic_name, "sv_", 3);
+
+    if (is_patch_constant_func)
+    {
+        if (output)
+        {
+            if (!ascii_strcasecmp(semantic_name, "sv_tessfactor"))
+                return get_tessfactor_sysval_semantic(sysval_semantic, domain, semantic_idx);
+            if (!ascii_strcasecmp(semantic_name, "sv_insidetessfactor"))
+                return get_insidetessfactor_sysval_semantic(sysval_semantic, domain, semantic_idx);
+            if (!ascii_strcasecmp(semantic_name, "sv_position"))
+            {
+                *sysval_semantic = VKD3D_SHADER_SV_NONE;
+                return true;
+            }
+        }
+        else
+        {
+            if (!ascii_strcasecmp(semantic_name, "sv_primitiveid")
+                    || !ascii_strcasecmp(semantic_name, "sv_position"))
+            {
+                *sysval_semantic = ~0u;
+                return true;
+            }
+            return false;
+        }
+    }
 
     for (i = 0; i < ARRAY_SIZE(semantics); ++i)
     {
@@ -4757,8 +4831,8 @@ static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct 
     if (shader_sm4_is_scalar_register(&instr.dsts[0].reg))
         instr.dsts[0].reg.dimension = VSIR_DIMENSION_SCALAR;
 
-    sm4_sysval_semantic_from_semantic_name(&semantic, version,
-            tpf->ctx->semantic_compat_mapping, var->semantic.name, output);
+    sm4_sysval_semantic_from_semantic_name(&semantic, version, tpf->ctx->semantic_compat_mapping,
+            tpf->ctx->domain, var->semantic.name, var->semantic.index, output, false);
     if (semantic == ~0u)
         semantic = VKD3D_SHADER_SV_NONE;
 
