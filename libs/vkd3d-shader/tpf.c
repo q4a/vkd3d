@@ -4918,7 +4918,7 @@ static void write_sm4_dcl_semantic(const struct tpf_compiler *tpf, const struct 
     {
         VKD3D_ASSERT(semantic != VKD3D_SHADER_SV_NONE);
         instr.idx_count = 1;
-        instr.idx[0] = semantic;
+        instr.idx[0] = vkd3d_siv_from_sysval_indexed(semantic, var->semantic.index);
     }
 
     write_sm4_instruction(tpf, &instr);
