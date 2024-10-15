@@ -6479,6 +6479,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_SAMPLER_STATE
 %token KW_SAMPLERCOMPARISONSTATE
 %token KW_SHARED
+%token KW_SNORM
 %token KW_STATEBLOCK
 %token KW_STATEBLOCK_STATE
 %token KW_STATIC
@@ -6503,6 +6504,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_TYPEDEF
 %token KW_UNSIGNED
 %token KW_UNIFORM
+%token KW_UNORM
 %token KW_VECTOR
 %token KW_VERTEXSHADER
 %token KW_VOID
@@ -6642,6 +6644,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <type> type
 %type <type> type_no_void
 %type <type> typedef_type
+%type <type> resource_format
 
 %type <variable_def> state_block_list
 %type <variable_def> type_spec
@@ -7637,6 +7640,15 @@ rov_type:
             $$ = HLSL_SAMPLER_DIM_3D;
         }
 
+resource_format:
+      var_modifiers type
+        {
+            uint32_t modifiers = $1;
+
+            if (!($$ = apply_type_modifiers(ctx, $2, &modifiers, false, &@1)))
+                YYABORT;
+        }
+
 type_no_void:
       KW_VECTOR '<' type ',' C_INTEGER '>'
         {
@@ -7730,18 +7742,18 @@ type_no_void:
         {
             $$ = hlsl_new_texture_type(ctx, $1, hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), 0);
         }
-    | texture_type '<' type '>'
+    | texture_type '<' resource_format '>'
         {
             validate_texture_format_type(ctx, $3, &@3);
             $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
         }
-    | texture_ms_type '<' type '>'
+    | texture_ms_type '<' resource_format '>'
         {
             validate_texture_format_type(ctx, $3, &@3);
 
             $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
         }
-    | texture_ms_type '<' type ',' shift_expr '>'
+    | texture_ms_type '<' resource_format ',' shift_expr '>'
         {
             unsigned int sample_count;
             struct hlsl_block block;
@@ -7757,14 +7769,14 @@ type_no_void:
 
             $$ = hlsl_new_texture_type(ctx, $1, $3, sample_count);
         }
-    | uav_type '<' type '>'
+    | uav_type '<' resource_format '>'
         {
             validate_uav_type(ctx, $1, $3, &@3);
             $$ = hlsl_new_uav_type(ctx, $1, $3, false);
         }
-    | rov_type '<' type '>'
+    | rov_type '<' resource_format '>'
         {
-            validate_uav_type(ctx, $1, $3, &@3);
+            validate_uav_type(ctx, $1, $3, &@4);
             $$ = hlsl_new_uav_type(ctx, $1, $3, true);
         }
     | KW_STRING
@@ -8313,6 +8325,14 @@ var_modifiers:
     | KW_EXPORT var_modifiers
         {
             $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_EXPORT, &@1);
+        }
+    | KW_UNORM var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_UNORM, &@1);
+        }
+    | KW_SNORM var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_SNORM, &@1);
         }
     | var_identifier var_modifiers
         {

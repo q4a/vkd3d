@@ -1506,6 +1506,13 @@ static void test_reflection(void)
         "    Texture1DArray<float> b;\n"
         "    struct { SamplerState a; } c;\n"
         "} k;\n"
+        "struct\n"
+        "{\n"
+        "    Texture2D<snorm float4> a;\n"
+        "    Texture2D<unorm float4> b;\n"
+        "    RWTexture2D<snorm float4> c;\n"
+        "    RWTexture2D<unorm float4> d;\n"
+        "} l;\n"
         "cbuffer buf : register(b3[-1])\n"
         "{\n"
         "    float4 v;\n"
@@ -1516,8 +1523,11 @@ static void test_reflection(void)
         "};\n"
         "float4 main(float2 pos : texcoord) : SV_TARGET\n"
         "{\n"
+        "    l.c[uint2(0,0)] = 0;\n"
+        "    l.d[uint2(0,0)] = 0;\n"
         "    return a.Sample(b, pos) + a.Sample(c, pos) + a.Sample(d, pos) + tex2D(f, pos) + tex2D(e, pos)"
-        "            + tex2D(g, pos) + h.b.Load(h.c).x + k.b.Sample(k.c.a, pos) + v + vv;\n"
+        "            + tex2D(g, pos) + h.b.Load(h.c).x + k.b.Sample(k.c.a, pos) + v + vv + l.a.Load(int3(0,0,0))"
+        "            + l.b.Load(int3(0,0,0));\n"
         "}";
 
     static const D3D12_SHADER_INPUT_BIND_DESC ps_bindings[] =
@@ -1535,6 +1545,10 @@ static void test_reflection(void)
         {"a", D3D_SIT_TEXTURE, 3, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 3},
         {"k.b", D3D_SIT_TEXTURE, 5, 1, 0, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE1DARRAY, ~0u, 0, 5},
         {"h.b", D3D_SIT_TEXTURE, 7, 1, D3D_SIF_USERPACKED | D3D_SIF_TEXTURE_COMPONENT_0, D3D_RETURN_TYPE_SINT, D3D_SRV_DIMENSION_TEXTURE1D, ~0u, 0, 7},
+        {"l.a", D3D_SIT_TEXTURE, 9, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_SNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 9},
+        {"l.b", D3D_SIT_TEXTURE, 10, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_UNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 10},
+        {"l.c", D3D_SIT_UAV_RWTYPED, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_SNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 1},
+        {"l.d", D3D_SIT_UAV_RWTYPED, 2, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_UNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 2},
         {"buf2", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .uID = 0},
         {"$Globals", D3D_SIT_CBUFFER, 1, 1, .uID = 1},
         {"buf", D3D_SIT_CBUFFER, 3, 1, D3D_SIF_USERPACKED, .uID = 3},

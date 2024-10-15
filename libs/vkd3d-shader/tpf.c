@@ -3430,13 +3430,19 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
 
 static enum vkd3d_sm4_data_type sm4_data_type(const struct hlsl_type *type)
 {
-    switch (type->e.resource.format->e.numeric.type)
+    const struct hlsl_type *format = type->e.resource.format;
+
+    switch (format->e.numeric.type)
     {
         case HLSL_TYPE_DOUBLE:
             return VKD3D_SM4_DATA_DOUBLE;
 
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_HALF:
+            if (format->modifiers & HLSL_MODIFIER_UNORM)
+                return VKD3D_SM4_DATA_UNORM;
+            if (format->modifiers & HLSL_MODIFIER_SNORM)
+                return VKD3D_SM4_DATA_SNORM;
             return VKD3D_SM4_DATA_FLOAT;
 
         case HLSL_TYPE_INT:

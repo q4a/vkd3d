@@ -265,6 +265,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/unbounded-array-5.1.shader_test \
 	tests/hlsl/uniform-parameters.shader_test \
 	tests/hlsl/uniform-semantics.shader_test \
+	tests/hlsl/unorm-snorm.shader_test \
 	tests/hlsl/unroll.shader_test \
 	tests/hlsl/unsigned.shader_test \
 	tests/hlsl/vector-indexing-uniform.shader_test \

@@ -142,6 +142,7 @@ samplerCUBE             {return KW_SAMPLERCUBE;         }
 SamplerState            {return KW_SAMPLER;             }
 sampler_state           {return KW_SAMPLER_STATE;       }
 shared                  {return KW_SHARED;              }
+snorm                   {return KW_SNORM;               }
 stateblock              {return KW_STATEBLOCK;          }
 stateblock_state        {return KW_STATEBLOCK_STATE;    }
 static                  {return KW_STATIC;              }
@@ -171,6 +172,7 @@ true                    {return KW_TRUE;                }
 typedef                 {return KW_TYPEDEF;             }
 unsigned                {return KW_UNSIGNED;            }
 uniform                 {return KW_UNIFORM;             }
+unorm                   {return KW_UNORM;               }
 vector                  {return KW_VECTOR;              }
 VertexShader            {return KW_VERTEXSHADER;        }
 vertexshader            {return KW_VERTEXSHADER;        }
