@@ -1057,12 +1057,19 @@ static HRESULT d3d12_reflection_init(struct d3d12_reflection *reflection, const 
             }
 
             if (FAILED(hr = parse_rdef(reflection, &section->data)))
-            {
-                vkd3d_shader_free_scan_signature_info(&reflection->signature_info);
-                vkd3d_shader_free_dxbc(&dxbc_desc);
-                return hr;
-            }
+                goto fail;
             found_rdef = true;
+        }
+        else if (section->tag == TAG_SHDR || section->tag == TAG_SHEX)
+        {
+            const uint32_t *version;
+
+            if (!(version = get_data_ptr(&section->data, 0, 1, sizeof(*version))))
+            {
+                hr = E_INVALIDARG;
+                goto fail;
+            }
+            reflection->desc.Version = *version;
         }
     }
 
@@ -1073,6 +1080,11 @@ static HRESULT d3d12_reflection_init(struct d3d12_reflection *reflection, const 
     vkd3d_shader_free_dxbc(&dxbc_desc);
 
     return S_OK;
+
+fail:
+    vkd3d_shader_free_scan_signature_info(&reflection->signature_info);
+    vkd3d_shader_free_dxbc(&dxbc_desc);
+    return hr;
 }
 
 HRESULT WINAPI D3DReflect(const void *data, SIZE_T data_size, REFIID iid, void **reflection)

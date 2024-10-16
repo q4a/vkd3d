@@ -1630,6 +1630,7 @@ static void test_reflection(void)
     {
         const char *source;
         const char *profile;
+        UINT version;
         const D3D12_SHADER_INPUT_BIND_DESC *bindings;
         size_t binding_count;
         const struct shader_buffer *buffers;
@@ -1638,9 +1639,9 @@ static void test_reflection(void)
     }
     tests[] =
     {
-        {vs_source, "vs_5_0", vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
-        {ps_source, "ps_5_0", ps_bindings, ARRAY_SIZE(ps_bindings), ps_buffers, ARRAY_SIZE(ps_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
-        {ps51_source, "ps_5_1", ps51_bindings, ARRAY_SIZE(ps51_bindings), ps51_buffers, ARRAY_SIZE(ps51_buffers), 0}
+        {vs_source, "vs_5_0", 0x10050, vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
+        {ps_source, "ps_5_0", 0x00050, ps_bindings, ARRAY_SIZE(ps_bindings), ps_buffers, ARRAY_SIZE(ps_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
+        {ps51_source, "ps_5_1", 0x00051, ps51_bindings, ARRAY_SIZE(ps51_bindings), ps51_buffers, ARRAY_SIZE(ps51_buffers), 0}
     };
 
     for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
@@ -1663,6 +1664,7 @@ static void test_reflection(void)
 
         hr = ID3D12ShaderReflection_GetDesc(reflection, &shader_desc);
         ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+        ok(shader_desc.Version == tests[t].version, "Got version %#x.\n", shader_desc.Version);
         ok(shader_desc.ConstantBuffers == tests[t].buffer_count, "Got %u buffers.\n", shader_desc.ConstantBuffers);
         ok(shader_desc.BoundResources == tests[t].binding_count, "Got %u resources.\n", shader_desc.BoundResources);
 
