@@ -3215,7 +3215,8 @@ static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
 
 static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_signature *signature, uint32_t tag)
 {
-    bool output = tag == TAG_OSGN || tag == TAG_PCSG;
+    bool output = tag == TAG_OSGN || (tag == TAG_PCSG
+            && tpf->program->shader_version.type == VKD3D_SHADER_TYPE_HULL);
     struct vkd3d_bytecode_buffer buffer = {0};
     unsigned int i;
 
@@ -6717,6 +6718,7 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
+    enum vkd3d_shader_type shader_type = program->shader_version.type;
     struct tpf_compiler tpf = {0};
     struct sm4_stat stat = {0};
     size_t i;
@@ -6731,7 +6733,7 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
 
     tpf_write_signature(&tpf, &program->input_signature, TAG_ISGN);
     tpf_write_signature(&tpf, &program->output_signature, TAG_OSGN);
-    if (ctx->profile->type == VKD3D_SHADER_TYPE_HULL)
+    if (shader_type == VKD3D_SHADER_TYPE_HULL || shader_type == VKD3D_SHADER_TYPE_DOMAIN)
         tpf_write_signature(&tpf, &program->patch_constant_signature, TAG_PCSG);
     write_sm4_rdef(ctx, &tpf.dxbc);
     tpf_write_shdr(&tpf, entry_func);

@@ -6282,7 +6282,7 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 }
 
 static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_program *program,
-        struct shader_signature *signature, bool output, struct hlsl_ir_var *var)
+        struct shader_signature *signature, bool output, bool is_patch_constant_func, struct hlsl_ir_var *var)
 {
     enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
     enum vkd3d_shader_component_type component_type;
@@ -6296,9 +6296,8 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
         struct vkd3d_string_buffer *string;
         bool has_idx, ret;
 
-        ret = sm4_sysval_semantic_from_semantic_name(&sysval, &program->shader_version,
-                ctx->semantic_compat_mapping, ctx->domain, var->semantic.name, var->semantic.index,
-                        output, signature == &program->patch_constant_signature);
+        ret = sm4_sysval_semantic_from_semantic_name(&sysval, &program->shader_version, ctx->semantic_compat_mapping,
+                ctx->domain, var->semantic.name, var->semantic.index, output, is_patch_constant_func);
         VKD3D_ASSERT(ret);
         if (sysval == ~0u)
             return;
@@ -6410,21 +6409,27 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
 static void generate_vsir_signature(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_function_decl *func)
 {
+    bool is_domain = program->shader_version.type == VKD3D_SHADER_TYPE_DOMAIN;
+    bool is_patch_constant_func = func == ctx->patch_constant_func;
     struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (func == ctx->patch_constant_func)
+        if (var->is_input_semantic)
         {
-            generate_vsir_signature_entry(ctx, program,
-                    &program->patch_constant_signature, var->is_output_semantic, var);
+            if (is_patch_constant_func)
+                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, true, var);
+            else if (is_domain)
+                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, false, var);
+            else
+                generate_vsir_signature_entry(ctx, program, &program->input_signature, false, false, var);
         }
-        else
+        if (var->is_output_semantic)
         {
-            if (var->is_input_semantic)
-                generate_vsir_signature_entry(ctx, program, &program->input_signature, false, var);
-            if (var->is_output_semantic)
-                generate_vsir_signature_entry(ctx, program, &program->output_signature, true, var);
+            if (is_patch_constant_func)
+                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, true, true, var);
+            else
+                generate_vsir_signature_entry(ctx, program, &program->output_signature, true, false, var);
         }
     }
 }
