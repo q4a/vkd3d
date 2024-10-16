@@ -1954,6 +1954,7 @@ static bool copy_propagation_process_loop(struct hlsl_ctx *ctx, struct hlsl_ir_l
     bool progress = false;
 
     copy_propagation_invalidate_from_block(ctx, state, &loop->body, loop->node.index);
+    copy_propagation_invalidate_from_block(ctx, state, &loop->iter, loop->node.index);
 
     copy_propagation_push_scope(state, ctx);
     progress |= copy_propagation_transform_block(ctx, &loop->body, state);
@@ -10177,6 +10178,101 @@ static bool unroll_loops(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, void *
     return true;
 }
 
+/* We could handle this at parse time. However, loop unrolling often needs to
+ * know the value of variables modified in the "iter" block. It is possible to
+ * detect that all exit paths of a loop body modify such variables in the same
+ * way, but difficult, and d3dcompiler does not attempt to do so.
+ * In fact, d3dcompiler is capable of unrolling the following loop:
+ * for (int i = 0; i < 10; ++i)
+ * {
+ *     if (some_uniform > 4)
+ *         continue;
+ * }
+ * but cannot unroll the same loop with "++i" moved to each exit path:
+ * for (int i = 0; i < 10;)
+ * {
+ *     if (some_uniform > 4)
+ *     {
+ *         ++i;
+ *         continue;
+ *     }
+ *     ++i;
+ * }
+ */
+static bool resolve_loops(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, void *context)
+{
+    struct hlsl_ir_loop *loop;
+
+    if (node->type != HLSL_IR_LOOP)
+        return true;
+
+    loop = hlsl_ir_loop(node);
+
+    hlsl_block_add_block(&loop->body, &loop->iter);
+    return true;
+}
+
+static void resolve_continues(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_loop *last_loop)
+{
+    struct hlsl_ir_node *node;
+
+    LIST_FOR_EACH_ENTRY(node, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        switch (node->type)
+        {
+            case HLSL_IR_LOOP:
+            {
+                struct hlsl_ir_loop *loop = hlsl_ir_loop(node);
+
+                resolve_continues(ctx, &loop->body, loop);
+                break;
+            }
+            case HLSL_IR_IF:
+            {
+                struct hlsl_ir_if *iff = hlsl_ir_if(node);
+                resolve_continues(ctx, &iff->then_block, last_loop);
+                resolve_continues(ctx, &iff->else_block, last_loop);
+                break;
+            }
+            case HLSL_IR_SWITCH:
+            {
+                struct hlsl_ir_switch *s = hlsl_ir_switch(node);
+                struct hlsl_ir_switch_case *c;
+
+                LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                {
+                    resolve_continues(ctx, &c->body, last_loop);
+                }
+
+                break;
+            }
+            case HLSL_IR_JUMP:
+            {
+                struct hlsl_ir_jump *jump = hlsl_ir_jump(node);
+
+                if (jump->type != HLSL_IR_JUMP_UNRESOLVED_CONTINUE)
+                    break;
+
+                if (last_loop->type == HLSL_LOOP_FOR)
+                {
+                    struct hlsl_block draft;
+
+                    if (!hlsl_clone_block(ctx, &draft, &last_loop->iter))
+                        return;
+
+                    list_move_before(&node->entry, &draft.instrs);
+                    hlsl_block_cleanup(&draft);
+                }
+
+                jump->type = HLSL_IR_JUMP_CONTINUE;
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
+
 static void loop_unrolling_execute(struct hlsl_ctx *ctx, struct hlsl_block *block)
 {
     bool progress;
@@ -10190,6 +10286,8 @@ static void loop_unrolling_execute(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     } while (progress);
     hlsl_transform_ir(ctx, split_matrix_copies, block, NULL);
 
+    resolve_continues(ctx, block, NULL);
+    hlsl_transform_ir(ctx, resolve_loops, block, NULL);
     hlsl_transform_ir(ctx, unroll_loops, block, block);
 }
 
