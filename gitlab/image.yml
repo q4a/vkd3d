@@ -37,9 +37,7 @@ image-mac:
     - mac
   script:
     - mkdir image
-    - mkdir image/bin
     - mkdir image/moltenvk
-    - export PATH="/usr/local/opt/bison/bin:/usr/local/opt/flex/bin:$PATH"
 
     - git clone --depth 1 --branch v1.2.9 https://github.com/KhronosGroup/MoltenVK.git
     - cd MoltenVK
@@ -51,15 +49,6 @@ image-mac:
     - cd ..
     - cp MoltenVK/Package/Release/MoltenVK/dylib/macOS/MoltenVK_icd.json image/moltenvk
     - cp MoltenVK/Package/Release/MoltenVK/dylib/macOS/libMoltenVK.dylib image/moltenvk
-
-    - git clone --depth 1 --branch wine-3.21 https://gitlab.winehq.org/wine/wine.git
-    - cd wine
-    - mkdir build
-    - cd build
-    - arch -x86_64 ../configure --enable-win64 --without-x --without-freetype
-    - arch -x86_64 make tools/widl/widl
-    - cd ../..
-    - cp wine/build/tools/widl/widl image/bin
   artifacts:
     paths:
       - image
