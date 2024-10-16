@@ -138,9 +138,6 @@ build-mac:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
   image: winehq-sonoma-pristine
-  variables:
-    TART_EXECUTOR_SSH_USERNAME: "gitlab"
-    TART_EXECUTOR_SSH_PASSWORD: "gitlab"
   allow_failure: true
   interruptible: true
   needs:
