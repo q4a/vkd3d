@@ -36,8 +36,22 @@ image-mac:
   tags:
     - mac
   script:
+    - brew install cmake clang-format
     - mkdir image
+    - mkdir image/dxc
     - mkdir image/moltenvk
+
+    # The specified commit includes the open sourced libdxil.dylib,
+    # which is not available yet in any released version
+    - git clone --recursive https://github.com/microsoft/DirectXShaderCompiler.git
+    - cd DirectXShaderCompiler
+    - git checkout dfa1c814cc4c912ba982854b72f64527baa3e7e5
+    - mkdir build
+    - cd build
+    - cmake .. -C ../cmake/caches/PredefinedParams.cmake
+    - make -j$(sysctl -n hw.ncpu)
+    - cd ../..
+    - cp DirectXShaderCompiler/build/lib/libdxcompiler.dylib DirectXShaderCompiler/build/lib/libdxil.dylib image/dxc
 
     - git clone --depth 1 --branch v1.2.9 https://github.com/KhronosGroup/MoltenVK.git
     - cd MoltenVK
