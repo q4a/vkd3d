@@ -648,6 +648,7 @@ enum vkd3d_shader_register_type
     VKD3DSPR_WAVELANECOUNT,
     VKD3DSPR_WAVELANEINDEX,
     VKD3DSPR_PARAMETER,
+    VKD3DSPR_POINT_COORD,
 
     VKD3DSPR_COUNT,
 
@@ -1421,6 +1422,7 @@ struct vsir_program
     unsigned int ssa_count;
     bool use_vocp;
     bool has_point_size;
+    bool has_point_coord;
     enum vsir_control_flow_type cf_type;
     enum vsir_normalisation_level normalisation_level;
 

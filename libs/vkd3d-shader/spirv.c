@@ -3252,6 +3252,9 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
         case VKD3DSPR_WAVELANEINDEX:
             snprintf(buffer, buffer_size, "vWaveLaneIndex");
             break;
+        case VKD3DSPR_POINT_COORD:
+            snprintf(buffer, buffer_size, "vPointCoord");
+            break;
         default:
             FIXME("Unhandled register %#x.\n", reg->type);
             snprintf(buffer, buffer_size, "unrecognized_%#x", reg->type);
@@ -4885,6 +4888,8 @@ vkd3d_register_builtins[] =
     {VKD3DSPR_PRIMID,           {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInPrimitiveId}},
 
     {VKD3DSPR_TESSCOORD,        {VKD3D_SHADER_COMPONENT_FLOAT, 3, SpvBuiltInTessCoord}},
+
+    {VKD3DSPR_POINT_COORD,      {VKD3D_SHADER_COMPONENT_FLOAT, 2, SpvBuiltInPointCoord}},
 
     {VKD3DSPR_COVERAGE,         {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInSampleMask, NULL, 1}},
     {VKD3DSPR_SAMPLEMASK,       {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInSampleMask, NULL, 1}},
@@ -10595,6 +10600,14 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
         vsir_dst_param_init(&dst, VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
         dst.reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
         spirv_compiler_emit_output_register(compiler, &dst);
+    }
+
+    if (compiler->program->has_point_coord)
+    {
+        struct vkd3d_shader_dst_param dst;
+
+        vsir_dst_param_init(&dst, VKD3DSPR_POINT_COORD, VKD3D_DATA_FLOAT, 0);
+        spirv_compiler_emit_input_register(compiler, &dst);
     }
 }
 

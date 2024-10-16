@@ -1190,6 +1190,10 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
             vkd3d_string_buffer_printf(buffer, "vWaveLaneIndex");
             break;
 
+        case VKD3DSPR_POINT_COORD:
+            vkd3d_string_buffer_printf(buffer, "vPointCoord");
+            break;
+
         default:
             vkd3d_string_buffer_printf(buffer, "%s<unhandled register type %#x>%s",
                     compiler->colours.error, reg->type, compiler->colours.reset);
