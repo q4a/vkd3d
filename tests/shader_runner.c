@@ -1335,6 +1335,13 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         line = rest;
         runner->point_size_max = strtof(line, &rest);
     }
+    else if (match_string(line, "point-sprite", &line))
+    {
+        if (match_string(line, "on", &line))
+            runner->point_sprite = true;
+        else
+            runner->point_sprite = false;
+    }
     else
     {
         fatal_error("Unknown test directive '%s'.\n", line);
