@@ -155,7 +155,7 @@ build-mac:
     - git clean -fdx
     - git reset --hard
     - rm -fr .git/rebase-merge
-    - curl -o image.zip https://gitlab.winehq.org/api/v4/projects/giomasce%2Fvkd3d/jobs/artifacts/ci-image/download?job=image-mac
+    - curl -o image.zip https://gitlab.winehq.org/api/v4/projects/wine%2Fvkd3d/jobs/artifacts/master/download?job=image-mac
     - unzip image.zip
     - mkdir artifacts
     - export PATH="/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/flex/bin:$PWD/image/bin:$PATH"
