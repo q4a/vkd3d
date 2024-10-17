@@ -1925,6 +1925,13 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         vkd3d_device_descriptor_limits_init(&vulkan_info->descriptor_limits,
                 &physical_device_info->properties2.properties.limits);
 
+    TRACE("Device %p: using %s descriptor heaps, with%s descriptor indexing, "
+            "with%s push descriptors, with%s mutable descriptors\n",
+            device, device->use_vk_heaps ? "Vulkan" : "virtual",
+            device->vk_info.EXT_descriptor_indexing ? "" : "out",
+            device->vk_info.KHR_push_descriptor ? "" : "out",
+            device->vk_info.EXT_mutable_descriptor_type ? "" : "out");
+
     vkd3d_chain_physical_device_info_structures(physical_device_info, device);
 
     return S_OK;
