@@ -7195,6 +7195,7 @@ static void vsir_validate_register_without_indices(struct validation_context *ct
 static void vsir_validate_io_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
+    unsigned int control_point_count = 0, control_point_index;
     const struct shader_signature *signature;
     bool has_control_point = false;
 
@@ -7209,6 +7210,7 @@ static void vsir_validate_io_register(struct validation_context *ctx,
                 case VKD3D_SHADER_TYPE_HULL:
                 case VKD3D_SHADER_TYPE_DOMAIN:
                     has_control_point = true;
+                    control_point_count = ctx->program->input_control_point_count;
                     break;
 
                 default:
@@ -7225,6 +7227,7 @@ static void vsir_validate_io_register(struct validation_context *ctx,
                     {
                         signature = &ctx->program->output_signature;
                         has_control_point = ctx->program->normalisation_level >= VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
+                        control_point_count = ctx->program->output_control_point_count;
                     }
                     else
                     {
@@ -7241,11 +7244,13 @@ static void vsir_validate_io_register(struct validation_context *ctx,
         case VKD3DSPR_INCONTROLPOINT:
             signature = &ctx->program->input_signature;
             has_control_point = true;
+            control_point_count = ctx->program->input_control_point_count;
             break;
 
         case VKD3DSPR_OUTCONTROLPOINT:
             signature = &ctx->program->output_signature;
             has_control_point = true;
+            control_point_count = ctx->program->output_control_point_count;
             break;
 
         case VKD3DSPR_PATCHCONST:
@@ -7261,6 +7266,8 @@ static void vsir_validate_io_register(struct validation_context *ctx,
         /* Indices are [register] or [control point, register]. Both are
          * allowed to have a relative address. */
         unsigned int expected_idx_count = 1 + !!has_control_point;
+
+        control_point_index = 0;
 
         if (reg->idx_count != expected_idx_count)
         {
@@ -7280,7 +7287,7 @@ static void vsir_validate_io_register(struct validation_context *ctx,
         /* If the signature element is not an array, indices are
          * [signature] or [control point, signature]. If the signature
          * element is an array, indices are [array, signature] or
-         * [control point, array, signature]. In any case `signature' is
+         * [array, control point, signature]. In any case `signature' is
          * not allowed to have a relative address, while the others are.
          */
         if (reg->idx_count < 1)
@@ -7314,6 +7321,7 @@ static void vsir_validate_io_register(struct validation_context *ctx,
             is_array = true;
 
         expected_idx_count = 1 + !!has_control_point + !!is_array;
+        control_point_index = !!is_array;
 
         if (reg->idx_count != expected_idx_count)
         {
@@ -7323,6 +7331,12 @@ static void vsir_validate_io_register(struct validation_context *ctx,
             return;
         }
     }
+
+    if (has_control_point && !reg->idx[control_point_index].rel_addr
+            && reg->idx[control_point_index].offset >= control_point_count)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Control point index %u exceeds the control point count %u in a register of type %#x.",
+                reg->idx[control_point_index].offset, control_point_count, reg->type);
 }
 
 static void vsir_validate_temp_register(struct validation_context *ctx,
