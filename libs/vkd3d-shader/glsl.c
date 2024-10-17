@@ -2214,6 +2214,7 @@ int glsl_compile(struct vsir_program *program, uint64_t config_flags,
         return ret;
 
     VKD3D_ASSERT(program->normalised_io);
+    VKD3D_ASSERT(program->normalised_hull_cp_io);
 
     vkd3d_glsl_generator_init(&generator, program, compile_info,
             descriptor_info, combined_sampler_info, message_context);

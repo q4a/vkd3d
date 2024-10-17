@@ -1416,6 +1416,7 @@ struct vsir_program
     bool has_point_size;
     enum vsir_control_flow_type cf_type;
     bool normalised_io;
+    bool normalised_hull_cp_io;
 
     const char **block_names;
     size_t block_name_count;

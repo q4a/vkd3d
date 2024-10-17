@@ -99,6 +99,7 @@ bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_c
     program->shader_version = *version;
     program->cf_type = cf_type;
     program->normalised_io = normalised_io;
+    program->normalised_hull_cp_io = normalised_io;
     return shader_instruction_array_init(&program->instructions, reserve);
 }
 
@@ -1134,6 +1135,14 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
     enum vkd3d_result ret;
     unsigned int i, j;
 
+    VKD3D_ASSERT(!program->normalised_hull_cp_io);
+
+    if (program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
+    {
+        program->normalised_hull_cp_io = true;
+        return VKD3D_OK;
+    }
+
     if (!(normaliser.outpointid_param = vsir_program_create_outpointid_param(program)))
     {
         ERR("Failed to allocate src param.\n");
@@ -1177,6 +1186,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
                 break;
             case VKD3DSIH_HS_CONTROL_POINT_PHASE:
                 program->instructions = normaliser.instructions;
+                program->normalised_hull_cp_io = true;
                 return VKD3D_OK;
             case VKD3DSIH_HS_FORK_PHASE:
             case VKD3DSIH_HS_JOIN_PHASE:
@@ -1185,6 +1195,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
                 ret = control_point_normaliser_emit_hs_input(&normaliser, &program->input_signature,
                         input_control_point_count, i, &location);
                 program->instructions = normaliser.instructions;
+                program->normalised_hull_cp_io = true;
                 return ret;
             default:
                 break;
@@ -1192,6 +1203,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
     }
 
     program->instructions = normaliser.instructions;
+    program->normalised_hull_cp_io = true;
     return VKD3D_OK;
 }
 
@@ -7659,11 +7671,9 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
             vsir_transform(&ctx, vsir_program_remap_output_signature);
 
         if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
-        {
             vsir_transform(&ctx, vsir_program_flatten_hull_shader_phases);
-            vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
-        }
 
+        vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
         vsir_transform(&ctx, vsir_program_normalise_flat_constants);
         vsir_transform(&ctx, vsir_program_remove_dead_code);

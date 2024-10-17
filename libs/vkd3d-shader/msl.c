@@ -870,6 +870,7 @@ int msl_compile(struct vsir_program *program, uint64_t config_flags,
         return ret;
 
     VKD3D_ASSERT(program->normalised_io);
+    VKD3D_ASSERT(program->normalised_hull_cp_io);
 
     if ((ret = msl_generator_init(&generator, program, compile_info, descriptor_info, message_context)) < 0)
         return ret;
