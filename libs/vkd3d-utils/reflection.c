@@ -482,7 +482,7 @@ static HRESULT get_signature_parameter(const struct vkd3d_shader_signature *sign
     desc->SystemValueType = (D3D_NAME)e->sysval_semantic;
     desc->ComponentType = (D3D_REGISTER_COMPONENT_TYPE)e->component_type;
     desc->Mask = e->mask;
-    desc->ReadWriteMask = output ? (e->mask & ~e->used_mask) : e->used_mask;
+    desc->ReadWriteMask = output ? (0xf ^ e->used_mask) : e->used_mask;
     desc->Stream = e->stream_index;
     desc->MinPrecision = (D3D_MIN_PRECISION)e->min_precision;
 
@@ -513,11 +513,11 @@ static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetPatchConstantParameterDesc(
         ID3D12ShaderReflection *iface, UINT index, D3D12_SIGNATURE_PARAMETER_DESC *desc)
 {
     struct d3d12_reflection *reflection = impl_from_ID3D12ShaderReflection(iface);
+    bool output = ((reflection->desc.Version & 0xffff0000) >> 16) == D3D12_SHVER_HULL_SHADER;
 
     TRACE("iface %p, index %u, desc %p.\n", iface, index, desc);
 
-    return get_signature_parameter(&reflection->signature_info.patch_constant, index, desc,
-            /* FIXME: check shader type */true);
+    return get_signature_parameter(&reflection->signature_info.patch_constant, index, desc, output);
 }
 
 static struct ID3D12ShaderReflectionVariable * STDMETHODCALLTYPE d3d12_reflection_GetVariableByName(
