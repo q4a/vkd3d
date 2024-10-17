@@ -2535,6 +2535,103 @@ static void test_signature_reflection(void)
         {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
     };
 
+    static const char ds1_source[] =
+        "struct hs_data\n"
+        "{\n"
+        "    float edges[4] : sv_tessfactor;\n"
+        "    float inside[2] : sv_insidetessfactor;\n"
+        "    float4 x : sv_position;\n"
+        "    float4 y : position;\n"
+        "    float4 apple : apple;\n"
+        "};\n"
+        "\n"
+        "struct ds_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "    float4 y : position;\n"
+        "    float2 banana : banana;\n"
+        "};\n"
+        "\n"
+        "[domain(\"quad\")]\n"
+        "void main(\n"
+        "        in hs_data input,\n"
+        "        in uint a : sv_primitiveid,\n"
+        "        in float2 b : sv_domainlocation,\n"
+        "        out ds_data output)\n"
+        "{\n"
+        "    output.x = output.y = input.apple;\n"
+        "    output.banana = float2(input.edges[0], input.inside[1]);\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds1_outputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"position",    0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"banana",      0, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds1_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0x1},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_tessfactor",       2, 2, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_tessfactor",       3, 3, D3D_NAME_FINAL_QUAD_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_insidetessfactor", 0, 4, D3D_NAME_FINAL_QUAD_INSIDE_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_insidetessfactor", 1, 5, D3D_NAME_FINAL_QUAD_INSIDE_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0x1},
+        {"sv_position",         0, 6, D3D_NAME_UNDEFINED,                    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"position",            0, 7, D3D_NAME_UNDEFINED,                    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"apple",               0, 8, D3D_NAME_UNDEFINED,                    D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+    };
+
+    static const char ds2_source[] =
+        "struct hs_data\n"
+        "{\n"
+        "    float edges[3] : sv_tessfactor;\n"
+        "    float inside : sv_insidetessfactor;\n"
+        "};\n"
+        "\n"
+        "[domain(\"tri\")]\n"
+        "float4 main(in hs_data input) : apple\n"
+        "{\n"
+        "    return 0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds2_outputs[] =
+    {
+        {"apple", 0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds2_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_TRI_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_TRI_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_tessfactor",       2, 2, D3D_NAME_FINAL_TRI_EDGE_TESSFACTOR,   D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_insidetessfactor", 0, 3, D3D_NAME_FINAL_TRI_INSIDE_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
+    static const char ds3_source[] =
+        "struct hs_data\n"
+        "{\n"
+        "    float edges[2] : sv_tessfactor;\n"
+        "};\n"
+        "\n"
+        "[domain(\"isoline\")]\n"
+        "float4 main(in hs_data input) : apple\n"
+        "{\n"
+        "    return 0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds3_outputs[] =
+    {
+        {"apple", 0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds3_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_LINE_DENSITY_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
     static const struct
     {
         const char *source;
@@ -2572,6 +2669,9 @@ static void test_signature_reflection(void)
         {hs1_source,  "hs_5_0", false, NULL, 0, hs1_outputs, ARRAY_SIZE(hs1_outputs), hs1_patch_constants, ARRAY_SIZE(hs1_patch_constants)},
         {hs2_source,  "hs_5_0", false, NULL, 0, hs2_outputs, ARRAY_SIZE(hs2_outputs), hs2_patch_constants, ARRAY_SIZE(hs2_patch_constants)},
         {hs3_source,  "hs_5_0", false, NULL, 0, hs3_outputs, ARRAY_SIZE(hs3_outputs), hs3_patch_constants, ARRAY_SIZE(hs3_patch_constants)},
+        {ds1_source,  "ds_5_0", false, NULL, 0, ds1_outputs, ARRAY_SIZE(ds1_outputs), ds1_patch_constants, ARRAY_SIZE(ds1_patch_constants)},
+        {ds2_source,  "ds_5_0", false, NULL, 0, ds2_outputs, ARRAY_SIZE(ds2_outputs), ds2_patch_constants, ARRAY_SIZE(ds2_patch_constants)},
+        {ds3_source,  "ds_5_0", false, NULL, 0, ds3_outputs, ARRAY_SIZE(ds3_outputs), ds3_patch_constants, ARRAY_SIZE(ds3_patch_constants)},
     };
 
     for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
