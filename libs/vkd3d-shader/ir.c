@@ -75,7 +75,7 @@ static int convert_parameter_info(const struct vkd3d_shader_compile_info *compil
 
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_version *version, unsigned int reserve, enum vsir_control_flow_type cf_type,
-        bool normalised_io)
+        enum vsir_normalisation_level normalisation_level)
 {
     memset(program, 0, sizeof(*program));
 
@@ -98,8 +98,7 @@ bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_c
 
     program->shader_version = *version;
     program->cf_type = cf_type;
-    program->normalised_io = normalised_io;
-    program->normalised_hull_cp_io = normalised_io;
+    program->normalisation_level = normalisation_level;
     return shader_instruction_array_init(&program->instructions, reserve);
 }
 
@@ -1135,11 +1134,11 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
     enum vkd3d_result ret;
     unsigned int i, j;
 
-    VKD3D_ASSERT(!program->normalised_hull_cp_io);
+    VKD3D_ASSERT(program->normalisation_level == VSIR_NOT_NORMALISED);
 
     if (program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
     {
-        program->normalised_hull_cp_io = true;
+        program->normalisation_level = VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
         return VKD3D_OK;
     }
 
@@ -1186,7 +1185,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
                 break;
             case VKD3DSIH_HS_CONTROL_POINT_PHASE:
                 program->instructions = normaliser.instructions;
-                program->normalised_hull_cp_io = true;
+                program->normalisation_level = VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
                 return VKD3D_OK;
             case VKD3DSIH_HS_FORK_PHASE:
             case VKD3DSIH_HS_JOIN_PHASE:
@@ -1195,7 +1194,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
                 ret = control_point_normaliser_emit_hs_input(&normaliser, &program->input_signature,
                         input_control_point_count, i, &location);
                 program->instructions = normaliser.instructions;
-                program->normalised_hull_cp_io = true;
+                program->normalisation_level = VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
                 return ret;
             default:
                 break;
@@ -1203,7 +1202,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
     }
 
     program->instructions = normaliser.instructions;
-    program->normalised_hull_cp_io = true;
+    program->normalisation_level = VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
     return VKD3D_OK;
 }
 
@@ -1917,7 +1916,7 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
     struct vkd3d_shader_instruction *ins;
     unsigned int i;
 
-    VKD3D_ASSERT(!program->normalised_io);
+    VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_HULL_CONTROL_POINT_IO);
 
     normaliser.phase = VKD3DSIH_INVALID;
     normaliser.shader_type = program->shader_version.type;
@@ -1975,7 +1974,7 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
 
     program->instructions = normaliser.instructions;
     program->use_vocp = normaliser.use_vocp;
-    program->normalised_io = true;
+    program->normalisation_level = VSIR_FULLY_NORMALISED_IO;
     return VKD3D_OK;
 }
 
@@ -6234,15 +6233,11 @@ static void vsir_validate_io_register(struct validation_context *ctx,
             switch (ctx->program->shader_version.type)
             {
                 case VKD3D_SHADER_TYPE_HULL:
-                    if (ctx->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE)
+                    if (ctx->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE
+                            || ctx->program->normalisation_level >= VSIR_FULLY_NORMALISED_IO)
                     {
                         signature = &ctx->program->output_signature;
-                        has_control_point = ctx->program->normalised_hull_cp_io;
-                    }
-                    else if (ctx->program->normalised_io)
-                    {
-                        signature = &ctx->program->output_signature;
-                        has_control_point = true;
+                        has_control_point = ctx->program->normalisation_level >= VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
                     }
                     else
                     {
@@ -6274,7 +6269,7 @@ static void vsir_validate_io_register(struct validation_context *ctx,
             vkd3d_unreachable();
     }
 
-    if (!ctx->program->normalised_io)
+    if (ctx->program->normalisation_level < VSIR_FULLY_NORMALISED_IO)
     {
         /* Indices are [register] or [control point, register]. Both are
          * allowed to have a relative address. */

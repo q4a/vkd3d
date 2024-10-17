@@ -1393,6 +1393,13 @@ enum vsir_control_flow_type
     VSIR_CF_BLOCKS,
 };
 
+enum vsir_normalisation_level
+{
+    VSIR_NOT_NORMALISED,
+    VSIR_NORMALISED_HULL_CONTROL_POINT_IO,
+    VSIR_FULLY_NORMALISED_IO,
+};
+
 struct vsir_program
 {
     struct vkd3d_shader_version shader_version;
@@ -1415,8 +1422,7 @@ struct vsir_program
     bool use_vocp;
     bool has_point_size;
     enum vsir_control_flow_type cf_type;
-    bool normalised_io;
-    bool normalised_hull_cp_io;
+    enum vsir_normalisation_level normalisation_level;
 
     const char **block_names;
     size_t block_name_count;
@@ -1430,7 +1436,7 @@ const struct vkd3d_shader_parameter1 *vsir_program_get_parameter(
         const struct vsir_program *program, enum vkd3d_shader_parameter_name name);
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_version *version, unsigned int reserve, enum vsir_control_flow_type cf_type,
-        bool normalised_io);
+        enum vsir_normalisation_level normalisation_level);
 enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context);
 enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t config_flags,

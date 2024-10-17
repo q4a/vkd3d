@@ -10650,8 +10650,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
             compile_info, compiler->message_context)) < 0)
         return result;
 
-    VKD3D_ASSERT(program->normalised_io);
-    VKD3D_ASSERT(program->normalised_hull_cp_io);
+    VKD3D_ASSERT(program->normalisation_level == VSIR_FULLY_NORMALISED_IO);
 
     max_element_count = max(program->output_signature.element_count, program->patch_constant_signature.element_count);
     if (!(compiler->output_info = vkd3d_calloc(max_element_count, sizeof(*compiler->output_info))))
