@@ -6256,6 +6256,11 @@ static void vsir_validate_io_register(struct validation_context *ctx,
             }
             break;
 
+        case VKD3DSPR_INCONTROLPOINT:
+            signature = &ctx->program->input_signature;
+            has_control_point = true;
+            break;
+
         case VKD3DSPR_PATCHCONST:
             signature = &ctx->program->patch_constant_signature;
             break;
@@ -6692,6 +6697,10 @@ static void vsir_validate_register(struct validation_context *ctx,
 
         case VKD3DSPR_UAV:
             vsir_validate_uav_register(ctx, reg);
+            break;
+
+        case VKD3DSPR_INCONTROLPOINT:
+            vsir_validate_io_register(ctx, reg);
             break;
 
         case VKD3DSPR_PATCHCONST:
