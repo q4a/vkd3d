@@ -80,6 +80,9 @@ source_type_info[] =
         "dxbc-dxil",    "A 'DirectX Intermediate Language' shader embedded in a DXBC container.\n"
         "                This is the format used for Direct3D shader model 6 shaders.\n",
         true, VKD3D_SHADER_TARGET_SPIRV_BINARY},
+    {VKD3D_SHADER_SOURCE_FX,
+        "fx",           "Raw effect binary section. This type includes fx_2_0 and fx_4+ formats.\n",
+        true, VKD3D_SHADER_TARGET_D3D_ASM},
 };
 
 static const struct target_type_info
