@@ -121,6 +121,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/exp.shader_test \
 	tests/hlsl/expr-indexing.shader_test \
 	tests/hlsl/f16tof32.shader_test \
+	tests/hlsl/f32tof16.shader_test \
 	tests/hlsl/faceforward.shader_test \
 	tests/hlsl/ffp-point-size.shader_test \
 	tests/hlsl/float-comparison.shader_test \

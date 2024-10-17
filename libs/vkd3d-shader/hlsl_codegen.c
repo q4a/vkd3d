@@ -7859,6 +7859,78 @@ static bool lower_f16tof32(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
     return true;
 }
 
+static bool lower_f32tof16(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *call, *rhs, *store;
+    struct hlsl_ir_function_decl *func;
+    unsigned int component_count;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_var *lhs;
+    char *body;
+
+    static const char template[] =
+    "typedef uint%u uintX;\n"
+    "uintX soft_f32tof16(float%u x)\n"
+    "{\n"
+    "    uintX v = asuint(x);\n"
+    "    uintX v_abs = v & 0x7fffffff;\n"
+    "    uintX sign_bit = (v >> 16) & 0x8000;\n"
+    "    uintX exp = (v >> 23) & 0xff;\n"
+    "    uintX mantissa = v & 0x7fffff;\n"
+    "    uintX nan16;\n"
+    "    uintX nan = (v & 0x7f800000) == 0x7f800000;\n"
+    "    uintX val;\n"
+    "\n"
+    "    val = 113 - exp;\n"
+    "    val = (mantissa + 0x800000) >> val;\n"
+    "    val >>= 13;\n"
+    "\n"
+    "    val = (exp - 127) < -38 ? 0 : val;\n"
+    "\n"
+    "    val = v_abs < 0x38800000 ? val : (v_abs + 0xc8000000) >> 13;\n"
+    "    val = v_abs > 0x47ffe000 ? 0x7bff : val;\n"
+    "\n"
+    "    nan16 = (((v >> 13) | (v >> 3) | v) & 0x3ff) + 0x7c00;\n"
+    "    val = nan ? nan16 : val;\n"
+    "\n"
+    "    return (val & 0x7fff) + sign_bit;\n"
+    "}\n";
+
+    if (node->type != HLSL_IR_EXPR)
+        return false;
+
+    expr = hlsl_ir_expr(node);
+
+    if (expr->op != HLSL_OP1_F32TOF16)
+        return false;
+
+    rhs = expr->operands[0].node;
+    component_count = hlsl_type_component_count(rhs->data_type);
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template, component_count, component_count)))
+        return false;
+
+    if (!(func = hlsl_compile_internal_function(ctx, "soft_f32tof16", body)))
+        return false;
+
+    lhs = func->parameters.vars[0];
+
+    if (!(store = hlsl_new_simple_store(ctx, lhs, rhs)))
+        return false;
+    hlsl_block_add_instr(block, store);
+
+    if (!(call = hlsl_new_call(ctx, func, &node->loc)))
+        return false;
+    hlsl_block_add_instr(block, call);
+
+    if (!(load = hlsl_new_var_load(ctx, func->return_var, &node->loc)))
+        return false;
+    hlsl_block_add_instr(block, &load->node);
+
+    return true;
+}
+
 static void process_entry_function(struct hlsl_ctx *ctx,
         const struct hlsl_block *global_uniform_block, struct hlsl_ir_function_decl *entry_func)
 {
@@ -7887,7 +7959,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         return;
 
     if (hlsl_version_ge(ctx, 4, 0) && hlsl_version_lt(ctx, 5, 0))
+    {
         lower_ir(ctx, lower_f16tof32, body);
+        lower_ir(ctx, lower_f32tof16, body);
+    }
 
     lower_return(ctx, entry_func, body, false);
 
