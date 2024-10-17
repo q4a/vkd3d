@@ -1918,6 +1918,26 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
             && descriptor_indexing->descriptorBindingUniformTexelBufferUpdateAfterBind
             && descriptor_indexing->descriptorBindingStorageTexelBufferUpdateAfterBind;
 
+    /* Many Vulkan implementations allow up to 8 descriptor sets. Unfortunately
+     * using vkd3d with Vulkan heaps and push descriptors currently requires up
+     * to 9 descriptor sets (up to one for the push descriptors, up to one for
+     * the static samplers and seven for Vulkan heaps, one for each needed
+     * descriptor type). If we detect such situation, we disable push
+     * descriptors, which allows us to stay within the limits (not doing so is
+     * fatal on many implmentations).
+     *
+     * It is possible that a different strategy might be used. For example, we
+     * could move the static samplers to one of the seven Vulkan heaps sets. Or
+     * we could decide whether to create the push descriptor set when creating
+     * the root signature, depending on whether there are static samplers or
+     * not. */
+    if (device->vk_info.device_limits.maxBoundDescriptorSets == 8 && device->use_vk_heaps
+            && device->vk_info.KHR_push_descriptor)
+    {
+        TRACE("Disabling VK_KHR_push_descriptor to save a descriptor set.\n");
+        device->vk_info.KHR_push_descriptor = VK_FALSE;
+    }
+
     if (device->use_vk_heaps)
         vkd3d_device_vk_heaps_descriptor_limits_init(&vulkan_info->descriptor_limits,
                 &physical_device_info->descriptor_indexing_properties);
