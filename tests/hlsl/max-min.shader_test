@@ -101,7 +101,7 @@ uint4 main() : sv_target
 
 [test]
 uniform 0 uint4 1 2 0 0
-todo(glsl) draw quad
+draw quad
 probe (0, 0) rgbaui (2, 1, 2, 1)
 
 [rtv 0]

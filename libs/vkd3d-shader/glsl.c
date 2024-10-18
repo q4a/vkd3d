@@ -1482,9 +1482,11 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_IMAX:
         case VKD3DSIH_MAX:
+        case VKD3DSIH_UMAX:
             shader_glsl_intrinsic(gen, ins, "max");
             break;
         case VKD3DSIH_MIN:
+        case VKD3DSIH_UMIN:
             shader_glsl_intrinsic(gen, ins, "min");
             break;
         case VKD3DSIH_IMUL:
