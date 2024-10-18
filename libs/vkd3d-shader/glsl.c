@@ -900,7 +900,13 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
 
     vkd3d_string_buffer_printf(sample, "texture(");
     shader_glsl_print_combined_sampler_name(sample, gen, resource_idx, resource_space, sampler_idx, sampler_space);
-    vkd3d_string_buffer_printf(sample, ", %s)", coord.str->buffer);
+    vkd3d_string_buffer_printf(sample, ", %s", coord.str->buffer);
+    if (ins->opcode == VKD3DSIH_SAMPLE_B)
+    {
+        vkd3d_string_buffer_printf(sample, ", ");
+        shader_glsl_print_src(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
+    }
+    vkd3d_string_buffer_printf(sample, ")");
     shader_glsl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
 
     shader_glsl_print_assignment_ext(gen, &dst, data_type, "%s", sample->buffer);
@@ -1493,6 +1499,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             shader_glsl_intrinsic(gen, ins, "inversesqrt");
             break;
         case VKD3DSIH_SAMPLE:
+        case VKD3DSIH_SAMPLE_B:
             shader_glsl_sample(gen, ins);
             break;
         case VKD3DSIH_SQRT:
