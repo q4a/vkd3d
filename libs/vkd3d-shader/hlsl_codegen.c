@@ -278,7 +278,7 @@ static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hls
 
 static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         struct hlsl_ir_var *var, struct hlsl_type *type, uint32_t modifiers, struct hlsl_semantic *semantic,
-        uint32_t index, bool output, const struct vkd3d_shader_location *loc)
+        uint32_t index, bool output, bool force_align, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_semantic new_semantic;
     struct hlsl_ir_var *ext_var;
@@ -338,6 +338,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
     else
         ext_var->is_input_semantic = 1;
     ext_var->is_param = var->is_param;
+    ext_var->force_align = force_align;
     list_add_before(&var->scope_entry, &ext_var->scope_entry);
     list_add_tail(&func->extern_vars, &ext_var->extern_entry);
 
@@ -362,7 +363,7 @@ static uint32_t combine_field_storage_modifiers(uint32_t modifiers, uint32_t fie
 }
 
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func, struct hlsl_ir_load *lhs,
-        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
     struct vkd3d_shader_location *loc = &lhs->node.loc;
@@ -386,14 +387,17 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
     if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
         vector_type_src = hlsl_get_vector_type(ctx, type->e.numeric.type, 4);
 
+    if (hlsl_type_major_size(type) > 1)
+        force_align = true;
+
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
         struct hlsl_ir_node *store, *cast;
         struct hlsl_ir_var *input;
         struct hlsl_ir_load *load;
 
-        if (!(input = add_semantic_var(ctx, func, var, vector_type_src, modifiers, semantic,
-                semantic_index + i, false, loc)))
+        if (!(input = add_semantic_var(ctx, func, var, vector_type_src,
+                modifiers, semantic, semantic_index + i, false, force_align, loc)))
             return;
 
         if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
@@ -425,8 +429,9 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
     }
 }
 
-static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
-        struct hlsl_ir_load *lhs, uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+static void prepend_input_copy_recurse(struct hlsl_ctx *ctx,
+        struct hlsl_ir_function_decl *func, struct hlsl_ir_load *lhs, uint32_t modifiers,
+        struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct vkd3d_shader_location *loc = &lhs->node.loc;
     struct hlsl_type *type = lhs->node.data_type;
@@ -449,6 +454,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 elem_semantic_index = semantic_index
                         + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
                 element_modifiers = modifiers;
+                force_align = true;
             }
             else
             {
@@ -463,6 +469,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 elem_semantic_index = semantic->index;
                 loc = &field->loc;
                 element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
+                force_align = (i == 0);
             }
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
@@ -474,12 +481,13 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 return;
             list_add_after(&c->entry, &element_load->node.entry);
 
-            prepend_input_copy_recurse(ctx, func, element_load, element_modifiers, semantic, elem_semantic_index);
+            prepend_input_copy_recurse(ctx, func, element_load, element_modifiers,
+                    semantic, elem_semantic_index, force_align);
         }
     }
     else
     {
-        prepend_input_copy(ctx, func, lhs, modifiers, semantic, semantic_index);
+        prepend_input_copy(ctx, func, lhs, modifiers, semantic, semantic_index, force_align);
     }
 }
 
@@ -494,11 +502,12 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
         return;
     list_add_head(&func->body.instrs, &load->node.entry);
 
-    prepend_input_copy_recurse(ctx, func, load, var->storage_modifiers, &var->semantic, var->semantic.index);
+    prepend_input_copy_recurse(ctx, func, load, var->storage_modifiers, &var->semantic, var->semantic.index, false);
 }
 
-static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func, struct hlsl_ir_load *rhs,
-        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+        struct hlsl_ir_load *rhs, uint32_t modifiers,
+        struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
     struct vkd3d_shader_location *loc = &rhs->node.loc;
@@ -519,6 +528,9 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
 
     vector_type = hlsl_get_vector_type(ctx, type->e.numeric.type, hlsl_type_minor_size(type));
 
+    if (hlsl_type_major_size(type) > 1)
+        force_align = true;
+
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
         struct hlsl_ir_node *store;
@@ -526,7 +538,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         struct hlsl_ir_load *load;
 
         if (!(output = add_semantic_var(ctx, func, var, vector_type,
-                modifiers, semantic, semantic_index + i, true, loc)))
+                modifiers, semantic, semantic_index + i, true, force_align, loc)))
             return;
 
         if (type->class == HLSL_CLASS_MATRIX)
@@ -554,8 +566,9 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
     }
 }
 
-static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
-        struct hlsl_ir_load *rhs, uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+static void append_output_copy_recurse(struct hlsl_ctx *ctx,
+        struct hlsl_ir_function_decl *func, struct hlsl_ir_load *rhs, uint32_t modifiers,
+        struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct vkd3d_shader_location *loc = &rhs->node.loc;
     struct hlsl_type *type = rhs->node.data_type;
@@ -578,6 +591,7 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 elem_semantic_index = semantic_index
                         + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
                 element_modifiers = modifiers;
+                force_align = true;
             }
             else
             {
@@ -589,6 +603,7 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 elem_semantic_index = semantic->index;
                 loc = &field->loc;
                 element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
+                force_align = (i == 0);
             }
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
@@ -599,12 +614,13 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 return;
             hlsl_block_add_instr(&func->body, &element_load->node);
 
-            append_output_copy_recurse(ctx, func, element_load, element_modifiers, semantic, elem_semantic_index);
+            append_output_copy_recurse(ctx, func, element_load, element_modifiers,
+                    semantic, elem_semantic_index, force_align);
         }
     }
     else
     {
-        append_output_copy(ctx, func, rhs, modifiers, semantic, semantic_index);
+        append_output_copy(ctx, func, rhs, modifiers, semantic, semantic_index, force_align);
     }
 }
 
@@ -620,7 +636,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
         return;
     hlsl_block_add_instr(&func->body, &load->node);
 
-    append_output_copy_recurse(ctx, func, load, var->storage_modifiers, &var->semantic, var->semantic.index);
+    append_output_copy_recurse(ctx, func, load, var->storage_modifiers, &var->semantic, var->semantic.index, false);
 }
 
 bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
@@ -4496,10 +4512,11 @@ static void record_allocation(struct hlsl_ctx *ctx, struct register_allocator *a
 /* reg_size is the number of register components to be reserved, while component_count is the number
  * of components for the register's writemask. In SM1, floats and vectors allocate the whole
  * register, even if they don't use it completely. */
-static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx,
-        struct register_allocator *allocator, unsigned int first_write, unsigned int last_read,
-        unsigned int reg_size, unsigned int component_count, int mode)
+static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_allocator *allocator,
+        unsigned int first_write, unsigned int last_read, unsigned int reg_size,
+        unsigned int component_count, int mode, bool force_align)
 {
+    unsigned int required_size = force_align ? 4 : reg_size;
     struct hlsl_reg ret = {0};
     unsigned int writemask;
     uint32_t reg_idx;
@@ -4510,7 +4527,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx,
     {
         writemask = get_available_writemask(allocator, first_write, last_read, reg_idx, mode);
 
-        if (vkd3d_popcount(writemask) >= reg_size)
+        if (vkd3d_popcount(writemask) >= required_size)
         {
             writemask = hlsl_combine_writemasks(writemask, (1u << reg_size) - 1);
             break;
@@ -4603,7 +4620,7 @@ static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx,
     /* FIXME: We could potentially pack structs or arrays more efficiently... */
 
     if (type->class <= HLSL_CLASS_VECTOR)
-        return allocate_register(ctx, allocator, first_write, last_read, type->dimx, type->dimx, 0);
+        return allocate_register(ctx, allocator, first_write, last_read, type->dimx, type->dimx, 0, false);
     else
         return allocate_range(ctx, allocator, first_write, last_read, reg_size, 0);
 }
@@ -5292,7 +5309,8 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         int mode = (ctx->profile->major_version < 4)
                 ? 0 : sm4_get_interpolation_mode(var->data_type, var->storage_modifiers);
 
-        var->regs[HLSL_REGSET_NUMERIC] = allocate_register(ctx, allocator, 1, UINT_MAX, 4, var->data_type->dimx, mode);
+        var->regs[HLSL_REGSET_NUMERIC] = allocate_register(ctx, allocator, 1,
+                UINT_MAX, 4, var->data_type->dimx, mode, var->force_align);
 
         TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v',
                 var->regs[HLSL_REGSET_NUMERIC], var->data_type));

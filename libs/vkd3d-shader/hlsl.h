@@ -516,6 +516,9 @@ struct hlsl_ir_var
 
     /* Whether the shader performs dereferences with non-constant offsets in the variable. */
     bool indexable;
+    /* Whether this is a semantic variable that was split from an array, or is the first
+     * element of a struct, and thus needs to be aligned when packed in the signature. */
+    bool force_align;
 
     uint32_t is_input_semantic : 1;
     uint32_t is_output_semantic : 1;
