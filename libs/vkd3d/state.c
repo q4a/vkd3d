@@ -1482,8 +1482,8 @@ static unsigned int d3d12_root_signature_copy_descriptor_set_layouts(const struc
         VkDescriptorSetLayout *vk_set_layouts)
 {
     const struct d3d12_device *device = root_signature->device;
-    VkDescriptorSetLayout mutable_layout, vk_set_layout;
     enum vkd3d_vk_descriptor_set_index set;
+    VkDescriptorSetLayout vk_set_layout;
     unsigned int i;
 
     for (i = 0; i < root_signature->vk_set_count; ++i)
@@ -1492,12 +1492,15 @@ static unsigned int d3d12_root_signature_copy_descriptor_set_layouts(const struc
     if (!device->use_vk_heaps)
         return i;
 
-    mutable_layout = device->vk_descriptor_heap_layouts[VKD3D_SET_INDEX_MUTABLE].vk_set_layout;
     for (set = 0; set < ARRAY_SIZE(device->vk_descriptor_heap_layouts); ++set)
     {
         vk_set_layout = device->vk_descriptor_heap_layouts[set].vk_set_layout;
-        /* All layouts must be valid, so if null, just set it to the mutable one. */
-        vk_set_layouts[i++] = vk_set_layout ? vk_set_layout : mutable_layout;
+
+        VKD3D_ASSERT(vk_set_layout);
+        vk_set_layouts[i++] = vk_set_layout;
+
+        if (device->vk_info.EXT_mutable_descriptor_type && set == VKD3D_SET_INDEX_MUTABLE)
+            break;
     }
 
     return i;
