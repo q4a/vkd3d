@@ -1925,24 +1925,26 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
             && descriptor_indexing->descriptorBindingUniformTexelBufferUpdateAfterBind
             && descriptor_indexing->descriptorBindingStorageTexelBufferUpdateAfterBind;
 
-    /* Many Vulkan implementations allow up to 8 descriptor sets. Unfortunately
-     * using vkd3d with Vulkan heaps and push descriptors currently requires up
-     * to 9 descriptor sets (up to one for the push descriptors, up to one for
-     * the static samplers and seven for Vulkan heaps, one for each needed
-     * descriptor type). If we detect such situation, we disable push
-     * descriptors, which allows us to stay within the limits (not doing so is
-     * fatal on many implmentations).
-     *
-     * It is possible that a different strategy might be used. For example, we
-     * could move the static samplers to one of the seven Vulkan heaps sets. Or
-     * we could decide whether to create the push descriptor set when creating
-     * the root signature, depending on whether there are static samplers or
-     * not. */
-    if (device->vk_info.device_limits.maxBoundDescriptorSets == 8 && device->use_vk_heaps
-            && device->vk_info.KHR_push_descriptor)
+    if (device->use_vk_heaps && device->vk_info.KHR_push_descriptor)
     {
-        TRACE("Disabling VK_KHR_push_descriptor to save a descriptor set.\n");
-        device->vk_info.KHR_push_descriptor = VK_FALSE;
+        /* VKD3D_SET_INDEX_COUNT for the Vulkan heaps, one for the push
+         * descriptors set and one for the static samplers set. */
+        unsigned int descriptor_set_count = VKD3D_SET_INDEX_COUNT + 2;
+
+        /* A mutable descriptor set can replace all those that should otherwise
+         * back the SRV-UAV-CBV descriptor heap. */
+        if (device->vk_info.EXT_mutable_descriptor_type)
+            descriptor_set_count -= VKD3D_SET_INDEX_COUNT - (VKD3D_SET_INDEX_MUTABLE + 1);
+
+        /* For many Vulkan implementations maxBoundDescriptorSets == 8; also,
+         * if mutable descriptors are not available the descriptor set count
+         * will be 9; so saving a descriptor set is going to be often
+         * significant. */
+        if (descriptor_set_count > device->vk_info.device_limits.maxBoundDescriptorSets)
+        {
+            WARN("Disabling VK_KHR_push_descriptor to save a descriptor set.\n");
+            device->vk_info.KHR_push_descriptor = VK_FALSE;
+        }
     }
 
     if (device->use_vk_heaps)
