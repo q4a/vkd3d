@@ -87,6 +87,10 @@ probe (0, 0) rgba (0.4, -0.1, -0.2, -0.1)
 [require]
 shader model >= 4.0
 
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
+
 [pixel shader]
 uniform uint2 u;
 
@@ -100,6 +104,9 @@ uniform 0 uint4 1 2 0 0
 todo(glsl) draw quad
 probe (0, 0) rgbaui (2, 1, 2, 1)
 
+[rtv 0]
+format r32g32b32a32-sint
+size (2d, 640, 480)
 
 [pixel shader todo]
 uniform int2 u;
