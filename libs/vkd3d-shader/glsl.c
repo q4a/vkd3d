@@ -919,7 +919,7 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
         sampler_space = d->register_space;
         shadow = d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE;
 
-        if (ins->opcode == VKD3DSIH_SAMPLE_C)
+        if (ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
         {
             if (!shadow)
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -942,10 +942,13 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
     sample = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    vkd3d_string_buffer_printf(sample, "texture(");
+    if (ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
+        vkd3d_string_buffer_printf(sample, "textureLod(");
+    else
+        vkd3d_string_buffer_printf(sample, "texture(");
     shader_glsl_print_combined_sampler_name(sample, gen, resource_idx, resource_space, sampler_idx, sampler_space);
     vkd3d_string_buffer_printf(sample, ", ");
-    if (ins->opcode == VKD3DSIH_SAMPLE_C)
+    if (ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
         shader_glsl_print_shadow_coord(sample, gen, &ins->src[0], &ins->src[3], coord_size);
     else
         shader_glsl_print_src(sample, gen, &ins->src[0],
@@ -954,6 +957,10 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     {
         vkd3d_string_buffer_printf(sample, ", ");
         shader_glsl_print_src(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
+    }
+    else if (ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
+    {
+        vkd3d_string_buffer_printf(sample, ", 0.0");
     }
     vkd3d_string_buffer_printf(sample, ")");
     shader_glsl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
@@ -1549,6 +1556,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_SAMPLE:
         case VKD3DSIH_SAMPLE_B:
         case VKD3DSIH_SAMPLE_C:
+        case VKD3DSIH_SAMPLE_C_LZ:
             shader_glsl_sample(gen, ins);
             break;
         case VKD3DSIH_SQRT:
