@@ -20,6 +20,9 @@ float4 main() : sv_target
 draw quad
 probe (0, 0) rgba (197.0, 218.0, 238.0, 257.0)
 
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
 
 [pixel shader]
 uniform min16uint2 u;
