@@ -393,14 +393,13 @@ static unsigned int shader_get_float_offset(enum vkd3d_shader_register_type regi
     }
 }
 
-static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler,
-        enum vkd3d_shader_global_flags global_flags)
+static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler, enum vsir_global_flags global_flags)
 {
     unsigned int i;
 
     static const struct
     {
-        enum vkd3d_shader_global_flags flag;
+        enum vsir_global_flags flag;
         const char *name;
     }
     global_flag_info[] =

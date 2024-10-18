@@ -774,7 +774,7 @@ enum vkd3d_shader_interpolation_mode
     VKD3DSIM_COUNT = 8,
 };
 
-enum vkd3d_shader_global_flags
+enum vsir_global_flags
 {
     VKD3DSGF_REFACTORING_ALLOWED               = 0x01,
     VKD3DSGF_ENABLE_DOUBLE_PRECISION_FLOAT_OPS = 0x02,
@@ -1247,7 +1247,7 @@ struct vkd3d_shader_instruction
     const struct vkd3d_shader_src_param *predicate;
     union
     {
-        enum vkd3d_shader_global_flags global_flags;
+        enum vsir_global_flags global_flags;
         struct vkd3d_shader_semantic semantic;
         struct vkd3d_shader_register_semantic register_semantic;
         struct vkd3d_shader_primitive_type primitive_type;
@@ -1420,6 +1420,7 @@ struct vsir_program
     unsigned int block_count;
     unsigned int temp_count;
     unsigned int ssa_count;
+    enum vsir_global_flags global_flags;
     bool use_vocp;
     bool has_point_size;
     bool has_point_coord;

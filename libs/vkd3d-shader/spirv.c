@@ -5912,11 +5912,8 @@ static size_t spirv_compiler_get_current_function_location(struct spirv_compiler
     return builder->main_function_location;
 }
 
-static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
+static void spirv_compiler_emit_global_flags(struct spirv_compiler *compiler, enum vsir_global_flags flags)
 {
-    enum vkd3d_shader_global_flags flags = instruction->declaration.global_flags;
-
     if (flags & VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL)
     {
         spirv_compiler_emit_execution_mode(compiler, SpvExecutionModeEarlyFragmentTests, NULL, 0);
@@ -10185,9 +10182,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
 
     switch (instruction->opcode)
     {
-        case VKD3DSIH_DCL_GLOBAL_FLAGS:
-            spirv_compiler_emit_dcl_global_flags(compiler, instruction);
-            break;
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             spirv_compiler_emit_dcl_indexable_temp(compiler, instruction);
             break;
@@ -10675,6 +10669,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
         spirv_compiler_allocate_ssa_register_ids(compiler, program->ssa_count);
     if (compiler->shader_type == VKD3D_SHADER_TYPE_COMPUTE)
         spirv_compiler_emit_thread_group_size(compiler, &program->thread_group_size);
+    spirv_compiler_emit_global_flags(compiler, program->global_flags);
 
     spirv_compiler_emit_descriptor_declarations(compiler);
 

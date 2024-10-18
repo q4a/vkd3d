@@ -2210,6 +2210,10 @@ static void shader_glsl_generate_declarations(struct vkd3d_glsl_generator *gen)
                 group_size->x, group_size->y, group_size->z);
     }
 
+    if (program->global_flags)
+        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Unhandled global flags %#"PRIx64".", (uint64_t)program->global_flags);
+
     shader_glsl_generate_descriptor_declarations(gen);
     shader_glsl_generate_input_declarations(gen);
     shader_glsl_generate_output_declarations(gen);
