@@ -865,6 +865,7 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     const struct glsl_resource_type_info *resource_type_info;
     unsigned int resource_id, resource_idx, resource_space;
     unsigned int sampler_id, sampler_idx, sampler_space;
+    bool shadow_sampler, bias, lod, lod_zero, shadow;
     const struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_component_type sampled_type;
     enum vkd3d_shader_resource_type resource_type;
@@ -872,7 +873,11 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     enum vkd3d_data_type data_type;
     unsigned int coord_size;
     struct glsl_dst dst;
-    bool shadow;
+
+    bias = ins->opcode == VKD3DSIH_SAMPLE_B;
+    lod = ins->opcode == VKD3DSIH_SAMPLE_LOD || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    shadow = ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
 
     if (vkd3d_shader_instruction_has_texel_offset(ins))
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -917,17 +922,17 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     if ((d = shader_glsl_get_descriptor_by_id(gen, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, sampler_id)))
     {
         sampler_space = d->register_space;
-        shadow = d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE;
+        shadow_sampler = d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE;
 
-        if (ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
+        if (shadow)
         {
-            if (!shadow)
+            if (!shadow_sampler)
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                         "Internal compiler error: Sampler %u is not a comparison sampler.", sampler_id);
         }
         else
         {
-            if (shadow)
+            if (shadow_sampler)
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                         "Internal compiler error: Sampler %u is a comparison sampler.", sampler_id);
         }
@@ -942,25 +947,25 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
     sample = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    if (ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
+    if (lod)
         vkd3d_string_buffer_printf(sample, "textureLod(");
     else
         vkd3d_string_buffer_printf(sample, "texture(");
     shader_glsl_print_combined_sampler_name(sample, gen, resource_idx, resource_space, sampler_idx, sampler_space);
     vkd3d_string_buffer_printf(sample, ", ");
-    if (ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
+    if (shadow)
         shader_glsl_print_shadow_coord(sample, gen, &ins->src[0], &ins->src[3], coord_size);
     else
         shader_glsl_print_src(sample, gen, &ins->src[0],
                 vkd3d_write_mask_from_component_count(coord_size), ins->src[0].reg.data_type);
-    if (ins->opcode == VKD3DSIH_SAMPLE_B)
+    if (lod_zero)
+    {
+        vkd3d_string_buffer_printf(sample, ", 0.0");
+    }
+    else if (bias || lod)
     {
         vkd3d_string_buffer_printf(sample, ", ");
         shader_glsl_print_src(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
-    }
-    else if (ins->opcode == VKD3DSIH_SAMPLE_C_LZ)
-    {
-        vkd3d_string_buffer_printf(sample, ", 0.0");
     }
     vkd3d_string_buffer_printf(sample, ")");
     shader_glsl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
@@ -1559,6 +1564,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_SAMPLE_B:
         case VKD3DSIH_SAMPLE_C:
         case VKD3DSIH_SAMPLE_C_LZ:
+        case VKD3DSIH_SAMPLE_LOD:
             shader_glsl_sample(gen, ins);
             break;
         case VKD3DSIH_SQRT:
