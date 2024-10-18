@@ -136,7 +136,8 @@ static HRESULT vkd3d_create_vk_descriptor_heap_layout(struct d3d12_device *devic
         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
     };
 
-    if (device->vk_info.EXT_mutable_descriptor_type && index && index != VKD3D_SET_INDEX_UAV_COUNTER
+    if (device->vk_info.EXT_mutable_descriptor_type
+            && index != VKD3D_SET_INDEX_MUTABLE && index != VKD3D_SET_INDEX_UAV_COUNTER
             && device->vk_descriptor_heap_layouts[index].applicable_heap_type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
     {
         device->vk_descriptor_heap_layouts[index].vk_set_layout = VK_NULL_HANDLE;
@@ -144,7 +145,7 @@ static HRESULT vkd3d_create_vk_descriptor_heap_layout(struct d3d12_device *devic
     }
 
     binding.binding = 0;
-    binding.descriptorType = (device->vk_info.EXT_mutable_descriptor_type && !index)
+    binding.descriptorType = (device->vk_info.EXT_mutable_descriptor_type && index == VKD3D_SET_INDEX_MUTABLE)
             ? VK_DESCRIPTOR_TYPE_MUTABLE_EXT : device->vk_descriptor_heap_layouts[index].type;
     binding.descriptorCount = device->vk_descriptor_heap_layouts[index].count;
     binding.stageFlags = VK_SHADER_STAGE_ALL;
@@ -200,14 +201,20 @@ static HRESULT vkd3d_vk_descriptor_heap_layouts_init(struct d3d12_device *device
 {
     static const struct vkd3d_vk_descriptor_heap_layout vk_descriptor_heap_layouts[VKD3D_SET_INDEX_COUNT] =
     {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, false, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
-        {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, false, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
-        {VK_DESCRIPTOR_TYPE_SAMPLER, false, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER},
-        /* UAV counters */
-        {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
+        [VKD3D_SET_INDEX_UNIFORM_BUFFER] =
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
+        [VKD3D_SET_INDEX_UNIFORM_TEXEL_BUFFER] =
+                {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
+        [VKD3D_SET_INDEX_SAMPLED_IMAGE] =
+                {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, false, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
+        [VKD3D_SET_INDEX_STORAGE_TEXEL_BUFFER] =
+                {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
+        [VKD3D_SET_INDEX_STORAGE_IMAGE] =
+                {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, false, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
+        [VKD3D_SET_INDEX_SAMPLER] =
+                {VK_DESCRIPTOR_TYPE_SAMPLER, false, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER},
+        [VKD3D_SET_INDEX_UAV_COUNTER] =
+                {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, true, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV},
     };
     const struct vkd3d_device_descriptor_limits *limits = &device->vk_info.descriptor_limits;
     enum vkd3d_vk_descriptor_set_index set;

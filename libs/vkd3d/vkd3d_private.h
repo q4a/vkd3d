@@ -773,6 +773,7 @@ void d3d12_dsv_desc_create_dsv(struct d3d12_dsv_desc *dsv_desc, struct d3d12_dev
 enum vkd3d_vk_descriptor_set_index
 {
     VKD3D_SET_INDEX_UNIFORM_BUFFER = 0,
+    VKD3D_SET_INDEX_MUTABLE = VKD3D_SET_INDEX_UNIFORM_BUFFER,
     VKD3D_SET_INDEX_UNIFORM_TEXEL_BUFFER = 1,
     VKD3D_SET_INDEX_SAMPLED_IMAGE = 2,
     VKD3D_SET_INDEX_STORAGE_TEXEL_BUFFER = 3,
