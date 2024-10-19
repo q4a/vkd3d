@@ -167,7 +167,7 @@ static bool check_qualifier_args_conjunction(struct shader_runner *runner, const
             match = true;
             line += option_len;
             if (valid_args[i].tag)
-                holds = match_tag(runner, option_text);
+                holds &= match_tag(runner, option_text);
             else if (runner->minimum_shader_model < valid_args[i].sm_min
                     || runner->minimum_shader_model > valid_args[i].sm_max)
                 holds = false;
