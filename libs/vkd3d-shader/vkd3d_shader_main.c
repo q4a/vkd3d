@@ -1746,7 +1746,8 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
         }
     }
 
-    vkd3d_shader_dump_shader(&dump_data, out->code, out->size, false);
+    if (ret >= 0)
+        vkd3d_shader_dump_shader(&dump_data, out->code, out->size, false);
 
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
