@@ -147,6 +147,8 @@ static bool check_qualifier_args_conjunction(struct shader_runner *runner, const
         {"sm<6",  SHADER_MODEL_2_0, SHADER_MODEL_6_0 - 1},
         {"glsl", 0, 0, true},
         {"d3d12", 0, 0, true},
+        {"mvk", 0, 0, true},
+        {"vulkan", 0, 0, true},
     };
 
     while (*line != ')' && *line != '|')

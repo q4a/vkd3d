@@ -52,6 +52,7 @@ struct vulkan_shader_runner
     struct shader_runner r;
     struct shader_runner_caps caps;
     bool demote_to_helper_invocation;
+    bool driver_properties;
 
     struct vulkan_test_context context;
 
@@ -69,6 +70,8 @@ struct physical_device_info
     VkPhysicalDeviceFeatures2 features2;
     VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT interlock_features;
     VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT demote_to_helper_invocation_features;
+    VkPhysicalDeviceProperties2 properties2;
+    VkPhysicalDeviceDriverPropertiesKHR driver_properties;
 };
 
 static struct vulkan_shader_runner *vulkan_shader_runner(struct shader_runner *r)
@@ -641,9 +644,11 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
         ret &= create_shader_stage(runner, &stage_desc[stage_count++], "gs",
                 VK_SHADER_STAGE_GEOMETRY_BIT, runner->r.gs_source, NULL);
 
-    todo_if (runner->r.is_todo) ok(ret, "Failed to compile shaders.\n");
     if (!ret)
     {
+        /* We ok() only when failing here, so that we don't result in a "todo
+         * succeeded" when the todo applies to pipeline linking. */
+        todo_if (runner->r.is_todo) ok(false, "Failed to compile shaders.\n");
         for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
             VK_CALL(vkDestroyShaderModule(device, stage_desc[i].module, NULL));
         return VK_NULL_HANDLE;
@@ -768,7 +773,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     }
 
     vr = VK_CALL(vkCreateGraphicsPipelines(context->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
-    ok(vr == VK_SUCCESS, "Failed to create graphics pipeline, vr %d.\n", vr);
+    todo_if (runner->r.is_todo) ok(vr == VK_SUCCESS, "Failed to create graphics pipeline, vr %d.\n", vr);
 
     for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
         VK_CALL(vkDestroyShaderModule(device, stage_desc[i].module, NULL));
@@ -1410,6 +1415,7 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner,
         {VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME},
         {VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME, true},
         {VK_KHR_MAINTENANCE1_EXTENSION_NAME, true},
+        {VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME},
     };
 
     enabled_extensions->names = calloc(ARRAY_SIZE(device_extensions), sizeof(*enabled_extensions->names));
@@ -1430,6 +1436,8 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner,
                 runner->caps.rov = true;
             if (!strcmp(name, VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME))
                 runner->demote_to_helper_invocation = true;
+            if (!strcmp(name, VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME))
+                runner->driver_properties = true;
             continue;
         }
 
@@ -1471,6 +1479,20 @@ static void get_physical_device_info(struct vulkan_shader_runner *runner, struct
         VK_CALL(vkGetPhysicalDeviceFeatures2KHR(context->phys_device, &info->features2));
     else
         VK_CALL(vkGetPhysicalDeviceFeatures(context->phys_device, &info->features2.features));
+
+    if (runner->driver_properties)
+    {
+        void *list = info->properties2.pNext;
+
+        info->properties2.pNext = &info->driver_properties;
+        info->driver_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES_KHR;
+        info->driver_properties.pNext = list;
+    }
+
+    if (context->vkGetPhysicalDeviceFeatures2KHR)
+        VK_CALL(vkGetPhysicalDeviceProperties2KHR(context->phys_device, &info->properties2));
+    else
+        VK_CALL(vkGetPhysicalDeviceProperties(context->phys_device, &info->properties2.properties));
 }
 
 static uint32_t get_format_support(const struct vulkan_test_context *context, enum DXGI_FORMAT format)
@@ -1526,6 +1548,16 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
         DXGI_FORMAT_R8_UINT,
         DXGI_FORMAT_R8_SINT,
     };
+    static const char *const tags[] =
+    {
+        "vulkan",
+    };
+
+    static const char *const mvk_tags[] =
+    {
+        "vulkan",
+        "mvk",
+    };
 
     if (!vulkan_test_context_init_instance(context, instance_extensions, ARRAY_SIZE(instance_extensions)))
         return false;
@@ -1558,6 +1590,17 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     runner->caps.runner = "Vulkan";
     get_physical_device_info(runner, &device_info);
     ret_features = &device_info.features2.features;
+
+    if (device_info.driver_properties.driverID == VK_DRIVER_ID_MOLTENVK)
+    {
+        runner->caps.tags = mvk_tags;
+        runner->caps.tag_count = ARRAY_SIZE(mvk_tags);
+    }
+    else
+    {
+        runner->caps.tags = tags;
+        runner->caps.tag_count = ARRAY_SIZE(tags);
+    }
 
     runner->caps.clip_planes = true;
     runner->caps.point_size = true;

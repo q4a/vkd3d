@@ -42,6 +42,8 @@ VK_INSTANCE_PFN(vkGetPhysicalDeviceFeatures)
 VK_INSTANCE_PFN(vkGetPhysicalDeviceFeatures2KHR)
 VK_INSTANCE_PFN(vkGetPhysicalDeviceFormatProperties)
 VK_INSTANCE_PFN(vkGetPhysicalDeviceMemoryProperties)
+VK_INSTANCE_PFN(vkGetPhysicalDeviceProperties)
+VK_INSTANCE_PFN(vkGetPhysicalDeviceProperties2KHR)
 VK_INSTANCE_PFN(vkGetPhysicalDeviceQueueFamilyProperties)
 
 /* Device functions (obtained by vkGetDeviceProcAddr). */
