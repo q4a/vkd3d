@@ -868,19 +868,20 @@ static void shader_glsl_print_shadow_coord(struct vkd3d_string_buffer *buffer, s
 
 static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
-    bool shadow_sampler, array, bias, grad, lod, lod_zero, shadow;
+    bool shadow_sampler, array, bias, gather, grad, lod, lod_zero, shadow;
     const struct glsl_resource_type_info *resource_type_info;
     unsigned int resource_id, resource_idx, resource_space;
     unsigned int sampler_id, sampler_idx, sampler_space;
     const struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_component_type sampled_type;
     enum vkd3d_shader_resource_type resource_type;
+    unsigned int component_idx, coord_size;
     struct vkd3d_string_buffer *sample;
     enum vkd3d_data_type data_type;
-    unsigned int coord_size;
     struct glsl_dst dst;
 
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
+    gather = ins->opcode == VKD3DSIH_GATHER4;
     grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
     lod = ins->opcode == VKD3DSIH_SAMPLE_LOD || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
     lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
@@ -956,7 +957,9 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
     sample = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    if (grad)
+    if (gather)
+        vkd3d_string_buffer_printf(sample, "textureGather(");
+    else if (grad)
         vkd3d_string_buffer_printf(sample, "textureGrad(");
     else if (lod)
         vkd3d_string_buffer_printf(sample, "textureLod(");
@@ -986,6 +989,11 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     {
         vkd3d_string_buffer_printf(sample, ", ");
         shader_glsl_print_src(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
+    }
+    if (gather)
+    {
+        if ((component_idx = vsir_swizzle_get_component(ins->src[2].swizzle, 0)))
+            vkd3d_string_buffer_printf(sample, ", %d", component_idx);
     }
     vkd3d_string_buffer_printf(sample, ")");
     shader_glsl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
@@ -1490,6 +1498,15 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_FTOU:
             shader_glsl_cast(gen, ins, "uint", "uvec");
             break;
+        case VKD3DSIH_GATHER4:
+        case VKD3DSIH_SAMPLE:
+        case VKD3DSIH_SAMPLE_B:
+        case VKD3DSIH_SAMPLE_C:
+        case VKD3DSIH_SAMPLE_C_LZ:
+        case VKD3DSIH_SAMPLE_GRAD:
+        case VKD3DSIH_SAMPLE_LOD:
+            shader_glsl_sample(gen, ins);
+            break;
         case VKD3DSIH_GEO:
         case VKD3DSIH_IGE:
             shader_glsl_relop(gen, ins, ">=", "greaterThanEqual");
@@ -1579,14 +1596,6 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
             break;
         case VKD3DSIH_RSQ:
             shader_glsl_intrinsic(gen, ins, "inversesqrt");
-            break;
-        case VKD3DSIH_SAMPLE:
-        case VKD3DSIH_SAMPLE_B:
-        case VKD3DSIH_SAMPLE_C:
-        case VKD3DSIH_SAMPLE_C_LZ:
-        case VKD3DSIH_SAMPLE_GRAD:
-        case VKD3DSIH_SAMPLE_LOD:
-            shader_glsl_sample(gen, ins);
             break;
         case VKD3DSIH_SQRT:
             shader_glsl_intrinsic(gen, ins, "sqrt");
