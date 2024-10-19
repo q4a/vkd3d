@@ -489,13 +489,13 @@ static void vkd3d_shader_dump_shader(const struct shader_dump_data *dump_data,
     if ((f = fopen(filename, "wb")))
     {
         if (fwrite(data, 1, size, f) != size)
-            ERR("Failed to write shader to %s.\n", filename);
+            WARN("Failed to write shader to %s.\n", filename);
         if (fclose(f))
-            ERR("Failed to close stream %s.\n", filename);
+            WARN("Failed to close stream %s.\n", filename);
     }
     else
     {
-        ERR("Failed to open %s for dumping shader.\n", filename);
+        WARN("Failed to open %s for dumping shader.\n", filename);
     }
 }
 
