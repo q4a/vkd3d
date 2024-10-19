@@ -199,6 +199,10 @@ float4 main() : SV_TARGET
 draw quad
 probe (0, 0) rgba (0.0, 1.0, 1.0, 0.0)
 
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
+
 [pixel shader todo]
 uint u;
 int i;
@@ -218,6 +222,10 @@ probe (0, 0) rgbaui (32, 0, 31, 0xffffffff)
 uniform 0 uint4 0xcccccccc 0xcccccccc 0 0
 todo(sm<6) draw quad
 probe (0, 0) rgbaui (16, 2, 31, 29)
+
+[rtv 0]
+format r32g32b32a32-float
+size (2d, 640, 480)
 
 [require]
 shader model >= 6.0
