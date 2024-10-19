@@ -2356,6 +2356,26 @@ static void test_signature_reflection(void)
         {"TEXCOORD",       2, 3, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
     };
 
+    /* Only the first element of structs is aligned. */
+    static const char ps12_source[] =
+        "struct apple\n"
+        "{\n"
+        "    float b : SEM_B; // Only this one is aligned.\n"
+        "    float c : SEM_C;\n"
+        "};\n"
+        "\n"
+        "   float4 main(float a : SEM_A, apple ap) : sv_target\n"
+        "{\n"
+        "    return 0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps12_inputs[] =
+    {
+        {"SEM_A",          0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"SEM_C",          0, 0, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x2},
+        {"SEM_B",          0, 1, D3D_NAME_UNDEFINED,     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
     static const char vs4_source[] =
         "struct st\n"
         "{\n"
@@ -2678,6 +2698,7 @@ static void test_signature_reflection(void)
         {vs3_source,  "vs_4_0", false, vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs), NULL, 0, true},
         {ps10_source, "ps_4_0", false, ps10_inputs, ARRAY_SIZE(ps10_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
         {ps11_source, "ps_4_0", false, ps11_inputs, ARRAY_SIZE(ps11_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
+        {ps12_source, "ps_4_0", false, ps12_inputs, ARRAY_SIZE(ps12_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple), NULL, 0, true},
         {vs4_source,  "vs_4_0", false, vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs), NULL, 0, true},
         {vs5_source,  "vs_4_0", false, vs5_inputs, ARRAY_SIZE(vs5_inputs), vs5_outputs, ARRAY_SIZE(vs5_outputs), NULL, 0, true},
         {hs1_source,  "hs_5_0", false, NULL, 0, hs1_outputs, ARRAY_SIZE(hs1_outputs), hs1_patch_constants, ARRAY_SIZE(hs1_patch_constants)},

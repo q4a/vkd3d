@@ -30,7 +30,8 @@ shader model < 6.0
 // 1. Arrays always start on .x
 // 2. When placing a scalar or vector, search through the allocated slots for space *vertically*
 //    (So check if you can place at o1.y, then o2.y, o3.y before o1.z, o2.z, etc.)
-// 3. Elements with different interpolation cannot share a slot
+// 3. Elements with different interpolation cannot share a slot.
+// 4. The first field of a struct is always aligned.
 struct data
 {
     float4 position : SV_Position; // Should be placed in o0
