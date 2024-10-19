@@ -48,7 +48,7 @@ image-mac:
     - git checkout dfa1c814cc4c912ba982854b72f64527baa3e7e5
     - mkdir build
     - cd build
-    - cmake .. -C ../cmake/caches/PredefinedParams.cmake
+    - cmake .. -C ../cmake/caches/PredefinedParams.cmake -D CMAKE_BUILD_TYPE=Release
     - make -j$(sysctl -n hw.ncpu)
     - cd ../..
     - cp DirectXShaderCompiler/build/lib/libdxcompiler.dylib DirectXShaderCompiler/build/lib/libdxil.dylib image/dxc
