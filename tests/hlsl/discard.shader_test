@@ -21,7 +21,7 @@ shader model >= 3.0
 
 % Check that derivatives are still computed after discarding
 % other pixels in the same quad
-[pixel shader todo(sm<4)]
+[pixel shader]
 float4 main(float4 pos : sv_position) : sv_target
 {
     if (frac((floor(pos.x) + floor(pos.y)) / 2) == 0.5)

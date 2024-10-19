@@ -4079,6 +4079,44 @@ static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     return true;
 }
 
+static bool lower_discard_nz(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *cond, *cond_cast, *abs, *neg;
+    struct hlsl_type *float_type;
+    struct hlsl_ir_jump *jump;
+    struct hlsl_block block;
+
+    if (instr->type != HLSL_IR_JUMP)
+        return false;
+    jump = hlsl_ir_jump(instr);
+    if (jump->type != HLSL_IR_JUMP_DISCARD_NZ)
+        return false;
+
+    cond = jump->condition.node;
+    float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, cond->data_type->dimx);
+
+    hlsl_block_init(&block);
+
+    if (!(cond_cast = hlsl_new_cast(ctx, cond, float_type, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(&block, cond_cast);
+
+    if (!(abs = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, cond_cast, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(&block, abs);
+
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, abs, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(&block, neg);
+
+    list_move_tail(&instr->entry, &block.instrs);
+    hlsl_src_remove(&jump->condition);
+    hlsl_src_from_node(&jump->condition, neg);
+    jump->type = HLSL_IR_JUMP_DISCARD_NEG;
+
+    return true;
+}
+
 static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     switch (instr->type)
@@ -7902,6 +7940,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     if (profile->major_version >= 4)
     {
         hlsl_transform_ir(ctx, lower_discard_neg, body, NULL);
+    }
+    else
+    {
+        hlsl_transform_ir(ctx, lower_discard_nz, body, NULL);
     }
 
     transform_unroll_loops(ctx, body);
