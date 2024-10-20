@@ -901,6 +901,17 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     return true;
 }
 
+static bool d3d11_runner_copy(struct shader_runner *r, struct resource *src, struct resource *dst)
+{
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+    struct d3d11_resource *s = d3d11_resource(src);
+    struct d3d11_resource *d = d3d11_resource(dst);
+
+    ID3D11DeviceContext_CopyResource(runner->immediate_context, d->resource, s->resource);
+
+    return true;
+}
+
 struct d3d11_resource_readback
 {
     struct resource_readback rb;
@@ -1000,6 +1011,7 @@ static const struct shader_runner_ops d3d11_runner_ops =
     .dispatch = d3d11_runner_dispatch,
     .clear = d3d11_runner_clear,
     .draw = d3d11_runner_draw,
+    .copy = d3d11_runner_copy,
     .get_resource_readback = d3d11_runner_get_resource_readback,
     .release_readback = d3d11_runner_release_readback,
 };

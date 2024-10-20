@@ -145,3 +145,56 @@ probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.5, 0.7, 0.6, 0.8)
 probe (0, 1) rgba (0.6, 0.5, 0.2, 0.1)
 probe (1, 1) rgba (0.8, 0.0, 0.7, 1.0)
+
+% Test an actual multisample load
+
+[require]
+shader model >= 4.1
+
+[rtv 0]
+format r32g32b32a32-float
+size (2dms, 4, 64, 64)
+
+[srv 0]
+format r32g32b32a32-float
+size (2dms, 4, 64, 64)
+
+[pixel shader]
+float4 main(uint id : sv_sampleindex) : sv_target
+{
+    return float4(1u << id, 0.25f, 0.5f, 1.0f);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(glsl | sm>=6) draw quad
+probe (32, 32) rgba(3.75, 0.25, 0.5, 1.0)
+copy rtv 0 srv 0
+
+[rtv 0]
+format r32g32b32a32-float
+size (2d, 64, 64)
+
+[pixel shader]
+Texture2DMS<float4> t;
+uint sample;
+
+float4 main(float4 position : sv_position) : sv_target
+{
+    float2 p = position.xy / 64.0f;
+    return t.Load(p, sample);
+}
+
+[test]
+uniform 0 uint 0
+todo(glsl) draw quad
+todo(sm>=6) probe (32, 32) rgba(1.0, 0.25, 0.5, 1.0)
+uniform 0 uint 1
+todo(glsl) draw quad
+todo(sm>=6) probe (32, 32) rgba(2.0, 0.25, 0.5, 1.0)
+uniform 0 uint 2
+todo(glsl) draw quad
+todo(sm>=6) probe (32, 32) rgba(4.0, 0.25, 0.5, 1.0)
+uniform 0 uint 3
+todo(glsl) draw quad
+todo(sm>=6) probe (32, 32) rgba(8.0, 0.25, 0.5, 1.0)

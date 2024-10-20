@@ -902,6 +902,33 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     return true;
 }
 
+static bool d3d12_runner_copy(struct shader_runner *r, struct resource *src, struct resource *dst)
+{
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *context = &runner->test_context;
+    struct d3d12_resource *s = d3d12_resource(src);
+    struct d3d12_resource *d = d3d12_resource(dst);
+    D3D12_RESOURCE_STATES src_state, dst_state;
+    HRESULT hr;
+
+    src_state = resource_get_state(src);
+    dst_state = resource_get_state(dst);
+
+    transition_resource_state(context->list, s->resource, src_state, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    transition_resource_state(context->list, d->resource, dst_state, D3D12_RESOURCE_STATE_COPY_DEST);
+    ID3D12GraphicsCommandList_CopyResource(context->list, d->resource, s->resource);
+    transition_resource_state(context->list, d->resource, D3D12_RESOURCE_STATE_COPY_DEST, dst_state);
+    transition_resource_state(context->list, s->resource, D3D12_RESOURCE_STATE_COPY_SOURCE, src_state);
+
+    hr = ID3D12GraphicsCommandList_Close(context->list);
+    ok(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
+    exec_command_list(context->queue, context->list);
+    wait_queue_idle(context->device, context->queue);
+    reset_command_list(context->list, context->allocator);
+
+    return true;
+}
+
 static struct resource_readback *d3d12_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
@@ -933,6 +960,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .dispatch = d3d12_runner_dispatch,
     .clear = d3d12_runner_clear,
     .draw = d3d12_runner_draw,
+    .copy = d3d12_runner_copy,
     .get_resource_readback = d3d12_runner_get_resource_readback,
     .release_readback = d3d12_runner_release_readback,
 };

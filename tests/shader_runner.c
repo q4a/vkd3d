@@ -845,6 +845,30 @@ static void read_uint64_t2(const char **line, struct u64vec2 *v)
     read_uint64(line, &v->y, true);
 }
 
+static struct resource *parse_resource_reference(struct shader_runner *runner, const char **const line)
+{
+    enum resource_type type;
+    unsigned int slot = 0;
+
+    if (match_string(*line, "dsv", line))
+        type = RESOURCE_TYPE_DEPTH_STENCIL;
+    else if (match_string(*line, "rtv", line))
+        type = RESOURCE_TYPE_RENDER_TARGET;
+    else if (match_string(*line, "srv", line))
+        type = RESOURCE_TYPE_TEXTURE;
+    else if (match_string(*line, "uav", line))
+        type = RESOURCE_TYPE_UAV;
+    else if (match_string(*line, "vb", line))
+        type = RESOURCE_TYPE_VERTEX_BUFFER;
+    else
+        fatal_error("Malformed resource reference '%s'.\n", *line);
+
+    if (type != RESOURCE_TYPE_DEPTH_STENCIL)
+        read_uint(line, &slot, false);
+
+    return shader_runner_get_resource(runner, type, slot);
+}
+
 static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
     bool skip_directive = false;
@@ -1043,6 +1067,26 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         }
 
         runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count, instance_count);
+    }
+    else if (match_string(line, "copy", &line))
+    {
+        struct resource *src, *dst;
+
+        if (!(src = parse_resource_reference(runner, &line)))
+            fatal_error("Undefined source resource.\n");
+        if (!(dst = parse_resource_reference(runner, &line)))
+            fatal_error("Undefined destination resource.\n");
+
+        if (src->desc.dimension != dst->desc.dimension
+                || src->desc.texel_size != dst->desc.texel_size
+                || src->desc.width != dst->desc.width
+                || src->desc.height != dst->desc.height
+                || src->desc.level_count != dst->desc.level_count
+                || src->desc.sample_count != dst->desc.sample_count)
+            fatal_error("Resource dimensions don't match.\n");
+
+        if (!(runner->ops->copy(runner, src, dst)))
+            fatal_error("Failed to copy resource.\n");
     }
     else if (match_string(line, "probe", &line))
     {

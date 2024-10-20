@@ -1256,6 +1256,66 @@ out:
     return ret;
 }
 
+static VkImageLayout resource_get_layout(struct resource *r)
+{
+    if (r->desc.type == RESOURCE_TYPE_RENDER_TARGET)
+        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    if (r->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    if (r->desc.type == RESOURCE_TYPE_TEXTURE)
+        return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    return VK_IMAGE_LAYOUT_GENERAL;
+}
+
+static bool vulkan_runner_copy(struct shader_runner *r, struct resource *src, struct resource *dst)
+{
+    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+    const struct vulkan_test_context *context = &runner->context;
+    VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+    struct vulkan_resource *s = vulkan_resource(src);
+    struct vulkan_resource *d = vulkan_resource(dst);
+    VkImageLayout src_layout, dst_layout;
+    VkImageCopy vk_image_copy;
+    unsigned int l;
+
+    if (src->desc.dimension == RESOURCE_DIMENSION_BUFFER)
+        return false;
+
+    if (src->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+    src_layout = resource_get_layout(src);
+    dst_layout = resource_get_layout(dst);
+
+    begin_command_buffer(context);
+    transition_image_layout(context, s->image, aspect_mask, src_layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    transition_image_layout(context, d->image, aspect_mask,
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    vk_image_copy.srcSubresource = (VkImageSubresourceLayers){.aspectMask = aspect_mask, .layerCount = 1};
+    vk_image_copy.srcOffset = (VkOffset3D){.x = 0, .y = 0, .z = 0};
+    vk_image_copy.dstSubresource = vk_image_copy.srcSubresource;
+    vk_image_copy.dstOffset = vk_image_copy.srcOffset;
+    vk_image_copy.extent.depth = 1;
+
+    for (l = 0; l < src->desc.level_count; ++l)
+    {
+        vk_image_copy.srcSubresource.mipLevel = l;
+        vk_image_copy.dstSubresource.mipLevel = l;
+        vk_image_copy.extent.width = get_level_dimension(src->desc.width, l);
+        vk_image_copy.extent.height = get_level_dimension(src->desc.height, l);
+
+        VK_CALL(vkCmdCopyImage(context->cmd_buffer, s->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                d->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vk_image_copy));
+    }
+
+    transition_image_layout(context, d->image, aspect_mask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dst_layout);
+    transition_image_layout(context, s->image, aspect_mask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, src_layout);
+    end_command_buffer(context);
+
+    return true;
+}
+
 struct vulkan_resource_readback
 {
     struct resource_readback rb;
@@ -1300,13 +1360,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
 
         aspect_mask = (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
                 ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-
-        if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
-            layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
-            layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        else
-            layout = VK_IMAGE_LAYOUT_GENERAL;
+        layout = resource_get_layout(res);
 
         begin_command_buffer(context);
 
@@ -1388,6 +1442,7 @@ static const struct shader_runner_ops vulkan_runner_ops =
     .dispatch = vulkan_runner_dispatch,
     .clear = vulkan_runner_clear,
     .draw = vulkan_runner_draw,
+    .copy = vulkan_runner_copy,
     .get_resource_readback = vulkan_runner_get_resource_readback,
     .release_readback = vulkan_runner_release_readback,
 };
@@ -1615,6 +1670,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     features.x = VK_TRUE
 
     ENABLE_FEATURE(fragmentStoresAndAtomics);
+    ENABLE_FEATURE(sampleRateShading);
     ENABLE_FEATURE(shaderClipDistance);
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);

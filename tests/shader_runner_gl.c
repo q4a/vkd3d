@@ -113,6 +113,7 @@ static bool check_gl_extensions(struct gl_runner *runner)
     {
         "GL_ARB_clip_control",
         "GL_ARB_compute_shader",
+        "GL_ARB_copy_image",
         "GL_ARB_sampler_objects",
         "GL_ARB_shader_image_load_store",
         "GL_ARB_texture_storage",
@@ -1249,6 +1250,28 @@ static bool gl_runner_draw(struct shader_runner *r,
     return true;
 }
 
+static bool gl_runner_copy(struct shader_runner *r, struct resource *src, struct resource *dst)
+{
+    struct gl_resource *s = gl_resource(src);
+    struct gl_resource *d = gl_resource(dst);
+    GLenum target = GL_TEXTURE_2D;
+    unsigned int l, w, h;
+
+    if (src->desc.dimension == RESOURCE_DIMENSION_BUFFER)
+        return false;
+
+    if (src->desc.sample_count > 1)
+        target = GL_TEXTURE_2D_MULTISAMPLE;
+    for (l = 0; l < src->desc.level_count; ++l)
+    {
+        w = get_level_dimension(src->desc.width, l);
+        h = get_level_dimension(src->desc.height, l);
+        glCopyImageSubData(s->id, target, l, 0, 0, 0, d->id, target, l, 0, 0, 0, w, h, 1);
+    }
+
+    return true;
+}
+
 struct gl_resource_readback
 {
     struct resource_readback rb;
@@ -1330,6 +1353,7 @@ static const struct shader_runner_ops gl_runner_ops =
     .dispatch = gl_runner_dispatch,
     .clear = gl_runner_clear,
     .draw = gl_runner_draw,
+    .copy = gl_runner_copy,
     .get_resource_readback = gl_runner_get_resource_readback,
     .release_readback = gl_runner_release_readback,
 };
