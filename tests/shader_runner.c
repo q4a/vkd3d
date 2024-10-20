@@ -83,7 +83,11 @@ static const char *const model_strings[] =
 
 void fatal_error(const char *format, ...)
 {
+    unsigned int i;
     va_list args;
+
+    for (i = 0; i < vkd3d_test_state.context_count; ++i)
+        fprintf(stderr, "%s: ", vkd3d_test_state.context[i]);
 
     va_start(args, format);
     vfprintf(stderr, format, args);
