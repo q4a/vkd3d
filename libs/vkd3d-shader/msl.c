@@ -39,6 +39,8 @@ struct msl_generator
     struct vkd3d_shader_message_context *message_context;
     unsigned int indent;
     const char *prefix;
+    bool failed;
+
     const struct vkd3d_shader_interface_info *interface_info;
     const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info;
 };
@@ -51,6 +53,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) msl_compiler_error(struct msl_generator *gen
     va_start(args, fmt);
     vkd3d_shader_verror(gen->message_context, &gen->location, error, fmt, args);
     va_end(args);
+    gen->failed = true;
 }
 
 static const char *msl_get_prefix(enum vkd3d_shader_type type)
@@ -778,7 +781,7 @@ static void msl_generate_entrypoint(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "    return output;\n}\n");
 }
 
-static void msl_generator_generate(struct msl_generator *gen)
+static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader_code *out)
 {
     const struct vkd3d_shader_instruction_array *instructions = &gen->program->instructions;
     unsigned int i;
@@ -829,6 +832,13 @@ static void msl_generator_generate(struct msl_generator *gen)
 
     if (TRACE_ON())
         vkd3d_string_buffer_trace(gen->buffer);
+
+    if (gen->failed)
+        return VKD3D_ERROR_INVALID_SHADER;
+
+    vkd3d_shader_code_from_string_buffer(out, gen->buffer);
+
+    return VKD3D_OK;
 }
 
 static void msl_generator_cleanup(struct msl_generator *gen)
@@ -867,7 +877,8 @@ static int msl_generator_init(struct msl_generator *gen, struct vsir_program *pr
 
 int msl_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
+        struct vkd3d_shader_message_context *message_context)
 {
     struct msl_generator generator;
     int ret;
@@ -879,8 +890,8 @@ int msl_compile(struct vsir_program *program, uint64_t config_flags,
 
     if ((ret = msl_generator_init(&generator, program, compile_info, descriptor_info, message_context)) < 0)
         return ret;
-    msl_generator_generate(&generator);
+    ret = msl_generator_generate(&generator, out);
     msl_generator_cleanup(&generator);
 
-    return VKD3D_ERROR_INVALID_SHADER;
+    return ret;
 }
