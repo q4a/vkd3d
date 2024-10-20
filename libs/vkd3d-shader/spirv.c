@@ -3192,6 +3192,14 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
         case VKD3DSPR_CONSTBUFFER:
             snprintf(buffer, buffer_size, "cb%u_%u", reg->idx[0].offset, reg->idx[1].offset);
             break;
+        case VKD3DSPR_RASTOUT:
+            if (idx == VSIR_RASTOUT_POINT_SIZE)
+            {
+                snprintf(buffer, buffer_size, "oPts");
+                break;
+            }
+            FIXME("Unhandled rastout register %#x.\n", idx);
+            return false;
         case VKD3DSPR_INPUT:
             snprintf(buffer, buffer_size, "v%u", idx);
             break;
