@@ -763,6 +763,27 @@ static void shader_glsl_default(struct vkd3d_glsl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "default:\n");
 }
 
+static void shader_glsl_print_texel_offset(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
+        unsigned int offset_size, const struct vkd3d_shader_texel_offset *offset)
+{
+    switch (offset_size)
+    {
+        case 1:
+            vkd3d_string_buffer_printf(buffer, "%d", offset->u);
+            break;
+        case 2:
+            vkd3d_string_buffer_printf(buffer, "ivec2(%d, %d)", offset->u, offset->v);
+            break;
+        default:
+            vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                    "Internal compiler error: Invalid texel offset size %u.", offset_size);
+            /* fall through */
+        case 3:
+            vkd3d_string_buffer_printf(buffer, "ivec3(%d, %d, %d)", offset->u, offset->v, offset->w);
+            break;
+    }
+}
+
 static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const struct glsl_resource_type_info *resource_type_info;
@@ -868,7 +889,7 @@ static void shader_glsl_print_shadow_coord(struct vkd3d_string_buffer *buffer, s
 
 static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
-    bool shadow_sampler, array, bias, gather, grad, lod, lod_zero, offset, shadow;
+    bool shadow_sampler, array, bias, dynamic_offset, gather, grad, lod, lod_zero, offset, shadow;
     const struct glsl_resource_type_info *resource_type_info;
     const struct vkd3d_shader_src_param *resource, *sampler;
     unsigned int resource_id, resource_idx, resource_space;
@@ -882,19 +903,16 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     struct glsl_dst dst;
 
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
+    dynamic_offset = ins->opcode == VKD3DSIH_GATHER4_PO;
     gather = ins->opcode == VKD3DSIH_GATHER4 || ins->opcode == VKD3DSIH_GATHER4_PO;
     grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
     lod = ins->opcode == VKD3DSIH_SAMPLE_LOD || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
     lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
-    offset = ins->opcode == VKD3DSIH_GATHER4_PO;
+    offset = dynamic_offset || vkd3d_shader_instruction_has_texel_offset(ins);
     shadow = ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
 
-    resource = &ins->src[1 + offset];
-    sampler = &ins->src[2 + offset];
-
-    if (vkd3d_shader_instruction_has_texel_offset(ins))
-        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                "Internal compiler error: Unhandled texel sample offset.");
+    resource = &ins->src[1 + dynamic_offset];
+    sampler = &ins->src[2 + dynamic_offset];
 
     if (resource->reg.idx[0].rel_addr || resource->reg.idx[1].rel_addr
             || sampler->reg.idx[0].rel_addr || sampler->reg.idx[1].rel_addr)
@@ -963,13 +981,14 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     sample = vkd3d_string_buffer_get(&gen->string_buffers);
 
     if (gather)
-        vkd3d_string_buffer_printf(sample, "textureGather%s(", offset ? "Offset" : "");
+        vkd3d_string_buffer_printf(sample, "textureGather");
     else if (grad)
-        vkd3d_string_buffer_printf(sample, "textureGrad(");
+        vkd3d_string_buffer_printf(sample, "textureGrad");
     else if (lod)
-        vkd3d_string_buffer_printf(sample, "textureLod(");
+        vkd3d_string_buffer_printf(sample, "textureLod");
     else
-        vkd3d_string_buffer_printf(sample, "texture(");
+        vkd3d_string_buffer_printf(sample, "texture");
+    vkd3d_string_buffer_printf(sample, "%s(", offset ? "Offset" : "");
     shader_glsl_print_combined_sampler_name(sample, gen, resource_idx, resource_space, sampler_idx, sampler_space);
     vkd3d_string_buffer_printf(sample, ", ");
     if (shadow)
@@ -990,7 +1009,7 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     {
         vkd3d_string_buffer_printf(sample, ", 0.0");
     }
-    else if (bias || lod)
+    else if (lod)
     {
         vkd3d_string_buffer_printf(sample, ", ");
         shader_glsl_print_src(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
@@ -998,10 +1017,18 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     if (offset)
     {
         vkd3d_string_buffer_printf(sample, ", ");
-        shader_glsl_print_src(sample, gen, &ins->src[1],
-                vkd3d_write_mask_from_component_count(coord_size - array), ins->src[1].reg.data_type);
+        if (dynamic_offset)
+            shader_glsl_print_src(sample, gen, &ins->src[1],
+                    vkd3d_write_mask_from_component_count(coord_size - array), ins->src[1].reg.data_type);
+        else
+            shader_glsl_print_texel_offset(sample, gen, coord_size - array, &ins->texel_offset);
     }
-    if (gather)
+    if (bias)
+    {
+        vkd3d_string_buffer_printf(sample, ", ");
+        shader_glsl_print_src(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
+    }
+    else if (gather)
     {
         if ((component_idx = vsir_swizzle_get_component(sampler->swizzle, 0)))
             vkd3d_string_buffer_printf(sample, ", %d", component_idx);
