@@ -57,7 +57,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+dispatch 1 1 1
 probe uav 2 (0) rui (0xf01)
 probe uav 2 (1) rui (0x503)
 probe uav 2 (2) rui (0x511)
@@ -125,7 +125,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+dispatch 1 1 1
 probe uav 2 (0) rui (0x701)
 probe uav 2 (1) rui (0x503)
 probe uav 2 (2) rui (0x511)
