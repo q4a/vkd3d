@@ -12,16 +12,16 @@ uniform 0 float4 1.0 2.0 3.0 4.0
 uniform 4 float4 5.0 6.0 7.0 8.0
 uniform 8 float4 9.0 10.0 11.0 12.0
 uniform 12 float4 0 0 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
 uniform 12 float4 1 0 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (5.0, 6.0, 7.0, 8.0)
 uniform 12 float4 0 1 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (5.0, 6.0, 7.0, 8.0)
 uniform 12 float4 1 1 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (9.0, 10.0, 11.0, 12.0)
 
 
@@ -36,16 +36,16 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 float 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (11.0, 11.0, 11.0, 11.0)
 uniform 0 float 1
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (12.0, 12.0, 12.0, 12.0)
 uniform 0 float 2
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (13.0, 13.0, 13.0, 13.0)
 uniform 0 float 3
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (14.0, 14.0, 14.0, 14.0)
 
 
@@ -61,7 +61,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 2.3
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (3, 3, 3, 3)
 
 
@@ -77,16 +77,16 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 float 0
-todo(sm<4) draw quad
+todo(sm<4 | msl) draw quad
 probe (0, 0) rgba (21.0, 1.0, 24.0, 0.0)
 uniform 0 float 1
-todo(sm<4) draw quad
+todo(sm<4 | msl) draw quad
 probe (0, 0) rgba (22.0, 0.0, 23.0, 1.0)
 uniform 0 float 2
-todo(sm<4) draw quad
+todo(sm<4 | msl) draw quad
 probe (0, 0) rgba (23.0, 1.0, 22.0, 0.0)
 uniform 0 float 3
-todo(sm<4) draw quad
+todo(sm<4 | msl) draw quad
 probe (0, 0) rgba (24.0, 0.0, 21.0, 1.0)
 
 
@@ -102,16 +102,16 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0 0 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
 uniform 0 float4 1 0 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (5.0, 6.0, 7.0, 8.0)
 uniform 0 float4 0 1 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (5.0, 6.0, 7.0, 8.0)
 uniform 0 float4 1 1 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (9.0, 10.0, 11.0, 12.0)
 
 
@@ -130,7 +130,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0 0 2.4 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (1.0, 120.0, 90.0, 4.0)
 
 
@@ -148,12 +148,12 @@ float4 main() : sv_target
 if(sm<4) uniform 0 float 3
 if(sm<4) uniform 4 float 1
 if(sm>=4) uniform 0 float4 3 1 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (7, 7, 7, 7)
 if(sm<4) uniform 0 float 5
 if(sm<4) uniform 4 float 0
 if(sm>=4) uniform 0 float4 5 0 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (10, 10, 10, 10)
 
 
@@ -186,13 +186,13 @@ if(sm<4) uniform 0 float 2
 if(sm<4) uniform 4 float 1
 if(sm<4) uniform 8 float -1
 if(sm>=4) uniform 0 float4 2 1 -1 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (30, 31, 32, 33)
 if(sm<4) uniform 0 float 1
 if(sm<4) uniform 4 float 0
 if(sm<4) uniform 8 float 1
 if(sm>=4) uniform 0 float4 1 0 1 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (70, 71, 72, 73)
 
 
@@ -214,12 +214,12 @@ float4 main() : sv_target
 if(sm<4) uniform 0 float 11
 if(sm<4) uniform 4 float 12
 if(sm>=4) uniform 0 float4 11 12 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (5, 5, 5, 5)
 if(sm<4) uniform 0 float 13
 if(sm<4) uniform 4 float 10
 if(sm>=4) uniform 0 float4 13 10 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (9, 9, 9, 9)
 
 
@@ -244,15 +244,15 @@ float4 main() : sv_target
 [test]
 uniform 0 int 0
 uniform 1 int 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (100, 6, 7, 8)
 uniform 0 int 2
 uniform 1 int 2
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (5, 6, 100, 8)
 uniform 0 int 1
 uniform 1 int 3
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (5, 6, 7, 4)
 
 
@@ -281,7 +281,7 @@ uniform 0 float4 1 2 3 4
 uniform 4 float4 5 6 7 8
 uniform 8 int 3
 uniform 9 int 4
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (1126, 3344, 5566, 3788)
 
 
@@ -301,7 +301,7 @@ float4 main() : sv_target
 [test]
 uniform 0 uint 1
 uniform 1 uint 0x40a00000
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (1, 5, 3, 4)
 
 
@@ -332,7 +332,7 @@ uniform 8 float 3.0
 uniform 12 float 4.0
 uniform 16 uint4 3 1 0 2
 uniform 20 uint4 0 3 1 2
-draw quad
+todo(msl) draw quad
 if(sm<4)         probe (0,0) rgba (1.0, 1.0, 1.0, 1.0)
 if(sm>=4 & sm<6) todo probe (0,0) rgba (4.0, 4.0, 4.0, 4.0)
 if(sm>=6)        probe (0,0) rgba (4.0, 3.0, 2.0, 1.0)

@@ -491,6 +491,13 @@ tests_shader_runner_SOURCES = \
 	tests/shader_runner_d3d12.c \
 	tests/shader_runner_gl.c \
 	tests/shader_runner_vulkan.c
+if HAVE_METAL
+tests_shader_runner_OBJCFLAGS = $(AM_CFLAGS)
+tests_shader_runner_SOURCES += tests/shader_runner_metal.m
+tests_shader_runner_LINK = $(OBJCLINK) -framework Foundation -framework Metal
+else
+tests_shader_runner_LINK = $(LINK)
+endif
 tests_vkd3d_api_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
 tests_vkd3d_shader_api_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)

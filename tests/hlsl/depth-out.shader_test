@@ -16,22 +16,22 @@ float main() : SV_Depth
 uniform 0 float 0.0
 clear dsv 1.0
 depth less
-draw quad
+todo(msl) draw quad
 probe dsv (0,0) r (0.0)
 
 uniform 0 float 0.75
 clear dsv 1.0
-draw quad
+todo(msl) draw quad
 probe dsv (0,0) r (0.75)
 
 clear dsv 0.5
 depth greater
-draw quad
+todo(msl) draw quad
 probe dsv (0,0) r (0.75)
 
 depth less
 clear dsv 0.5
-draw quad
+todo(msl) draw quad
 probe dsv (0,0) r (0.5)
 
 

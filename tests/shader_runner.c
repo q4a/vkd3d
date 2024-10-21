@@ -149,8 +149,9 @@ static bool check_qualifier_args_conjunction(struct shader_runner *runner, const
         {"sm>=6", SHADER_MODEL_6_0, SHADER_MODEL_6_0},
         {"sm<4",  SHADER_MODEL_2_0, SHADER_MODEL_4_0 - 1},
         {"sm<6",  SHADER_MODEL_2_0, SHADER_MODEL_6_0 - 1},
-        {"glsl", 0, 0, true},
         {"d3d12", 0, 0, true},
+        {"glsl", 0, 0, true},
+        {"msl", 0, 0, true},
         {"mvk", 0, 0, true},
         {"vulkan", 0, 0, true},
     };
@@ -2423,7 +2424,9 @@ START_TEST(shader_runner)
 # ifdef HAVE_OPENGL
     run_shader_tests_gl();
 # endif
-
+# ifdef HAVE_METAL
+    run_shader_tests_metal();
+# endif
     run_shader_tests_vulkan();
 
     dxc_compiler = dxcompiler_create();

@@ -32,15 +32,15 @@ float4 main(float2 coord : texcoord) : sv_target
 
 [test]
 uniform 0 float4 6.5 0.0 0.0 0.0
-todo(sm<4) draw quad
+todo(sm<4 | msl) draw quad
 probe (0, 0) rgba (10.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 7.5 0.0 0.0 0.0
-todo(sm<4) draw quad
+todo(sm<4 | msl) draw quad
 probe (0, 0) rgba (4.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 8.5 0.0 0.0 0.0
-todo(sm<4) draw quad
+todo(sm<4 | msl) draw quad
 probe (0, 0) rgba (0.0, 0.0, 10.0, 0.0)
 
 [require]
@@ -60,13 +60,13 @@ float4 main(float2 coord : texcoord) : sv_target
 
 [test]
 uniform 0 float4 6.5 0.0 0.0 0.0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (10.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 7.5 0.0 0.0 0.0
-draw quad
+todo(msl) draw quad
 todo(sm<4) probe (0,0) rgba (4.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 8.5 0.0 0.0 0.0
-draw quad
+todo(msl) draw quad
 todo(sm<4) probe (0,0) rgba (0.0, 0.0, 10.0, 0.0)

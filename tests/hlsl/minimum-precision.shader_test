@@ -17,7 +17,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (197.0, 218.0, 238.0, 257.0)
 
 [rtv 0]
@@ -39,7 +39,7 @@ shader model < 6.0
 
 [test]
 uniform 0 uint4 0 0 0 0
-draw quad
+todo(msl) draw quad
 probe (0, 0) rgbaui (0x7fff, 0xffff, 0, 0)
 
 [require]

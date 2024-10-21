@@ -8,6 +8,7 @@ AC_CONFIG_HEADERS(include/config.h)
 AC_ARG_VAR([WIDL], [widl IDL compiler])
 AC_ARG_VAR([CROSSCC32], [32-bit Windows cross compiler])
 AC_ARG_VAR([CROSSCC64], [64-bit Windows cross compiler])
+AC_ARG_WITH([metal], AS_HELP_STRING([--with-metal], [Build with the Metal library (default: test)]))
 AC_ARG_WITH([ncurses], AS_HELP_STRING([--with-ncurses], [Build with the ncurses library (default: test)]))
 AC_ARG_WITH([opengl], AS_HELP_STRING([--with-opengl], [Build with the OpenGL library (default: test)]))
 AC_ARG_WITH([spirv-tools], AS_HELP_STRING([--with-spirv-tools],
@@ -134,6 +135,16 @@ AS_IF([test "x$SONAME_LIBDXCOMPILER" = "x"],
       [VKD3D_CHECK_SONAME([dxcompiler], [DxcCreateInstance], [HAVE_DXCOMPILER=yes], [HAVE_DXCOMPILER=no], [$DXCOMPILER_LIBS])],
       [AC_DEFINE_UNQUOTED([SONAME_LIBDXCOMPILER],["$SONAME_LIBDXCOMPILER"],[Define to the shared object name of the dxcompiler library.])])
 
+AS_IF([test "x$with_metal" != "xno"],
+      [AC_MSG_CHECKING([for Metal])]
+      [AC_PREPROC_IFELSE([AC_LANG_PROGRAM([#include <Metal/Metal.h>])],
+                         [AC_MSG_RESULT([yes])
+                          AC_PROG_OBJC
+                          AC_DEFINE([HAVE_METAL], [1], [Define to 1 if you have Metal.])
+                          with_metal=yes],
+                         [AC_MSG_RESULT([no])
+                          AM_CONDITIONAL([am__fastdepOBJC], [false])
+                          with_metal=no])])
 AS_IF([test "x$with_ncurses" != "xno"],
       [PKG_CHECK_MODULES([NCURSES], [ncurses],
                          [AC_DEFINE([HAVE_NCURSES], [1], [Define to 1 if you have ncurses.]) with_ncurses=yes],
@@ -181,6 +192,7 @@ AM_CONDITIONAL([BUILD_TESTS], [test "x$enable_tests" != "xno"])
 AM_CONDITIONAL([HAVE_WIDL], [test "x$WIDL" != "xno"])
 AM_CONDITIONAL([HAVE_CROSSTARGET32], [test "x$CROSSTARGET32" != "xno"])
 AM_CONDITIONAL([HAVE_CROSSTARGET64], [test "x$CROSSTARGET64" != "xno"])
+AM_CONDITIONAL([HAVE_METAL], [test "${host_os#darwin}" != "$host_os"])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
@@ -197,11 +209,12 @@ AS_ECHO(["
 
   widl: ${WIDL}
 
+  Have dxcompiler: ${HAVE_DXCOMPILER}
+  Have Metal: ${with_metal}
   Have ncurses: ${with_ncurses}
   Have OpenGL: ${with_opengl}
   Have SPIRV-Tools: ${with_spirv_tools}
   Have xcb: ${HAVE_XCB}
-  Have dxcompiler: ${HAVE_DXCOMPILER}
 
   Building demos: ${enable_demos}
   Building tests: ${enable_tests}

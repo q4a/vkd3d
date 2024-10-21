@@ -257,6 +257,7 @@ void run_shader_tests_d3d9(void);
 void run_shader_tests_d3d11(void);
 #else
 void run_shader_tests_gl(void);
+void run_shader_tests_metal(void);
 void run_shader_tests_vulkan(void);
 #endif
 void run_shader_tests_d3d12(void *dxc_compiler);
