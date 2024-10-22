@@ -4196,7 +4196,7 @@ static bool mark_indexable_var(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
     return true;
 }
 
-void mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static void mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
@@ -4447,7 +4447,7 @@ static void init_var_liveness(struct hlsl_ir_var *var)
         var->last_read = UINT_MAX;
 }
 
-void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
@@ -5228,7 +5228,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
  * index to all (simultaneously live) variables or intermediate values. Agnostic
  * as to how many registers are actually available for the current backend, and
  * does not handle constants. */
-uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct register_allocator allocator = {0};
     struct hlsl_scope *scope;
