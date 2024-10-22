@@ -7557,6 +7557,13 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     generate_vsir_signature(ctx, program, entry_func);
     if (version.type == VKD3D_SHADER_TYPE_HULL)
         generate_vsir_signature(ctx, program, ctx->patch_constant_func);
+
+    if (version.type == VKD3D_SHADER_TYPE_COMPUTE)
+    {
+        program->thread_group_size.x = ctx->thread_count[0];
+        program->thread_group_size.y = ctx->thread_count[1];
+        program->thread_group_size.z = ctx->thread_count[2];
+    }
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,

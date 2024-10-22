@@ -4962,15 +4962,13 @@ static void write_sm4_dcl_indexable_temp(const struct tpf_compiler *tpf, uint32_
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_thread_group(const struct tpf_compiler *tpf, const uint32_t thread_count[3])
+static void tpf_dcl_thread_group(const struct tpf_compiler *tpf, const struct vsir_thread_group_size *group_size)
 {
     struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM5_OP_DCL_THREAD_GROUP,
 
-        .idx[0] = thread_count[0],
-        .idx[1] = thread_count[1],
-        .idx[2] = thread_count[2],
+        .idx = {group_size->x, group_size->y, group_size->z},
         .idx_count = 3,
     };
 
@@ -6544,7 +6542,7 @@ static void tpf_write_shader_function(struct tpf_compiler *tpf, struct hlsl_ir_f
     }
 
     if (tpf->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
-        write_sm4_dcl_thread_group(tpf, ctx->thread_count);
+        tpf_dcl_thread_group(tpf, &tpf->program->thread_group_size);
 
     if (temp_count)
         write_sm4_dcl_temps(tpf, temp_count);
