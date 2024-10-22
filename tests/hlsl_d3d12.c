@@ -484,10 +484,10 @@ static ID3D10Blob *compile_shader_(unsigned int line, const char *source, const 
 
 static void test_thread_id(void)
 {
+    struct d3d12_resource_readback rb, rb_threadid;
     ID3D12GraphicsCommandList *command_list;
-    struct d3d12_resource_readback rb;
     struct test_context context;
-    ID3D12Resource *textures[3];
+    ID3D12Resource *textures[4];
     ID3D12DescriptorHeap *heap;
     unsigned int i, x, y, z;
     ID3D12Device *device;
@@ -495,16 +495,18 @@ static void test_thread_id(void)
     HRESULT hr;
 
     static const char cs_source[] =
-        "RWTexture3D<uint4> group_uav, thread_uav, dispatch_uav;\n"
+        "RWTexture3D<uint4> group_uav, thread_uav, dispatch_uav, threadindex_uav;\n"
         "[numthreads(5, 3, 2)]\n"
-        "void main(uint3 group : sv_groupid, uint3 thread : sv_groupthreadid, uint3 dispatch : sv_dispatchthreadid)\n"
+        "void main(uint3 group : sv_groupid, uint3 thread : sv_groupthreadid, uint3 dispatch : sv_dispatchthreadid,"
+        "        uint threadindex : sv_groupindex)\n"
         "{\n"
         "    group_uav[dispatch] = uint4(group, 1);\n"
         "    thread_uav[dispatch] = uint4(thread, 2);\n"
         "    dispatch_uav[dispatch] = uint4(dispatch, 3);\n"
+        "    threadindex_uav[dispatch] = uint4(threadindex, 0, 0, 4);\n"
         "}";
 
-    static const D3D12_DESCRIPTOR_RANGE descriptor_range = {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0, 0, 0};
+    static const D3D12_DESCRIPTOR_RANGE descriptor_range = {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4, 0, 0, 0};
 
     static const D3D12_ROOT_PARAMETER root_parameter =
     {
@@ -526,9 +528,9 @@ static void test_thread_id(void)
     hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
     ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
 
-    heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 3);
+    heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4);
 
-    for (i = 0; i < 3; ++i)
+    for (i = 0; i < 4; ++i)
     {
         const UINT clear_value[4] = {0};
 
@@ -623,7 +625,37 @@ static void test_thread_id(void)
     release_resource_readback(&rb);
     reset_command_list(command_list, context.allocator);
 
-    for (i = 0; i < 3; ++i)
+    /* Verify SV_GroupIndex using SV_GroupThreadId. */
+    transition_resource_state(command_list, textures[1],
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_resource_readback_with_command_list(textures[1], 0, &rb_threadid, context.queue, command_list);
+    reset_command_list(command_list, context.allocator);
+    transition_resource_state(command_list, textures[3],
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_resource_readback_with_command_list(textures[3], 0, &rb, context.queue, command_list);
+    for (x = 0; x < 16; ++x)
+    {
+        for (y = 0; y < 8; ++y)
+        {
+            for (z = 0; z < 8; ++z)
+            {
+                const struct uvec4 *v = get_readback_data(&rb.rb, x, y, z, sizeof(struct uvec4));
+                const struct uvec4 *tid = get_readback_data(&rb_threadid.rb, x, y, z, sizeof(struct uvec4));
+                struct uvec4 expect = {tid->z * 5 * 3 + tid->y * 5 + tid->x, 0, 0, 4};
+
+                if (x >= 10 || y >= 6 || z >= 4)
+                    memset(&expect, 0, sizeof(expect));
+
+                ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
+                        v->x, v->y, v->z, v->w, x, y, z);
+            }
+        }
+    }
+    release_resource_readback(&rb);
+    release_resource_readback(&rb_threadid);
+    reset_command_list(command_list, context.allocator);
+
+    for (i = 0; i < 4; ++i)
         ID3D12Resource_Release(textures[i]);
     ID3D12DescriptorHeap_Release(heap);
     destroy_test_context(&context);

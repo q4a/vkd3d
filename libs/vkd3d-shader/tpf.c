@@ -3002,9 +3002,10 @@ bool sm4_register_from_semantic_name(const struct vkd3d_shader_version *version,
     }
     register_table[] =
     {
-        {"sv_dispatchthreadid", false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_THREADID,      false},
-        {"sv_groupid",          false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_THREADGROUPID, false},
-        {"sv_groupthreadid",    false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_LOCALTHREADID, false},
+        {"sv_dispatchthreadid", false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_THREADID,         false},
+        {"sv_groupid",          false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_THREADGROUPID,    false},
+        {"sv_groupindex",       false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_LOCALTHREADINDEX, false},
+        {"sv_groupthreadid",    false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_LOCALTHREADID,    false},
 
         {"sv_domainlocation",   false, VKD3D_SHADER_TYPE_DOMAIN,   VKD3DSPR_TESSCOORD,     false},
         {"sv_primitiveid",      false, VKD3D_SHADER_TYPE_DOMAIN,   VKD3DSPR_PRIMID,        false},
@@ -3105,6 +3106,7 @@ bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *s
     {
         {"sv_dispatchthreadid",         false, VKD3D_SHADER_TYPE_COMPUTE,   ~0u},
         {"sv_groupid",                  false, VKD3D_SHADER_TYPE_COMPUTE,   ~0u},
+        {"sv_groupindex",               false, VKD3D_SHADER_TYPE_COMPUTE,   ~0u},
         {"sv_groupthreadid",            false, VKD3D_SHADER_TYPE_COMPUTE,   ~0u},
 
         {"sv_domainlocation",           false, VKD3D_SHADER_TYPE_DOMAIN,    ~0u},
