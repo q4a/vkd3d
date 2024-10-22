@@ -203,12 +203,23 @@ static inline bool compare_uvec4(const struct uvec4 *v1, const struct uvec4 *v2)
     return v1->x == v2->x && v1->y == v2->y && v1->z == v2->z && v1->w == v2->w;
 }
 
+static inline bool compare_vec(const struct vec4 *v1, const struct vec4 *v2,
+        unsigned int ulps, unsigned component_count)
+{
+    if (component_count > 0 && !compare_float(v1->x, v2->x, ulps))
+        return false;
+    if (component_count > 1 && !compare_float(v1->y, v2->y, ulps))
+        return false;
+    if (component_count > 2 && !compare_float(v1->z, v2->z, ulps))
+        return false;
+    if (component_count > 3 && !compare_float(v1->w, v2->w, ulps))
+        return false;
+    return true;
+}
+
 static inline bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, unsigned int ulps)
 {
-    return compare_float(v1->x, v2->x, ulps)
-            && compare_float(v1->y, v2->y, ulps)
-            && compare_float(v1->z, v2->z, ulps)
-            && compare_float(v1->w, v2->w, ulps);
+    return compare_vec(v1, v2, ulps, 4);
 }
 
 static inline void set_rect(RECT *rect, int left, int top, int right, int bottom)
@@ -377,9 +388,10 @@ static inline void check_readback_data_uint64_(unsigned int line, struct resourc
     ok_(line)(all_match, "Got 0x%016"PRIx64", expected 0x%016"PRIx64" at (%u, %u).\n", got, expected, x, y);
 }
 
-#define check_readback_data_vec4(a, b, c, d) check_readback_data_vec4_(__LINE__, a, b, c, d)
-static inline void check_readback_data_vec4_(unsigned int line, const struct resource_readback *rb,
-        const RECT *rect, const struct vec4 *expected, unsigned int max_diff)
+#define check_readback_data_vec2(a, b, c, d) check_readback_data_vec_(__LINE__, a, b, c, d, 2)
+#define check_readback_data_vec4(a, b, c, d) check_readback_data_vec_(__LINE__, a, b, c, d, 4)
+static inline void check_readback_data_vec_(unsigned int line, const struct resource_readback *rb,
+        const RECT *rect, const struct vec4 *expected, unsigned int max_diff, unsigned component_count)
 {
     RECT r = {0, 0, rb->width, rb->height};
     unsigned int x = 0, y = 0;
@@ -394,7 +406,7 @@ static inline void check_readback_data_vec4_(unsigned int line, const struct res
         for (x = r.left; x < r.right; ++x)
         {
             got = *get_readback_vec4(rb, x, y);
-            if (!compare_vec4(&got, expected, max_diff))
+            if (!compare_vec(&got, expected, max_diff, component_count))
             {
                 all_match = false;
                 break;

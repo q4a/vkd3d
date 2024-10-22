@@ -1138,6 +1138,17 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 ulps = 0;
             todo_if(runner->is_todo) check_readback_data_vec4(rb, &rect, &v, ulps);
         }
+        else if (match_string(line, "rg", &line))
+        {
+            struct vec4 v;
+
+            ret = sscanf(line, "( %f , %f ) %u", &v.x, &v.y, &ulps);
+            if (ret < 2)
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            if (ret < 3)
+                ulps = 0;
+            todo_if(runner->is_todo) check_readback_data_vec2(rb, &rect, &v, ulps);
+        }
         else if (match_string(line, "rui", &line) || (is_signed = match_string(line, "ri", &line)))
         {
             unsigned int expect;

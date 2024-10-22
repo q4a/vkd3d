@@ -716,7 +716,7 @@ static inline void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *t
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_vec4_(line, &rb.rb, NULL, expected, max_diff);
+    check_readback_data_vec_(line, &rb.rb, NULL, expected, max_diff, 4);
     release_resource_readback(&rb);
 }
 
