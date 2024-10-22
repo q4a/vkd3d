@@ -2005,6 +2005,8 @@ static void d3d12_command_list_invalidate_bindings(struct d3d12_command_list *li
 
         vkd3d_array_reserve((void **)&bindings->vk_uav_counter_views, &bindings->vk_uav_counter_views_size,
                 state->uav_counters.binding_count, sizeof(*bindings->vk_uav_counter_views));
+        memset(bindings->vk_uav_counter_views, 0,
+                state->uav_counters.binding_count * sizeof(*bindings->vk_uav_counter_views));
         bindings->uav_counters_dirty = true;
     }
 }
