@@ -7542,10 +7542,101 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     sm1_generate_vsir_block(ctx, &entry_func->body, program);
 }
 
+static void add_last_vsir_instr_to_block(struct hlsl_ctx *ctx, struct vsir_program *program, struct hlsl_block *block)
+{
+    struct vkd3d_shader_location *loc;
+    struct hlsl_ir_node *vsir_instr;
+
+    loc = &program->instructions.elements[program->instructions.count - 1].location;
+
+    if (!(vsir_instr = hlsl_new_vsir_instruction_ref(ctx, program->instructions.count - 1, NULL, NULL, loc)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+    hlsl_block_add_instr(block, vsir_instr);
+}
+
+static void sm4_generate_vsir_instr_dcl_temps(struct hlsl_ctx *ctx, struct vsir_program *program,
+        uint32_t temp_count, struct hlsl_block *block, const struct vkd3d_shader_location *loc)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, loc, VKD3DSIH_DCL_TEMPS, 0, 0)))
+        return;
+
+    ins->declaration.count = temp_count;
+
+    add_last_vsir_instr_to_block(ctx, program, block);
+}
+
+static void sm4_generate_vsir_instr_dcl_indexable_temp(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_block *block, uint32_t idx,
+        uint32_t size, uint32_t comp_count, const struct vkd3d_shader_location *loc)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, loc, VKD3DSIH_DCL_INDEXABLE_TEMP, 0, 0)))
+        return;
+
+    ins->declaration.indexable_temp.register_idx = idx;
+    ins->declaration.indexable_temp.register_size = size;
+    ins->declaration.indexable_temp.alignment = 0;
+    ins->declaration.indexable_temp.data_type = VKD3D_DATA_FLOAT;
+    ins->declaration.indexable_temp.component_count = comp_count;
+    ins->declaration.indexable_temp.has_function_scope = false;
+
+    add_last_vsir_instr_to_block(ctx, program, block);
+}
+
+static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
+        struct hlsl_ir_function_decl *func, uint64_t config_flags, struct vsir_program *program)
+{
+    struct hlsl_block block = {0};
+    struct hlsl_scope *scope;
+    struct hlsl_ir_var *var;
+    uint32_t temp_count;
+
+    compute_liveness(ctx, func);
+    mark_indexable_vars(ctx, func);
+    temp_count = allocate_temp_registers(ctx, func);
+    if (ctx->result)
+        return;
+    program->temp_count = max(program->temp_count, temp_count);
+
+    hlsl_block_init(&block);
+
+    if (temp_count)
+        sm4_generate_vsir_instr_dcl_temps(ctx, program, temp_count, &block, &func->loc);
+
+    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+        {
+            if (var->is_uniform || var->is_input_semantic || var->is_output_semantic)
+                continue;
+            if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
+                continue;
+
+            if (var->indexable)
+            {
+                unsigned int id = var->regs[HLSL_REGSET_NUMERIC].id;
+                unsigned int size = align(var->data_type->reg_size[HLSL_REGSET_NUMERIC], 4) / 4;
+
+                sm4_generate_vsir_instr_dcl_indexable_temp(ctx, program, &block, id, size, 4, &var->loc);
+            }
+        }
+    }
+
+    list_move_head(&func->body.instrs, &block.instrs);
+
+    hlsl_block_cleanup(&block);
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program, so it can be used as input to tpf_compile() without relying
  * on ctx and entry_func. */
-static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         uint64_t config_flags, struct vsir_program *program)
 {
     struct vkd3d_shader_version version = {0};
@@ -7560,7 +7651,7 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         return;
     }
 
-    generate_vsir_signature(ctx, program, entry_func);
+    generate_vsir_signature(ctx, program, func);
     if (version.type == VKD3D_SHADER_TYPE_HULL)
         generate_vsir_signature(ctx, program, ctx->patch_constant_func);
 
@@ -7570,6 +7661,10 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         program->thread_group_size.y = ctx->thread_count[1];
         program->thread_group_size.z = ctx->thread_count[2];
     }
+
+    sm4_generate_vsir_add_function(ctx, func, config_flags, program);
+    if (version.type == VKD3D_SHADER_TYPE_HULL)
+        sm4_generate_vsir_add_function(ctx, ctx->patch_constant_func, config_flags, program);
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,

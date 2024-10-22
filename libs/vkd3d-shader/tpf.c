@@ -4935,27 +4935,26 @@ static void tpf_write_dcl_semantic(const struct tpf_compiler *tpf,
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_temps(const struct tpf_compiler *tpf, uint32_t temp_count)
+static void tpf_dcl_temps(const struct tpf_compiler *tpf, unsigned int count)
 {
     struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM4_OP_DCL_TEMPS,
 
-        .idx = {temp_count},
+        .idx = {count},
         .idx_count = 1,
     };
 
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_indexable_temp(const struct tpf_compiler *tpf, uint32_t idx,
-        uint32_t size, uint32_t comp_count)
+static void tpf_dcl_indexable_temp(const struct tpf_compiler *tpf, const struct vkd3d_shader_indexable_temp *temp)
 {
     struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM4_OP_DCL_INDEXABLE_TEMP,
 
-        .idx = {idx, size, comp_count},
+        .idx = {temp->register_idx, temp->register_size, temp->component_count},
         .idx_count = 3,
     };
 
@@ -6447,9 +6446,28 @@ static void write_sm4_swizzle(const struct tpf_compiler *tpf, const struct hlsl_
     write_sm4_instruction(tpf, &instr);
 }
 
+static void tpf_handle_instruction(const struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
+{
+    switch (ins->opcode)
+    {
+        case VKD3DSIH_DCL_TEMPS:
+            tpf_dcl_temps(tpf, ins->declaration.count);
+            break;
+
+        case VKD3DSIH_DCL_INDEXABLE_TEMP:
+            tpf_dcl_indexable_temp(tpf, &ins->declaration.indexable_temp);
+            break;
+
+        default:
+            vkd3d_unreachable();
+            break;
+    }
+}
+
 static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_block *block)
 {
     const struct hlsl_ir_node *instr;
+    unsigned int vsir_instr_idx;
 
     LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
@@ -6515,6 +6533,11 @@ static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_bl
                 write_sm4_swizzle(tpf, hlsl_ir_swizzle(instr));
                 break;
 
+            case HLSL_IR_VSIR_INSTRUCTION_REF:
+                vsir_instr_idx = hlsl_ir_vsir_instruction_ref(instr)->vsir_instr_idx;
+                tpf_handle_instruction(tpf, &tpf->program->instructions.elements[vsir_instr_idx]);
+                break;
+
             default:
                 hlsl_fixme(tpf->ctx, &instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
         }
@@ -6524,15 +6547,7 @@ static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_bl
 static void tpf_write_shader_function(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *func)
 {
     struct hlsl_ctx *ctx = tpf->ctx;
-    const struct hlsl_scope *scope;
     const struct hlsl_ir_var *var;
-    uint32_t temp_count;
-
-    compute_liveness(ctx, func);
-    mark_indexable_vars(ctx, func);
-    temp_count = allocate_temp_registers(ctx, func);
-    if (ctx->result)
-        return;
 
     LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -6543,28 +6558,6 @@ static void tpf_write_shader_function(struct tpf_compiler *tpf, struct hlsl_ir_f
 
     if (tpf->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
         tpf_dcl_thread_group(tpf, &tpf->program->thread_group_size);
-
-    if (temp_count)
-        write_sm4_dcl_temps(tpf, temp_count);
-
-    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
-    {
-        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
-        {
-            if (var->is_uniform || var->is_input_semantic || var->is_output_semantic)
-                continue;
-            if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
-                continue;
-
-            if (var->indexable)
-            {
-                unsigned int id = var->regs[HLSL_REGSET_NUMERIC].id;
-                unsigned int size = align(var->data_type->reg_size[HLSL_REGSET_NUMERIC], 4) / 4;
-
-                write_sm4_dcl_indexable_temp(tpf, id, size, 4);
-            }
-        }
-    }
 
     write_sm4_block(tpf, &func->body);
 
