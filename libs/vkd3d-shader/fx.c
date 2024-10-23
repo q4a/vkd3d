@@ -1568,20 +1568,17 @@ static uint32_t write_fx_4_state_numeric_value(struct hlsl_ir_constant *value, s
 
     for (i = 0; i < count; ++i)
     {
-        if (hlsl_is_numeric_type(data_type))
+        switch (data_type->e.numeric.type)
         {
-            switch (data_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                case HLSL_TYPE_BOOL:
-                    type = fx_4_numeric_base_types[data_type->e.numeric.type];
-                    break;
-                default:
-                    type = 0;
-                    hlsl_fixme(ctx, &ctx->location, "Unsupported numeric state value type %u.", data_type->e.numeric.type);
-            }
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+            case HLSL_TYPE_BOOL:
+                type = fx_4_numeric_base_types[data_type->e.numeric.type];
+                break;
+            default:
+                type = 0;
+                hlsl_fixme(ctx, &ctx->location, "Unsupported numeric state value type %u.", data_type->e.numeric.type);
         }
 
         put_u32_unaligned(buffer, type);
