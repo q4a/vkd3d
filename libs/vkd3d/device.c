@@ -1696,7 +1696,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT *descriptor_indexing;
     VkPhysicalDevice physical_device = device->vk_physical_device;
     struct vkd3d_vulkan_info *vulkan_info = &device->vk_info;
-    VkExtensionProperties *vk_extensions;
+    VkExtensionProperties *vk_extensions = NULL;
     VkPhysicalDeviceFeatures *features;
     uint32_t vk_extension_count;
     HRESULT hr;
