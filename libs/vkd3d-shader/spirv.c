@@ -1913,7 +1913,11 @@ static uint32_t vkd3d_spirv_get_type_id(struct vkd3d_spirv_builder *builder,
     uint32_t scalar_id, type_id;
 
     VKD3D_ASSERT(component_type < VKD3D_SHADER_COMPONENT_TYPE_COUNT);
-    VKD3D_ASSERT(1 <= component_count && component_count <= VKD3D_VEC4_SIZE);
+    if (!component_count || component_count > VKD3D_VEC4_SIZE)
+    {
+        ERR("Invalid component count %u.\n", component_count);
+        return 0;
+    }
 
     if ((type_id = builder->numeric_type_ids[component_type][component_count - 1]))
         return type_id;
