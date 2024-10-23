@@ -1531,6 +1531,7 @@ static void get_physical_device_info(struct vulkan_shader_runner *runner, struct
     else
         VK_CALL(vkGetPhysicalDeviceFeatures(context->phys_device, &info->features2.features));
 
+    info->properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     if (runner->driver_properties)
     {
         void *list = info->properties2.pNext;
