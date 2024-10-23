@@ -129,8 +129,8 @@ struct d3d12_view_instancing_subobject
     D3D12_VIEW_INSTANCING_DESC view_instancing_desc;
 };
 
-#define wait_queue_idle(a, b) wait_queue_idle_(__LINE__, a, b)
-static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue);
+#define wait_queue_idle(a, b) wait_queue_idle_(__FILE__, __LINE__, a, b)
+static void wait_queue_idle_(const char *file, unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue);
 static ID3D12Device *create_device(void);
 
 static inline HRESULT wait_for_fence_no_event(ID3D12Fence *fence, uint64_t value)
@@ -142,20 +142,21 @@ static inline HRESULT wait_for_fence_no_event(ID3D12Fence *fence, uint64_t value
     return ID3D12Fence_SetEventOnCompletion(fence, value, NULL);
 }
 
-#define wait_queue_idle_no_event(a, b) wait_queue_idle_no_event_(__LINE__, a, b)
-static inline void wait_queue_idle_no_event_(unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue)
+#define wait_queue_idle_no_event(a, b) wait_queue_idle_no_event_(__FILE__, __LINE__, a, b)
+static inline void wait_queue_idle_no_event_(const char *file,
+        unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue)
 {
     ID3D12Fence *fence;
     HRESULT hr;
 
     hr = ID3D12Device_CreateFence(device, 0, D3D12_FENCE_FLAG_NONE,
-        &IID_ID3D12Fence, (void **)&fence);
-    assert_that_(line)(hr == S_OK, "Failed to create fence, hr %#x.\n", hr);
+            &IID_ID3D12Fence, (void **)&fence);
+    assert_that_(file, line)(hr == S_OK, "Failed to create fence, hr %#x.\n", hr);
 
     hr = ID3D12CommandQueue_Signal(queue, fence, 1);
-    assert_that_(line)(hr == S_OK, "Failed to signal fence, hr %#x.\n", hr);
+    assert_that_(file, line)(hr == S_OK, "Failed to signal fence, hr %#x.\n", hr);
     hr = wait_for_fence_no_event(fence, 1);
-    assert_that_(line)(hr == S_OK, "Failed to wait for fence, hr %#x.\n", hr);
+    assert_that_(file, line)(hr == S_OK, "Failed to wait for fence, hr %#x.\n", hr);
 
     ID3D12Fence_Release(fence);
 }
@@ -199,38 +200,40 @@ static void exec_command_list(ID3D12CommandQueue *queue, ID3D12GraphicsCommandLi
     ID3D12CommandQueue_ExecuteCommandLists(queue, 1, lists);
 }
 
-#define reset_command_list(a, b) reset_command_list_(__LINE__, a, b)
-static inline void reset_command_list_(unsigned int line,
+#define reset_command_list(a, b) reset_command_list_(__FILE__, __LINE__, a, b)
+static inline void reset_command_list_(const char *file, unsigned int line,
         ID3D12GraphicsCommandList *list, ID3D12CommandAllocator *allocator)
 {
     HRESULT hr;
 
     hr = ID3D12CommandAllocator_Reset(allocator);
-    assert_that_(line)(hr == S_OK, "Failed to reset command allocator, hr %#x.\n", hr);
+    assert_that_(file, line)(hr == S_OK, "Failed to reset command allocator, hr %#x.\n", hr);
     hr = ID3D12GraphicsCommandList_Reset(list, allocator, NULL);
-    assert_that_(line)(hr == S_OK, "Failed to reset command list, hr %#x.\n", hr);
+    assert_that_(file, line)(hr == S_OK, "Failed to reset command list, hr %#x.\n", hr);
 }
 
-#define queue_signal(a, b, c) queue_signal_(__LINE__, a, b, c)
-static inline void queue_signal_(unsigned int line, ID3D12CommandQueue *queue, ID3D12Fence *fence, uint64_t value)
+#define queue_signal(a, b, c) queue_signal_(__FILE__, __LINE__, a, b, c)
+static inline void queue_signal_(const char *file, unsigned int line,
+        ID3D12CommandQueue *queue, ID3D12Fence *fence, uint64_t value)
 {
     HRESULT hr;
 
     hr = ID3D12CommandQueue_Signal(queue, fence, value);
-    ok_(line)(hr == S_OK, "Failed to submit signal operation to queue, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to submit signal operation to queue, hr %#x.\n", hr);
 }
 
-#define queue_wait(a, b, c) queue_wait_(__LINE__, a, b, c)
-static inline void queue_wait_(unsigned int line, ID3D12CommandQueue *queue, ID3D12Fence *fence, uint64_t value)
+#define queue_wait(a, b, c) queue_wait_(__FILE__, __LINE__, a, b, c)
+static inline void queue_wait_(const char *file, unsigned int line,
+        ID3D12CommandQueue *queue, ID3D12Fence *fence, uint64_t value)
 {
     HRESULT hr;
 
     hr = ID3D12CommandQueue_Wait(queue, fence, value);
-    ok_(line)(hr == S_OK, "Failed to submit wait operation to queue, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to submit wait operation to queue, hr %#x.\n", hr);
 }
 
-#define create_placed_buffer(a, b, c, d, e, f) create_placed_buffer_(__LINE__, a, b, c, d, e, f)
-static inline ID3D12Resource *create_placed_buffer_(unsigned int line, ID3D12Device *device,
+#define create_placed_buffer(a, b, c, d, e, f) create_placed_buffer_(__FILE__, __LINE__, a, b, c, d, e, f)
+static inline ID3D12Resource *create_placed_buffer_(const char *file, unsigned int line, ID3D12Device *device,
         ID3D12Heap *heap, size_t offset, size_t size, D3D12_RESOURCE_FLAGS resource_flags,
         D3D12_RESOURCE_STATES initial_resource_state)
 {
@@ -252,12 +255,12 @@ static inline ID3D12Resource *create_placed_buffer_(unsigned int line, ID3D12Dev
 
     hr = ID3D12Device_CreatePlacedResource(device, heap, offset, &resource_desc,
             initial_resource_state, NULL, &IID_ID3D12Resource, (void **)&buffer);
-    assert_that_(line)(SUCCEEDED(hr), "Failed to create buffer, hr %#x.\n", hr);
+    assert_that_(file, line)(SUCCEEDED(hr), "Failed to create buffer, hr %#x.\n", hr);
     return buffer;
 }
 
-#define create_buffer(a, b, c, d, e) create_buffer_(__LINE__, a, b, c, d, e)
-static ID3D12Resource *create_buffer_(unsigned int line, ID3D12Device *device,
+#define create_buffer(a, b, c, d, e) create_buffer_(__FILE__, __LINE__, a, b, c, d, e)
+static ID3D12Resource *create_buffer_(const char *file, unsigned int line, ID3D12Device *device,
         D3D12_HEAP_TYPE heap_type, size_t size, D3D12_RESOURCE_FLAGS resource_flags,
         D3D12_RESOURCE_STATES initial_resource_state)
 {
@@ -284,20 +287,20 @@ static ID3D12Resource *create_buffer_(unsigned int line, ID3D12Device *device,
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties,
             D3D12_HEAP_FLAG_NONE, &resource_desc, initial_resource_state,
             NULL, &IID_ID3D12Resource, (void **)&buffer);
-    assert_that_(line)(SUCCEEDED(hr), "Failed to create buffer, hr %#x.\n", hr);
+    assert_that_(file, line)(SUCCEEDED(hr), "Failed to create buffer, hr %#x.\n", hr);
     return buffer;
 }
 
-#define create_readback_buffer(a, b) create_readback_buffer_(__LINE__, a, b)
-static ID3D12Resource *create_readback_buffer_(unsigned int line, ID3D12Device *device,
+#define create_readback_buffer(a, b) create_readback_buffer_(__FILE__, __LINE__, a, b)
+static ID3D12Resource *create_readback_buffer_(const char *file, unsigned int line, ID3D12Device *device,
         size_t size)
 {
-    return create_buffer_(line, device, D3D12_HEAP_TYPE_READBACK, size,
+    return create_buffer_(file, line, device, D3D12_HEAP_TYPE_READBACK, size,
             D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 }
 
-#define update_buffer_data(a, b, c, d) update_buffer_data_(__LINE__, a, b, c, d)
-static inline void update_buffer_data_(unsigned int line, ID3D12Resource *buffer,
+#define update_buffer_data(a, b, c, d) update_buffer_data_(__FILE__, __LINE__, a, b, c, d)
+static inline void update_buffer_data_(const char *file, unsigned int line, ID3D12Resource *buffer,
         size_t offset, size_t size, const void *data)
 {
     D3D12_RANGE range;
@@ -306,27 +309,27 @@ static inline void update_buffer_data_(unsigned int line, ID3D12Resource *buffer
 
     range.Begin = range.End = 0;
     hr = ID3D12Resource_Map(buffer, 0, &range, &ptr);
-    ok_(line)(hr == S_OK, "Failed to map buffer, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to map buffer, hr %#x.\n", hr);
     memcpy((BYTE *)ptr + offset, data, size);
     ID3D12Resource_Unmap(buffer, 0, NULL);
 }
 
-#define create_upload_buffer(a, b, c) create_upload_buffer_(__LINE__, a, b, c)
-static inline ID3D12Resource *create_upload_buffer_(unsigned int line, ID3D12Device *device,
+#define create_upload_buffer(a, b, c) create_upload_buffer_(__FILE__, __LINE__, a, b, c)
+static inline ID3D12Resource *create_upload_buffer_(const char *file, unsigned int line, ID3D12Device *device,
         size_t size, const void *data)
 {
     ID3D12Resource *buffer;
 
-    buffer = create_buffer_(line, device, D3D12_HEAP_TYPE_UPLOAD, size,
+    buffer = create_buffer_(file, line, device, D3D12_HEAP_TYPE_UPLOAD, size,
             D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ);
     if (data)
-        update_buffer_data_(line, buffer, 0, size, data);
+        update_buffer_data_(file, line, buffer, 0, size, data);
     return buffer;
 }
 
-#define create_cpu_descriptor_heap(a, b, c) create_cpu_descriptor_heap_(__LINE__, a, b, c)
-static inline ID3D12DescriptorHeap *create_cpu_descriptor_heap_(unsigned int line, ID3D12Device *device,
-        D3D12_DESCRIPTOR_HEAP_TYPE heap_type, unsigned int descriptor_count)
+#define create_cpu_descriptor_heap(a, b, c) create_cpu_descriptor_heap_(__FILE__, __LINE__, a, b, c)
+static inline ID3D12DescriptorHeap *create_cpu_descriptor_heap_(const char *file, unsigned int line,
+        ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE heap_type, unsigned int descriptor_count)
 {
     D3D12_DESCRIPTOR_HEAP_DESC heap_desc;
     ID3D12DescriptorHeap *descriptor_heap;
@@ -338,14 +341,14 @@ static inline ID3D12DescriptorHeap *create_cpu_descriptor_heap_(unsigned int lin
     heap_desc.NodeMask = 0;
     hr = ID3D12Device_CreateDescriptorHeap(device, &heap_desc,
             &IID_ID3D12DescriptorHeap, (void **)&descriptor_heap);
-    ok_(line)(SUCCEEDED(hr), "Failed to create descriptor heap, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create descriptor heap, hr %#x.\n", hr);
 
     return descriptor_heap;
 }
 
-#define create_gpu_descriptor_heap(a, b, c) create_gpu_descriptor_heap_(__LINE__, a, b, c)
-static inline ID3D12DescriptorHeap *create_gpu_descriptor_heap_(unsigned int line, ID3D12Device *device,
-        D3D12_DESCRIPTOR_HEAP_TYPE heap_type, unsigned int descriptor_count)
+#define create_gpu_descriptor_heap(a, b, c) create_gpu_descriptor_heap_(__FILE__, __LINE__, a, b, c)
+static inline ID3D12DescriptorHeap *create_gpu_descriptor_heap_(const char *file, unsigned int line,
+        ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE heap_type, unsigned int descriptor_count)
 {
     D3D12_DESCRIPTOR_HEAP_DESC heap_desc;
     ID3D12DescriptorHeap *descriptor_heap;
@@ -357,7 +360,7 @@ static inline ID3D12DescriptorHeap *create_gpu_descriptor_heap_(unsigned int lin
     heap_desc.NodeMask = 0;
     hr = ID3D12Device_CreateDescriptorHeap(device, &heap_desc,
             &IID_ID3D12DescriptorHeap, (void **)&descriptor_heap);
-    ok_(line)(SUCCEEDED(hr), "Failed to create descriptor heap, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create descriptor heap, hr %#x.\n", hr);
 
     return descriptor_heap;
 }
@@ -388,8 +391,8 @@ static inline void uav_barrier(ID3D12GraphicsCommandList *list, ID3D12Resource *
     ID3D12GraphicsCommandList_ResourceBarrier(list, 1, &barrier);
 }
 
-#define create_command_queue(a, b, c) create_command_queue_(__LINE__, a, b, c)
-static inline ID3D12CommandQueue *create_command_queue_(unsigned int line, ID3D12Device *device,
+#define create_command_queue(a, b, c) create_command_queue_(__FILE__, __LINE__, a, b, c)
+static inline ID3D12CommandQueue *create_command_queue_(const char *file, unsigned int line, ID3D12Device *device,
         D3D12_COMMAND_LIST_TYPE type, int priority)
 {
     D3D12_COMMAND_QUEUE_DESC queue_desc;
@@ -401,7 +404,7 @@ static inline ID3D12CommandQueue *create_command_queue_(unsigned int line, ID3D1
     queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queue_desc.NodeMask = 0;
     hr = ID3D12Device_CreateCommandQueue(device, &queue_desc, &IID_ID3D12CommandQueue, (void **)&queue);
-    ok_(line)(hr == S_OK, "Failed to create command queue, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create command queue, hr %#x.\n", hr);
 
     return queue;
 }
@@ -689,51 +692,52 @@ static void release_resource_readback(struct d3d12_resource_readback *rb)
     ID3D12Resource_Release(rb->resource);
 }
 
-#define check_sub_resource_uint(a, b, c, d, e, f) check_sub_resource_uint_(__LINE__, a, b, c, d, e, f)
-static inline void check_sub_resource_uint_(unsigned int line, ID3D12Resource *texture,
+#define check_sub_resource_uint(a, b, c, d, e, f) check_sub_resource_uint_(__FILE__, __LINE__, a, b, c, d, e, f)
+static inline void check_sub_resource_uint_(const char *file, unsigned int line, ID3D12Resource *texture,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         unsigned int expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint_(line, &rb.rb, NULL, expected, max_diff);
+    check_readback_data_uint_(file, line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
-#define check_sub_resource_uint_with_box(a, b, c, d, e, f, g) check_sub_resource_uint_with_box_(__LINE__, a, b, c, d, e, f, g)
-static inline void check_sub_resource_uint_with_box_(unsigned int line, ID3D12Resource *texture,
+#define check_sub_resource_uint_with_box(a, b, c, d, e, f, g) \
+        check_sub_resource_uint_with_box_(__FILE__, __LINE__, a, b, c, d, e, f, g)
+static inline void check_sub_resource_uint_with_box_(const char *file, unsigned int line, ID3D12Resource *texture,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         const D3D12_BOX *box, unsigned int expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint_(line, &rb.rb, box, expected, max_diff);
+    check_readback_data_uint_(file, line, &rb.rb, box, expected, max_diff);
     release_resource_readback(&rb);
 }
 
-#define check_sub_resource_vec4(a, b, c, d, e, f) check_sub_resource_vec4_(__LINE__, a, b, c, d, e, f)
-static inline void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *texture,
+#define check_sub_resource_vec4(a, b, c, d, e, f) check_sub_resource_vec4_(__FILE__, __LINE__, a, b, c, d, e, f)
+static inline void check_sub_resource_vec4_(const char *file, unsigned int line, ID3D12Resource *texture,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         const struct vec4 *expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_vec_(line, &rb.rb, NULL, expected, max_diff, 4);
+    check_readback_data_vec_(file, line, &rb.rb, NULL, expected, max_diff, 4);
     release_resource_readback(&rb);
 }
 
-#define create_default_buffer(a, b, c, d) create_default_buffer_(__LINE__, a, b, c, d)
-static inline ID3D12Resource *create_default_buffer_(unsigned int line, ID3D12Device *device,
+#define create_default_buffer(a, b, c, d) create_default_buffer_(__FILE__, __LINE__, a, b, c, d)
+static inline ID3D12Resource *create_default_buffer_(const char *file, unsigned int line, ID3D12Device *device,
         size_t size, D3D12_RESOURCE_FLAGS resource_flags, D3D12_RESOURCE_STATES initial_resource_state)
 {
-    return create_buffer_(line, device, D3D12_HEAP_TYPE_DEFAULT, size,
+    return create_buffer_(file, line, device, D3D12_HEAP_TYPE_DEFAULT, size,
             resource_flags, initial_resource_state);
 }
 
-static ID3D12Resource *create_default_texture_(unsigned int line, ID3D12Device *device,
+static ID3D12Resource *create_default_texture_(const char *file, unsigned int line, ID3D12Device *device,
         D3D12_RESOURCE_DIMENSION dimension, unsigned int width, unsigned int height,
         unsigned int depth_or_array_size, unsigned int miplevel_count, unsigned int sample_count,
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
@@ -759,27 +763,29 @@ static ID3D12Resource *create_default_texture_(unsigned int line, ID3D12Device *
     resource_desc.Flags = flags;
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
             &resource_desc, initial_state, NULL, &IID_ID3D12Resource, (void **)&texture);
-    ok_(line)(SUCCEEDED(hr), "Failed to create texture, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create texture, hr %#x.\n", hr);
 
     return texture;
 }
 
-#define create_default_texture(a, b, c, d, e, f) create_default_texture2d_(__LINE__, a, b, c, 1, 1, d, e, f)
-#define create_default_texture2d(a, b, c, d, e, f, g, h) create_default_texture2d_(__LINE__, a, b, c, d, e, f, g, h)
-static inline ID3D12Resource *create_default_texture2d_(unsigned int line, ID3D12Device *device,
+#define create_default_texture(a, b, c, d, e, f) create_default_texture2d_(__FILE__, __LINE__, a, b, c, 1, 1, d, e, f)
+#define create_default_texture2d(a, b, c, d, e, f, g, h) \
+        create_default_texture2d_(__FILE__, __LINE__, a, b, c, d, e, f, g, h)
+static inline ID3D12Resource *create_default_texture2d_(const char *file, unsigned int line, ID3D12Device *device,
         unsigned int width, unsigned int height, unsigned int array_size, unsigned int miplevel_count,
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
 {
-    return create_default_texture_(line, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+    return create_default_texture_(file, line, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
             width, height, array_size, miplevel_count, 1, format, flags, initial_state);
 }
 
-#define create_default_texture3d(a, b, c, d, e, f, g, h) create_default_texture3d_(__LINE__, a, b, c, d, e, f, g, h)
-static inline ID3D12Resource *create_default_texture3d_(unsigned int line, ID3D12Device *device,
+#define create_default_texture3d(a, b, c, d, e, f, g, h) \
+        create_default_texture3d_(__FILE__, __LINE__, a, b, c, d, e, f, g, h)
+static inline ID3D12Resource *create_default_texture3d_(const char *file, unsigned int line, ID3D12Device *device,
         unsigned int width, unsigned int height, unsigned int depth, unsigned int miplevel_count,
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
 {
-    return create_default_texture_(line, device, D3D12_RESOURCE_DIMENSION_TEXTURE3D,
+    return create_default_texture_(file, line, device, D3D12_RESOURCE_DIMENSION_TEXTURE3D,
             width, height, depth, miplevel_count, 1, format, flags, initial_state);
 }
 
@@ -799,9 +805,10 @@ static void copy_sub_resource_data(const D3D12_MEMCPY_DEST *dst, const D3D12_SUB
     }
 }
 
-#define upload_texture_data_with_states(a, b, c, d, e, f, g) upload_texture_data_with_states_(__LINE__, a, b, c, d, e, f, g)
-static inline void upload_texture_data_with_states_(unsigned int line, ID3D12Resource *texture,
-        const D3D12_SUBRESOURCE_DATA *data, unsigned int sub_resource_count,
+#define upload_texture_data_with_states(a, b, c, d, e, f, g) \
+        upload_texture_data_with_states_(__FILE__, __LINE__, a, b, c, d, e, f, g)
+static inline void upload_texture_data_with_states_(const char *file, unsigned int line,
+        ID3D12Resource *texture, const D3D12_SUBRESOURCE_DATA *data, unsigned int sub_resource_count,
         ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         D3D12_RESOURCE_STATES initial_state, D3D12_RESOURCE_STATES final_state)
 {
@@ -826,15 +833,15 @@ static inline void upload_texture_data_with_states_(unsigned int line, ID3D12Res
 
     resource_desc = ID3D12Resource_GetDesc(texture);
     hr = ID3D12Resource_GetDevice(texture, &IID_ID3D12Device, (void **)&device);
-    ok_(line)(SUCCEEDED(hr), "Failed to get device, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to get device, hr %#x.\n", hr);
 
     ID3D12Device_GetCopyableFootprints(device, &resource_desc, 0, sub_resource_count,
             0, layouts, row_counts, row_sizes, &required_size);
 
-    upload_buffer = create_upload_buffer_(line, device, required_size, NULL);
+    upload_buffer = create_upload_buffer_(file, line, device, required_size, NULL);
 
     hr = ID3D12Resource_Map(upload_buffer, 0, NULL, (void **)&ptr);
-    ok_(line)(SUCCEEDED(hr), "Failed to map upload buffer, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to map upload buffer, hr %#x.\n", hr);
     for (i = 0; i < sub_resource_count; ++i)
     {
         dst_data.pData = (BYTE *)ptr + layouts[i].Offset;
@@ -879,7 +886,7 @@ static inline void upload_texture_data_with_states_(unsigned int line, ID3D12Res
     }
 
     hr = ID3D12GraphicsCommandList_Close(command_list);
-    ok_(line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
 
     exec_command_list(queue, command_list);
     wait_queue_idle(device, queue);
@@ -892,18 +899,20 @@ static inline void upload_texture_data_with_states_(unsigned int line, ID3D12Res
     free(row_sizes);
 }
 
-#define upload_texture_data(a, b, c, d, e) upload_texture_data_(__LINE__, a, b, c, d, e)
-static inline void upload_texture_data_(unsigned int line, ID3D12Resource *texture,
+#define upload_texture_data(a, b, c, d, e) upload_texture_data_(__FILE__, __LINE__, a, b, c, d, e)
+static inline void upload_texture_data_(const char *file, unsigned int line, ID3D12Resource *texture,
         const D3D12_SUBRESOURCE_DATA *data, unsigned int sub_resource_count,
         ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
 {
-    return upload_texture_data_with_states_(line, texture, data, sub_resource_count, queue, command_list,
+    return upload_texture_data_with_states_(file, line, texture, data, sub_resource_count, queue, command_list,
             RESOURCE_STATE_DO_NOT_CHANGE, RESOURCE_STATE_DO_NOT_CHANGE);
 }
 
-#define upload_buffer_data_with_states(a, b, c, d, e, f, g, h) upload_buffer_data_with_states_(__LINE__, a, b, c, d, e, f, g, h)
-static inline void upload_buffer_data_with_states_(unsigned int line, ID3D12Resource *buffer, size_t offset,
-        size_t size, const void *data, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
+#define upload_buffer_data_with_states(a, b, c, d, e, f, g, h) \
+        upload_buffer_data_with_states_(__FILE__, __LINE__, a, b, c, d, e, f, g, h)
+static inline void upload_buffer_data_with_states_(const char *file, unsigned int line,
+        ID3D12Resource *buffer, size_t offset, size_t size, const void *data,
+        ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         D3D12_RESOURCE_STATES initial_state, D3D12_RESOURCE_STATES final_state)
 {
     ID3D12Resource *upload_buffer;
@@ -911,9 +920,9 @@ static inline void upload_buffer_data_with_states_(unsigned int line, ID3D12Reso
     HRESULT hr;
 
     hr = ID3D12Resource_GetDevice(buffer, &IID_ID3D12Device, (void **)&device);
-    ok_(line)(SUCCEEDED(hr), "Failed to get device, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to get device, hr %#x.\n", hr);
 
-    upload_buffer = create_upload_buffer_(line, device, size, data);
+    upload_buffer = create_upload_buffer_(file, line, device, size, data);
 
     if (initial_state != RESOURCE_STATE_DO_NOT_CHANGE)
         transition_resource_state(command_list, buffer, initial_state, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -925,7 +934,7 @@ static inline void upload_buffer_data_with_states_(unsigned int line, ID3D12Reso
         transition_resource_state(command_list, buffer, D3D12_RESOURCE_STATE_COPY_DEST, final_state);
 
     hr = ID3D12GraphicsCommandList_Close(command_list);
-    ok_(line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
     exec_command_list(queue, command_list);
     wait_queue_idle(device, queue);
 
@@ -933,11 +942,11 @@ static inline void upload_buffer_data_with_states_(unsigned int line, ID3D12Reso
     ID3D12Device_Release(device);
 }
 
-#define upload_buffer_data(a, b, c, d, e, f) upload_buffer_data_(__LINE__, a, b, c, d, e, f)
-static inline void upload_buffer_data_(unsigned int line, ID3D12Resource *buffer, size_t offset,
+#define upload_buffer_data(a, b, c, d, e, f) upload_buffer_data_(__FILE__, __LINE__, a, b, c, d, e, f)
+static inline void upload_buffer_data_(const char *file, unsigned int line, ID3D12Resource *buffer, size_t offset,
         size_t size, const void *data, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
 {
-    return upload_buffer_data_with_states_(line, buffer, offset, size, data, queue, command_list,
+    return upload_buffer_data_with_states_(file, line, buffer, offset, size, data, queue, command_list,
             RESOURCE_STATE_DO_NOT_CHANGE, RESOURCE_STATE_DO_NOT_CHANGE);
 }
 
@@ -956,9 +965,9 @@ static HRESULT create_root_signature(ID3D12Device *device, const D3D12_ROOT_SIGN
     return hr;
 }
 
-#define create_empty_root_signature(device, flags) create_empty_root_signature_(__LINE__, device, flags)
-static ID3D12RootSignature *create_empty_root_signature_(unsigned int line,
-        ID3D12Device *device, D3D12_ROOT_SIGNATURE_FLAGS flags)
+#define create_empty_root_signature(device, flags) create_empty_root_signature_(__FILE__, __LINE__, device, flags)
+static ID3D12RootSignature *create_empty_root_signature_(const char *file,
+        unsigned int line, ID3D12Device *device, D3D12_ROOT_SIGNATURE_FLAGS flags)
 {
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     ID3D12RootSignature *root_signature = NULL;
@@ -970,15 +979,15 @@ static ID3D12RootSignature *create_empty_root_signature_(unsigned int line,
     root_signature_desc.pStaticSamplers = NULL;
     root_signature_desc.Flags = flags;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    ok_(line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
 
     return root_signature;
 }
 
 #define create_32bit_constants_root_signature(a, b, c, e) \
-        create_32bit_constants_root_signature_(__LINE__, a, b, c, e, 0)
-static inline ID3D12RootSignature *create_32bit_constants_root_signature_(unsigned int line,
-        ID3D12Device *device, unsigned int reg_idx, unsigned int element_count,
+        create_32bit_constants_root_signature_(__FILE__, __LINE__, a, b, c, e, 0)
+static inline ID3D12RootSignature *create_32bit_constants_root_signature_(const char *file,
+        unsigned int line, ID3D12Device *device, unsigned int reg_idx, unsigned int element_count,
         D3D12_SHADER_VISIBILITY shader_visibility, D3D12_ROOT_SIGNATURE_FLAGS flags)
 {
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
@@ -997,7 +1006,7 @@ static inline ID3D12RootSignature *create_32bit_constants_root_signature_(unsign
     root_signature_desc.pParameters = &root_parameter;
     root_signature_desc.Flags = flags;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    ok_(line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
 
     return root_signature;
 }
@@ -1073,11 +1082,10 @@ static void init_pipeline_state_desc(D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc,
     desc->SampleDesc.Count = 1;
 }
 
-#define create_pipeline_state(a, b, c, d, e, f) create_pipeline_state_(__LINE__, a, b, c, d, e, f)
-static ID3D12PipelineState *create_pipeline_state_(unsigned int line, ID3D12Device *device,
-        ID3D12RootSignature *root_signature, DXGI_FORMAT rt_format,
-        const D3D12_SHADER_BYTECODE *vs, const D3D12_SHADER_BYTECODE *ps,
-        const D3D12_INPUT_LAYOUT_DESC *input_layout)
+#define create_pipeline_state(a, b, c, d, e, f) create_pipeline_state_(__FILE__, __LINE__, a, b, c, d, e, f)
+static ID3D12PipelineState *create_pipeline_state_(const char *file, unsigned int line, ID3D12Device *device,
+        ID3D12RootSignature *root_signature, DXGI_FORMAT rt_format, const D3D12_SHADER_BYTECODE *vs,
+        const D3D12_SHADER_BYTECODE *ps, const D3D12_INPUT_LAYOUT_DESC *input_layout)
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc;
     ID3D12PipelineState *pipeline_state = NULL;
@@ -1086,14 +1094,14 @@ static ID3D12PipelineState *create_pipeline_state_(unsigned int line, ID3D12Devi
     init_pipeline_state_desc(&pipeline_state_desc, root_signature, rt_format, vs, ps, input_layout);
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pipeline_state_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
-    ok_(line)(SUCCEEDED(hr), "Failed to create graphics pipeline state, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create graphics pipeline state, hr %#x.\n", hr);
 
     return SUCCEEDED(hr) ? pipeline_state : NULL;
 }
 
-#define create_compute_pipeline_state(a, b, c) create_compute_pipeline_state_(__LINE__, a, b, c)
-static inline ID3D12PipelineState *create_compute_pipeline_state_(unsigned int line, ID3D12Device *device,
-        ID3D12RootSignature *root_signature, const D3D12_SHADER_BYTECODE cs)
+#define create_compute_pipeline_state(a, b, c) create_compute_pipeline_state_(__FILE__, __LINE__, a, b, c)
+static inline ID3D12PipelineState *create_compute_pipeline_state_(const char *file, unsigned int line,
+        ID3D12Device *device, ID3D12RootSignature *root_signature, const D3D12_SHADER_BYTECODE cs)
 {
     D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc;
     ID3D12PipelineState *pipeline_state = NULL;
@@ -1106,7 +1114,7 @@ static inline ID3D12PipelineState *create_compute_pipeline_state_(unsigned int l
     pipeline_state_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
     hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
-    ok_(line)(SUCCEEDED(hr), "Failed to create compute pipeline state, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create compute pipeline state, hr %#x.\n", hr);
 
     return pipeline_state;
 }
@@ -1151,9 +1159,9 @@ struct test_context
     RECT scissor_rect;
 };
 
-#define check_multisample_support(a, b, c) check_multisample_support_(__LINE__, a, b, c)
-static unsigned int check_multisample_support_(unsigned int line, ID3D12Device *device,
-        DXGI_FORMAT format, unsigned int sample_count)
+#define check_multisample_support(a, b, c) check_multisample_support_(__FILE__, __LINE__, a, b, c)
+static unsigned int check_multisample_support_(const char *file, unsigned int line,
+        ID3D12Device *device, DXGI_FORMAT format, unsigned int sample_count)
 {
     D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS format_support =
     {
@@ -1164,18 +1172,18 @@ static unsigned int check_multisample_support_(unsigned int line, ID3D12Device *
 
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
             &format_support, sizeof(format_support));
-    ok_(line)(hr == S_OK, "Cannot check feature support, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Cannot check feature support, hr %#x.\n", hr);
 
     return format_support.NumQualityLevels;
 }
 
-#define create_render_target(context, a, b, c) create_render_target_(__LINE__, context, a, b, c)
-static void create_render_target_(unsigned int line, struct test_context *context,
-        const struct test_context_desc *desc, ID3D12Resource **render_target,
-        const D3D12_CPU_DESCRIPTOR_HANDLE *rtv)
+#define create_render_target(context, a, b, c) create_render_target_(__FILE__, __LINE__, context, a, b, c)
+static void create_render_target_(const char *file, unsigned int line, struct test_context *context,
+        const struct test_context_desc *desc, ID3D12Resource **render_target, const D3D12_CPU_DESCRIPTOR_HANDLE *rtv)
 {
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_RESOURCE_DESC resource_desc;
+    unsigned int quality_level_count;
     D3D12_CLEAR_VALUE clear_value;
     HRESULT hr;
 
@@ -1203,10 +1211,8 @@ static void create_render_target_(unsigned int line, struct test_context *contex
     {
         for (; resource_desc.SampleDesc.Count != 1; resource_desc.SampleDesc.Count /= 2)
         {
-            unsigned int quality_level_count = check_multisample_support_(line, context->device,
-                    resource_desc.Format, resource_desc.SampleDesc.Count);
-
-            if (quality_level_count != 0)
+            if ((quality_level_count = check_multisample_support_(file, line,
+                    context->device, resource_desc.Format, resource_desc.SampleDesc.Count)))
             {
                 resource_desc.SampleDesc.Quality = min(resource_desc.SampleDesc.Quality, quality_level_count - 1);
                 break;
@@ -1218,7 +1224,7 @@ static void create_render_target_(unsigned int line, struct test_context *contex
             &heap_properties, D3D12_HEAP_FLAG_NONE, &resource_desc,
             D3D12_RESOURCE_STATE_RENDER_TARGET, &clear_value,
             &IID_ID3D12Resource, (void **)render_target);
-    ok_(line)(hr == S_OK, "Failed to create texture, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create texture, hr %#x.\n", hr);
 
     context->render_target_desc = resource_desc;
 
@@ -1226,9 +1232,9 @@ static void create_render_target_(unsigned int line, struct test_context *contex
         ID3D12Device_CreateRenderTargetView(context->device, *render_target, NULL, *rtv);
 }
 
-#define init_test_context(context, desc) init_test_context_(__LINE__, context, desc)
-static inline bool init_test_context_(unsigned int line, struct test_context *context,
-        const struct test_context_desc *desc)
+#define init_test_context(context, desc) init_test_context_(__FILE__, __LINE__, context, desc)
+static inline bool init_test_context_(const char *file, unsigned int line,
+        struct test_context *context, const struct test_context_desc *desc)
 {
     D3D12_DESCRIPTOR_HEAP_DESC rtv_heap_desc;
     ID3D12Device *device;
@@ -1238,7 +1244,7 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
 
     if (!(context->device = create_device()))
     {
-        skip_(line)("Failed to create device.\n");
+        skip_(file, line)("Failed to create device.\n");
         return false;
     }
     device = context->device;
@@ -1246,15 +1252,16 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
     if (FAILED(hr = ID3D12Device_QueryInterface(device, &IID_ID3D12Device2, (void **)&context->device2)))
         context->device2 = NULL;
 
-    context->queue = create_command_queue_(line, device, D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
+    context->queue = create_command_queue_(file, line, device,
+            D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
 
     hr = ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_DIRECT,
             &IID_ID3D12CommandAllocator, (void **)&context->allocator);
-    ok_(line)(SUCCEEDED(hr), "Failed to create command allocator, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create command allocator, hr %#x.\n", hr);
 
     hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT,
             context->allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&context->list);
-    ok_(line)(SUCCEEDED(hr), "Failed to create command list, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create command list, hr %#x.\n", hr);
 
     if (FAILED(hr = ID3D12GraphicsCommandList_QueryInterface(context->list,
             &IID_ID3D12GraphicsCommandList1, (void**)&context->list1)))
@@ -1269,11 +1276,11 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
     rtv_heap_desc.NodeMask = 0;
     hr = ID3D12Device_CreateDescriptorHeap(device, &rtv_heap_desc,
             &IID_ID3D12DescriptorHeap, (void **)&context->rtv_heap);
-    ok_(line)(SUCCEEDED(hr), "Failed to create descriptor heap, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create descriptor heap, hr %#x.\n", hr);
 
     context->rtv = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(context->rtv_heap);
 
-    create_render_target_(line, context, desc, &context->render_target, &context->rtv);
+    create_render_target_(file, line, context, desc, &context->render_target, &context->rtv);
 
     set_viewport(&context->viewport, 0.0f, 0.0f,
             context->render_target_desc.Width, context->render_target_desc.Height, 0.0f, 1.0f);
@@ -1283,21 +1290,21 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
     if (desc && desc->no_root_signature)
         return true;
 
-    context->root_signature = create_empty_root_signature_(line,
+    context->root_signature = create_empty_root_signature_(file, line,
             device, desc ? desc->root_signature_flags : D3D12_ROOT_SIGNATURE_FLAG_NONE);
 
     if (desc && desc->no_pipeline)
         return true;
 
-    context->pipeline_state = create_pipeline_state_(line, device,
+    context->pipeline_state = create_pipeline_state_(file, line, device,
             context->root_signature, context->render_target_desc.Format,
             desc ? desc->vs : NULL, desc ? desc->ps : NULL, NULL);
 
     return true;
 }
 
-#define init_compute_test_context(context) init_compute_test_context_(__LINE__, context)
-static inline bool init_compute_test_context_(unsigned int line, struct test_context *context)
+#define init_compute_test_context(context) init_compute_test_context_(__FILE__, __LINE__, context)
+static inline bool init_compute_test_context_(const char *file, unsigned int line, struct test_context *context)
 {
     ID3D12Device *device;
     HRESULT hr;
@@ -1306,21 +1313,21 @@ static inline bool init_compute_test_context_(unsigned int line, struct test_con
 
     if (!(context->device = create_device()))
     {
-        skip_(line)("Failed to create device.\n");
+        skip_(file, line)("Failed to create device.\n");
         return false;
     }
     device = context->device;
 
-    context->queue = create_command_queue_(line, device,
+    context->queue = create_command_queue_(file, line, device,
             D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
 
     hr = ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_COMPUTE,
             &IID_ID3D12CommandAllocator, (void **)&context->allocator);
-    ok_(line)(hr == S_OK, "Failed to create command allocator, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create command allocator, hr %#x.\n", hr);
 
     hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
             context->allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&context->list);
-    ok_(line)(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
     return true;
 }
@@ -1334,8 +1341,8 @@ static inline void destroy_pipeline_state_objects(struct test_context *context)
     context->pso_count = 0;
 }
 
-#define destroy_test_context(context) destroy_test_context_(__LINE__, context)
-static inline void destroy_test_context_(unsigned int line, struct test_context *context)
+#define destroy_test_context(context) destroy_test_context_(__FILE__, __LINE__, context)
+static inline void destroy_test_context_(const char *file, unsigned int line, struct test_context *context)
 {
     ULONG refcount;
 
@@ -1361,7 +1368,7 @@ static inline void destroy_test_context_(unsigned int line, struct test_context 
         ID3D12Device2_Release(context->device2);
 
     refcount = ID3D12Device_Release(context->device);
-    ok_(line)(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
+    ok_(file, line)(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
 }
 
 static inline D3D12_CPU_DESCRIPTOR_HANDLE get_cpu_handle(ID3D12Device *device,

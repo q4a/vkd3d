@@ -43,53 +43,58 @@ static void vkd3d_test_end_todo(void);
  * Use assert_that() for conditions that should always be true.
  * todo_if() and bug_if() do not influence assert_that().
  */
-#define assert_that assert_that_(__LINE__)
+#define assert_that assert_that_(__FILE__, __LINE__)
 
-#define ok ok_(__LINE__)
+#define ok ok_(__FILE__, __LINE__)
 
-#define skip skip_(__LINE__)
+#define skip skip_(__FILE__, __LINE__)
 
-#define trace trace_(__LINE__)
+#define trace trace_(__FILE__, __LINE__)
 
-#define assert_that_(line) \
+#define assert_that_(file, line) \
         do { \
+        const char *vkd3d_file = file; \
         unsigned int vkd3d_line = line; \
         VKD3D_TEST_ASSERT_THAT
 
 #define VKD3D_TEST_ASSERT_THAT(...) \
-        vkd3d_test_assert_that(vkd3d_line, __VA_ARGS__); } while (0)
+        vkd3d_test_assert_that(vkd3d_file, vkd3d_line, __VA_ARGS__); } while (0)
 
-#define ok_(line) \
+#define ok_(file, line) \
         do { \
+        const char *vkd3d_file = file; \
         unsigned int vkd3d_line = line; \
         VKD3D_TEST_OK
 
 #define VKD3D_TEST_OK(...) \
-        vkd3d_test_ok(vkd3d_line, __VA_ARGS__); } while (0)
+        vkd3d_test_ok(vkd3d_file, vkd3d_line, __VA_ARGS__); } while (0)
 
-#define todo_(line) \
+#define todo_(file, line) \
         do { \
+        const char *vkd3d_file = file; \
         unsigned int vkd3d_line = line; \
         VKD3D_TEST_TODO
 
 #define VKD3D_TEST_TODO(...) \
-        vkd3d_test_todo(vkd3d_line, __VA_ARGS__); } while (0)
+        vkd3d_test_todo(vkd3d_file, vkd3d_line, __VA_ARGS__); } while (0)
 
-#define skip_(line) \
+#define skip_(file, line) \
         do { \
+        const char *vkd3d_file = file; \
         unsigned int vkd3d_line = line; \
         VKD3D_TEST_SKIP
 
 #define VKD3D_TEST_SKIP(...) \
-        vkd3d_test_skip(vkd3d_line, __VA_ARGS__); } while (0)
+        vkd3d_test_skip(vkd3d_file, vkd3d_line, __VA_ARGS__); } while (0)
 
-#define trace_(line) \
+#define trace_(file, line) \
         do { \
+        const char *vkd3d_file = file; \
         unsigned int vkd3d_line = line; \
         VKD3D_TEST_TRACE
 
 #define VKD3D_TEST_TRACE(...) \
-        vkd3d_test_trace(vkd3d_line, __VA_ARGS__); } while (0)
+        vkd3d_test_trace(vkd3d_file, vkd3d_line, __VA_ARGS__); } while (0)
 
 #define todo_if(is_todo) \
     for (vkd3d_test_start_todo(is_todo); vkd3d_test_loop_todo(); vkd3d_test_end_todo())
@@ -135,45 +140,59 @@ broken(bool condition)
     return condition && vkd3d_test_platform_is_windows();
 }
 
-static void vkd3d_test_printf(unsigned int line, const char *msg)
+/* basename() is not reentrant, basename_r() is not standard and this simple
+ * implementation should be enough for us. */
+static const char *vkd3d_basename(const char *filename)
+{
+    const char *p;
+
+    if ((p = strrchr(filename, '/')))
+        filename = ++p;
+    if ((p = strrchr(filename, '\\')))
+        filename = ++p;
+
+    return filename;
+}
+
+static void vkd3d_test_printf(const char *file, unsigned int line, const char *msg)
 {
     unsigned int i;
 
-    printf("%s:%u: ", vkd3d_test_name, line);
+    printf("%s:%u: ", vkd3d_basename(file), line);
     for (i = 0; i < vkd3d_test_state.context_count; ++i)
         printf("%s: ", vkd3d_test_state.context[i]);
     printf("%s", msg);
 }
 
 static void
-vkd3d_test_check_assert_that(unsigned int line, bool result, const char *fmt, va_list args)
+vkd3d_test_check_assert_that(const char *file, unsigned int line, bool result, const char *fmt, va_list args)
 {
     if (result)
     {
         vkd3d_atomic_increment_u32(&vkd3d_test_state.success_count);
         if (vkd3d_test_state.debug_level > 1)
-            vkd3d_test_printf(line, "Test succeeded.\n");
+            vkd3d_test_printf(file, line, "Test succeeded.\n");
     }
     else
     {
         vkd3d_atomic_increment_u32(&vkd3d_test_state.failure_count);
-        vkd3d_test_printf(line, "Test failed: ");
+        vkd3d_test_printf(file, line, "Test failed: ");
         vprintf(fmt, args);
     }
 }
 
-static void VKD3D_PRINTF_FUNC(3, 4) VKD3D_UNUSED
-vkd3d_test_assert_that(unsigned int line, bool result, const char *fmt, ...)
+static void VKD3D_PRINTF_FUNC(4, 5) VKD3D_UNUSED
+vkd3d_test_assert_that(const char *file, unsigned int line, bool result, const char *fmt, ...)
 {
     va_list args;
 
     va_start(args, fmt);
-    vkd3d_test_check_assert_that(line, result, fmt, args);
+    vkd3d_test_check_assert_that(file, line, result, fmt, args);
     va_end(args);
 }
 
 static void
-vkd3d_test_check_ok(unsigned int line, bool result, const char *fmt, va_list args)
+vkd3d_test_check_ok(const char *file, unsigned int line, bool result, const char *fmt, va_list args)
 {
     bool is_todo = vkd3d_test_state.todo_level && !vkd3d_test_platform_is_windows();
     bool is_bug = vkd3d_test_state.bug_level && !vkd3d_test_platform_is_windows();
@@ -184,9 +203,9 @@ vkd3d_test_check_ok(unsigned int line, bool result, const char *fmt, va_list arg
         if (is_todo)
             result = !result;
         if (result)
-            vkd3d_test_printf(line, "Fixed bug: ");
+            vkd3d_test_printf(file, line, "Fixed bug: ");
         else
-            vkd3d_test_printf(line, "Bug: ");
+            vkd3d_test_printf(file, line, "Bug: ");
         vprintf(fmt, args);
     }
     else if (is_todo)
@@ -194,48 +213,48 @@ vkd3d_test_check_ok(unsigned int line, bool result, const char *fmt, va_list arg
         if (result)
         {
             vkd3d_atomic_increment_u32(&vkd3d_test_state.todo_success_count);
-            vkd3d_test_printf(line, "Todo succeeded: ");
+            vkd3d_test_printf(file, line, "Todo succeeded: ");
         }
         else
         {
             vkd3d_atomic_increment_u32(&vkd3d_test_state.todo_count);
-            vkd3d_test_printf(line, "Todo: ");
+            vkd3d_test_printf(file, line, "Todo: ");
         }
         vprintf(fmt, args);
     }
     else
     {
-        vkd3d_test_check_assert_that(line, result, fmt, args);
+        vkd3d_test_check_assert_that(file, line, result, fmt, args);
     }
 }
 
-static void VKD3D_PRINTF_FUNC(3, 4) VKD3D_UNUSED
-vkd3d_test_ok(unsigned int line, bool result, const char *fmt, ...)
+static void VKD3D_PRINTF_FUNC(4, 5) VKD3D_UNUSED
+vkd3d_test_ok(const char *file, unsigned int line, bool result, const char *fmt, ...)
 {
     va_list args;
 
     va_start(args, fmt);
-    vkd3d_test_check_ok(line, result, fmt, args);
+    vkd3d_test_check_ok(file, line, result, fmt, args);
     va_end(args);
 }
 
-static void VKD3D_PRINTF_FUNC(2, 3) VKD3D_UNUSED
-vkd3d_test_skip(unsigned int line, const char *fmt, ...)
+static void VKD3D_PRINTF_FUNC(3, 4) VKD3D_UNUSED
+vkd3d_test_skip(const char *file, unsigned int line, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    vkd3d_test_printf(line, "Test skipped: ");
+    vkd3d_test_printf(file, line, "Test skipped: ");
     vprintf(fmt, args);
     va_end(args);
     vkd3d_atomic_increment_u32(&vkd3d_test_state.skip_count);
 }
 
-static void VKD3D_PRINTF_FUNC(2, 3) VKD3D_UNUSED
-vkd3d_test_trace(unsigned int line, const char *fmt, ...)
+static void VKD3D_PRINTF_FUNC(3, 4) VKD3D_UNUSED
+vkd3d_test_trace(const char *file, unsigned int line, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    vkd3d_test_printf(line, "");
+    vkd3d_test_printf(file, line, "");
     vprintf(fmt, args);
     va_end(args);
 }

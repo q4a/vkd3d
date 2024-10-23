@@ -29,9 +29,9 @@ VKD3D_AGILITY_SDK_EXPORTS
 
 struct test_options test_options = {0};
 
-#define check_preprocess(a, b, c, d, e) check_preprocess_(__LINE__, a, b, c, d, e)
-static void check_preprocess_(int line, const char *source, const D3D_SHADER_MACRO *macros,
-        ID3DInclude *include, const char *present, const char *absent)
+#define check_preprocess(a, b, c, d, e) check_preprocess_(__FILE__, __LINE__, a, b, c, d, e)
+static void check_preprocess_(const char *file, int line, const char *source,
+        const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *present, const char *absent)
 {
     ID3D10Blob *blob, *errors;
     const char *code;
@@ -39,20 +39,20 @@ static void check_preprocess_(int line, const char *source, const D3D_SHADER_MAC
     HRESULT hr;
 
     hr = D3DPreprocess(source, strlen(source), NULL, macros, include, &blob, &errors);
-    assert_that_(line)(hr == S_OK, "Failed to preprocess shader, hr %#x.\n", hr);
+    assert_that_(file, line)(hr == S_OK, "Failed to preprocess shader, hr %#x.\n", hr);
     if (errors)
     {
         if (vkd3d_test_state.debug_level)
-            trace_(line)("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+            trace_(file, line)("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
         ID3D10Blob_Release(errors);
     }
     code = ID3D10Blob_GetBufferPointer(blob);
     size = ID3D10Blob_GetBufferSize(blob);
     if (present)
-        ok_(line)(vkd3d_memmem(code, size, present, strlen(present)),
+        ok_(file, line)(vkd3d_memmem(code, size, present, strlen(present)),
                 "\"%s\" not found in preprocessed shader.\n", present);
     if (absent)
-        ok_(line)(!vkd3d_memmem(code, size, absent, strlen(absent)),
+        ok_(file, line)(!vkd3d_memmem(code, size, absent, strlen(absent)),
                 "\"%s\" found in preprocessed shader.\n", absent);
     ID3D10Blob_Release(blob);
 }
@@ -464,19 +464,20 @@ static void test_preprocess(void)
     ID3D10Blob_Release(errors);
 }
 
-#define compile_shader(a, b) compile_shader_(__LINE__, a, b, 0)
-#define compile_shader_flags(a, b, c) compile_shader_(__LINE__, a, b, c)
-static ID3D10Blob *compile_shader_(unsigned int line, const char *source, const char *target, UINT flags)
+#define compile_shader(a, b) compile_shader_(__FILE__, __LINE__, a, b, 0)
+#define compile_shader_flags(a, b, c) compile_shader_(__FILE__, __LINE__, a, b, c)
+static ID3D10Blob *compile_shader_(const char *file, unsigned int line,
+        const char *source, const char *target, UINT flags)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
     HRESULT hr;
 
     hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", target, flags, 0, &blob, &errors);
-    ok_(line)(hr == S_OK, "Failed to compile shader, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to compile shader, hr %#x.\n", hr);
     if (errors)
     {
         if (vkd3d_test_state.debug_level)
-            trace_(line)("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+            trace_(file, line)("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
         ID3D10Blob_Release(errors);
     }
     return blob;
@@ -1371,18 +1372,19 @@ static void test_get_blob_part(void)
     ok(!refcount, "Got refcount %u.\n", refcount);
 }
 
-static void check_type_desc_(int line, const D3D12_SHADER_TYPE_DESC *type, const D3D12_SHADER_TYPE_DESC *expect)
+#define check_type_desc(a, b) check_type_desc_(__FILE__, __LINE__, a, b)
+static void check_type_desc_(const char *file, int line,
+        const D3D12_SHADER_TYPE_DESC *type, const D3D12_SHADER_TYPE_DESC *expect)
 {
-    ok_(line)(type->Class == expect->Class, "Got class %#x.\n", type->Class);
-    ok_(line)(type->Type == expect->Type, "Got type %#x.\n", type->Type);
-    ok_(line)(type->Rows == expect->Rows, "Got %u rows.\n", type->Rows);
-    ok_(line)(type->Columns == expect->Columns, "Got %u columns.\n", type->Columns);
-    ok_(line)(type->Elements == expect->Elements, "Got %u elements.\n", type->Elements);
-    ok_(line)(type->Members == expect->Members, "Got %u members.\n", type->Members);
-    ok_(line)(type->Offset == expect->Offset, "Got offset %u.\n", type->Offset);
-    ok_(line)(!strcmp(type->Name, expect->Name), "Got name \"%s\".\n", type->Name);
+    ok_(file, line)(type->Class == expect->Class, "Got class %#x.\n", type->Class);
+    ok_(file, line)(type->Type == expect->Type, "Got type %#x.\n", type->Type);
+    ok_(file, line)(type->Rows == expect->Rows, "Got %u rows.\n", type->Rows);
+    ok_(file, line)(type->Columns == expect->Columns, "Got %u columns.\n", type->Columns);
+    ok_(file, line)(type->Elements == expect->Elements, "Got %u elements.\n", type->Elements);
+    ok_(file, line)(type->Members == expect->Members, "Got %u members.\n", type->Members);
+    ok_(file, line)(type->Offset == expect->Offset, "Got offset %u.\n", type->Offset);
+    ok_(file, line)(!strcmp(type->Name, expect->Name), "Got name \"%s\".\n", type->Name);
 }
-#define check_type_desc(a, b) check_type_desc_(__LINE__, a, b)
 
 static void test_reflection(void)
 {
@@ -2023,27 +2025,27 @@ static void test_default_values_reflection(void)
     }
 }
 
-static void check_signature_element_(int line, const D3D12_SIGNATURE_PARAMETER_DESC *desc,
+#define check_signature_element(a, b, c) check_signature_element_(__FILE__, __LINE__, a, b, c)
+static void check_signature_element_(const char *file, int line, const D3D12_SIGNATURE_PARAMETER_DESC *desc,
         const D3D12_SIGNATURE_PARAMETER_DESC *expect, bool is_todo)
 {
     todo_if(is_todo && strcmp(desc->SemanticName, expect->SemanticName))
-        ok_(line)(!strcmp(desc->SemanticName, expect->SemanticName), "Got name \"%s\".\n", desc->SemanticName);
+        ok_(file, line)(!strcmp(desc->SemanticName, expect->SemanticName), "Got name \"%s\".\n", desc->SemanticName);
     todo_if(is_todo && desc->SemanticIndex != expect->SemanticIndex)
-        ok_(line)(desc->SemanticIndex == expect->SemanticIndex, "Got index %u.\n", desc->SemanticIndex);
+        ok_(file, line)(desc->SemanticIndex == expect->SemanticIndex, "Got index %u.\n", desc->SemanticIndex);
     todo_if(is_todo && desc->Register != expect->Register)
-        ok_(line)(desc->Register == expect->Register, "Got register %u.\n", desc->Register);
+        ok_(file, line)(desc->Register == expect->Register, "Got register %u.\n", desc->Register);
     todo_if(is_todo && desc->SystemValueType != expect->SystemValueType)
-        ok_(line)(desc->SystemValueType == expect->SystemValueType, "Got sysval %u.\n", desc->SystemValueType);
+        ok_(file, line)(desc->SystemValueType == expect->SystemValueType, "Got sysval %u.\n", desc->SystemValueType);
     todo_if(is_todo && desc->ComponentType != expect->ComponentType)
-        ok_(line)(desc->ComponentType == expect->ComponentType, "Got data type %u.\n", desc->ComponentType);
+        ok_(file, line)(desc->ComponentType == expect->ComponentType, "Got data type %u.\n", desc->ComponentType);
     todo_if(is_todo && desc->Mask != expect->Mask)
-        ok_(line)(desc->Mask == expect->Mask, "Got mask %#x.\n", desc->Mask);
+        ok_(file, line)(desc->Mask == expect->Mask, "Got mask %#x.\n", desc->Mask);
     todo_if(desc->ReadWriteMask != expect->ReadWriteMask)
-        ok_(line)(desc->ReadWriteMask == expect->ReadWriteMask, "Got used mask %#x.\n", desc->ReadWriteMask);
+        ok_(file, line)(desc->ReadWriteMask == expect->ReadWriteMask, "Got used mask %#x.\n", desc->ReadWriteMask);
     todo_if(is_todo && desc->Stream != expect->Stream)
-        ok_(line)(desc->Stream == expect->Stream, "Got stream %u.\n", desc->Stream);
+        ok_(file, line)(desc->Stream == expect->Stream, "Got stream %u.\n", desc->Stream);
 }
-#define check_signature_element(a, b, c) check_signature_element_(__LINE__, a, b, c)
 
 static void test_signature_reflection(void)
 {

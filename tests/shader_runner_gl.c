@@ -1419,13 +1419,8 @@ static void run_tests(enum shading_language language)
 
 void run_shader_tests_gl(void)
 {
-    const char *test_name;
-
-    test_name = vkd3d_test_name;
-    vkd3d_test_name = "shader_runner_gl";
     run_tests(SPIR_V);
     run_tests(GLSL);
-    vkd3d_test_name = test_name;
 }
 
 #endif

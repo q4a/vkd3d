@@ -55,7 +55,7 @@ HRESULT WINAPI D3D12SerializeRootSignature(const D3D12_ROOT_SIGNATURE_DESC *root
     return vkd3d_serialize_root_signature(root_signature_desc, version, blob, error_blob);
 }
 
-static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue)
+static void wait_queue_idle_(const char *file, unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue)
 {
     VkQueue vk_queue;
 

@@ -267,9 +267,9 @@ static const struct uvec4 *get_readback_uvec4(const struct resource_readback *rb
     return get_readback_data(rb, x, y, 0, sizeof(struct uvec4));
 }
 
-#define check_readback_data_float(a, b, c, d) check_readback_data_float_(__LINE__, a, b, c, d)
-static inline void check_readback_data_float_(unsigned int line, const struct resource_readback *rb,
-        const RECT *rect, float expected, unsigned int max_diff)
+#define check_readback_data_float(a, b, c, d) check_readback_data_float_(__FILE__, __LINE__, a, b, c, d)
+static inline void check_readback_data_float_(const char *file, unsigned int line,
+        const struct resource_readback *rb, const RECT *rect, float expected, unsigned int max_diff)
 {
     RECT r = {0, 0, rb->width, rb->height};
     unsigned int x = 0, y;
@@ -293,12 +293,12 @@ static inline void check_readback_data_float_(unsigned int line, const struct re
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got %.8e, expected %.8e at (%u, %u).\n", got, expected, x, y);
+    ok_(file, line)(all_match, "Got %.8e, expected %.8e at (%u, %u).\n", got, expected, x, y);
 }
 
-#define check_readback_data_double(a, b, c, d) check_readback_data_double_(__LINE__, a, b, c, d)
-static inline void check_readback_data_double_(unsigned int line, const struct resource_readback *rb,
-        const RECT *rect, double expected, unsigned int max_diff)
+#define check_readback_data_double(a, b, c, d) check_readback_data_double_(__FILE__, __LINE__, a, b, c, d)
+static inline void check_readback_data_double_(const char *file, unsigned int line,
+        const struct resource_readback *rb, const RECT *rect, double expected, unsigned int max_diff)
 {
     RECT r = {0, 0, rb->width, rb->height};
     unsigned int x = 0, y;
@@ -322,12 +322,12 @@ static inline void check_readback_data_double_(unsigned int line, const struct r
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got %.15le, expected %.15le at (%u, %u).\n", got, expected, x, y);
+    ok_(file, line)(all_match, "Got %.15le, expected %.15le at (%u, %u).\n", got, expected, x, y);
 }
 
-#define check_readback_data_uint(a, b, c, d) check_readback_data_uint_(__LINE__, a, b, c, d)
-static inline void check_readback_data_uint_(unsigned int line, struct resource_readback *rb,
-        const D3D12_BOX *box, unsigned int expected, unsigned int max_diff)
+#define check_readback_data_uint(a, b, c, d) check_readback_data_uint_(__FILE__, __LINE__, a, b, c, d)
+static inline void check_readback_data_uint_(const char *file, unsigned int line,
+        struct resource_readback *rb, const D3D12_BOX *box, unsigned int expected, unsigned int max_diff)
 {
     D3D12_BOX b = {0, 0, 0, rb->width, rb->height, rb->depth};
     unsigned int x = 0, y = 0, z;
@@ -356,12 +356,12 @@ static inline void check_readback_data_uint_(unsigned int line, struct resource_
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got 0x%08x, expected 0x%08x at (%u, %u, %u).\n", got, expected, x, y, z);
+    ok_(file, line)(all_match, "Got 0x%08x, expected 0x%08x at (%u, %u, %u).\n", got, expected, x, y, z);
 }
 
-#define check_readback_data_uint64(a, b, c, d) check_readback_data_uint64_(__LINE__, a, b, c, d)
-static inline void check_readback_data_uint64_(unsigned int line, struct resource_readback *rb,
-        const D3D12_BOX *box, uint64_t expected, unsigned int max_diff)
+#define check_readback_data_uint64(a, b, c, d) check_readback_data_uint64_(__FILE__, __LINE__, a, b, c, d)
+static inline void check_readback_data_uint64_(const char *file, unsigned int line,
+        struct resource_readback *rb, const D3D12_BOX *box, uint64_t expected, unsigned int max_diff)
 {
     D3D12_BOX b = {0, 0, 0, rb->width, rb->height, rb->depth};
     unsigned int x = 0, y = 0;
@@ -385,12 +385,12 @@ static inline void check_readback_data_uint64_(unsigned int line, struct resourc
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got 0x%016"PRIx64", expected 0x%016"PRIx64" at (%u, %u).\n", got, expected, x, y);
+    ok_(file, line)(all_match, "Got 0x%016"PRIx64", expected 0x%016"PRIx64" at (%u, %u).\n", got, expected, x, y);
 }
 
-#define check_readback_data_vec2(a, b, c, d) check_readback_data_vec_(__LINE__, a, b, c, d, 2)
-#define check_readback_data_vec4(a, b, c, d) check_readback_data_vec_(__LINE__, a, b, c, d, 4)
-static inline void check_readback_data_vec_(unsigned int line, const struct resource_readback *rb,
+#define check_readback_data_vec2(a, b, c, d) check_readback_data_vec_(__FILE__, __LINE__, a, b, c, d, 2)
+#define check_readback_data_vec4(a, b, c, d) check_readback_data_vec_(__FILE__, __LINE__, a, b, c, d, 4)
+static inline void check_readback_data_vec_(const char *file, unsigned int line, const struct resource_readback *rb,
         const RECT *rect, const struct vec4 *expected, unsigned int max_diff, unsigned component_count)
 {
     RECT r = {0, 0, rb->width, rb->height};
@@ -415,14 +415,15 @@ static inline void check_readback_data_vec_(unsigned int line, const struct reso
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
+    ok_(file, line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
             got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 
-#define check_readback_data_ivec4(a, b, c) check_readback_data_uvec4_(__LINE__, a, b, (const struct uvec4 *)(c))
-#define check_readback_data_uvec4(a, b, c) check_readback_data_uvec4_(__LINE__, a, b, c)
-static inline void check_readback_data_uvec4_(unsigned int line, const struct resource_readback *rb,
-        const RECT *rect, const struct uvec4 *expected)
+#define check_readback_data_ivec4(a, b, c) \
+        check_readback_data_uvec4_(__FILE__, __LINE__, a, b, (const struct uvec4 *)(c))
+#define check_readback_data_uvec4(a, b, c) check_readback_data_uvec4_(__FILE__, __LINE__, a, b, c)
+static inline void check_readback_data_uvec4_(const char *file, unsigned int line,
+        const struct resource_readback *rb, const RECT *rect, const struct uvec4 *expected)
 {
     RECT r = {0, 0, rb->width, rb->height};
     unsigned int x = 0, y = 0;
@@ -446,7 +447,8 @@ static inline void check_readback_data_uvec4_(unsigned int line, const struct re
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got {0x%08x, 0x%08x, 0x%08x, 0x%08x}, expected {0x%08x, 0x%08x, 0x%08x, 0x%08x} at (%u, %u).\n",
+    ok_(file, line)(all_match,
+            "Got {0x%08x, 0x%08x, 0x%08x, 0x%08x}, expected {0x%08x, 0x%08x, 0x%08x, 0x%08x} at (%u, %u).\n",
             got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 

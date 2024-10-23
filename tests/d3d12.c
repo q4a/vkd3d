@@ -61,8 +61,8 @@ static ULONG get_refcount(void *iface)
     return IUnknown_Release(unk);
 }
 
-#define check_interface(a, b, c) check_interface_(__LINE__, (IUnknown *)a, b, c)
-static void check_interface_(unsigned int line, IUnknown *iface, REFIID riid, bool supported)
+#define check_interface(a, b, c) check_interface_(__FILE__, __LINE__, (IUnknown *)a, b, c)
+static void check_interface_(const char *file, unsigned int line, IUnknown *iface, REFIID riid, bool supported)
 {
     HRESULT hr, expected_hr;
     IUnknown *unk;
@@ -70,13 +70,13 @@ static void check_interface_(unsigned int line, IUnknown *iface, REFIID riid, bo
     expected_hr = supported ? S_OK : E_NOINTERFACE;
 
     hr = IUnknown_QueryInterface(iface, riid, (void **)&unk);
-    ok_(line)(hr == expected_hr, "Got hr %#x, expected %#x.\n", hr, expected_hr);
+    ok_(file, line)(hr == expected_hr, "Got hr %#x, expected %#x.\n", hr, expected_hr);
     if (SUCCEEDED(hr))
         IUnknown_Release(unk);
 }
 
-#define check_heap_properties(a, b) check_heap_properties_(__LINE__, a, b)
-static void check_heap_properties_(unsigned int line,
+#define check_heap_properties(a, b) check_heap_properties_(__FILE__, __LINE__, a, b)
+static void check_heap_properties_(const char *file, unsigned int line,
         const D3D12_HEAP_PROPERTIES *properties, const D3D12_HEAP_PROPERTIES *expected_properties)
 {
     D3D12_HEAP_PROPERTIES expected = *expected_properties;
@@ -86,24 +86,24 @@ static void check_heap_properties_(unsigned int line,
     if (!expected.VisibleNodeMask)
         expected.VisibleNodeMask = 0x1;
 
-    ok_(line)(properties->Type == expected.Type,
+    ok_(file, line)(properties->Type == expected.Type,
             "Got type %#x, expected %#x.\n", properties->Type, expected.Type);
-    ok_(line)(properties->CPUPageProperty == expected.CPUPageProperty,
+    ok_(file, line)(properties->CPUPageProperty == expected.CPUPageProperty,
             "Got CPU page properties %#x, expected %#x.\n",
             properties->CPUPageProperty, expected.CPUPageProperty);
-    ok_(line)(properties->MemoryPoolPreference == expected.MemoryPoolPreference,
+    ok_(file, line)(properties->MemoryPoolPreference == expected.MemoryPoolPreference,
             "Got memory pool %#x, expected %#x.\n",
             properties->MemoryPoolPreference, expected.MemoryPoolPreference);
-    ok_(line)(properties->CreationNodeMask == expected.CreationNodeMask,
+    ok_(file, line)(properties->CreationNodeMask == expected.CreationNodeMask,
             "Got creation node mask %#x, expected %#x.\n",
             properties->CreationNodeMask, expected.CreationNodeMask);
-    ok_(line)(properties->VisibleNodeMask == expected.VisibleNodeMask,
+    ok_(file, line)(properties->VisibleNodeMask == expected.VisibleNodeMask,
             "Got visible node mask %#x, expected %#x.\n",
             properties->VisibleNodeMask, expected.VisibleNodeMask);
 }
 
-#define check_heap_desc(a, b) check_heap_desc_(__LINE__, a, b)
-static void check_heap_desc_(unsigned int line, const D3D12_HEAP_DESC *desc,
+#define check_heap_desc(a, b) check_heap_desc_(__FILE__, __LINE__, a, b)
+static void check_heap_desc_(const char *file, unsigned int line, const D3D12_HEAP_DESC *desc,
         const D3D12_HEAP_DESC *expected_desc)
 {
     D3D12_HEAP_DESC expected = *expected_desc;
@@ -111,22 +111,22 @@ static void check_heap_desc_(unsigned int line, const D3D12_HEAP_DESC *desc,
     if (!expected.Alignment)
         expected.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 
-    ok_(line)(desc->SizeInBytes == expected.SizeInBytes,
+    ok_(file, line)(desc->SizeInBytes == expected.SizeInBytes,
             "Got size %"PRIu64", expected %"PRIu64".\n",
             desc->SizeInBytes, expected.SizeInBytes);
-    check_heap_properties_(line, &desc->Properties, &expected.Properties);
-    ok_(line)(desc->Alignment == expected.Alignment,
+    check_heap_properties_(file, line, &desc->Properties, &expected.Properties);
+    ok_(file, line)(desc->Alignment == expected.Alignment,
             "Got alignment %"PRIu64", expected %"PRIu64".\n",
             desc->Alignment, expected.Alignment);
-    ok_(line)(desc->Flags == expected.Flags,
+    ok_(file, line)(desc->Flags == expected.Flags,
             "Got flags %#x, expected %#x.\n", desc->Flags, expected.Flags);
 }
 
-#define check_alignment(a, b) check_alignment_(__LINE__, a, b)
-static void check_alignment_(unsigned int line, uint64_t size, uint64_t alignment)
+#define check_alignment(a, b) check_alignment_(__FILE__, __LINE__, a, b)
+static void check_alignment_(const char *file, unsigned int line, uint64_t size, uint64_t alignment)
 {
     uint64_t aligned_size = align(size, alignment);
-    ok_(line)(aligned_size == size, "Got unaligned size %"PRIu64", expected %"PRIu64".\n",
+    ok_(file, line)(aligned_size == size, "Got unaligned size %"PRIu64", expected %"PRIu64".\n",
             size, aligned_size);
 }
 
@@ -228,20 +228,20 @@ static uint16_t get_readback_uint16(struct resource_readback *rb, unsigned int x
     return *(uint16_t *)get_readback_data(rb, x, y, 0, sizeof(uint16_t));
 }
 
-#define check_sub_resource_float(a, b, c, d, e, f) check_sub_resource_float_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_float_(unsigned int line, ID3D12Resource *resource,
+#define check_sub_resource_float(a, b, c, d, e, f) check_sub_resource_float_(__FILE__, __LINE__, a, b, c, d, e, f)
+static void check_sub_resource_float_(const char *file, unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         float expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_float_(line, &rb.rb, NULL, expected, max_diff);
+    check_readback_data_float_(file, line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
-#define check_readback_data_uint8(a, b, c, d) check_readback_data_uint8_(__LINE__, a, b, c, d)
-static void check_readback_data_uint8_(unsigned int line, struct resource_readback *rb,
+#define check_readback_data_uint8(a, b, c, d) check_readback_data_uint8_(__FILE__, __LINE__, a, b, c, d)
+static void check_readback_data_uint8_(const char *file, unsigned int line, struct resource_readback *rb,
         const RECT *rect, uint8_t expected, unsigned int max_diff)
 {
     RECT r = {0, 0, rb->width, rb->height};
@@ -266,23 +266,23 @@ static void check_readback_data_uint8_(unsigned int line, struct resource_readba
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got 0x%02x, expected 0x%02x at (%u, %u).\n", got, expected, x, y);
+    ok_(file, line)(all_match, "Got 0x%02x, expected 0x%02x at (%u, %u).\n", got, expected, x, y);
 }
 
-#define check_sub_resource_uint8(a, b, c, d, e, f) check_sub_resource_uint8_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_uint8_(unsigned int line, ID3D12Resource *resource,
+#define check_sub_resource_uint8(a, b, c, d, e, f) check_sub_resource_uint8_(__FILE__, __LINE__, a, b, c, d, e, f)
+static void check_sub_resource_uint8_(const char *file, unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint8_t expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint8_(line, &rb.rb, NULL, expected, max_diff);
+    check_readback_data_uint8_(file, line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
-#define check_readback_data_uint16(a, b, c, d) check_readback_data_uint16_(__LINE__, a, b, c, d)
-static void check_readback_data_uint16_(unsigned int line, struct resource_readback *rb,
+#define check_readback_data_uint16(a, b, c, d) check_readback_data_uint16_(__FILE__, __LINE__, a, b, c, d)
+static void check_readback_data_uint16_(const char *file, unsigned int line, struct resource_readback *rb,
         const RECT *rect, uint16_t expected, unsigned int max_diff)
 {
     RECT r = {0, 0, rb->width, rb->height};
@@ -307,35 +307,35 @@ static void check_readback_data_uint16_(unsigned int line, struct resource_readb
         if (!all_match)
             break;
     }
-    ok_(line)(all_match, "Got 0x%04x, expected 0x%04x at (%u, %u).\n", got, expected, x, y);
+    ok_(file, line)(all_match, "Got 0x%04x, expected 0x%04x at (%u, %u).\n", got, expected, x, y);
 }
 
-#define check_sub_resource_uint16(a, b, c, d, e, f) check_sub_resource_uint16_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_uint16_(unsigned int line, ID3D12Resource *resource,
+#define check_sub_resource_uint16(a, b, c, d, e, f) check_sub_resource_uint16_(__FILE__, __LINE__, a, b, c, d, e, f)
+static void check_sub_resource_uint16_(const char *file, unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint16_t expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint16_(line, &rb.rb, NULL, expected, max_diff);
+    check_readback_data_uint16_(file, line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
-#define check_sub_resource_uint64(a, b, c, d, e, f) check_sub_resource_uint64_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_uint64_(unsigned int line, ID3D12Resource *resource,
+#define check_sub_resource_uint64(a, b, c, d, e, f) check_sub_resource_uint64_(__FILE__, __LINE__, a, b, c, d, e, f)
+static void check_sub_resource_uint64_(const char *file, unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint64_t expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint64_(line, &rb.rb, NULL, expected, max_diff);
+    check_readback_data_uint64_(file, line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
-#define check_sub_resource_uvec4(a, b, c, d, e) check_sub_resource_uvec4_(__LINE__, a, b, c, d, e)
-static void check_sub_resource_uvec4_(unsigned int line, ID3D12Resource *resource,
+#define check_sub_resource_uvec4(a, b, c, d, e) check_sub_resource_uvec4_(__FILE__, __LINE__, a, b, c, d, e)
+static void check_sub_resource_uvec4_(const char *file, unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         const struct uvec4 *expected_value)
 {
@@ -361,21 +361,21 @@ static void check_sub_resource_uvec4_(unsigned int line, ID3D12Resource *resourc
     }
     release_resource_readback(&rb);
 
-    ok_(line)(all_match,
+    ok_(file, line)(all_match,
             "Got {0x%08x, 0x%08x, 0x%08x, 0x%08x}, expected {0x%08x, 0x%08x, 0x%08x, 0x%08x} at (%u, %u).\n",
             value.x, value.y, value.z, value.w,
             expected_value->x, expected_value->y, expected_value->z, expected_value->w, x, y);
 }
 
-#define check_buffer_uint(a, b, c, d, e) check_buffer_uint_(__LINE__, a, b, c, d, e)
-static void check_buffer_uint_(unsigned int line, ID3D12Resource *buffer,
+#define check_buffer_uint(a, b, c, d, e) check_buffer_uint_(__FILE__, __LINE__, a, b, c, d, e)
+static void check_buffer_uint_(const char *file, unsigned int line, ID3D12Resource *buffer,
         ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         unsigned int expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    check_readback_data_uint_(line, &rb.rb, NULL, expected, max_diff);
+    check_readback_data_uint_(file, line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
@@ -577,8 +577,8 @@ static bool are_unaligned_block_textures_supported(ID3D12Device *device)
     return options.UnalignedBlockTexturesSupported;
 }
 
-#define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
-static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
+#define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__FILE__, __LINE__, a, b, c, e)
+static ID3D12RootSignature *create_cb_root_signature_(const char *file, unsigned int line,
         ID3D12Device *device, unsigned int reg_idx, D3D12_SHADER_VISIBILITY shader_visibility,
         D3D12_ROOT_SIGNATURE_FLAGS flags)
 {
@@ -597,13 +597,13 @@ static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
     root_signature_desc.pParameters = &root_parameter;
     root_signature_desc.Flags = flags;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    ok_(line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
 
     return root_signature;
 }
 
-#define create_texture_root_signature(a, b, c, d) create_texture_root_signature_(__LINE__, a, b, c, d, NULL)
-static ID3D12RootSignature *create_texture_root_signature_(unsigned int line,
+#define create_texture_root_signature(a, b, c, d) create_texture_root_signature_(__FILE__, __LINE__, a, b, c, d, NULL)
+static ID3D12RootSignature *create_texture_root_signature_(const char *file, unsigned int line,
         ID3D12Device *device, D3D12_SHADER_VISIBILITY shader_visibility,
         unsigned int constant_count, D3D12_ROOT_SIGNATURE_FLAGS flags,
         const D3D12_STATIC_SAMPLER_DESC *sampler_desc)
@@ -656,13 +656,13 @@ static ID3D12RootSignature *create_texture_root_signature_(unsigned int line,
     root_signature_desc.Flags = flags;
 
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    ok_(line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
 
     return root_signature;
 }
 
-#define create_command_signature(a, b) create_command_signature_(__LINE__, a, b)
-static ID3D12CommandSignature *create_command_signature_(unsigned int line,
+#define create_command_signature(a, b) create_command_signature_(__FILE__, __LINE__, a, b)
+static ID3D12CommandSignature *create_command_signature_(const char *file, unsigned int line,
         ID3D12Device *device, D3D12_INDIRECT_ARGUMENT_TYPE argument_type)
 {
     D3D12_COMMAND_SIGNATURE_DESC signature_desc;
@@ -692,7 +692,7 @@ static ID3D12CommandSignature *create_command_signature_(unsigned int line,
     signature_desc.NodeMask = 0;
     hr = ID3D12Device_CreateCommandSignature(device, &signature_desc,
             NULL, &IID_ID3D12CommandSignature, (void **)&command_signature);
-    ok_(line)(hr == S_OK, "Failed to create command signature, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create command signature, hr %#x.\n", hr);
 
     return command_signature;
 }
@@ -704,10 +704,10 @@ struct depth_stencil_resource
     D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle;
 };
 
-#define init_depth_stencil(a, b, c, d, e, f, g, h, i) init_depth_stencil_(__LINE__, a, b, c, d, e, f, g, h, i)
-static void init_depth_stencil_(unsigned int line, struct depth_stencil_resource *ds,
-        ID3D12Device *device, unsigned int width, unsigned int height, unsigned int array_size, unsigned int level_count,
-        DXGI_FORMAT format, DXGI_FORMAT view_format, const D3D12_CLEAR_VALUE *clear_value)
+#define init_depth_stencil(a, b, c, d, e, f, g, h, i) init_depth_stencil_(__FILE__, __LINE__, a, b, c, d, e, f, g, h, i)
+static void init_depth_stencil_(const char *file, unsigned int line, struct depth_stencil_resource *ds,
+        ID3D12Device *device, unsigned int width, unsigned int height, unsigned int array_size,
+        unsigned int level_count, DXGI_FORMAT format, DXGI_FORMAT view_format, const D3D12_CLEAR_VALUE *clear_value)
 {
     D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc, *view_desc;
     D3D12_HEAP_PROPERTIES heap_properties;
@@ -734,7 +734,7 @@ static void init_depth_stencil_(unsigned int line, struct depth_stencil_resource
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
             &resource_desc, D3D12_RESOURCE_STATE_DEPTH_WRITE, clear_value,
             &IID_ID3D12Resource, (void **)&ds->texture);
-    ok_(line)(SUCCEEDED(hr), "Failed to create texture, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to create texture, hr %#x.\n", hr);
 
     view_desc = NULL;
     if (view_format)
@@ -748,8 +748,8 @@ static void init_depth_stencil_(unsigned int line, struct depth_stencil_resource
     ID3D12Device_CreateDepthStencilView(device, ds->texture, view_desc, ds->dsv_handle);
 }
 
-#define destroy_depth_stencil(depth_stencil) destroy_depth_stencil_(__LINE__, depth_stencil)
-static void destroy_depth_stencil_(unsigned int line, struct depth_stencil_resource *ds)
+#define destroy_depth_stencil(depth_stencil) destroy_depth_stencil_(__FILE__, __LINE__, depth_stencil)
+static void destroy_depth_stencil_(const char *file, unsigned int line, struct depth_stencil_resource *ds)
 {
     ID3D12DescriptorHeap_Release(ds->heap);
     ID3D12Resource_Release(ds->texture);
@@ -12092,47 +12092,47 @@ static void test_shader_input_output_components(void)
     destroy_test_context(&context);
 }
 
-static void check_descriptor_range_(unsigned int line, const D3D12_DESCRIPTOR_RANGE *range,
+static void check_descriptor_range_(const char *file, unsigned int line, const D3D12_DESCRIPTOR_RANGE *range,
         const D3D12_DESCRIPTOR_RANGE *expected_range)
 {
-    ok_(line)(range->RangeType == expected_range->RangeType,
+    ok_(file, line)(range->RangeType == expected_range->RangeType,
             "Got range type %#x, expected %#x.\n", range->RangeType, expected_range->RangeType);
-    ok_(line)(range->NumDescriptors == expected_range->NumDescriptors,
+    ok_(file, line)(range->NumDescriptors == expected_range->NumDescriptors,
             "Got descriptor count %u, expected %u.\n", range->NumDescriptors, expected_range->NumDescriptors);
-    ok_(line)(range->BaseShaderRegister == expected_range->BaseShaderRegister,
+    ok_(file, line)(range->BaseShaderRegister == expected_range->BaseShaderRegister,
             "Got base shader register %u, expected %u.\n",
             range->BaseShaderRegister, expected_range->BaseShaderRegister);
-    ok_(line)(range->RegisterSpace == expected_range->RegisterSpace,
+    ok_(file, line)(range->RegisterSpace == expected_range->RegisterSpace,
             "Got register space %u, expected %u.\n", range->RegisterSpace, expected_range->RegisterSpace);
-    ok_(line)(range->OffsetInDescriptorsFromTableStart == expected_range->OffsetInDescriptorsFromTableStart,
+    ok_(file, line)(range->OffsetInDescriptorsFromTableStart == expected_range->OffsetInDescriptorsFromTableStart,
             "Got offset %u, expected %u.\n", range->OffsetInDescriptorsFromTableStart,
             expected_range->OffsetInDescriptorsFromTableStart);
 }
 
-static void check_descriptor_range1_(unsigned int line, const D3D12_DESCRIPTOR_RANGE1 *range,
+static void check_descriptor_range1_(const char *file, unsigned int line, const D3D12_DESCRIPTOR_RANGE1 *range,
         const D3D12_DESCRIPTOR_RANGE1 *expected_range, bool converted)
 {
     unsigned int expected_flags = converted
             ? D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE
             : expected_range->Flags;
 
-    ok_(line)(range->RangeType == expected_range->RangeType,
+    ok_(file, line)(range->RangeType == expected_range->RangeType,
             "Got range type %#x, expected %#x.\n", range->RangeType, expected_range->RangeType);
-    ok_(line)(range->NumDescriptors == expected_range->NumDescriptors,
+    ok_(file, line)(range->NumDescriptors == expected_range->NumDescriptors,
             "Got descriptor count %u, expected %u.\n", range->NumDescriptors, expected_range->NumDescriptors);
-    ok_(line)(range->BaseShaderRegister == expected_range->BaseShaderRegister,
+    ok_(file, line)(range->BaseShaderRegister == expected_range->BaseShaderRegister,
             "Got base shader register %u, expected %u.\n",
             range->BaseShaderRegister, expected_range->BaseShaderRegister);
-    ok_(line)(range->RegisterSpace == expected_range->RegisterSpace,
+    ok_(file, line)(range->RegisterSpace == expected_range->RegisterSpace,
             "Got register space %u, expected %u.\n", range->RegisterSpace, expected_range->RegisterSpace);
-    ok_(line)(range->Flags == expected_flags,
+    ok_(file, line)(range->Flags == expected_flags,
             "Got descriptor range flags %#x, expected %#x.\n", range->Flags, expected_flags);
-    ok_(line)(range->OffsetInDescriptorsFromTableStart == expected_range->OffsetInDescriptorsFromTableStart,
+    ok_(file, line)(range->OffsetInDescriptorsFromTableStart == expected_range->OffsetInDescriptorsFromTableStart,
             "Got offset %u, expected %u.\n", range->OffsetInDescriptorsFromTableStart,
             expected_range->OffsetInDescriptorsFromTableStart);
 }
 
-static void check_root_parameter_(unsigned int line, const D3D12_ROOT_PARAMETER *parameter,
+static void check_root_parameter_(const char *file, unsigned int line, const D3D12_ROOT_PARAMETER *parameter,
         const D3D12_ROOT_PARAMETER *expected_parameter)
 {
     const D3D12_ROOT_DESCRIPTOR *descriptor, *expected_descriptor;
@@ -12140,7 +12140,7 @@ static void check_root_parameter_(unsigned int line, const D3D12_ROOT_PARAMETER 
     const D3D12_ROOT_CONSTANTS *constants, *expected_constants;
     unsigned int i;
 
-    ok_(line)(parameter->ParameterType == expected_parameter->ParameterType,
+    ok_(file, line)(parameter->ParameterType == expected_parameter->ParameterType,
             "Got type %#x, expected %#x.\n", parameter->ParameterType, expected_parameter->ParameterType);
     if (parameter->ParameterType != expected_parameter->ParameterType)
         return;
@@ -12150,26 +12150,26 @@ static void check_root_parameter_(unsigned int line, const D3D12_ROOT_PARAMETER 
         case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
             table = &parameter->DescriptorTable;
             expected_table = &expected_parameter->DescriptorTable;
-            ok_(line)(table->NumDescriptorRanges == expected_table->NumDescriptorRanges,
+            ok_(file, line)(table->NumDescriptorRanges == expected_table->NumDescriptorRanges,
                     "Got range count %u, expected %u.\n",
                     table->NumDescriptorRanges, expected_table->NumDescriptorRanges);
             if (table->NumDescriptorRanges == expected_table->NumDescriptorRanges)
             {
                 for (i = 0; i < table->NumDescriptorRanges; ++i)
-                    check_descriptor_range_(line, &table->pDescriptorRanges[i],
+                    check_descriptor_range_(file, line, &table->pDescriptorRanges[i],
                             &expected_table->pDescriptorRanges[i]);
             }
             break;
         case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
             constants = &parameter->Constants;
             expected_constants = &expected_parameter->Constants;
-            ok_(line)(constants->ShaderRegister == expected_constants->ShaderRegister,
+            ok_(file, line)(constants->ShaderRegister == expected_constants->ShaderRegister,
                     "Got shader register %u, expected %u.\n",
                     constants->ShaderRegister, expected_constants->ShaderRegister);
-            ok_(line)(constants->RegisterSpace == expected_constants->RegisterSpace,
+            ok_(file, line)(constants->RegisterSpace == expected_constants->RegisterSpace,
                     "Got register space %u, expected %u.\n",
                     constants->RegisterSpace, expected_constants->RegisterSpace);
-            ok_(line)(constants->Num32BitValues == expected_constants->Num32BitValues,
+            ok_(file, line)(constants->Num32BitValues == expected_constants->Num32BitValues,
                     "Got 32-bit value count %u, expected %u.\n",
                     constants->Num32BitValues, expected_constants->Num32BitValues);
             break;
@@ -12178,10 +12178,10 @@ static void check_root_parameter_(unsigned int line, const D3D12_ROOT_PARAMETER 
         case D3D12_ROOT_PARAMETER_TYPE_UAV:
             descriptor = &parameter->Descriptor;
             expected_descriptor = &expected_parameter->Descriptor;
-            ok_(line)(descriptor->ShaderRegister == expected_descriptor->ShaderRegister,
+            ok_(file, line)(descriptor->ShaderRegister == expected_descriptor->ShaderRegister,
                     "Got shader register %u, expected %u.\n",
                     descriptor->ShaderRegister, expected_descriptor->ShaderRegister);
-            ok_(line)(descriptor->RegisterSpace == expected_descriptor->RegisterSpace,
+            ok_(file, line)(descriptor->RegisterSpace == expected_descriptor->RegisterSpace,
                     "Got register space %u, expected %u.\n",
                     descriptor->RegisterSpace, expected_descriptor->RegisterSpace);
             break;
@@ -12189,12 +12189,12 @@ static void check_root_parameter_(unsigned int line, const D3D12_ROOT_PARAMETER 
             trace("Unhandled type %#x.\n", parameter->ParameterType);
     }
 
-    ok_(line)(parameter->ShaderVisibility == expected_parameter->ShaderVisibility,
+    ok_(file, line)(parameter->ShaderVisibility == expected_parameter->ShaderVisibility,
             "Got shader visibility %#x, expected %#x.\n",
             parameter->ShaderVisibility, expected_parameter->ShaderVisibility);
 }
 
-static void check_root_parameter1_(unsigned int line, const D3D12_ROOT_PARAMETER1 *parameter,
+static void check_root_parameter1_(const char *file, unsigned int line, const D3D12_ROOT_PARAMETER1 *parameter,
         const D3D12_ROOT_PARAMETER1 *expected_parameter, bool converted)
 {
     const D3D12_ROOT_DESCRIPTOR1 *descriptor, *expected_descriptor;
@@ -12203,7 +12203,7 @@ static void check_root_parameter1_(unsigned int line, const D3D12_ROOT_PARAMETER
     unsigned int expected_flags;
     unsigned int i;
 
-    ok_(line)(parameter->ParameterType == expected_parameter->ParameterType,
+    ok_(file, line)(parameter->ParameterType == expected_parameter->ParameterType,
             "Got type %#x, expected %#x.\n", parameter->ParameterType, expected_parameter->ParameterType);
     if (parameter->ParameterType != expected_parameter->ParameterType)
         return;
@@ -12213,26 +12213,26 @@ static void check_root_parameter1_(unsigned int line, const D3D12_ROOT_PARAMETER
         case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
             table = &parameter->DescriptorTable;
             expected_table = &expected_parameter->DescriptorTable;
-            ok_(line)(table->NumDescriptorRanges == expected_table->NumDescriptorRanges,
+            ok_(file, line)(table->NumDescriptorRanges == expected_table->NumDescriptorRanges,
                     "Got range count %u, expected %u.\n",
                     table->NumDescriptorRanges, expected_table->NumDescriptorRanges);
             if (table->NumDescriptorRanges == expected_table->NumDescriptorRanges)
             {
                 for (i = 0; i < table->NumDescriptorRanges; ++i)
-                    check_descriptor_range1_(line, &table->pDescriptorRanges[i],
+                    check_descriptor_range1_(file, line, &table->pDescriptorRanges[i],
                             &expected_table->pDescriptorRanges[i], converted);
             }
             break;
         case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
             constants = &parameter->Constants;
             expected_constants = &expected_parameter->Constants;
-            ok_(line)(constants->ShaderRegister == expected_constants->ShaderRegister,
+            ok_(file, line)(constants->ShaderRegister == expected_constants->ShaderRegister,
                     "Got shader register %u, expected %u.\n",
                     constants->ShaderRegister, expected_constants->ShaderRegister);
-            ok_(line)(constants->RegisterSpace == expected_constants->RegisterSpace,
+            ok_(file, line)(constants->RegisterSpace == expected_constants->RegisterSpace,
                     "Got register space %u, expected %u.\n",
                     constants->RegisterSpace, expected_constants->RegisterSpace);
-            ok_(line)(constants->Num32BitValues == expected_constants->Num32BitValues,
+            ok_(file, line)(constants->Num32BitValues == expected_constants->Num32BitValues,
                     "Got 32-bit value count %u, expected %u.\n",
                     constants->Num32BitValues, expected_constants->Num32BitValues);
             break;
@@ -12241,14 +12241,14 @@ static void check_root_parameter1_(unsigned int line, const D3D12_ROOT_PARAMETER
         case D3D12_ROOT_PARAMETER_TYPE_UAV:
             descriptor = &parameter->Descriptor;
             expected_descriptor = &expected_parameter->Descriptor;
-            ok_(line)(descriptor->ShaderRegister == expected_descriptor->ShaderRegister,
+            ok_(file, line)(descriptor->ShaderRegister == expected_descriptor->ShaderRegister,
                     "Got shader register %u, expected %u.\n",
                     descriptor->ShaderRegister, expected_descriptor->ShaderRegister);
-            ok_(line)(descriptor->RegisterSpace == expected_descriptor->RegisterSpace,
+            ok_(file, line)(descriptor->RegisterSpace == expected_descriptor->RegisterSpace,
                     "Got register space %u, expected %u.\n",
                     descriptor->RegisterSpace, expected_descriptor->RegisterSpace);
             expected_flags = converted ? D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE : expected_descriptor->Flags;
-            ok_(line)(descriptor->Flags == expected_flags,
+            ok_(file, line)(descriptor->Flags == expected_flags,
                     "Got root descriptor flags %#x, expected %#x.\n",
                     descriptor->Flags, expected_flags);
             break;
@@ -12256,114 +12256,115 @@ static void check_root_parameter1_(unsigned int line, const D3D12_ROOT_PARAMETER
             trace("Unhandled type %#x.\n", parameter->ParameterType);
     }
 
-    ok_(line)(parameter->ShaderVisibility == expected_parameter->ShaderVisibility,
+    ok_(file, line)(parameter->ShaderVisibility == expected_parameter->ShaderVisibility,
             "Got shader visibility %#x, expected %#x.\n",
             parameter->ShaderVisibility, expected_parameter->ShaderVisibility);
 }
 
-static void check_static_sampler_(unsigned int line, const D3D12_STATIC_SAMPLER_DESC *sampler,
+static void check_static_sampler_(const char *file, unsigned int line, const D3D12_STATIC_SAMPLER_DESC *sampler,
         const D3D12_STATIC_SAMPLER_DESC *expected_sampler)
 {
-    ok_(line)(sampler->Filter == expected_sampler->Filter,
+    ok_(file, line)(sampler->Filter == expected_sampler->Filter,
             "Got filter %#x, expected %#x.\n", sampler->Filter, expected_sampler->Filter);
-    ok_(line)(sampler->AddressU == expected_sampler->AddressU,
+    ok_(file, line)(sampler->AddressU == expected_sampler->AddressU,
             "Got address U %#x, expected %#x.\n", sampler->AddressU, expected_sampler->AddressU);
-    ok_(line)(sampler->AddressV == expected_sampler->AddressV,
+    ok_(file, line)(sampler->AddressV == expected_sampler->AddressV,
             "Got address V %#x, expected %#x.\n", sampler->AddressV, expected_sampler->AddressV);
-    ok_(line)(sampler->AddressW == expected_sampler->AddressW,
+    ok_(file, line)(sampler->AddressW == expected_sampler->AddressW,
             "Got address W %#x, expected %#x.\n", sampler->AddressW, expected_sampler->AddressW);
-    ok_(line)(sampler->MipLODBias == expected_sampler->MipLODBias,
+    ok_(file, line)(sampler->MipLODBias == expected_sampler->MipLODBias,
             "Got mip LOD bias %.8e, expected %.8e.\n", sampler->MipLODBias, expected_sampler->MipLODBias);
-    ok_(line)(sampler->MaxAnisotropy == expected_sampler->MaxAnisotropy,
+    ok_(file, line)(sampler->MaxAnisotropy == expected_sampler->MaxAnisotropy,
             "Got max anisotropy %u, expected %u.\n", sampler->MaxAnisotropy, expected_sampler->MaxAnisotropy);
-    ok_(line)(sampler->ComparisonFunc == expected_sampler->ComparisonFunc,
+    ok_(file, line)(sampler->ComparisonFunc == expected_sampler->ComparisonFunc,
             "Got comparison func %#x, expected %#x.\n", sampler->ComparisonFunc, expected_sampler->ComparisonFunc);
-    ok_(line)(sampler->BorderColor == expected_sampler->BorderColor,
+    ok_(file, line)(sampler->BorderColor == expected_sampler->BorderColor,
             "Got border color %#x, expected %#x.\n", sampler->BorderColor, expected_sampler->BorderColor);
-    ok_(line)(sampler->MinLOD == expected_sampler->MinLOD,
+    ok_(file, line)(sampler->MinLOD == expected_sampler->MinLOD,
             "Got min LOD %.8e, expected %.8e.\n", sampler->MinLOD, expected_sampler->MinLOD);
-    ok_(line)(sampler->MaxLOD == expected_sampler->MaxLOD,
+    ok_(file, line)(sampler->MaxLOD == expected_sampler->MaxLOD,
             "Got max LOD %.8e, expected %.8e.\n", sampler->MaxLOD, expected_sampler->MaxLOD);
-    ok_(line)(sampler->ShaderRegister == expected_sampler->ShaderRegister,
+    ok_(file, line)(sampler->ShaderRegister == expected_sampler->ShaderRegister,
             "Got shader register %u, expected %u.\n", sampler->ShaderRegister, expected_sampler->ShaderRegister);
-    ok_(line)(sampler->RegisterSpace == expected_sampler->RegisterSpace,
+    ok_(file, line)(sampler->RegisterSpace == expected_sampler->RegisterSpace,
             "Got register space %u, expected %u.\n", sampler->RegisterSpace, expected_sampler->RegisterSpace);
-    ok_(line)(sampler->ShaderVisibility == expected_sampler->ShaderVisibility,
+    ok_(file, line)(sampler->ShaderVisibility == expected_sampler->ShaderVisibility,
             "Got shader visibility %#x, expected %#x.\n",
             sampler->ShaderVisibility, expected_sampler->ShaderVisibility);
 }
 
-#define check_root_signature_desc(desc, expected) check_root_signature_desc_(__LINE__, desc, expected)
-static void check_root_signature_desc_(unsigned int line, const D3D12_ROOT_SIGNATURE_DESC *desc,
+#define check_root_signature_desc(desc, expected) check_root_signature_desc_(__FILE__, __LINE__, desc, expected)
+static void check_root_signature_desc_(const char *file, unsigned int line, const D3D12_ROOT_SIGNATURE_DESC *desc,
         const D3D12_ROOT_SIGNATURE_DESC *expected_desc)
 {
     unsigned int i;
 
-    ok_(line)(desc->NumParameters == expected_desc->NumParameters,
+    ok_(file, line)(desc->NumParameters == expected_desc->NumParameters,
             "Got parameter count %u, expected %u.\n",
             desc->NumParameters, expected_desc->NumParameters);
     if (!expected_desc->pParameters)
     {
-        ok_(line)(!desc->pParameters, "Got unexpected parameters %p.\n", desc->pParameters);
+        ok_(file, line)(!desc->pParameters, "Got unexpected parameters %p.\n", desc->pParameters);
     }
     else if (desc->NumParameters == expected_desc->NumParameters)
     {
         for (i = 0; i < desc->NumParameters; ++i)
-            check_root_parameter_(line, &desc->pParameters[i], &expected_desc->pParameters[i]);
+            check_root_parameter_(file, line, &desc->pParameters[i], &expected_desc->pParameters[i]);
     }
-    ok_(line)(desc->NumStaticSamplers == expected_desc->NumStaticSamplers,
+    ok_(file, line)(desc->NumStaticSamplers == expected_desc->NumStaticSamplers,
             "Got static sampler count %u, expected %u.\n",
             desc->NumStaticSamplers, expected_desc->NumStaticSamplers);
     if (!expected_desc->pStaticSamplers)
     {
-        ok_(line)(!desc->pStaticSamplers, "Got unexpected static samplers %p.\n", desc->pStaticSamplers);
+        ok_(file, line)(!desc->pStaticSamplers, "Got unexpected static samplers %p.\n", desc->pStaticSamplers);
     }
     else if (desc->NumStaticSamplers == expected_desc->NumStaticSamplers)
     {
         for (i = 0; i < desc->NumStaticSamplers; ++i)
-            check_static_sampler_(line, &desc->pStaticSamplers[i], &expected_desc->pStaticSamplers[i]);
+            check_static_sampler_(file, line, &desc->pStaticSamplers[i], &expected_desc->pStaticSamplers[i]);
     }
-    ok_(line)(desc->Flags == expected_desc->Flags, "Got flags %#x, expected %#x.\n",
+    ok_(file, line)(desc->Flags == expected_desc->Flags, "Got flags %#x, expected %#x.\n",
             desc->Flags, expected_desc->Flags);
 }
 
-#define check_root_signature_desc1(a, b, c) check_root_signature_desc1_(__LINE__, a, b, c)
-static void check_root_signature_desc1_(unsigned int line, const D3D12_ROOT_SIGNATURE_DESC1 *desc,
+#define check_root_signature_desc1(a, b, c) check_root_signature_desc1_(__FILE__, __LINE__, a, b, c)
+static void check_root_signature_desc1_(const char *file, unsigned int line, const D3D12_ROOT_SIGNATURE_DESC1 *desc,
         const D3D12_ROOT_SIGNATURE_DESC1 *expected_desc, bool converted)
 {
     unsigned int i;
 
-    ok_(line)(desc->NumParameters == expected_desc->NumParameters,
+    ok_(file, line)(desc->NumParameters == expected_desc->NumParameters,
             "Got parameter count %u, expected %u.\n",
             desc->NumParameters, expected_desc->NumParameters);
     if (!expected_desc->pParameters)
     {
-        ok_(line)(!desc->pParameters, "Got unexpected parameters %p.\n", desc->pParameters);
+        ok_(file, line)(!desc->pParameters, "Got unexpected parameters %p.\n", desc->pParameters);
     }
     else if (desc->NumParameters == expected_desc->NumParameters)
     {
         for (i = 0; i < desc->NumParameters; ++i)
-            check_root_parameter1_(line, &desc->pParameters[i], &expected_desc->pParameters[i], converted);
+            check_root_parameter1_(file, line, &desc->pParameters[i], &expected_desc->pParameters[i], converted);
     }
-    ok_(line)(desc->NumStaticSamplers == expected_desc->NumStaticSamplers,
+    ok_(file, line)(desc->NumStaticSamplers == expected_desc->NumStaticSamplers,
             "Got static sampler count %u, expected %u.\n",
             desc->NumStaticSamplers, expected_desc->NumStaticSamplers);
     if (!expected_desc->pStaticSamplers)
     {
-        ok_(line)(!desc->pStaticSamplers, "Got unexpected static samplers %p.\n", desc->pStaticSamplers);
+        ok_(file, line)(!desc->pStaticSamplers, "Got unexpected static samplers %p.\n", desc->pStaticSamplers);
     }
     else if (desc->NumStaticSamplers == expected_desc->NumStaticSamplers)
     {
         for (i = 0; i < desc->NumStaticSamplers; ++i)
-            check_static_sampler_(line, &desc->pStaticSamplers[i], &expected_desc->pStaticSamplers[i]);
+            check_static_sampler_(file, line, &desc->pStaticSamplers[i], &expected_desc->pStaticSamplers[i]);
     }
-    ok_(line)(desc->Flags == expected_desc->Flags, "Got flags %#x, expected %#x.\n",
+    ok_(file, line)(desc->Flags == expected_desc->Flags, "Got flags %#x, expected %#x.\n",
             desc->Flags, expected_desc->Flags);
 }
 
-#define check_root_signature_deserialization(a, b, c) check_root_signature_deserialization_(__LINE__, a, b, c)
-static void check_root_signature_deserialization_(unsigned int line, const D3D12_SHADER_BYTECODE *code,
-        const D3D12_ROOT_SIGNATURE_DESC *expected_desc, const D3D12_ROOT_SIGNATURE_DESC1 *expected_desc1)
+#define check_root_signature_deserialization(a, b, c) check_root_signature_deserialization_(__FILE__, __LINE__, a, b, c)
+static void check_root_signature_deserialization_(const char *file, unsigned int line,
+        const D3D12_SHADER_BYTECODE *code, const D3D12_ROOT_SIGNATURE_DESC *expected_desc,
+        const D3D12_ROOT_SIGNATURE_DESC1 *expected_desc1)
 {
     const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *versioned_desc, *versioned_desc2;
     ID3D12VersionedRootSignatureDeserializer *versioned_deserializer;
@@ -12377,46 +12378,49 @@ static void check_root_signature_deserialization_(unsigned int line, const D3D12
 
     hr = D3D12CreateRootSignatureDeserializer(code->pShaderBytecode, code->BytecodeLength,
             &IID_ID3D12RootSignatureDeserializer, (void **)&deserializer);
-    ok_(line)(hr == S_OK, "Failed to create deserializer, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create deserializer, hr %#x.\n", hr);
 
     desc = ID3D12RootSignatureDeserializer_GetRootSignatureDesc(deserializer);
     ok(desc, "Got NULL root signature desc.\n");
-    check_root_signature_desc_(line, desc, expected_desc);
+    check_root_signature_desc_(file, line, desc, expected_desc);
 
     refcount = ID3D12RootSignatureDeserializer_Release(deserializer);
-    ok_(line)(!refcount, "ID3D12RootSignatureDeserializer has %u references left.\n", (unsigned int)refcount);
+    ok_(file, line)(!refcount, "ID3D12RootSignatureDeserializer has %u references left.\n", (unsigned int)refcount);
 
     if (!pfn_D3D12CreateVersionedRootSignatureDeserializer)
         return;
 
     hr = pfn_D3D12CreateVersionedRootSignatureDeserializer(code->pShaderBytecode, code->BytecodeLength,
             &IID_ID3D12VersionedRootSignatureDeserializer, (void **)&versioned_deserializer);
-    ok_(line)(hr == S_OK, "Failed to create versioned deserializer, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create versioned deserializer, hr %#x.\n", hr);
 
     versioned_desc = ID3D12VersionedRootSignatureDeserializer_GetUnconvertedRootSignatureDesc(versioned_deserializer);
     ok(versioned_desc, "Got NULL root signature desc.\n");
     ok(versioned_desc->Version == D3D_ROOT_SIGNATURE_VERSION_1_0, "Got unexpected version %#x.\n", versioned_desc->Version);
-    check_root_signature_desc_(line, &versioned_desc->Desc_1_0, expected_desc);
+    check_root_signature_desc_(file, line, &versioned_desc->Desc_1_0, expected_desc);
 
     hr = ID3D12VersionedRootSignatureDeserializer_GetRootSignatureDescAtVersion(versioned_deserializer,
             D3D_ROOT_SIGNATURE_VERSION_1_0, &versioned_desc2);
-    ok_(line)(hr == S_OK, "Failed to get root signature 1.0, hr %#x.\n", hr);
-    ok_(line)(versioned_desc2 == versioned_desc, "Got unexpected pointer %p.\n", versioned_desc2);
+    ok_(file, line)(hr == S_OK, "Failed to get root signature 1.0, hr %#x.\n", hr);
+    ok_(file, line)(versioned_desc2 == versioned_desc, "Got unexpected pointer %p.\n", versioned_desc2);
 
     hr = ID3D12VersionedRootSignatureDeserializer_GetRootSignatureDescAtVersion(versioned_deserializer,
             D3D_ROOT_SIGNATURE_VERSION_1_1, &versioned_desc);
-    ok_(line)(hr == S_OK, "Failed to get root signature 1.0, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to get root signature 1.0, hr %#x.\n", hr);
     ok(versioned_desc, "Got NULL root signature desc.\n");
     ok(versioned_desc->Version == D3D_ROOT_SIGNATURE_VERSION_1_1, "Got unexpected version %#x.\n", versioned_desc->Version);
-    check_root_signature_desc1_(line, &versioned_desc->Desc_1_1, expected_desc1, true);
+    check_root_signature_desc1_(file, line, &versioned_desc->Desc_1_1, expected_desc1, true);
 
     refcount = ID3D12VersionedRootSignatureDeserializer_Release(versioned_deserializer);
-    ok_(line)(!refcount, "ID3D12VersionedRootSignatureDeserializer has %u references left.\n", (unsigned int)refcount);
+    ok_(file, line)(!refcount, "ID3D12VersionedRootSignatureDeserializer has %u references left.\n",
+            (unsigned int)refcount);
 }
 
-#define check_root_signature_deserialization1(a, b, c) check_root_signature_deserialization1_(__LINE__, a, b, c)
-static void check_root_signature_deserialization1_(unsigned int line, const D3D12_SHADER_BYTECODE *code,
-        const D3D12_ROOT_SIGNATURE_DESC *expected_desc, const D3D12_ROOT_SIGNATURE_DESC1 *expected_desc1)
+#define check_root_signature_deserialization1(a, b, c) \
+        check_root_signature_deserialization1_(__FILE__, __LINE__, a, b, c)
+static void check_root_signature_deserialization1_(const char *file, unsigned int line,
+        const D3D12_SHADER_BYTECODE *code, const D3D12_ROOT_SIGNATURE_DESC *expected_desc,
+        const D3D12_ROOT_SIGNATURE_DESC1 *expected_desc1)
 {
     const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *versioned_desc, *versioned_desc2;
     ID3D12VersionedRootSignatureDeserializer *versioned_deserializer;
@@ -12427,43 +12431,44 @@ static void check_root_signature_deserialization1_(unsigned int line, const D3D1
 
     hr = pfn_D3D12CreateVersionedRootSignatureDeserializer(code->pShaderBytecode, code->BytecodeLength,
             &IID_ID3D12VersionedRootSignatureDeserializer, (void **)&versioned_deserializer);
-    ok_(line)(hr == S_OK, "Failed to create deserializer, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create deserializer, hr %#x.\n", hr);
 
     versioned_desc = ID3D12VersionedRootSignatureDeserializer_GetUnconvertedRootSignatureDesc(versioned_deserializer);
     ok(versioned_desc, "Got NULL root signature desc.\n");
     ok(versioned_desc->Version == D3D_ROOT_SIGNATURE_VERSION_1_1, "Got unexpected version %#x.\n", versioned_desc->Version);
-    check_root_signature_desc1_(line, &versioned_desc->Desc_1_1, expected_desc1, false);
+    check_root_signature_desc1_(file, line, &versioned_desc->Desc_1_1, expected_desc1, false);
 
     hr = ID3D12VersionedRootSignatureDeserializer_GetRootSignatureDescAtVersion(versioned_deserializer,
             D3D_ROOT_SIGNATURE_VERSION_1_1, &versioned_desc2);
-    ok_(line)(hr == S_OK, "Failed to get root signature 1.1, hr %#x.\n", hr);
-    ok_(line)(versioned_desc2 == versioned_desc, "Got unexpected pointer %p.\n", versioned_desc2);
+    ok_(file, line)(hr == S_OK, "Failed to get root signature 1.1, hr %#x.\n", hr);
+    ok_(file, line)(versioned_desc2 == versioned_desc, "Got unexpected pointer %p.\n", versioned_desc2);
 
     hr = ID3D12VersionedRootSignatureDeserializer_GetRootSignatureDescAtVersion(versioned_deserializer,
             D3D_ROOT_SIGNATURE_VERSION_1_0, &versioned_desc);
-    ok_(line)(hr == S_OK, "Failed to get root signature 1.0, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to get root signature 1.0, hr %#x.\n", hr);
     ok(versioned_desc, "Got NULL root signature desc.\n");
     ok(versioned_desc->Version == D3D_ROOT_SIGNATURE_VERSION_1_0, "Got unexpected version %#x.\n", versioned_desc->Version);
-    check_root_signature_desc_(line, &versioned_desc->Desc_1_0, expected_desc);
+    check_root_signature_desc_(file, line, &versioned_desc->Desc_1_0, expected_desc);
 
     refcount = ID3D12VersionedRootSignatureDeserializer_Release(versioned_deserializer);
-    ok_(line)(!refcount, "ID3D12VersionedRootSignatureDeserializer has %u references left.\n", (unsigned int)refcount);
+    ok_(file, line)(!refcount, "ID3D12VersionedRootSignatureDeserializer has %u references left.\n",
+            (unsigned int)refcount);
 
     hr = D3D12CreateRootSignatureDeserializer(code->pShaderBytecode, code->BytecodeLength,
             &IID_ID3D12RootSignatureDeserializer, (void **)&deserializer);
-    ok_(line)(hr == S_OK, "Failed to create deserializer, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create deserializer, hr %#x.\n", hr);
 
     desc = ID3D12RootSignatureDeserializer_GetRootSignatureDesc(deserializer);
     ok(desc, "Got NULL root signature desc.\n");
-    check_root_signature_desc_(line, desc, expected_desc);
+    check_root_signature_desc_(file, line, desc, expected_desc);
 
     refcount = ID3D12RootSignatureDeserializer_Release(deserializer);
-    ok_(line)(!refcount, "ID3D12RootSignatureDeserializer has %u references left.\n", (unsigned int)refcount);
+    ok_(file, line)(!refcount, "ID3D12RootSignatureDeserializer has %u references left.\n", (unsigned int)refcount);
 }
 
-#define check_root_signature_serialization(a, b) check_root_signature_serialization_(__LINE__, a, b)
-static void check_root_signature_serialization_(unsigned int line, const D3D12_SHADER_BYTECODE *bytecode,
-        const D3D12_ROOT_SIGNATURE_DESC *desc)
+#define check_root_signature_serialization(a, b) check_root_signature_serialization_(__FILE__, __LINE__, a, b)
+static void check_root_signature_serialization_(const char *file, unsigned int line,
+        const D3D12_SHADER_BYTECODE *bytecode, const D3D12_ROOT_SIGNATURE_DESC *desc)
 {
     const DWORD *code = bytecode->pShaderBytecode;
     ID3DBlob *blob, *error_blob;
@@ -12477,26 +12482,26 @@ static void check_root_signature_serialization_(unsigned int line, const D3D12_S
 
     error_blob = (ID3DBlob *)0xdeadbeef;
     hr = D3D12SerializeRootSignature(desc, D3D_ROOT_SIGNATURE_VERSION_1_0, &blob, &error_blob);
-    ok_(line)(hr == S_OK, "Failed to serialize root signature, hr %#x.\n", hr);
-    ok_(line)(!error_blob, "Got unexpected error blob %p.\n", error_blob);
+    ok_(file, line)(hr == S_OK, "Failed to serialize root signature, hr %#x.\n", hr);
+    ok_(file, line)(!error_blob, "Got unexpected error blob %p.\n", error_blob);
 
     blob_buffer = ID3D10Blob_GetBufferPointer(blob);
     blob_size = ID3D10Blob_GetBufferSize(blob);
-    ok_(line)(blob_size == bytecode->BytecodeLength, "Got size %u, expected %u.\n",
+    ok_(file, line)(blob_size == bytecode->BytecodeLength, "Got size %u, expected %u.\n",
             (unsigned int)blob_size, (unsigned int)bytecode->BytecodeLength);
 
     for (i = 0; i < bytecode->BytecodeLength / sizeof(*code); ++i)
     {
-        ok_(line)(blob_buffer[i] == code[i], "Got dword %#x, expected %#x at %u.\n",
+        ok_(file, line)(blob_buffer[i] == code[i], "Got dword %#x, expected %#x at %u.\n",
                 (unsigned int)blob_buffer[i], (unsigned int)code[i], i);
     }
 
     ID3D10Blob_Release(blob);
 }
 
-#define check_root_signature_serialization1(a, b) check_root_signature_serialization1_(__LINE__, a, b)
-static void check_root_signature_serialization1_(unsigned int line, const D3D12_SHADER_BYTECODE *bytecode,
-        const D3D12_ROOT_SIGNATURE_DESC1 *desc)
+#define check_root_signature_serialization1(a, b) check_root_signature_serialization1_(__FILE__, __LINE__, a, b)
+static void check_root_signature_serialization1_(const char *file, unsigned int line,
+        const D3D12_SHADER_BYTECODE *bytecode, const D3D12_ROOT_SIGNATURE_DESC1 *desc)
 {
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC versioned_desc;
     const DWORD *code = bytecode->pShaderBytecode;
@@ -12511,17 +12516,17 @@ static void check_root_signature_serialization1_(unsigned int line, const D3D12_
 
     error_blob = (ID3DBlob *)0xdeadbeef;
     hr = pfn_D3D12SerializeVersionedRootSignature(&versioned_desc, &blob, &error_blob);
-    ok_(line)(hr == S_OK, "Failed to serialize root signature, hr %#x.\n", hr);
-    ok_(line)(!error_blob, "Got unexpected error blob %p.\n", error_blob);
+    ok_(file, line)(hr == S_OK, "Failed to serialize root signature, hr %#x.\n", hr);
+    ok_(file, line)(!error_blob, "Got unexpected error blob %p.\n", error_blob);
 
     blob_buffer = ID3D10Blob_GetBufferPointer(blob);
     blob_size = ID3D10Blob_GetBufferSize(blob);
-    ok_(line)(blob_size == bytecode->BytecodeLength, "Got size %u, expected %u.\n",
+    ok_(file, line)(blob_size == bytecode->BytecodeLength, "Got size %u, expected %u.\n",
             (unsigned int)blob_size, (unsigned int)bytecode->BytecodeLength);
 
     for (i = 0; i < bytecode->BytecodeLength / sizeof(*code); ++i)
     {
-        ok_(line)(blob_buffer[i] == code[i], "Got dword %#x, expected %#x at %u.\n",
+        ok_(file, line)(blob_buffer[i] == code[i], "Got dword %#x, expected %#x at %u.\n",
                 (unsigned int)blob_buffer[i], (unsigned int)code[i], i);
     }
 
@@ -15105,7 +15110,7 @@ static void test_gather_c(void)
     command_list = context.list;
     queue = context.queue;
 
-    context.root_signature = create_texture_root_signature_(__LINE__, context.device,
+    context.root_signature = create_texture_root_signature_(__FILE__, __LINE__, context.device,
             D3D12_SHADER_VISIBILITY_PIXEL, 5, 0, &sampler_desc);
 
     heap = create_gpu_descriptor_heap(context.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
@@ -15529,7 +15534,7 @@ static void test_sample_c_lz(void)
     command_list = context.list;
     queue = context.queue;
 
-    context.root_signature = create_texture_root_signature_(__LINE__, device,
+    context.root_signature = create_texture_root_signature_(__FILE__, __LINE__, device,
             D3D12_SHADER_VISIBILITY_PIXEL, 4, 0, &sampler_desc);
 
     heap = create_gpu_descriptor_heap(context.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 6);
@@ -20256,8 +20261,8 @@ static void test_null_vbv(void)
 }
 
 #define check_copyable_footprints(a, b, c, d, e, f, g, h) \
-        check_copyable_footprints_(__LINE__, a, b, c, d, e, f, g, h)
-static void check_copyable_footprints_(unsigned int line, const D3D12_RESOURCE_DESC *desc,
+        check_copyable_footprints_(__FILE__, __LINE__, a, b, c, d, e, f, g, h)
+static void check_copyable_footprints_(const char *file, unsigned int line, const D3D12_RESOURCE_DESC *desc,
         unsigned int sub_resource_idx, unsigned int sub_resource_count, uint64_t base_offset,
         const D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts, const UINT *row_counts,
         const uint64_t *row_sizes, uint64_t *total_size)
@@ -20295,24 +20300,26 @@ static void check_copyable_footprints_(unsigned int line, const D3D12_RESOURCE_D
             const D3D12_SUBRESOURCE_FOOTPRINT *f = &l->Footprint;
 
             todo_if(format_is_ds && l->Offset != base_offset + offset)
-            ok_(line)(l->Offset == base_offset + offset,
+            ok_(file, line)(l->Offset == base_offset + offset,
                     "Got offset %"PRIu64", expected %"PRIu64".\n", l->Offset, base_offset + offset);
             todo_if(format_is_ds)
-            ok_(line)(f->Format == expected_format, "Got format %#x, expected %#x.\n", f->Format, expected_format);
-            ok_(line)(f->Width == width, "Got width %u, expected %u.\n", f->Width, width);
-            ok_(line)(f->Height == height, "Got height %u, expected %u.\n", f->Height, height);
-            ok_(line)(f->Depth == depth, "Got depth %u, expected %u.\n", f->Depth, depth);
+            ok_(file, line)(f->Format == expected_format, "Got format %#x, expected %#x.\n",
+                    f->Format, expected_format);
+            ok_(file, line)(f->Width == width, "Got width %u, expected %u.\n", f->Width, width);
+            ok_(file, line)(f->Height == height, "Got height %u, expected %u.\n", f->Height, height);
+            ok_(file, line)(f->Depth == depth, "Got depth %u, expected %u.\n", f->Depth, depth);
             todo_if(format_is_ds)
-            ok_(line)(f->RowPitch == row_pitch, "Got row pitch %u, expected %u.\n", f->RowPitch, row_pitch);
+            ok_(file, line)(f->RowPitch == row_pitch, "Got row pitch %u, expected %u.\n", f->RowPitch, row_pitch);
         }
 
         if (row_counts)
-            ok_(line)(row_counts[i] == row_count, "Got row count %u, expected %u.\n", row_counts[i], row_count);
+            ok_(file, line)(row_counts[i] == row_count, "Got row count %u, expected %u.\n", row_counts[i], row_count);
 
         if (row_sizes)
         {
             todo_if(format_is_ds && (plane_idx || format_size(desc->Format) > 4))
-            ok_(line)(row_sizes[i] == row_size, "Got row size %"PRIu64", expected %u.\n", row_sizes[i], row_size);
+            ok_(file, line)(row_sizes[i] == row_size, "Got row size %"PRIu64", expected %u.\n",
+                    row_sizes[i], row_size);
         }
 
         size = max(0, row_count - 1) * row_pitch + row_size;
@@ -20325,7 +20332,7 @@ static void check_copyable_footprints_(unsigned int line, const D3D12_RESOURCE_D
     if (total_size)
     {
         todo_if(format_is_ds && *total_size != total)
-        ok_(line)(*total_size == total, "Got total size %"PRIu64", expected %"PRIu64".\n", *total_size, total);
+        ok_(file, line)(*total_size == total, "Got total size %"PRIu64", expected %"PRIu64".\n", *total_size, total);
     }
 }
 
@@ -20771,7 +20778,7 @@ static void test_depth_clip(void)
     command_list = context.list;
     queue = context.queue;
 
-    context.root_signature = create_32bit_constants_root_signature_(__LINE__, context.device,
+    context.root_signature = create_32bit_constants_root_signature_(__FILE__, __LINE__, context.device,
             0, 4, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
     init_depth_stencil(&ds, context.device, 32, 32, 1, 1, DXGI_FORMAT_D32_FLOAT, 0, NULL);
@@ -20904,11 +20911,10 @@ static void test_depth_clip(void)
 }
 
 #define check_depth_stencil_sampling(a, b, c, d, e, f, g, h) \
-        check_depth_stencil_sampling_(__LINE__, a, b, c, d, e, f, g, h)
-static void check_depth_stencil_sampling_(unsigned int line, struct test_context *context,
-        ID3D12PipelineState *pso, ID3D12Resource *cb, ID3D12Resource *texture,
-        D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle, ID3D12DescriptorHeap *srv_heap,
-        float expected_value, bool is_bug)
+        check_depth_stencil_sampling_(__FILE__, __LINE__, a, b, c, d, e, f, g, h)
+static void check_depth_stencil_sampling_(const char *file, unsigned int line,
+        struct test_context *context, ID3D12PipelineState *pso, ID3D12Resource *cb, ID3D12Resource *texture,
+        D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle, ID3D12DescriptorHeap *srv_heap, float expected_value, bool is_bug)
 {
     static const float black[] = {0.0f, 0.0f, 0.0f, 0.0f};
     ID3D12GraphicsCommandList *command_list;
@@ -20940,7 +20946,7 @@ static void check_depth_stencil_sampling_(unsigned int line, struct test_context
     transition_sub_resource_state(command_list, context->render_target, 0,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     bug_if(is_bug)
-    check_sub_resource_float_(line, context->render_target, 0, queue, command_list, expected_value, 2);
+    check_sub_resource_float_(file, line, context->render_target, 0, queue, command_list, expected_value, 2);
 
     reset_command_list(command_list, context->allocator);
     transition_sub_resource_state(command_list, context->render_target, 0,
@@ -20948,7 +20954,7 @@ static void check_depth_stencil_sampling_(unsigned int line, struct test_context
     transition_sub_resource_state(command_list, texture, 0,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     hr = ID3D12GraphicsCommandList_Close(command_list);
-    ok_(line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
+    ok_(file, line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
     exec_command_list(queue, command_list);
     wait_queue_idle(context->device, queue);
 }
@@ -29048,8 +29054,8 @@ struct triangle
     struct vec4 v[3];
 };
 
-#define check_triangles(a, b, c) check_triangles_(__LINE__, a, b, c)
-static void check_triangles_(unsigned int line, struct resource_readback *rb,
+#define check_triangles(a, b, c) check_triangles_(__FILE__, __LINE__, a, b, c)
+static void check_triangles_(const char *file, unsigned int line, struct resource_readback *rb,
         const struct triangle *triangles, unsigned int triangle_count)
 {
     const struct triangle *current, *expected;
@@ -29089,7 +29095,7 @@ static void check_triangles_(unsigned int line, struct resource_readback *rb,
             break;
     }
 
-    ok_(line)(all_match, "Triangle %u vertices {%.8e, %.8e, %.8e, %.8e}, "
+    ok_(file, line)(all_match, "Triangle %u vertices {%.8e, %.8e, %.8e, %.8e}, "
             "{%.8e, %.8e, %.8e, %.8e}, {%.8e, %.8e, %.8e, %.8e} "
             "do not match {%.8e, %.8e, %.8e, %.8e}, {%.8e, %.8e, %.8e, %.8e}, "
             "{%.8e, %.8e, %.8e, %.8e}.\n", i,
@@ -29342,7 +29348,7 @@ static void test_quad_tessellation(void)
     }
     ok(hr == S_OK, "Failed to create query heap, hr %#x.\n", hr);
 
-    context.root_signature = create_32bit_constants_root_signature_(__LINE__,
+    context.root_signature = create_32bit_constants_root_signature_(__FILE__, __LINE__,
             device, 0, 6, D3D12_SHADER_VISIBILITY_HULL,
             D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
             | D3D12_ROOT_SIGNATURE_FLAG_ALLOW_STREAM_OUTPUT);

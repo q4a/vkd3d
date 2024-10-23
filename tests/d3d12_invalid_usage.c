@@ -22,18 +22,18 @@ VKD3D_AGILITY_SDK_EXPORTS
 
 struct test_options test_options = {0};
 
-#define recreate_command_list(a, b, c) recreate_command_list_(__LINE__, a, b, c)
-static void recreate_command_list_(unsigned int line, ID3D12Device *device,
+#define recreate_command_list(a, b, c) recreate_command_list_(__FILE__, __LINE__, a, b, c)
+static void recreate_command_list_(const char *file, unsigned int line, ID3D12Device *device,
         ID3D12CommandAllocator *allocator, ID3D12GraphicsCommandList **command_list)
 {
     HRESULT hr;
 
     hr = ID3D12CommandAllocator_Reset(allocator);
-    ok_(line)(hr == S_OK, "Failed to reset command allocator, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to reset command allocator, hr %#x.\n", hr);
     ID3D12GraphicsCommandList_Release(*command_list);
     hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT,
             allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)command_list);
-    ok_(line)(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
+    ok_(file, line)(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 }
 
 static void test_invalid_resource_barriers(void)

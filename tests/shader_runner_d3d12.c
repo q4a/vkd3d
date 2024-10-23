@@ -120,7 +120,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             if (params->desc.sample_count > 1 && params->desc.level_count > 1)
                 fatal_error("Multisampled texture has multiple levels.\n");
 
-            resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+            resource->resource = create_default_texture_(__FILE__, __LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
                     params->desc.width, params->desc.height, 1, params->desc.level_count, params->desc.sample_count,
                     params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, initial_state);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
@@ -169,9 +169,9 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 if (params->desc.sample_count > 1 && params->desc.level_count > 1)
                     fatal_error("Multisampled texture has multiple levels.\n");
 
-                resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                        params->desc.width, params->desc.height, 1, params->desc.level_count,
-                        params->desc.sample_count, params->desc.format,
+                resource->resource = create_default_texture_(__FILE__, __LINE__, device,
+                        D3D12_RESOURCE_DIMENSION_TEXTURE2D, params->desc.width, params->desc.height, 1,
+                        params->desc.level_count, params->desc.sample_count, params->desc.format,
                         /* Multisampled textures must have ALLOW_RENDER_TARGET set. */
                         (params->desc.sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0, initial_state);
                 if (params->data)
