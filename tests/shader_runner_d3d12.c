@@ -740,10 +740,10 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL, *gs_code = NULL;
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
     ID3D12GraphicsCommandList1 *command_list1 = test_context->list1;
+    unsigned int uniform_index, fb_width, fb_height, rtv_count = 0;
     ID3D12GraphicsCommandList *command_list = test_context->list;
     ID3D12CommandQueue *queue = test_context->queue;
     ID3D12Device *device = test_context->device;
-    unsigned int uniform_index, rtv_count = 0;
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = {0};
     ID3D12PipelineState *pso;
     bool succeeded;
@@ -811,6 +811,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
 
     add_pso(test_context, pso);
 
+    fb_width = ~0u;
+    fb_height = ~0u;
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, test_context->root_signature);
     if (runner->r.uniform_count)
         ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, uniform_index,
@@ -827,10 +829,18 @@ static bool d3d12_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_RENDER_TARGET:
                 rtvs[resource->r.desc.slot] = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.desc.slot);
                 rtv_count = max(rtv_count, resource->r.desc.slot + 1);
+                if (resource->r.desc.width < fb_width)
+                    fb_width = resource->r.desc.width;
+                if (resource->r.desc.height < fb_height)
+                    fb_height = resource->r.desc.height;
                 break;
 
             case RESOURCE_TYPE_DEPTH_STENCIL:
                 dsv = get_cpu_dsv_handle(test_context, runner->dsv_heap, 0);
+                if (resource->r.desc.width < fb_width)
+                    fb_width = resource->r.desc.width;
+                if (resource->r.desc.height < fb_height)
+                    fb_height = resource->r.desc.height;
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
@@ -859,7 +869,9 @@ static bool d3d12_runner_draw(struct shader_runner *r,
 
     if (runner->r.depth_bounds)
         ID3D12GraphicsCommandList1_OMSetDepthBounds(command_list1, runner->r.depth_min, runner->r.depth_max);
+    set_rect(&test_context->scissor_rect, 0, 0, fb_width, fb_height);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &test_context->scissor_rect);
+    set_viewport(&test_context->viewport, 0.0f, 0.0f, fb_width, fb_height, 0.0f, 1.0f);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &test_context->viewport);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, primitive_topology);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);

@@ -59,6 +59,7 @@ struct vulkan_shader_runner
 
     ID3D10Blob *d3d_blobs[SHADER_TYPE_COUNT];
     struct vkd3d_shader_scan_signature_info signatures[SHADER_TYPE_COUNT];
+    VkExtent2D rt_size;
 
     struct vulkan_sampler
     {
@@ -570,15 +571,15 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkPipelineVertexInputStateCreateInfo input_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
     VkPipelineColorBlendStateCreateInfo blend_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
     VkPipelineMultisampleStateCreateInfo ms_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-    VkViewport viewport = {.y = RENDER_TARGET_HEIGHT,
-            .width = RENDER_TARGET_WIDTH, .height = -RENDER_TARGET_HEIGHT, .maxDepth = 1};
     VkPipelineViewportStateCreateInfo vp_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-    static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
     VkGraphicsPipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+    VkViewport viewport = {.y = runner->rt_size.height, .width = runner->rt_size.width,
+            .height = -(float)runner->rt_size.height, .maxDepth = 1};
     VkPipelineColorBlendAttachmentState attachment_desc[MAX_RESOURCES] = {0};
     const struct vulkan_test_context *context = &runner->context;
     VkPipelineTessellationStateCreateInfo tessellation_info;
     VkVertexInputAttributeDescription input_attributes[32];
+    const VkRect2D rt_rect = {.extent = runner->rt_size};
     VkPipelineDepthStencilStateCreateInfo ds_desc = {0};
     VkVertexInputBindingDescription input_bindings[32];
     VkPipelineShaderStageCreateInfo stage_desc[5];
@@ -996,6 +997,8 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
     VkImageLayout layout;
     bool is_ds;
 
+    runner->rt_size.width = ~0u;
+    runner->rt_size.height = ~0u;
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         const struct vulkan_resource *resource = vulkan_resource(runner->r.resources[i]);
@@ -1030,6 +1033,11 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
             ++color_ref_count;
         }
 
+        if (resource->r.desc.width < runner->rt_size.width)
+            runner->rt_size.width = resource->r.desc.width;
+        if (resource->r.desc.height < runner->rt_size.height)
+            runner->rt_size.height = resource->r.desc.height;
+
         views[view_count++] = resource->image_view;
     }
 
@@ -1047,8 +1055,8 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
     fb_desc.renderPass = *render_pass;
     fb_desc.attachmentCount = view_count;
     fb_desc.pAttachments = views;
-    fb_desc.width = RENDER_TARGET_WIDTH;
-    fb_desc.height = RENDER_TARGET_HEIGHT;
+    fb_desc.width = runner->rt_size.width;
+    fb_desc.height = runner->rt_size.height;
     fb_desc.layers = 1;
 
     VK_CALL(vkCreateFramebuffer(context->device, &fb_desc, NULL, fb));
@@ -1206,8 +1214,6 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     bool ret = false;
     unsigned int i;
 
-    static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
-
     create_render_pass_and_framebuffer(runner, &render_pass, &fb);
 
     /* Create this before compiling shaders, it will assign resource bindings. */
@@ -1221,7 +1227,7 @@ static bool vulkan_runner_draw(struct shader_runner *r,
 
     pass_begin_desc.renderPass = render_pass;
     pass_begin_desc.framebuffer = fb;
-    pass_begin_desc.renderArea = rt_rect;
+    pass_begin_desc.renderArea.extent = runner->rt_size;
 
     VK_CALL(vkCmdBeginRenderPass(cmd_buffer, &pass_begin_desc, VK_SUBPASS_CONTENTS_INLINE));
 

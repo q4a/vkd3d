@@ -1038,8 +1038,8 @@ static void gl_runner_clear(struct shader_runner *r, struct resource *res, const
 static bool gl_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY topology, unsigned int vertex_count, unsigned int instance_count)
 {
+    unsigned int attribute_idx, fb_width, fb_height, rt_count, i, j;
     struct vkd3d_shader_signature vs_input_signature;
-    unsigned int attribute_idx, rt_count, i, j;
     struct gl_runner *runner = gl_runner(r);
     struct vkd3d_shader_code vs_dxbc;
     uint8_t *attribute_offsets[32];
@@ -1123,6 +1123,8 @@ static bool gl_runner_draw(struct shader_runner *r,
         glBindSampler(s->binding.binding, sampler_info[sampler - r->samplers].id);
     }
 
+    fb_width = ~0u;
+    fb_height = ~0u;
     memset(vbo_info, 0, sizeof(vbo_info));
     memset(draw_buffers, 0, sizeof(draw_buffers));
     for (i = 0, rt_count = 0; i < runner->r.resource_count; ++i)
@@ -1138,6 +1140,10 @@ static bool gl_runner_draw(struct shader_runner *r,
                 draw_buffers[resource->r.desc.slot] = GL_COLOR_ATTACHMENT0 + resource->r.desc.slot;
                 if (resource->r.desc.slot >= rt_count)
                     rt_count = resource->r.desc.slot + 1;
+                if (resource->r.desc.width < fb_width)
+                    fb_width = resource->r.desc.width;
+                if (resource->r.desc.height < fb_height)
+                    fb_height = resource->r.desc.height;
                 break;
 
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -1150,6 +1156,10 @@ static bool gl_runner_draw(struct shader_runner *r,
                     glEnable(GL_DEPTH_BOUNDS_TEST_EXT);
                     p_glDepthBoundsEXT(runner->r.depth_min, runner->r.depth_max);
                 }
+                if (resource->r.desc.width < fb_width)
+                    fb_width = resource->r.desc.width;
+                if (resource->r.desc.height < fb_height)
+                    fb_height = resource->r.desc.height;
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
@@ -1185,8 +1195,8 @@ static bool gl_runner_draw(struct shader_runner *r,
 
     glEnable(GL_SAMPLE_MASK);
     glSampleMaski(0, runner->r.sample_mask);
-    glViewport(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
-    glScissor(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
+    glViewport(0, 0, fb_width, fb_height);
+    glScissor(0, 0, fb_width, fb_height);
     glDrawBuffers(rt_count, draw_buffers);
 
     vs_dxbc.code = ID3D10Blob_GetBufferPointer(vs_blob);

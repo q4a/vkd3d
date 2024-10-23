@@ -57,6 +57,22 @@ static struct d3d9_shader_runner *d3d9_shader_runner(struct shader_runner *r)
 
 static IDirect3D9 *(WINAPI *pDirect3DCreate9)(UINT sdk_version);
 
+static HRESULT set_viewport(IDirect3DDevice9 *device, unsigned int x, unsigned int y,
+        unsigned int width, unsigned int height, float min_depth, float max_depth)
+{
+    D3DVIEWPORT9 vp =
+    {
+        .X = x,
+        .Y = y,
+        .Width = width,
+        .Height = height,
+        .MinZ = min_depth,
+        .MaxZ = max_depth,
+    };
+
+    return IDirect3DDevice9_SetViewport(device, &vp);
+}
+
 static void init_adapter_info(void)
 {
     D3DADAPTER_IDENTIFIER9 identifier;
@@ -329,11 +345,11 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
     IDirect3DVertexDeclaration9 *vertex_declaration;
     IDirect3DDevice9 *device = runner->device;
+    unsigned int fb_width, fb_height, i, j;
     D3DVERTEXELEMENT9 *decl_elements;
     ID3D10Blob *vs_code, *ps_code;
     IDirect3DVertexShader9 *vs;
     IDirect3DPixelShader9 *ps;
-    unsigned int i, j;
     HRESULT hr;
 
     if (instance_count > 1)
@@ -375,6 +391,8 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     }
     decl_elements[runner->r.input_element_count] = decl_element_end;
 
+    fb_width = ~0u;
+    fb_height = ~0u;
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         struct d3d9_resource *resource = d3d9_resource(runner->r.resources[i]);
@@ -385,6 +403,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_RENDER_TARGET:
                 hr = IDirect3DDevice9_SetRenderTarget(device, resource->r.desc.slot, resource->surface);
                 ok(hr == D3D_OK, "Failed to set render target, hr %#lx.\n", hr);
+                if (resource->r.desc.width < fb_width)
+                    fb_width = resource->r.desc.width;
+                if (resource->r.desc.height < fb_height)
+                    fb_height = resource->r.desc.height;
                 break;
 
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -415,6 +437,9 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 break;
         }
     }
+
+    hr = set_viewport(device, 0, 0, fb_width, fb_height, 0.0f, 1.0f);
+    ok(hr == D3D_OK, "Failed to set viewport, hr %#lx.\n", hr);
 
     for (i = 0; i < runner->r.sampler_count; ++i)
     {

@@ -75,6 +75,22 @@ static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct d3d11_shader_runner, r);
 }
 
+static void set_viewport(ID3D11DeviceContext *context, float x, float y,
+        float width, float height, float min_depth, float max_depth)
+{
+    D3D11_VIEWPORT vp =
+    {
+        .TopLeftX = x,
+        .TopLeftY = y,
+        .Width = width,
+        .Height = height,
+        .MinDepth = min_depth,
+        .MaxDepth = max_depth,
+    };
+
+    ID3D11DeviceContext_RSSetViewports(context, 1, &vp);
+}
+
 static IDXGIAdapter *create_adapter(void)
 {
     IDXGIFactory4 *factory4;
@@ -247,7 +263,6 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
     D3D11_FEATURE_DATA_DOUBLES doubles = {0};
     unsigned int rt_width, rt_height;
     D3D11_RASTERIZER_DESC rs_desc;
-    D3D11_VIEWPORT vp;
     HRESULT hr;
     RECT rect;
 
@@ -310,13 +325,7 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
 
     ID3D11Device_GetImmediateContext(runner->device, &runner->immediate_context);
 
-    vp.TopLeftX = 0.0f;
-    vp.TopLeftY = 0.0f;
-    vp.Width = rt_width;
-    vp.Height = rt_height;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    ID3D11DeviceContext_RSSetViewports(runner->immediate_context, 1, &vp);
+    set_viewport(runner->immediate_context, 0.0f, 0.0f, rt_width, rt_height, 0.0f, 1.0f);
 
     rs_desc.FillMode = D3D11_FILL_SOLID;
     rs_desc.CullMode = D3D11_CULL_NONE;
@@ -670,12 +679,12 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     ID3D11RenderTargetView *rtvs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11DeviceContext *context = runner->immediate_context;
+    unsigned int fb_width, fb_height, rtv_count = 0;
     unsigned int min_uav_slot = ARRAY_SIZE(uavs);
     ID3D11DepthStencilState *ds_state = NULL;
     D3D11_DEPTH_STENCIL_DESC ds_desc = {0};
     ID3D11Device *device = runner->device;
     ID3D11DepthStencilView *dsv = NULL;
-    unsigned int rtv_count = 0;
     ID3D11GeometryShader *gs;
     ID3D11Buffer *cb = NULL;
     ID3D11VertexShader *vs;
@@ -770,6 +779,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
             ID3D11DeviceContext_GSSetConstantBuffers(context, 0, 1, &cb);
     }
 
+    fb_width = ~0u;
+    fb_height = ~0u;
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         struct d3d11_resource *resource = d3d11_resource(runner->r.resources[i]);
@@ -781,6 +792,10 @@ static bool d3d11_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_RENDER_TARGET:
                 rtvs[resource->r.desc.slot] = resource->rtv;
                 rtv_count = max(rtv_count, resource->r.desc.slot + 1);
+                if (resource->r.desc.width < fb_width)
+                    fb_width = resource->r.desc.width;
+                if (resource->r.desc.height < fb_height)
+                    fb_height = resource->r.desc.height;
                 break;
 
             case RESOURCE_TYPE_DEPTH_STENCIL:
@@ -791,6 +806,10 @@ static bool d3d11_runner_draw(struct shader_runner *r,
                 hr = ID3D11Device_CreateDepthStencilState(device, &ds_desc, &ds_state);
                 ok(hr == S_OK, "Failed to create depth/stencil state, hr %#lx.\n", hr);
                 ID3D11DeviceContext_OMSetDepthStencilState(context, ds_state, 0);
+                if (resource->r.desc.width < fb_width)
+                    fb_width = resource->r.desc.width;
+                if (resource->r.desc.height < fb_height)
+                    fb_height = resource->r.desc.height;
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
@@ -862,6 +881,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     if (gs_code)
         ID3D11DeviceContext_GSSetShader(context, gs, NULL, 0);
     ID3D11DeviceContext_RSSetState(context, runner->rasterizer_state);
+    set_viewport(context, 0.0f, 0.0f, fb_width, fb_height, 0.0f, 1.0f);
 
     ID3D11DeviceContext_DrawInstanced(context, vertex_count, instance_count, 0, 0);
 
