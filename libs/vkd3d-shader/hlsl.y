@@ -6201,27 +6201,26 @@ static const struct method_function
     const char *name;
     bool (*handler)(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
             const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc);
-    bool valid_dims[HLSL_SAMPLER_DIM_MAX + 1];
+    char valid_dims[HLSL_SAMPLER_DIM_MAX + 1];
 }
 object_methods[] =
 {
-                                                        /*  g c   1d  2d  3d  cube  1darr  2darr  2dms  2dmsarr  cubearr  buff  sbuff*/
-    { "Gather",             add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
-    { "GatherAlpha",        add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
-    { "GatherBlue",         add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
-    { "GatherGreen",        add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
-    { "GatherRed",          add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
+    { "Gather",             add_gather_method_call,        "0001010100100" },
+    { "GatherAlpha",        add_gather_method_call,        "0001010100100" },
+    { "GatherBlue",         add_gather_method_call,        "0001010100100" },
+    { "GatherGreen",        add_gather_method_call,        "0001010100100" },
+    { "GatherRed",          add_gather_method_call,        "0001010100100" },
 
-    { "GetDimensions",      add_getdimensions_method_call, {0,0,  1,  1,  1,  1,    1,     1,     1,    1,       1,       1,    1}},
+    { "GetDimensions",      add_getdimensions_method_call, "0011111111111" },
 
-    { "Load",               add_load_method_call,          {0,0,  1,  1,  1,  0,    1,     1,     1,    1,       0,       1,    1}},
+    { "Load",               add_load_method_call,          "0011101111011" },
 
-    { "Sample",             add_sample_method_call,        {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
-    { "SampleBias",         add_sample_lod_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
-    { "SampleCmp",          add_sample_cmp_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
-    { "SampleCmpLevelZero", add_sample_cmp_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
-    { "SampleGrad",         add_sample_grad_method_call,   {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
-    { "SampleLevel",        add_sample_lod_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
+    { "Sample",             add_sample_method_call,        "0011111100100" },
+    { "SampleBias",         add_sample_lod_method_call,    "0011111100100" },
+    { "SampleCmp",          add_sample_cmp_method_call,    "0011111100100" },
+    { "SampleCmpLevelZero", add_sample_cmp_method_call,    "0011111100100" },
+    { "SampleGrad",         add_sample_grad_method_call,   "0011111100100" },
+    { "SampleLevel",        add_sample_lod_method_call,    "0011111100100" },
 };
 
 static int object_method_function_name_compare(const void *a, const void *b)
@@ -6266,7 +6265,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
     method = bsearch(name, object_methods, ARRAY_SIZE(object_methods), sizeof(*method),
             object_method_function_name_compare);
 
-    if (method && method->valid_dims[object_type->sampler_dim])
+    if (method && method->valid_dims[object_type->sampler_dim] == '1')
     {
         return method->handler(ctx, block, object, name, params, loc);
     }
