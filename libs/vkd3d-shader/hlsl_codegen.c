@@ -4567,38 +4567,38 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
         unsigned int first_write, unsigned int last_read, unsigned int reg_size,
         unsigned int component_count, int mode, bool force_align)
 {
+    struct hlsl_reg ret = {.allocation_size = 1, .allocated = true};
     unsigned int required_size = force_align ? 4 : reg_size;
-    unsigned int writemask = 0, pref;
-    struct hlsl_reg ret = {0};
-    uint32_t reg_idx;
+    unsigned int pref;
 
     VKD3D_ASSERT(component_count <= reg_size);
 
     pref = allocator->prioritize_smaller_writemasks ? 4 : required_size;
     for (; pref >= required_size; --pref)
     {
-        for (reg_idx = 0; pref == required_size || reg_idx < allocator->reg_count; ++reg_idx)
+        for (uint32_t reg_idx = 0; reg_idx < allocator->reg_count; ++reg_idx)
         {
             unsigned int available_writemask = get_available_writemask(allocator,
                     first_write, last_read, reg_idx, mode);
 
             if (vkd3d_popcount(available_writemask) >= pref)
             {
-                writemask = hlsl_combine_writemasks(available_writemask, (1u << reg_size) - 1);
-                break;
+                unsigned int writemask = hlsl_combine_writemasks(available_writemask,
+                        vkd3d_write_mask_from_component_count(reg_size));
+
+                ret.id = reg_idx;
+                ret.writemask = hlsl_combine_writemasks(writemask,
+                        vkd3d_write_mask_from_component_count(component_count));
+                record_allocation(ctx, allocator, reg_idx, writemask, first_write, last_read, mode);
+                return ret;
             }
         }
-        if (writemask)
-            break;
     }
 
-    VKD3D_ASSERT(vkd3d_popcount(writemask) == reg_size);
-    record_allocation(ctx, allocator, reg_idx, writemask, first_write, last_read, mode);
-
-    ret.id = reg_idx;
-    ret.allocation_size = 1;
-    ret.writemask = hlsl_combine_writemasks(writemask, (1u << component_count) - 1);
-    ret.allocated = true;
+    ret.id = allocator->reg_count;
+    ret.writemask = vkd3d_write_mask_from_component_count(component_count);
+    record_allocation(ctx, allocator, allocator->reg_count,
+            vkd3d_write_mask_from_component_count(reg_size), first_write, last_read, mode);
     return ret;
 }
 
