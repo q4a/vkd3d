@@ -244,8 +244,7 @@ void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2)
 
 unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot);
 void init_resource(struct resource *resource, const struct resource_params *params);
-HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type,
-        unsigned int compile_options, const char *hlsl, ID3D10Blob **blob_out);
+ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type type);
 struct sampler *shader_runner_get_sampler(struct shader_runner *runner, unsigned int slot);
 struct resource *shader_runner_get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot);
 

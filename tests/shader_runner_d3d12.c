@@ -63,45 +63,6 @@ static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct d3d12_shader_runner, r);
 }
 
-static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, enum shader_type type)
-{
-    const char *source = runner->r.shader_source[type];
-    ID3D10Blob *blob = NULL, *errors = NULL;
-    char profile[7];
-    HRESULT hr;
-
-    static const char *const shader_models[] =
-    {
-        [SHADER_MODEL_2_0] = "4_0",
-        [SHADER_MODEL_3_0] = "4_0",
-        [SHADER_MODEL_4_0] = "4_0",
-        [SHADER_MODEL_4_1] = "4_1",
-        [SHADER_MODEL_5_0] = "5_0",
-        [SHADER_MODEL_5_1] = "5_1",
-        [SHADER_MODEL_6_0] = "6_0",
-    };
-
-    if (runner->r.minimum_shader_model >= SHADER_MODEL_6_0)
-    {
-        assert(runner->r.dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->r.dxc_compiler, type, runner->r.compile_options, source, &blob);
-    }
-    else
-    {
-        sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->r.minimum_shader_model]);
-        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main",
-                profile, runner->r.compile_options, 0, &blob, &errors);
-    }
-    ok(FAILED(hr) == !blob, "Got unexpected hr %#x, blob %p.\n", hr, blob);
-    if (errors)
-    {
-        if (vkd3d_test_state.debug_level)
-            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-        ID3D10Blob_Release(errors);
-    }
-    return blob;
-}
-
 #define MAX_RESOURCE_DESCRIPTORS (MAX_RESOURCES * 2)
 
 static struct resource *d3d12_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
@@ -395,7 +356,7 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     HRESULT hr;
     size_t i;
 
-    cs_code = compile_shader(runner, SHADER_TYPE_CS);
+    cs_code = compile_hlsl(&runner->r, SHADER_TYPE_CS);
     todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0) ok(cs_code, "Failed to compile shader.\n");
     if (!cs_code)
         return false;
@@ -789,23 +750,23 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     HRESULT hr;
     size_t i;
 
-    ps_code = compile_shader(runner, SHADER_TYPE_PS);
-    vs_code = compile_shader(runner, SHADER_TYPE_VS);
+    ps_code = compile_hlsl(&runner->r, SHADER_TYPE_PS);
+    vs_code = compile_hlsl(&runner->r, SHADER_TYPE_VS);
     succeeded = ps_code && vs_code;
 
     if (runner->r.shader_source[SHADER_TYPE_HS])
     {
-        hs_code = compile_shader(runner, SHADER_TYPE_HS);
+        hs_code = compile_hlsl(&runner->r, SHADER_TYPE_HS);
         succeeded = succeeded && hs_code;
     }
     if (runner->r.shader_source[SHADER_TYPE_DS])
     {
-        ds_code = compile_shader(runner, SHADER_TYPE_DS);
+        ds_code = compile_hlsl(&runner->r, SHADER_TYPE_DS);
         succeeded = succeeded && ds_code;
     }
     if (runner->r.shader_source[SHADER_TYPE_GS])
     {
-        gs_code = compile_shader(runner, SHADER_TYPE_GS);
+        gs_code = compile_hlsl(&runner->r, SHADER_TYPE_GS);
         succeeded = succeeded && gs_code;
     }
 

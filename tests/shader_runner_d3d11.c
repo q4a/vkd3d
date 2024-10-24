@@ -75,35 +75,6 @@ static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct d3d11_shader_runner, r);
 }
 
-static ID3D10Blob *compile_shader(const struct d3d11_shader_runner *runner, enum shader_type type)
-{
-    const char *source = runner->r.shader_source[type];
-    ID3D10Blob *blob = NULL, *errors = NULL;
-    char profile[7];
-    HRESULT hr;
-
-    static const char *const shader_models[] =
-    {
-        [SHADER_MODEL_2_0] = "4_0",
-        [SHADER_MODEL_3_0] = "4_0",
-        [SHADER_MODEL_4_0] = "4_0",
-        [SHADER_MODEL_4_1] = "4_1",
-        [SHADER_MODEL_5_0] = "5_0",
-        [SHADER_MODEL_5_1] = "5_1",
-    };
-
-    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->r.minimum_shader_model]);
-    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, runner->r.compile_options, 0, &blob, &errors);
-    ok(hr == S_OK, "Failed to compile shader, hr %#lx.\n", hr);
-    if (errors)
-    {
-        if (vkd3d_test_state.debug_level)
-            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-        ID3D10Blob_Release(errors);
-    }
-    return blob;
-}
-
 static IDXGIAdapter *create_adapter(void)
 {
     IDXGIFactory4 *factory4;
@@ -614,7 +585,7 @@ static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     HRESULT hr;
     size_t i;
 
-    if (!(cs_code = compile_shader(runner, SHADER_TYPE_CS)))
+    if (!(cs_code = compile_hlsl(&runner->r, SHADER_TYPE_CS)))
         return false;
 
     hr = ID3D11Device_CreateComputeShader(device, ID3D10Blob_GetBufferPointer(cs_code),
@@ -715,23 +686,23 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     unsigned int i;
     HRESULT hr;
 
-    vs_code = compile_shader(runner, SHADER_TYPE_VS);
-    ps_code = compile_shader(runner, SHADER_TYPE_PS);
+    vs_code = compile_hlsl(&runner->r, SHADER_TYPE_VS);
+    ps_code = compile_hlsl(&runner->r, SHADER_TYPE_PS);
     succeeded = vs_code && ps_code;
 
     if (runner->r.shader_source[SHADER_TYPE_HS])
     {
-        hs_code = compile_shader(runner, SHADER_TYPE_HS);
+        hs_code = compile_hlsl(&runner->r, SHADER_TYPE_HS);
         succeeded = succeeded && hs_code;
     }
     if (runner->r.shader_source[SHADER_TYPE_DS])
     {
-        ds_code = compile_shader(runner, SHADER_TYPE_DS);
+        ds_code = compile_hlsl(&runner->r, SHADER_TYPE_DS);
         succeeded = succeeded && ds_code;
     }
     if (runner->r.shader_source[SHADER_TYPE_GS])
     {
-        gs_code = compile_shader(runner, SHADER_TYPE_GS);
+        gs_code = compile_hlsl(&runner->r, SHADER_TYPE_GS);
         succeeded = succeeded && gs_code;
     }
 

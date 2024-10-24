@@ -533,32 +533,6 @@ static void gl_runner_destroy_resource(struct shader_runner *r, struct resource 
     free(resource);
 }
 
-static ID3DBlob *compile_hlsl(const struct shader_runner *runner, enum shader_type type)
-{
-    const char *source = runner->shader_source[type];
-    ID3DBlob *blob = NULL, *errors = NULL;
-    char profile[7];
-
-    static const char *const shader_models[] =
-    {
-        [SHADER_MODEL_4_0] = "4_0",
-        [SHADER_MODEL_4_1] = "4_1",
-        [SHADER_MODEL_5_0] = "5_0",
-        [SHADER_MODEL_5_1] = "5_1",
-    };
-
-    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
-    D3DCompile(source, strlen(source), NULL, NULL, NULL, "main",
-            profile, runner->compile_options, 0, &blob, &errors);
-    if (errors)
-    {
-        trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-        ID3D10Blob_Release(errors);
-    }
-
-    return blob;
-}
-
 static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3d_shader_code *out)
 {
     struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};

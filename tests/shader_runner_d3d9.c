@@ -57,31 +57,6 @@ static struct d3d9_shader_runner *d3d9_shader_runner(struct shader_runner *r)
 
 static IDirect3D9 *(WINAPI *pDirect3DCreate9)(UINT sdk_version);
 
-static ID3D10Blob *compile_shader(const struct d3d9_shader_runner *runner, enum shader_type type)
-{
-    const char *source = runner->r.shader_source[type];
-    ID3D10Blob *blob = NULL, *errors = NULL;
-    char profile[7];
-    HRESULT hr;
-
-    static const char *const shader_models[] =
-    {
-        [SHADER_MODEL_2_0] = "2_0",
-        [SHADER_MODEL_3_0] = "3_0",
-    };
-
-    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->r.minimum_shader_model]);
-    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, runner->r.compile_options, 0, &blob, &errors);
-    ok(hr == S_OK, "Failed to compile shader, hr %#lx.\n", hr);
-    if (errors)
-    {
-        if (vkd3d_test_state.debug_level)
-            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-        ID3D10Blob_Release(errors);
-    }
-    return blob;
-}
-
 static void init_adapter_info(void)
 {
     D3DADAPTER_IDENTIFIER9 identifier;
@@ -362,10 +337,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     if (instance_count > 1)
         fatal_error("Unhandled instance count %u.\n", instance_count);
 
-    if (!(vs_code = compile_shader(runner, SHADER_TYPE_VS)))
+    if (!(vs_code = compile_hlsl(&runner->r, SHADER_TYPE_VS)))
         return false;
 
-    if (!(ps_code = compile_shader(runner, SHADER_TYPE_PS)))
+    if (!(ps_code = compile_hlsl(&runner->r, SHADER_TYPE_PS)))
     {
         ID3D10Blob_Release(vs_code);
         return false;

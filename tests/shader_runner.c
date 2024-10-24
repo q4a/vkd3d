@@ -1445,7 +1445,7 @@ static HRESULT d3d10_blob_from_vkd3d_shader_code(const struct vkd3d_shader_code 
     return S_OK;
 }
 
-HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type,
+static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type,
         unsigned int compile_options, const char *hlsl, ID3D10Blob **blob_out)
 {
     struct vkd3d_shader_code blob;
@@ -1470,6 +1470,49 @@ HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type,
     free((void *)blob.code);
 
     return hr;
+}
+
+ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type type)
+{
+    const char *source = runner->shader_source[type];
+    ID3D10Blob *blob = NULL, *errors = NULL;
+    char profile[7];
+    HRESULT hr;
+
+    static const char *const shader_models[] =
+    {
+        [SHADER_MODEL_2_0] = "2_0",
+        [SHADER_MODEL_3_0] = "3_0",
+        [SHADER_MODEL_4_0] = "4_0",
+        [SHADER_MODEL_4_1] = "4_1",
+        [SHADER_MODEL_5_0] = "5_0",
+        [SHADER_MODEL_5_1] = "5_1",
+        [SHADER_MODEL_6_0] = "6_0",
+    };
+
+    if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
+    {
+        assert(runner->dxc_compiler);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->compile_options, source, &blob);
+    }
+    else
+    {
+        sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
+        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main",
+                profile, runner->compile_options, 0, &blob, &errors);
+    }
+    if (hr != S_OK)
+    {
+        todo_if (runner->is_todo)
+            ok(false, "Failed to compile shader, hr %#x.\n", hr);
+    }
+    if (errors)
+    {
+        if (vkd3d_test_state.debug_level)
+            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+        ID3D10Blob_Release(errors);
+    }
+    return blob;
 }
 
 static void compile_shader(struct shader_runner *runner, const char *source, size_t len,
