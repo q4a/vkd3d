@@ -206,6 +206,8 @@ struct shader_runner
     struct input_element *input_elements;
     size_t input_element_count, input_element_capacity;
 
+    IDxcCompiler3 *dxc_compiler;
+
     unsigned int compile_options;
 
     D3D12_COMPARISON_FUNC depth_func;

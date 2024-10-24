@@ -1472,7 +1472,7 @@ HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type,
     return hr;
 }
 
-static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_compiler, const char *source, size_t len,
+static void compile_shader(struct shader_runner *runner, const char *source, size_t len,
         enum shader_type type, HRESULT expect)
 {
     bool use_dxcompiler = runner->minimum_shader_model >= SHADER_MODEL_6_0;
@@ -1501,8 +1501,8 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
 
     if (use_dxcompiler)
     {
-        assert(dxc_compiler);
-        hr = dxc_compiler_compile_shader(dxc_compiler, type, runner->compile_options, source, &blob);
+        assert(runner->dxc_compiler);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->compile_options, source, &blob);
     }
     else
     {
@@ -1751,6 +1751,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     memset(runner, 0, sizeof(*runner));
     runner->ops = ops;
     runner->caps = caps;
+    runner->dxc_compiler = dxc_compiler;
     runner->minimum_shader_model = caps->minimum_shader_model;
     runner->maximum_shader_model = caps->maximum_shader_model;
     runner->alpha_test_func = VKD3D_SHADER_COMPARISON_FUNC_ALWAYS;
@@ -1820,8 +1821,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_COMPUTE_TODO)
-                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_CS,
-                                expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_CS, expect_hr);
                     }
                     free(runner->shader_source[SHADER_TYPE_CS]);
                     runner->shader_source[SHADER_TYPE_CS] = shader_source;
@@ -1835,8 +1835,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_PIXEL_TODO)
-                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_PS,
-                                expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_PS, expect_hr);
                     }
                     free(runner->shader_source[SHADER_TYPE_PS]);
                     runner->shader_source[SHADER_TYPE_PS] = shader_source;
@@ -1850,8 +1849,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_VERTEX_TODO)
-                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_VS,
-                                expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_VS, expect_hr);
                     }
                     free(runner->shader_source[SHADER_TYPE_VS]);
                     runner->shader_source[SHADER_TYPE_VS] = shader_source;
@@ -1865,8 +1863,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_EFFECT_TODO)
-                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_FX,
-                                expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_FX, expect_hr);
                     }
                     free(runner->shader_source[SHADER_TYPE_FX]);
                     runner->shader_source[SHADER_TYPE_FX] = shader_source;
@@ -1880,8 +1877,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_HULL_TODO)
-                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_HS,
-                                expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_HS, expect_hr);
                     }
                     free(runner->shader_source[SHADER_TYPE_HS]);
                     runner->shader_source[SHADER_TYPE_HS] = shader_source;
@@ -1895,8 +1891,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_DOMAIN_TODO)
-                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_DS,
-                                expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_DS, expect_hr);
                     }
                     free(runner->shader_source[SHADER_TYPE_DS]);
                     runner->shader_source[SHADER_TYPE_DS] = shader_source;
@@ -1910,8 +1905,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
                     {
                         todo_if (state == STATE_SHADER_GEOMETRY_TODO)
-                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_GS,
-                                expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_GS, expect_hr);
                     }
                     free(runner->shader_source[SHADER_TYPE_GS]);
                     runner->shader_source[SHADER_TYPE_GS] = shader_source;

@@ -56,8 +56,6 @@ struct d3d12_shader_runner
     ID3D12CommandQueue *compute_queue;
     ID3D12CommandAllocator *compute_allocator;
     ID3D12GraphicsCommandList *compute_list;
-
-    IDxcCompiler3 *dxc_compiler;
 };
 
 static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
@@ -85,8 +83,8 @@ static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, enum
 
     if (runner->r.minimum_shader_model >= SHADER_MODEL_6_0)
     {
-        assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->r.compile_options, source, &blob);
+        assert(runner->r.dxc_compiler);
+        hr = dxc_compiler_compile_shader(runner->r.dxc_compiler, type, runner->r.compile_options, source, &blob);
     }
     else
     {
@@ -1094,8 +1092,6 @@ static void run_shader_tests_for_model_range(void *dxc_compiler,
     }
 
     d3d12_runner_init_caps(&runner, minimum_shader_model, maximum_shader_model);
-
-    runner.dxc_compiler = dxc_compiler;
 
     runner.compute_queue = create_command_queue(device,
             D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
