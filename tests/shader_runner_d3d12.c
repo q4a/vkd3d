@@ -65,15 +65,28 @@ static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
 
 #define MAX_RESOURCE_DESCRIPTORS (MAX_RESOURCES * 2)
 
+static D3D12_RESOURCE_STATES resource_get_state(struct resource *r)
+{
+    if (r->desc.type == RESOURCE_TYPE_RENDER_TARGET)
+        return D3D12_RESOURCE_STATE_RENDER_TARGET;
+    if (r->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    if (r->desc.type == RESOURCE_TYPE_TEXTURE)
+        return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (r->desc.type == RESOURCE_TYPE_UAV)
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    return D3D12_RESOURCE_STATE_GENERIC_READ;
+}
+
 static struct resource *d3d12_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
     ID3D12Device *device = test_context->device;
     D3D12_SUBRESOURCE_DATA resource_data[3] = {0};
+    D3D12_RESOURCE_STATES initial_state, state;
     struct d3d12_resource *resource;
     unsigned int buffer_offset = 0;
-    D3D12_RESOURCE_STATES state;
 
     if (params->desc.level_count > ARRAY_SIZE(resource_data))
         fatal_error("Level count %u is too high.\n", params->desc.level_count);
@@ -92,6 +105,9 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
         buffer_offset += resource_data[level].SlicePitch;
     }
 
+    state = resource_get_state(&resource->r);
+    initial_state = params->data ? D3D12_RESOURCE_STATE_COPY_DEST : state;
+
     switch (params->desc.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
@@ -105,8 +121,8 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 fatal_error("Multisampled texture has multiple levels.\n");
 
             resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                    params->desc.width, params->desc.height, 1, params->desc.level_count, params->desc.sample_count, params->desc.format,
-                    D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+                    params->desc.width, params->desc.height, 1, params->desc.level_count, params->desc.sample_count,
+                    params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, initial_state);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
                     NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.desc.slot));
             break;
@@ -115,8 +131,9 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             if (!runner->dsv_heap)
                 runner->dsv_heap = create_cpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
 
-            resource->resource = create_default_texture2d(device, params->desc.width, params->desc.height, 1, params->desc.level_count,
-                    params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+            resource->resource = create_default_texture2d(device, params->desc.width,
+                    params->desc.height, 1, params->desc.level_count, params->desc.format,
+                    D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, initial_state);
             ID3D12Device_CreateDepthStencilView(device, resource->resource,
                     NULL, get_cpu_dsv_handle(test_context, runner->dsv_heap, 0));
             break;
@@ -130,13 +147,13 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             {
                 D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = { 0 };
 
-                resource->resource = create_default_buffer(device, params->data_size,
-                        0, D3D12_RESOURCE_STATE_COPY_DEST);
-                upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data[0].pData,
-                        test_context->queue, test_context->list,
-                        RESOURCE_STATE_DO_NOT_CHANGE,
-                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                reset_command_list(test_context->list, test_context->allocator);
+                resource->resource = create_default_buffer(device, params->data_size, 0, initial_state);
+                if (params->data)
+                {
+                    upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data[0].pData,
+                            test_context->queue, test_context->list, RESOURCE_STATE_DO_NOT_CHANGE, state);
+                    reset_command_list(test_context->list, test_context->allocator);
+                }
 
                 srv_desc.Format = params->desc.format;
                 srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -152,19 +169,16 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                     fatal_error("Multisampled texture has multiple levels.\n");
 
                 resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                        params->desc.width, params->desc.height, 1, params->desc.level_count, params->desc.sample_count, params->desc.format,
+                        params->desc.width, params->desc.height, 1, params->desc.level_count,
+                        params->desc.sample_count, params->desc.format,
                         /* Multisampled textures must have ALLOW_RENDER_TARGET set. */
-                        (params->desc.sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0,
-                        D3D12_RESOURCE_STATE_COPY_DEST);
-
+                        (params->desc.sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0, initial_state);
                 if (params->data)
                 {
                     if (params->desc.sample_count > 1)
                         fatal_error("Cannot upload data to a multisampled texture.\n");
-                    upload_texture_data_with_states(resource->resource, resource_data,
-                            params->desc.level_count, test_context->queue, test_context->list,
-                            RESOURCE_STATE_DO_NOT_CHANGE,
-                            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                    upload_texture_data_with_states(resource->resource, resource_data, params->desc.level_count,
+                            test_context->queue, test_context->list, RESOURCE_STATE_DO_NOT_CHANGE, state);
                     reset_command_list(test_context->list, test_context->allocator);
                 }
 
@@ -183,11 +197,13 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = { 0 };
 
                 resource->resource = create_default_buffer(device, params->data_size,
-                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-                upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data[0].pData,
-                        test_context->queue, test_context->list,
-                        RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-                reset_command_list(test_context->list, test_context->allocator);
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, initial_state);
+                if (params->data)
+                {
+                    upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data[0].pData,
+                            test_context->queue, test_context->list, RESOURCE_STATE_DO_NOT_CHANGE, state);
+                    reset_command_list(test_context->list, test_context->allocator);
+                }
 
                 uav_desc.Format = params->desc.format;
                 uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
@@ -201,14 +217,13 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             }
             else
             {
-                state = params->data ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                resource->resource = create_default_texture2d(device, params->desc.width, params->desc.height, 1, params->desc.level_count,
-                        params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, state);
+                resource->resource = create_default_texture2d(device, params->desc.width,
+                        params->desc.height, 1, params->desc.level_count, params->desc.format,
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, initial_state);
                 if (params->data)
                 {
-                    upload_texture_data_with_states(resource->resource, resource_data,
-                            params->desc.level_count, test_context->queue, test_context->list,
-                            RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                    upload_texture_data_with_states(resource->resource, resource_data, params->desc.level_count,
+                            test_context->queue, test_context->list, RESOURCE_STATE_DO_NOT_CHANGE, state);
                     reset_command_list(test_context->list, test_context->allocator);
                 }
                 ID3D12Device_CreateUnorderedAccessView(device, resource->resource, NULL, NULL,
@@ -895,13 +910,7 @@ static struct resource_readback *d3d12_runner_get_resource_readback(struct shade
     struct d3d12_resource *resource = d3d12_resource(res);
     D3D12_RESOURCE_STATES state;
 
-    if (resource->r.desc.type == RESOURCE_TYPE_RENDER_TARGET)
-        state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    else if (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
-        state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    else
-        state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-
+    state = resource_get_state(res);
     get_resource_readback_with_command_list_and_states(resource->resource, 0, rb,
             test_context->queue, test_context->list, state, state);
     reset_command_list(test_context->list, test_context->allocator);
