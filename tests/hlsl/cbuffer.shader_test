@@ -201,7 +201,7 @@ draw quad
 probe (0, 0) rgba (0.0, 4.0, 5.0, 6.0)
 
 
-[pixel shader fail(sm<6)]
+[pixel shader fail]
 // Elements cannot overlap if buffer is used.
 cbuffer buffer
 {
@@ -215,16 +215,8 @@ float4 main() : sv_target
     return float4(c, a[1].x, b[0].x, b[1].x);
 }
 
-[test]
-uniform 0 float4 1.0 0.0 0.0 0.0
-uniform 4 float4 2.0 0.0 0.0 0.0
-uniform 8 float4 3.0 0.0 0.0 0.0
-uniform 12 float4 4.0 0.0 0.0 0.0
-todo(sm<6) draw quad
-probe (0, 0) rgba (1.0, 3.0, 3.0, 4.0)
 
-
-[pixel shader]
+[pixel shader fail(sm>=6)]
 // Elements can overlap if buffer is not used.
 cbuffer buffer
 {
@@ -316,7 +308,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail(sm<6)]
+[pixel shader fail]
 // Matrices must be aligned.
 cbuffer buffer
 {
@@ -329,7 +321,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail(sm<6)]
+[pixel shader fail]
 // Arrays must be aligned.
 cbuffer buffer
 {
@@ -342,7 +334,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail(sm<6)]
+[pixel shader fail]
 // Structs must be aligned.
 struct apple
 {

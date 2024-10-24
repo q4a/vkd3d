@@ -46,7 +46,7 @@ float4 main() : POSITION
 }
 
 % outputcontrolpoints defaults to 0 for SM >= 6.
-[hull shader fail(sm<6)]
+[hull shader fail]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;
@@ -395,7 +395,7 @@ float4 main() : POSITION
 
 %% Test the valid range for outputcontrolpoints ([0, 32]).
 
-[hull shader]
+[hull shader fail(sm>=6)]
 struct patch_constant_data
 {
     float edges[2] : SV_TessFactor;

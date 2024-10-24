@@ -81,7 +81,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     rm -fr mesa && \
 
     apt-get clean && \
-    curl -L -s https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2308/linux_dxc_2023_08_14.x86_64.tar.gz | tar zx -C /usr/local ./lib/libdxcompiler.so ./lib/libdxil.so && \
+    curl -L -s https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2407/linux_dxc_2024_07_31.x86_64.tar.gz | tar zx -C /usr/local ./lib/libdxcompiler.so ./lib/libdxil.so && \
     groupadd host-render -g 800 && \
     useradd -m gitlab -G host-render
 

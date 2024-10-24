@@ -38,7 +38,7 @@ test-win-64-dxc:
   tags:
     - win10-21h2
   script:
-    - 'Invoke-WebRequest -Uri "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2308/dxc_2023_08_14.zip" -OutFile ".\dxc.zip"'
+    - 'Invoke-WebRequest -Uri "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2407/dxc_2024_07_31.zip" -OutFile ".\dxc.zip"'
     - 'Expand-Archive -Path "dxc.zip" -DestinationPath ".\dxc"'
     - '$Env:PATH += ";" + (Convert-Path ".\dxc\bin\x64")'
     - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec './artifacts/driver.cross64.exe $(git cherry $CI_MERGE_REQUEST_DIFF_BASE_SHA HEAD^ | wc -l) $(git rev-parse --short HEAD)'
