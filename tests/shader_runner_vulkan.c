@@ -1355,8 +1355,8 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     else
     {
         struct resource_desc resolved_desc = resource->r.desc;
+        VkImage resolved_image = VK_NULL_HANDLE;
         VkDeviceMemory resolved_memory;
-        VkImage resolved_image;
 
         aspect_mask = (resource->r.desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
                 ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
