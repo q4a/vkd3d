@@ -1291,6 +1291,19 @@ static VkDescriptorPool vkd3d_vk_descriptor_pool_array_pop(struct vkd3d_vk_descr
     return array->pools[--array->count];
 }
 
+static void vkd3d_vk_descriptor_pool_array_destroy_pools(struct vkd3d_vk_descriptor_pool_array *array,
+        const struct d3d12_device *device)
+{
+    const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
+    size_t i;
+
+    for (i = 0; i < array->count; ++i)
+    {
+        VK_CALL(vkDestroyDescriptorPool(device->vk_device, array->pools[i], NULL));
+    }
+    array->count = 0;
+}
+
 /* Command buffers */
 static void d3d12_command_list_mark_as_invalid(struct d3d12_command_list *list,
         const char *message, ...)
@@ -1576,11 +1589,7 @@ static void d3d12_command_allocator_free_resources(struct d3d12_command_allocato
     }
     else
     {
-        for (i = 0; i < allocator->free_descriptor_pools.count; ++i)
-        {
-            VK_CALL(vkDestroyDescriptorPool(device->vk_device, allocator->free_descriptor_pools.pools[i], NULL));
-        }
-        allocator->free_descriptor_pools.count = 0;
+        vkd3d_vk_descriptor_pool_array_destroy_pools(&allocator->free_descriptor_pools, device);
     }
 
     for (i = 0; i < allocator->transfer_buffer_count; ++i)
@@ -1601,11 +1610,7 @@ static void d3d12_command_allocator_free_resources(struct d3d12_command_allocato
     }
     allocator->view_count = 0;
 
-    for (i = 0; i < allocator->descriptor_pools.count; ++i)
-    {
-        VK_CALL(vkDestroyDescriptorPool(device->vk_device, allocator->descriptor_pools.pools[i], NULL));
-    }
-    allocator->descriptor_pools.count = 0;
+    vkd3d_vk_descriptor_pool_array_destroy_pools(&allocator->descriptor_pools, device);
 
     for (i = 0; i < allocator->framebuffer_count; ++i)
     {
