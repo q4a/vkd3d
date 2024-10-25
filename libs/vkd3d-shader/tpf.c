@@ -674,6 +674,7 @@ struct sm4_index_range_array
 struct vkd3d_sm4_lookup_tables
 {
     const struct vkd3d_sm4_opcode_info *opcode_info_from_sm4[VKD3D_SM4_OP_COUNT];
+    const struct vkd3d_sm4_opcode_info *opcode_info_from_vsir[VKD3DSIH_COUNT];
     const struct vkd3d_sm4_register_type_info *register_type_info_from_sm4[VKD3D_SM4_REGISTER_TYPE_COUNT];
     const struct vkd3d_sm4_register_type_info *register_type_info_from_vkd3d[VKD3DSPR_COUNT];
     const struct vkd3d_sm4_stat_field_info *stat_field_from_sm4[VKD3D_SM4_OP_COUNT];
@@ -1412,6 +1413,8 @@ struct tpf_compiler
     struct vkd3d_sm4_lookup_tables lookup;
     struct sm4_stat *stat;
 
+    int result;
+
     struct vkd3d_bytecode_buffer *buffer;
     struct dxbc_writer dxbc;
 };
@@ -1903,6 +1906,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         const struct vkd3d_sm4_opcode_info *info = &opcode_table[i];
 
         lookup->opcode_info_from_sm4[info->opcode] = info;
+        lookup->opcode_info_from_vsir[info->handler_idx] = info;
     }
 
     for (i = 0; i < ARRAY_SIZE(register_type_table); ++i)
@@ -1927,6 +1931,24 @@ static const struct vkd3d_sm4_opcode_info *get_info_from_sm4_opcode(
     if (sm4_opcode >= VKD3D_SM4_OP_COUNT)
         return NULL;
     return lookup->opcode_info_from_sm4[sm4_opcode];
+}
+
+static const struct vkd3d_sm4_opcode_info *get_info_from_vsir_opcode(
+        const struct vkd3d_sm4_lookup_tables *lookup, enum vkd3d_shader_opcode vsir_opcode)
+{
+    if (vsir_opcode >= VKD3DSIH_COUNT)
+        return NULL;
+    return lookup->opcode_info_from_vsir[vsir_opcode];
+}
+
+static unsigned int opcode_info_get_dst_count(const struct vkd3d_sm4_opcode_info *info)
+{
+    return strnlen(info->dst_info, SM4_MAX_DST_COUNT);
+}
+
+static unsigned int opcode_info_get_src_count(const struct vkd3d_sm4_opcode_info *info)
+{
+    return strnlen(info->src_info, SM4_MAX_SRC_COUNT);
 }
 
 static const struct vkd3d_sm4_register_type_info *get_info_from_sm4_register_type(
@@ -2651,8 +2673,8 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
     ins->raw = false;
     ins->structured = false;
     ins->predicate = NULL;
-    ins->dst_count = strnlen(opcode_info->dst_info, SM4_MAX_DST_COUNT);
-    ins->src_count = strnlen(opcode_info->src_info, SM4_MAX_SRC_COUNT);
+    ins->dst_count = opcode_info_get_dst_count(opcode_info);
+    ins->src_count = opcode_info_get_src_count(opcode_info);
     ins->src = src_params = vsir_program_get_src_params(program, ins->src_count);
     if (!src_params && ins->src_count)
     {
@@ -2971,7 +2993,7 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
     return VKD3D_OK;
 }
 
-static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_block *block);
+static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *block);
 
 static bool type_is_integer(const struct hlsl_type *type)
 {
@@ -6094,7 +6116,7 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
     hlsl_release_string_buffer(tpf->ctx, dst_type_string);
 }
 
-static void write_sm4_if(const struct tpf_compiler *tpf, const struct hlsl_ir_if *iff)
+static void write_sm4_if(struct tpf_compiler *tpf, const struct hlsl_ir_if *iff)
 {
     struct sm4_instruction instr =
     {
@@ -6211,7 +6233,7 @@ static void write_sm4_load(const struct tpf_compiler *tpf, const struct hlsl_ir_
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_loop(const struct tpf_compiler *tpf, const struct hlsl_ir_loop *loop)
+static void write_sm4_loop(struct tpf_compiler *tpf, const struct hlsl_ir_loop *loop)
 {
     struct sm4_instruction instr =
     {
@@ -6395,7 +6417,7 @@ static void write_sm4_store(const struct tpf_compiler *tpf, const struct hlsl_ir
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_switch(const struct tpf_compiler *tpf, const struct hlsl_ir_switch *s)
+static void write_sm4_switch(struct tpf_compiler *tpf, const struct hlsl_ir_switch *s)
 {
     const struct hlsl_ir_node *selector = s->selector.node;
     struct hlsl_ir_switch_case *c;
@@ -6456,7 +6478,46 @@ static void write_sm4_swizzle(const struct tpf_compiler *tpf, const struct hlsl_
     write_sm4_instruction(tpf, &instr);
 }
 
-static void tpf_handle_instruction(const struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
+static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
+{
+    const struct vkd3d_sm4_opcode_info *info;
+    struct sm4_instruction instr = {0};
+    unsigned int dst_count, src_count;
+
+    info = get_info_from_vsir_opcode(&tpf->lookup, ins->opcode);
+    VKD3D_ASSERT(info);
+
+    dst_count = opcode_info_get_dst_count(info);
+    src_count = opcode_info_get_src_count(info);
+
+    if (ins->dst_count != dst_count)
+    {
+        ERR("Invalid destination count %u for vsir instruction %#x (expected %u).\n",
+                ins->dst_count, ins->opcode, dst_count);
+        tpf->result = VKD3D_ERROR_INVALID_SHADER;
+        return;
+    }
+    if (ins->src_count != src_count)
+    {
+        ERR("Invalid source count %u for vsir instruction %#x (expected %u).\n",
+                ins->src_count, ins->opcode, src_count);
+        tpf->result = VKD3D_ERROR_INVALID_SHADER;
+        return;
+    }
+
+    instr.opcode = info->opcode;
+    instr.dst_count = ins->dst_count;
+    instr.src_count = ins->src_count;
+
+    for (unsigned int i = 0; i < ins->dst_count; ++i)
+        instr.dsts[i] = ins->dst[i];
+    for (unsigned int i = 0; i < ins->src_count; ++i)
+        instr.srcs[i] = ins->src[i];
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
 {
     switch (ins->opcode)
     {
@@ -6468,13 +6529,17 @@ static void tpf_handle_instruction(const struct tpf_compiler *tpf, const struct 
             tpf_dcl_indexable_temp(tpf, &ins->declaration.indexable_temp);
             break;
 
+        case VKD3DSIH_MOV:
+            tpf_simple_instruction(tpf, ins);
+            break;
+
         default:
             vkd3d_unreachable();
             break;
     }
 }
 
-static void write_sm4_block(const struct tpf_compiler *tpf, const struct hlsl_block *block)
+static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *block)
 {
     const struct hlsl_ir_node *instr;
     unsigned int vsir_instr_idx;
@@ -6766,7 +6831,13 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
     tpf_write_sfi0(&tpf);
     tpf_write_stat(&tpf);
 
-    if (!(ret = ctx->result))
+    ret = VKD3D_OK;
+    if (ctx->result)
+        ret = ctx->result;
+    if (tpf.result)
+        ret = tpf.result;
+
+    if (!ret)
         ret = dxbc_writer_write(&tpf.dxbc, out);
     for (i = 0; i < tpf.dxbc.section_count; ++i)
         vkd3d_shader_free_shader_code(&tpf.dxbc.sections[i].data);

@@ -585,6 +585,8 @@ enum vkd3d_shader_opcode
     VKD3DSIH_XOR,
 
     VKD3DSIH_INVALID,
+
+    VKD3DSIH_COUNT,
 };
 
 enum vkd3d_shader_register_type
