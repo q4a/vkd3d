@@ -1265,6 +1265,18 @@ static void vkd3d_vk_descriptor_pool_array_init(struct vkd3d_vk_descriptor_pool_
     memset(array, 0, sizeof(*array));
 }
 
+static bool vkd3d_vk_descriptor_pool_array_push_array(struct vkd3d_vk_descriptor_pool_array *array,
+        VkDescriptorPool *vk_pools, size_t count)
+{
+    if (!vkd3d_array_reserve((void **)&array->pools, &array->capacity, array->count + count, sizeof(*array->pools)))
+        return false;
+
+    memcpy(&array->pools[array->count], vk_pools, count * sizeof(*vk_pools));
+    array->count += count;
+
+    return true;
+}
+
 /* Command buffers */
 static void d3d12_command_list_mark_as_invalid(struct d3d12_command_list *list,
         const char *message, ...)
@@ -1389,14 +1401,7 @@ static bool d3d12_command_allocator_add_framebuffer(struct d3d12_command_allocat
 static bool d3d12_command_allocator_add_descriptor_pool(struct d3d12_command_allocator *allocator,
         VkDescriptorPool pool)
 {
-    struct vkd3d_vk_descriptor_pool_array *array = &allocator->descriptor_pools;
-
-    if (!vkd3d_array_reserve((void **)&array->pools, &array->capacity, array->count + 1, sizeof(*array->pools)))
-        return false;
-
-    array->pools[array->count++] = pool;
-
-    return true;
+    return vkd3d_vk_descriptor_pool_array_push_array(&allocator->descriptor_pools, &pool, 1);
 }
 
 static bool d3d12_command_allocator_add_view(struct d3d12_command_allocator *allocator,
@@ -1550,7 +1555,7 @@ static void d3d12_command_allocator_free_resources(struct d3d12_command_allocato
 {
     struct d3d12_device *device = allocator->device;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
-    unsigned int i, j;
+    unsigned int i;
 
     allocator->vk_descriptor_pool = VK_NULL_HANDLE;
 
@@ -1558,16 +1563,12 @@ static void d3d12_command_allocator_free_resources(struct d3d12_command_allocato
     {
         struct vkd3d_vk_descriptor_pool_array *array = &allocator->descriptor_pools;
 
-        if (vkd3d_array_reserve((void **)&allocator->free_descriptor_pools.pools,
-                &allocator->free_descriptor_pools.capacity, allocator->free_descriptor_pools.count + array->count,
-                sizeof(*allocator->free_descriptor_pools.pools)))
+        if (vkd3d_vk_descriptor_pool_array_push_array(&allocator->free_descriptor_pools, array->pools, array->count))
         {
-            for (i = 0, j = allocator->free_descriptor_pools.count; i < array->count; ++i, ++j)
+            for (i = 0; i < array->count; ++i)
             {
                 VK_CALL(vkResetDescriptorPool(device->vk_device, array->pools[i], 0));
-                allocator->free_descriptor_pools.pools[j] = array->pools[i];
             }
-            allocator->free_descriptor_pools.count += array->count;
             array->count = 0;
         }
     }
