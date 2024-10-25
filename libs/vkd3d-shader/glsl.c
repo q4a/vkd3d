@@ -1390,6 +1390,9 @@ static void shader_glsl_shader_epilogue(struct vkd3d_glsl_generator *gen)
             case VKD3D_SHADER_COMPONENT_UINT:
                 vkd3d_string_buffer_printf(buffer, " = floatBitsToUint(%s_out[%u])", gen->prefix, e->register_index);
                 break;
+            case VKD3D_SHADER_COMPONENT_INT:
+                vkd3d_string_buffer_printf(buffer, " = floatBitsToInt(%s_out[%u])", gen->prefix, e->register_index);
+                break;
             default:
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                         "Internal compiler error: Unhandled output component type %#x.", e->component_type);
@@ -2212,6 +2215,9 @@ static void shader_glsl_generate_output_declarations(struct vkd3d_glsl_generator
             {
                 case VKD3D_SHADER_COMPONENT_UINT:
                     vkd3d_string_buffer_printf(buffer, "uvec4");
+                    break;
+                case VKD3D_SHADER_COMPONENT_INT:
+                    vkd3d_string_buffer_printf(buffer, "ivec4");
                     break;
                 case VKD3D_SHADER_COMPONENT_FLOAT:
                     vkd3d_string_buffer_printf(buffer, "vec4");
