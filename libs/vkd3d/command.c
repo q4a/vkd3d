@@ -1277,6 +1277,12 @@ static bool vkd3d_vk_descriptor_pool_array_push_array(struct vkd3d_vk_descriptor
     return true;
 }
 
+static bool vkd3d_vk_descriptor_pool_array_push(struct vkd3d_vk_descriptor_pool_array *array,
+        VkDescriptorPool vk_pool)
+{
+    return vkd3d_vk_descriptor_pool_array_push_array(array, &vk_pool, 1);
+}
+
 /* Command buffers */
 static void d3d12_command_list_mark_as_invalid(struct d3d12_command_list *list,
         const char *message, ...)
@@ -1398,12 +1404,6 @@ static bool d3d12_command_allocator_add_framebuffer(struct d3d12_command_allocat
     return true;
 }
 
-static bool d3d12_command_allocator_add_descriptor_pool(struct d3d12_command_allocator *allocator,
-        VkDescriptorPool pool)
-{
-    return vkd3d_vk_descriptor_pool_array_push_array(&allocator->descriptor_pools, &pool, 1);
-}
-
 static bool d3d12_command_allocator_add_view(struct d3d12_command_allocator *allocator,
         struct vkd3d_view *view)
 {
@@ -1472,7 +1472,7 @@ static VkDescriptorPool d3d12_command_allocator_allocate_descriptor_pool(
         }
     }
 
-    if (!(d3d12_command_allocator_add_descriptor_pool(allocator, vk_pool)))
+    if (!(vkd3d_vk_descriptor_pool_array_push(&allocator->descriptor_pools, vk_pool)))
     {
         ERR("Failed to add descriptor pool.\n");
         VK_CALL(vkDestroyDescriptorPool(vk_device, vk_pool, NULL));
