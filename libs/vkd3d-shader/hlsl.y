@@ -5579,6 +5579,7 @@ static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
         case HLSL_SAMPLER_DIM_CUBE:
         case HLSL_SAMPLER_DIM_CUBEARRAY:
         case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_RAW_BUFFER:
             /* Offset parameters not supported for these types. */
             return 0;
         default:
@@ -6205,22 +6206,22 @@ static const struct method_function
 }
 object_methods[] =
 {
-    { "Gather",             add_gather_method_call,        "0001010100100" },
-    { "GatherAlpha",        add_gather_method_call,        "0001010100100" },
-    { "GatherBlue",         add_gather_method_call,        "0001010100100" },
-    { "GatherGreen",        add_gather_method_call,        "0001010100100" },
-    { "GatherRed",          add_gather_method_call,        "0001010100100" },
+    { "Gather",             add_gather_method_call,        "00010101001000" },
+    { "GatherAlpha",        add_gather_method_call,        "00010101001000" },
+    { "GatherBlue",         add_gather_method_call,        "00010101001000" },
+    { "GatherGreen",        add_gather_method_call,        "00010101001000" },
+    { "GatherRed",          add_gather_method_call,        "00010101001000" },
 
-    { "GetDimensions",      add_getdimensions_method_call, "0011111111111" },
+    { "GetDimensions",      add_getdimensions_method_call, "00111111111110" },
 
-    { "Load",               add_load_method_call,          "0011101111011" },
+    { "Load",               add_load_method_call,          "00111011110110" },
 
-    { "Sample",             add_sample_method_call,        "0011111100100" },
-    { "SampleBias",         add_sample_lod_method_call,    "0011111100100" },
-    { "SampleCmp",          add_sample_cmp_method_call,    "0011111100100" },
-    { "SampleCmpLevelZero", add_sample_cmp_method_call,    "0011111100100" },
-    { "SampleGrad",         add_sample_grad_method_call,   "0011111100100" },
-    { "SampleLevel",        add_sample_lod_method_call,    "0011111100100" },
+    { "Sample",             add_sample_method_call,        "00111111001000" },
+    { "SampleBias",         add_sample_lod_method_call,    "00111111001000" },
+    { "SampleCmp",          add_sample_cmp_method_call,    "00111111001000" },
+    { "SampleCmpLevelZero", add_sample_cmp_method_call,    "00111111001000" },
+    { "SampleGrad",         add_sample_grad_method_call,   "00111111001000" },
+    { "SampleLevel",        add_sample_lod_method_call,    "00111111001000" },
 };
 
 static int object_method_function_name_compare(const void *a, const void *b)
@@ -6492,6 +6493,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_REGISTER
 %token KW_ROW_MAJOR
 %token KW_RWBUFFER
+%token KW_RWBYTEADDRESSBUFFER
 %token KW_RWSTRUCTUREDBUFFER
 %token KW_RWTEXTURE1D
 %token KW_RWTEXTURE1DARRAY
@@ -7805,6 +7807,10 @@ type_no_void:
         {
             validate_uav_type(ctx, $1, $3, &@4);
             $$ = hlsl_new_uav_type(ctx, $1, $3, true);
+        }
+    | KW_RWBYTEADDRESSBUFFER
+        {
+            $$ = hlsl_new_uav_type(ctx, HLSL_SAMPLER_DIM_RAW_BUFFER, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), false);
         }
     | KW_STRING
         {

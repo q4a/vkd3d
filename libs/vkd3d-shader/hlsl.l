@@ -127,6 +127,7 @@ RenderTargetView        {return KW_RENDERTARGETVIEW;    }
 return                  {return KW_RETURN;              }
 row_major               {return KW_ROW_MAJOR;           }
 RWBuffer                {return KW_RWBUFFER;            }
+RWByteAddressBuffer     {return KW_RWBYTEADDRESSBUFFER; }
 RWStructuredBuffer      {return KW_RWSTRUCTUREDBUFFER;  }
 RWTexture1D             {return KW_RWTEXTURE1D;         }
 RWTexture1DArray        {return KW_RWTEXTURE1DARRAY;    }
