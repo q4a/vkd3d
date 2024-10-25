@@ -1306,7 +1306,13 @@ static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, st
                         "Internal compiler error: Unhandled SV_IS_FRONT_FACE in shader type #%x.", version->type);
             vkd3d_string_buffer_printf(buffer,
                     "uintBitsToFloat(uvec4(gl_FrontFacing ? 0xffffffffu : 0u, 0u, 0u, 0u))");
+            break;
 
+        case VKD3D_SHADER_SV_SAMPLE_INDEX:
+            if (version->type != VKD3D_SHADER_TYPE_PIXEL)
+                vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                        "Internal compiler error: Unhandled SV_SAMPLE_INDEX in shader type #%x.", version->type);
+            vkd3d_string_buffer_printf(buffer, "intBitsToFloat(ivec4(gl_SampleID, 0, 0, 0))");
             break;
 
         case VKD3D_SHADER_SV_TARGET:
