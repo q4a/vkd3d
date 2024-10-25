@@ -7,7 +7,7 @@ size (raw_buffer, 4)
 
 1 2 3 4
 
-[pixel shader todo]
+[pixel shader]
 RWByteAddressBuffer u : register(u1);
 
 float4 main() : sv_target
@@ -18,12 +18,12 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe uav 1 (0) ri (10)
 if(sm<6) probe uav 1 (1) ri (11)
 if(sm>=6) probe uav 1 (1) r (11.1)
 
-[pixel shader todo]
+[pixel shader]
 RWByteAddressBuffer u : register(u1);
 
 float4 main() : sv_target
@@ -34,10 +34,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe uav 1 (0) rgbaui(10, 11, 12, 13)
 
-[pixel shader todo]
+[pixel shader]
 RWByteAddressBuffer u : register(u1);
 
 float4 main() : sv_target
@@ -48,10 +48,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe uav 1 (0) rgbaui(20, 21, 22, 23)
 
-[pixel shader todo]
+[pixel shader]
 RWByteAddressBuffer u : register(u1);
 
 float4 main() : sv_target
@@ -62,14 +62,14 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe uav 1 (0) rgbaui(20, 21, 22, 23)
 
 [require]
 shader model >= 5.0
 float64
 
-[pixel shader todo]
+[pixel shader]
 RWByteAddressBuffer u : register(u1);
 
 float4 main() : sv_target
@@ -79,7 +79,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 if(sm<6) probe uav 1 (0) ri (12)
 if(sm>=6) probe uav 1 (0) rd (12.2)
 

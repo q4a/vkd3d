@@ -3491,6 +3491,7 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return D3D_SRV_DIMENSION_TEXTURECUBEARRAY;
         case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_RAW_BUFFER:
         case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
             return D3D_SRV_DIMENSION_BUFFER;
         default:
@@ -4019,6 +4020,7 @@ static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_typ
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return VKD3D_SM4_RESOURCE_TEXTURE_CUBEARRAY;
         case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_RAW_BUFFER:
         case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
             return VKD3D_SM4_RESOURCE_BUFFER;
         default:
@@ -4808,6 +4810,9 @@ static void write_sm4_dcl_textures(const struct tpf_compiler *tpf, const struct 
                     instr.opcode = VKD3D_SM5_OP_DCL_UAV_STRUCTURED;
                     instr.byte_stride = component_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC] * 4;
                     break;
+                case HLSL_SAMPLER_DIM_RAW_BUFFER:
+                    instr.opcode = VKD3D_SM5_OP_DCL_UAV_RAW;
+                    break;
                 default:
                     instr.opcode = VKD3D_SM5_OP_DCL_UAV_TYPED;
                     break;
@@ -5546,24 +5551,6 @@ static void write_sm4_cast(const struct tpf_compiler *tpf, const struct hlsl_ir_
         default:
             vkd3d_unreachable();
     }
-}
-
-static void write_sm4_store_uav_typed(const struct tpf_compiler *tpf, const struct hlsl_deref *dst,
-        const struct hlsl_ir_node *coords, const struct hlsl_ir_node *value)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
-
-    sm4_register_from_deref(tpf, &instr.dsts[0].reg, &instr.dsts[0].write_mask, dst, &instr);
-    instr.dst_count = 1;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_node(tpf, &instr.srcs[1], value, VKD3DSP_WRITEMASK_ALL);
-    instr.src_count = 2;
-
-    write_sm4_instruction(tpf, &instr);
 }
 
 static void write_sm4_rasterizer_sample_count(const struct tpf_compiler *tpf, const struct hlsl_ir_node *dst)
@@ -6352,6 +6339,8 @@ static void write_sm4_resource_load(const struct tpf_compiler *tpf, const struct
 static void write_sm4_resource_store(const struct tpf_compiler *tpf, const struct hlsl_ir_resource_store *store)
 {
     struct hlsl_type *resource_type = hlsl_deref_get_type(tpf->ctx, &store->resource);
+    struct hlsl_ir_node *coords = store->coords.node, *value = store->value.node;
+    struct sm4_instruction instr;
 
     if (!store->resource.var->is_uniform)
     {
@@ -6365,7 +6354,25 @@ static void write_sm4_resource_store(const struct tpf_compiler *tpf, const struc
         return;
     }
 
-    write_sm4_store_uav_typed(tpf, &store->resource, store->coords.node, store->value.node);
+    memset(&instr, 0, sizeof(instr));
+
+    sm4_register_from_deref(tpf, &instr.dsts[0].reg, &instr.dsts[0].write_mask, &store->resource, &instr);
+    instr.dst_count = 1;
+    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+    {
+        instr.opcode = VKD3D_SM5_OP_STORE_RAW;
+        instr.dsts[0].write_mask = vkd3d_write_mask_from_component_count(value->data_type->dimx);
+    }
+    else
+    {
+        instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
+    }
+
+    sm4_src_from_node(tpf, &instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[1], value, VKD3DSP_WRITEMASK_ALL);
+    instr.src_count = 2;
+
+    write_sm4_instruction(tpf, &instr);
 }
 
 static void write_sm4_store(const struct tpf_compiler *tpf, const struct hlsl_ir_store *store)

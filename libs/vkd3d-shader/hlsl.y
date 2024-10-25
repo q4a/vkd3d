@@ -6197,6 +6197,52 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
     return true;
 }
 
+static bool add_store_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *offset, *rhs, *store;
+    struct hlsl_deref resource_deref;
+    unsigned int value_dim;
+
+    if (params->args_count != 2)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method '%s': expected 2.", name);
+        return false;
+    }
+
+    if (!strcmp(name, "Store"))
+        value_dim = 1;
+    else if (!strcmp(name, "Store2"))
+        value_dim = 2;
+    else if (!strcmp(name, "Store3"))
+        value_dim = 3;
+    else
+        value_dim = 4;
+
+    if (!(offset = add_implicit_conversion(ctx, block, params->args[0],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
+        return false;
+
+    if (!(rhs = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, value_dim), loc)))
+        return false;
+
+    if (!hlsl_init_deref_from_index_chain(ctx, &resource_deref, object))
+        return false;
+
+    if (!(store = hlsl_new_resource_store(ctx, &resource_deref, offset, rhs, loc)))
+    {
+        hlsl_cleanup_deref(&resource_deref);
+        return false;
+    }
+
+    hlsl_block_add_instr(block, store);
+    hlsl_cleanup_deref(&resource_deref);
+
+    return true;
+}
+
 static const struct method_function
 {
     const char *name;
@@ -6204,7 +6250,7 @@ static const struct method_function
             const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc);
     char valid_dims[HLSL_SAMPLER_DIM_MAX + 1];
 }
-object_methods[] =
+texture_methods[] =
 {
     { "Gather",             add_gather_method_call,        "00010101001000" },
     { "GatherAlpha",        add_gather_method_call,        "00010101001000" },
@@ -6224,6 +6270,14 @@ object_methods[] =
     { "SampleLevel",        add_sample_lod_method_call,    "00111111001000" },
 };
 
+static const struct method_function uav_methods[] =
+{
+    { "Store",  add_store_method_call, "00000000000001" },
+    { "Store2", add_store_method_call, "00000000000001" },
+    { "Store3", add_store_method_call, "00000000000001" },
+    { "Store4", add_store_method_call, "00000000000001" },
+};
+
 static int object_method_function_name_compare(const void *a, const void *b)
 {
     const struct method_function *func = b;
@@ -6235,7 +6289,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
-    const struct method_function *method;
+    const struct method_function *method, *methods;
+    unsigned int count;
 
     if (object_type->class == HLSL_CLASS_ERROR)
     {
@@ -6252,7 +6307,17 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
         }
     }
 
-    if (object_type->class != HLSL_CLASS_TEXTURE || object_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
+    if (object_type->class == HLSL_CLASS_TEXTURE)
+    {
+        count = ARRAY_SIZE(texture_methods);
+        methods = texture_methods;
+    }
+    else if (object_type->class == HLSL_CLASS_UAV)
+    {
+        count = ARRAY_SIZE(uav_methods);
+        methods = uav_methods;
+    }
+    else
     {
         struct vkd3d_string_buffer *string;
 
@@ -6263,7 +6328,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
         return false;
     }
 
-    method = bsearch(name, object_methods, ARRAY_SIZE(object_methods), sizeof(*method),
+    method = bsearch(name, methods, count, sizeof(*method),
             object_method_function_name_compare);
 
     if (method && method->valid_dims[object_type->sampler_dim] == '1')
