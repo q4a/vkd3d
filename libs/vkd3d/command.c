@@ -1283,6 +1283,14 @@ static bool vkd3d_vk_descriptor_pool_array_push(struct vkd3d_vk_descriptor_pool_
     return vkd3d_vk_descriptor_pool_array_push_array(array, &vk_pool, 1);
 }
 
+static VkDescriptorPool vkd3d_vk_descriptor_pool_array_pop(struct vkd3d_vk_descriptor_pool_array *array)
+{
+    if (!array->count)
+        return VK_NULL_HANDLE;
+
+    return array->pools[--array->count];
+}
+
 /* Command buffers */
 static void d3d12_command_list_mark_as_invalid(struct d3d12_command_list *list,
         const char *message, ...)
@@ -1451,13 +1459,7 @@ static VkDescriptorPool d3d12_command_allocator_allocate_descriptor_pool(
     VkDescriptorPool vk_pool;
     VkResult vr;
 
-    if (allocator->free_descriptor_pools.count > 0)
-    {
-        vk_pool = allocator->free_descriptor_pools.pools[allocator->free_descriptor_pools.count - 1];
-        allocator->free_descriptor_pools.pools[allocator->free_descriptor_pools.count - 1] = VK_NULL_HANDLE;
-        --allocator->free_descriptor_pools.count;
-    }
-    else
+    if (!(vk_pool = vkd3d_vk_descriptor_pool_array_pop(&allocator->free_descriptor_pools)))
     {
         pool_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         pool_desc.pNext = NULL;
