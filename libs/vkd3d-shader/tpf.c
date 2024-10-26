@@ -6098,7 +6098,8 @@ static void write_sm4_if(const struct tpf_compiler *tpf, const struct hlsl_ir_if
 {
     struct sm4_instruction instr =
     {
-        .opcode = VKD3D_SM4_OP_IF | VKD3D_SM4_CONDITIONAL_NZ,
+        .opcode = VKD3D_SM4_OP_IF,
+        .extra_bits = VKD3D_SM4_CONDITIONAL_NZ,
         .src_count = 1,
     };
 
