@@ -53,7 +53,7 @@ struct parse_parameter
     struct parse_initializer initializer;
 };
 
-struct parse_colon_attribute
+struct parse_colon_attributes
 {
     struct hlsl_semantic semantic;
     struct hlsl_reg_reservation reg_reservation;
@@ -6490,7 +6490,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
     struct parse_if_body if_body;
     enum parse_assign_op assign_op;
     struct hlsl_reg_reservation reg_reservation;
-    struct parse_colon_attribute colon_attribute;
+    struct parse_colon_attributes colon_attributes;
     struct hlsl_semantic semantic;
     enum hlsl_buffer_type buffer_type;
     enum hlsl_sampler_dim sampler_dim;
@@ -6687,7 +6687,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 
 %type <buffer_type> buffer_type
 
-%type <colon_attribute> colon_attribute
+%type <colon_attributes> colon_attributes
 
 %type <fields> field
 %type <fields> fields_list
@@ -6875,7 +6875,7 @@ effect_group:
         }
 
 buffer_declaration:
-      var_modifiers buffer_type any_identifier colon_attribute annotations_opt
+      var_modifiers buffer_type any_identifier colon_attributes annotations_opt
         {
             if ($4.semantic.name)
                 hlsl_error(ctx, &@4, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC, "Semantics are not allowed on buffers.");
@@ -7200,7 +7200,7 @@ func_declaration:
 
 func_prototype_no_attrs:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
-      var_modifiers type var_identifier '(' parameters ')' colon_attribute
+      var_modifiers type var_identifier '(' parameters ')' colon_attributes
         {
             uint32_t modifiers = $1;
             struct hlsl_ir_var *var;
@@ -7377,28 +7377,39 @@ var_identifier:
       VAR_IDENTIFIER
     | NEW_IDENTIFIER
 
-colon_attribute:
+colon_attributes:
       %empty
         {
             $$.semantic = (struct hlsl_semantic){0};
             $$.reg_reservation.reg_type = 0;
             $$.reg_reservation.offset_type = 0;
         }
-    | semantic
+    | colon_attributes semantic
         {
-            $$.semantic = $1;
-            $$.reg_reservation.reg_type = 0;
-            $$.reg_reservation.offset_type = 0;
+            hlsl_cleanup_semantic(&$$.semantic);
+            $$.semantic = $2;
         }
-    | register_reservation
+    | colon_attributes register_reservation
         {
-            $$.semantic = (struct hlsl_semantic){0};
-            $$.reg_reservation = $1;
+            if ($$.reg_reservation.reg_type)
+                hlsl_fixme(ctx, &@2, "Multiple register() reservations.");
+
+            $$.reg_reservation.reg_type = $2.reg_type;
+            $$.reg_reservation.reg_index = $2.reg_index;
+            $$.reg_reservation.reg_space = $2.reg_space;
         }
-    | packoffset_reservation
+    | colon_attributes packoffset_reservation
         {
-            $$.semantic = (struct hlsl_semantic){0};
-            $$.reg_reservation = $1;
+            if (ctx->cur_buffer == ctx->globals_buffer)
+            {
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "The packoffset() reservation is only allowed within 'cbuffer' blocks.");
+            }
+            else
+            {
+                $$.reg_reservation.offset_type = $2.offset_type;
+                $$.reg_reservation.offset_index = $2.offset_index;
+            }
         }
 
 semantic:
@@ -7594,7 +7605,7 @@ parameter:
         }
 
 parameter_decl:
-      var_modifiers type_no_void any_identifier arrays colon_attribute
+      var_modifiers type_no_void any_identifier arrays colon_attributes
         {
             uint32_t modifiers = $1;
             struct hlsl_type *type;
@@ -8095,7 +8106,7 @@ variables_def_typed:
         }
 
 variable_decl:
-      any_identifier arrays colon_attribute annotations_opt
+      any_identifier arrays colon_attributes annotations_opt
         {
             $$ = hlsl_alloc(ctx, sizeof(*$$));
             $$->loc = @1;

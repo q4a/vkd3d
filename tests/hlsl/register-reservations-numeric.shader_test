@@ -224,7 +224,7 @@ uniform 4 float 101
 todo(msl) draw quad
 probe (0, 0) rgba (100, 100, 100, 100)
 
-[pixel shader todo]
+[pixel shader]
 cbuffer c
 {
     float a : packoffset(c1);
@@ -241,9 +241,26 @@ float4 main() : sv_target
 uniform 0 float 200
 uniform 4 float 201
 uniform 8 float 202
-todo(sm<6) draw quad
-todo(sm<6) probe (0,0) rgba (201.0, 202.0, 0.0, 0.0)
+draw quad
+probe (0,0) rgba (201.0, 202.0, 0.0, 0.0)
 
+[pixel shader]
+cbuffer c
+{
+    float a : packoffset(c1) : packoffset(c2);
+}
+
+float4 main() : sv_target
+{
+    return float4(a, 0, 0, 0);
+}
+
+[test]
+uniform 0 float 201
+uniform 4 float 202
+uniform 8 float 203
+draw quad
+probe (0,0) rgba (203.0, 0.0, 0.0, 0.0)
 
 [pixel shader fail(sm<4)]
 int k : register(i0); // register(cX) is also required.

@@ -39,6 +39,16 @@ float4 main(float tex : texcoord) : sv_target
 todo(msl) draw quad
 probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
+[pixel shader fail(sm>=6)]
+float4 main(float tex : texcoord) : semantic : sv_target
+{
+    return tex;
+}
+
+[test]
+todo(msl) draw quad
+probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
+
 [pixel shader]
 
 float4 main(float tex : texcoord) : sv_target
@@ -76,7 +86,7 @@ float4 main(in float2 arr[2]) : sv_target
 [pixel shader]
 struct apple
 {
-    float3 tp[4] : TEXCOORD0;
+    float3 tp[4] : BOGUS : TEXCOORD0;
 };
 
 float4 main(in apple a) : sv_target

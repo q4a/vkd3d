@@ -639,7 +639,7 @@ float4 main() : sv_target
     return tex.Sample(sam, float2(0, 0));
 }
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 
 cbuffer buffer
