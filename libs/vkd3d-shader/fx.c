@@ -504,10 +504,30 @@ enum fx_4_type_constants
     FX_4_OBJECT_TYPE_VERTEX_SHADER = 0x6,
     FX_4_OBJECT_TYPE_GEOMETRY_SHADER = 0x7,
     FX_4_OBJECT_TYPE_GEOMETRY_SHADER_SO = 0x8,
+
+    FX_4_OBJECT_TYPE_TEXTURE = 0x9,
+    FX_4_OBJECT_TYPE_TEXTURE_1D = 0xa,
+    FX_4_OBJECT_TYPE_TEXTURE_1DARRAY = 0xb,
+    FX_4_OBJECT_TYPE_TEXTURE_2D = 0xc,
+    FX_4_OBJECT_TYPE_TEXTURE_2DARRAY = 0xd,
+    FX_4_OBJECT_TYPE_TEXTURE_2DMS = 0xe,
+    FX_4_OBJECT_TYPE_TEXTURE_2DMSARRAY = 0xf,
+    FX_4_OBJECT_TYPE_TEXTURE_3D = 0x10,
+    FX_4_OBJECT_TYPE_TEXTURE_CUBE = 0x11,
+    FX_4_OBJECT_TYPE_TEXTURE_CUBEARRAY = 0x17,
+
     FX_5_OBJECT_TYPE_GEOMETRY_SHADER = 0x1b,
     FX_5_OBJECT_TYPE_COMPUTE_SHADER = 0x1c,
     FX_5_OBJECT_TYPE_HULL_SHADER = 0x1d,
     FX_5_OBJECT_TYPE_DOMAIN_SHADER = 0x1e,
+
+    FX_5_OBJECT_TYPE_UAV_1D = 0x1f,
+    FX_5_OBJECT_TYPE_UAV_1DARRAY = 0x20,
+    FX_5_OBJECT_TYPE_UAV_2D = 0x21,
+    FX_5_OBJECT_TYPE_UAV_2DARRAY = 0x22,
+    FX_5_OBJECT_TYPE_UAV_3D = 0x23,
+    FX_5_OBJECT_TYPE_UAV_BUFFER = 0x24,
+    FX_5_OBJECT_TYPE_UAV_STRUCTURED_BUFFER = 0x28,
 
     /* Types */
     FX_4_TYPE_CLASS_NUMERIC = 1,
@@ -772,16 +792,16 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         static const uint32_t texture_type[] =
         {
-            [HLSL_SAMPLER_DIM_GENERIC]   = 9,
-            [HLSL_SAMPLER_DIM_1D]        = 10,
-            [HLSL_SAMPLER_DIM_1DARRAY]   = 11,
-            [HLSL_SAMPLER_DIM_2D]        = 12,
-            [HLSL_SAMPLER_DIM_2DARRAY]   = 13,
-            [HLSL_SAMPLER_DIM_2DMS]      = 14,
-            [HLSL_SAMPLER_DIM_2DMSARRAY] = 15,
-            [HLSL_SAMPLER_DIM_3D]        = 16,
-            [HLSL_SAMPLER_DIM_CUBE]      = 17,
-            [HLSL_SAMPLER_DIM_CUBEARRAY] = 23,
+            [HLSL_SAMPLER_DIM_GENERIC]   = FX_4_OBJECT_TYPE_TEXTURE,
+            [HLSL_SAMPLER_DIM_1D]        = FX_4_OBJECT_TYPE_TEXTURE_1D,
+            [HLSL_SAMPLER_DIM_1DARRAY]   = FX_4_OBJECT_TYPE_TEXTURE_1DARRAY,
+            [HLSL_SAMPLER_DIM_2D]        = FX_4_OBJECT_TYPE_TEXTURE_2D,
+            [HLSL_SAMPLER_DIM_2DARRAY]   = FX_4_OBJECT_TYPE_TEXTURE_2DARRAY,
+            [HLSL_SAMPLER_DIM_2DMS]      = FX_4_OBJECT_TYPE_TEXTURE_2DMS,
+            [HLSL_SAMPLER_DIM_2DMSARRAY] = FX_4_OBJECT_TYPE_TEXTURE_2DMSARRAY,
+            [HLSL_SAMPLER_DIM_3D]        = FX_4_OBJECT_TYPE_TEXTURE_3D,
+            [HLSL_SAMPLER_DIM_CUBE]      = FX_4_OBJECT_TYPE_TEXTURE_CUBE,
+            [HLSL_SAMPLER_DIM_CUBEARRAY] = FX_4_OBJECT_TYPE_TEXTURE_CUBEARRAY,
         };
 
         put_u32_unaligned(buffer, texture_type[element_type->sampler_dim]);
@@ -794,13 +814,13 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         static const uint32_t uav_type[] =
         {
-            [HLSL_SAMPLER_DIM_1D]                = 31,
-            [HLSL_SAMPLER_DIM_1DARRAY]           = 32,
-            [HLSL_SAMPLER_DIM_2D]                = 33,
-            [HLSL_SAMPLER_DIM_2DARRAY]           = 34,
-            [HLSL_SAMPLER_DIM_3D]                = 35,
-            [HLSL_SAMPLER_DIM_BUFFER]            = 36,
-            [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = 40,
+            [HLSL_SAMPLER_DIM_1D]                = FX_5_OBJECT_TYPE_UAV_1D,
+            [HLSL_SAMPLER_DIM_1DARRAY]           = FX_5_OBJECT_TYPE_UAV_1DARRAY,
+            [HLSL_SAMPLER_DIM_2D]                = FX_5_OBJECT_TYPE_UAV_2D,
+            [HLSL_SAMPLER_DIM_2DARRAY]           = FX_5_OBJECT_TYPE_UAV_2DARRAY,
+            [HLSL_SAMPLER_DIM_3D]                = FX_5_OBJECT_TYPE_UAV_3D,
+            [HLSL_SAMPLER_DIM_BUFFER]            = FX_5_OBJECT_TYPE_UAV_BUFFER,
+            [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = FX_5_OBJECT_TYPE_UAV_STRUCTURED_BUFFER,
         };
 
         put_u32_unaligned(buffer, uav_type[element_type->sampler_dim]);
@@ -3295,6 +3315,71 @@ static void fx_4_parse_shader_initializer(struct fx_parser *parser, unsigned int
     vkd3d_shader_free_shader_code(&output);
 }
 
+static bool fx_4_is_shader_resource(const struct fx_4_binary_type *type)
+{
+    switch (type->typeinfo)
+    {
+        case FX_4_OBJECT_TYPE_TEXTURE:
+        case FX_4_OBJECT_TYPE_TEXTURE_1D:
+        case FX_4_OBJECT_TYPE_TEXTURE_1DARRAY:
+        case FX_4_OBJECT_TYPE_TEXTURE_2D:
+        case FX_4_OBJECT_TYPE_TEXTURE_2DARRAY:
+        case FX_4_OBJECT_TYPE_TEXTURE_2DMS:
+        case FX_4_OBJECT_TYPE_TEXTURE_2DMSARRAY:
+        case FX_4_OBJECT_TYPE_TEXTURE_3D:
+        case FX_4_OBJECT_TYPE_TEXTURE_CUBE:
+        case FX_4_OBJECT_TYPE_TEXTURE_CUBEARRAY:
+        case FX_5_OBJECT_TYPE_UAV_1D:
+        case FX_5_OBJECT_TYPE_UAV_1DARRAY:
+        case FX_5_OBJECT_TYPE_UAV_2D:
+        case FX_5_OBJECT_TYPE_UAV_2DARRAY:
+        case FX_5_OBJECT_TYPE_UAV_3D:
+        case FX_5_OBJECT_TYPE_UAV_BUFFER:
+        case FX_5_OBJECT_TYPE_UAV_STRUCTURED_BUFFER:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void fx_4_parse_object_initializer(struct fx_parser *parser, const struct fx_4_binary_type *type)
+{
+    unsigned int i, element_count;
+    uint32_t value;
+
+    vkd3d_string_buffer_printf(&parser->buffer, " = {\n");
+    element_count = max(type->element_count, 1);
+    for (i = 0; i < element_count; ++i)
+    {
+        switch (type->typeinfo)
+        {
+            case FX_4_OBJECT_TYPE_STRING:
+                vkd3d_string_buffer_printf(&parser->buffer, "    ");
+                value = fx_parser_read_u32(parser);
+                fx_4_parse_string_initializer(parser, value);
+                break;
+            case FX_4_OBJECT_TYPE_PIXEL_SHADER:
+            case FX_4_OBJECT_TYPE_VERTEX_SHADER:
+            case FX_4_OBJECT_TYPE_GEOMETRY_SHADER:
+            case FX_4_OBJECT_TYPE_GEOMETRY_SHADER_SO:
+            case FX_5_OBJECT_TYPE_GEOMETRY_SHADER:
+            case FX_5_OBJECT_TYPE_COMPUTE_SHADER:
+            case FX_5_OBJECT_TYPE_HULL_SHADER:
+            case FX_5_OBJECT_TYPE_DOMAIN_SHADER:
+                parse_fx_start_indent(parser);
+                fx_4_parse_shader_initializer(parser, type->typeinfo);
+                parse_fx_end_indent(parser);
+                break;
+            default:
+                fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
+                        "Parsing object type %u is not implemented.", type->typeinfo);
+                return;
+        }
+        vkd3d_string_buffer_printf(&parser->buffer, ",\n");
+    }
+    vkd3d_string_buffer_printf(&parser->buffer, "}");
+}
+
 static void fx_4_parse_objects(struct fx_parser *parser)
 {
     struct fx_4_object_variable
@@ -3304,9 +3389,9 @@ static void fx_4_parse_objects(struct fx_parser *parser)
         uint32_t semantic;
         uint32_t bind_point;
     } var;
-    uint32_t i, j, value, element_count;
     struct fx_4_binary_type type;
     const char *name, *type_name;
+    uint32_t i;
 
     if (parser->failed)
         return;
@@ -3321,38 +3406,11 @@ static void fx_4_parse_objects(struct fx_parser *parser)
         vkd3d_string_buffer_printf(&parser->buffer, "%s %s", type_name, name);
         if (type.element_count)
             vkd3d_string_buffer_printf(&parser->buffer, "[%u]", type.element_count);
-        vkd3d_string_buffer_printf(&parser->buffer, " = {\n");
 
-        element_count = max(type.element_count, 1);
-        for (j = 0; j < element_count; ++j)
-        {
-            switch (type.typeinfo)
-            {
-                case FX_4_OBJECT_TYPE_STRING:
-                    vkd3d_string_buffer_printf(&parser->buffer, "    ");
-                    value = fx_parser_read_u32(parser);
-                    fx_4_parse_string_initializer(parser, value);
-                    break;
-                case FX_4_OBJECT_TYPE_PIXEL_SHADER:
-                case FX_4_OBJECT_TYPE_VERTEX_SHADER:
-                case FX_4_OBJECT_TYPE_GEOMETRY_SHADER:
-                case FX_4_OBJECT_TYPE_GEOMETRY_SHADER_SO:
-                case FX_5_OBJECT_TYPE_GEOMETRY_SHADER:
-                case FX_5_OBJECT_TYPE_COMPUTE_SHADER:
-                case FX_5_OBJECT_TYPE_HULL_SHADER:
-                case FX_5_OBJECT_TYPE_DOMAIN_SHADER:
-                    parse_fx_start_indent(parser);
-                    fx_4_parse_shader_initializer(parser, type.typeinfo);
-                    parse_fx_end_indent(parser);
-                    break;
-                default:
-                    fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
-                            "Parsing object type %u is not implemented.\n", type.typeinfo);
-                    return;
-            }
-            vkd3d_string_buffer_printf(&parser->buffer, ",\n");
-        }
-        vkd3d_string_buffer_printf(&parser->buffer, "};\n");
+        if (!fx_4_is_shader_resource(&type))
+            fx_4_parse_object_initializer(parser, &type);
+        vkd3d_string_buffer_printf(&parser->buffer, ";\n");
+
         fx_parse_fx_4_annotations(parser);
     }
 }
