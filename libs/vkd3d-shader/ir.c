@@ -290,6 +290,15 @@ static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigne
     dst->reg.idx[0].offset = idx;
 }
 
+static void dst_param_init_output(struct vkd3d_shader_dst_param *dst,
+        enum vkd3d_data_type data_type, uint32_t idx, uint32_t write_mask)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_OUTPUT, data_type, 1);
+    dst->reg.idx[0].offset = idx;
+    dst->reg.dimension = VSIR_DIMENSION_VEC4;
+    dst->write_mask = write_mask;
+}
+
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode opcode)
 {
@@ -984,8 +993,12 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
     const struct vkd3d_shader_compile_info *compile_info = ctx->compile_info;
     bool allows_subset_masks = target_allows_subset_masks(compile_info);
     struct shader_signature *signature = &program->output_signature;
+    unsigned int orig_element_count = signature->element_count;
     const struct vkd3d_shader_varying_map_info *varying_map;
+    struct signature_element *new_elements, *e;
+    unsigned int uninit_varying_count = 0;
     unsigned int subset_varying_count = 0;
+    unsigned int new_register_count = 0;
     unsigned int i;
 
     if (!(varying_map = vkd3d_find_struct(compile_info->next, VARYING_MAP_INFO)))
@@ -994,8 +1007,8 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
     for (i = 0; i < signature->element_count; ++i)
     {
         const struct vkd3d_shader_varying_map *map = find_varying_map(varying_map, i);
-        struct signature_element *e = &signature->elements[i];
 
+        e = &signature->elements[i];
         if (map)
         {
             unsigned int input_mask = map->input_mask;
@@ -1024,17 +1037,87 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
         {
             e->target_location = SIGNATURE_TARGET_LOCATION_UNUSED;
         }
+
+        new_register_count = max(new_register_count, e->register_index + 1);
     }
+
+    /* Handle uninitialized varyings by writing them before every ret.
+     *
+     * As far as sm1-sm3 is concerned, drivers disagree on what uninitialized
+     * varyings contain.
+     *
+     * - Diffuse (COLOR0) reliably contains (1, 1, 1, 1) in SM1/2.
+     *   In SM3 it may contain (0, 0, 0, 0), (0, 0, 0, 1), or (1, 1, 1, 1).
+     *
+     * - Specular (COLOR1) contains (0, 0, 0, 0) or (0, 0, 0, 1).
+     *   WARP writes (1, 1, 1, 1).
+     *
+     * - Anything else contains (0, 0, 0, 0) or (0, 0, 0, 1).
+     *
+     * We don't have enough knowledge to identify diffuse here. Instead we deal
+     * with that in vsir_program_ensure_diffuse(), by always writing diffuse if
+     * the shader doesn't.
+     */
 
     for (i = 0; i < varying_map->varying_count; ++i)
     {
         if (varying_map->varying_map[i].output_signature_index >= signature->element_count)
+            ++uninit_varying_count;
+    }
+
+    if (!(new_elements = vkd3d_realloc(signature->elements,
+            (signature->element_count + uninit_varying_count) * sizeof(*signature->elements))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    signature->elements = new_elements;
+
+    for (i = 0; i < varying_map->varying_count; ++i)
+    {
+        const struct vkd3d_shader_varying_map *map = &varying_map->varying_map[i];
+
+        if (map->output_signature_index < orig_element_count)
+            continue;
+
+        TRACE("Synthesizing zero value for uninitialized output %u (mask %u).\n",
+                map->input_register_index, map->input_mask);
+        e = &signature->elements[signature->element_count++];
+        memset(e, 0, sizeof(*e));
+        e->sysval_semantic = VKD3D_SHADER_SV_NONE;
+        e->component_type = VKD3D_SHADER_COMPONENT_FLOAT;
+        e->register_count = 1;
+        e->mask = map->input_mask;
+        e->used_mask = map->input_mask;
+        e->register_index = new_register_count++;
+        e->target_location = map->input_register_index;
+        e->interpolation_mode = VKD3DSIM_LINEAR;
+    }
+
+    /* Write each uninitialized varying before each ret. */
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+        struct vkd3d_shader_location loc;
+
+        if (ins->opcode != VKD3DSIH_RET)
+            continue;
+
+        loc = ins->location;
+        if (!shader_instruction_array_insert_at(&program->instructions, i, uninit_varying_count))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        ins = &program->instructions.elements[i];
+
+        for (unsigned int j = signature->element_count - uninit_varying_count; j < signature->element_count; ++j)
         {
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                    "Aborting due to not yet implemented feature: "
-                    "The next stage consumes varyings not written by this stage.");
-            return VKD3D_ERROR_NOT_IMPLEMENTED;
+            e = &signature->elements[j];
+
+            vsir_instruction_init_with_params(program, ins, &loc, VKD3DSIH_MOV, 1, 1);
+            dst_param_init_output(&ins->dst[0], VKD3D_DATA_FLOAT, e->register_index, e->mask);
+            vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+            ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+            ++ins;
         }
+
+        i += uninit_varying_count;
     }
 
     /* Vulkan (without KHR_maintenance4) disallows any mismatching masks,
