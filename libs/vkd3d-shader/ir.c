@@ -789,6 +789,23 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
         shader_register_eliminate_phase_addressing(&ins->dst[i].reg, instance_id);
 }
 
+/* Ensure that the program closes with a ret. sm1 programs do not, by default.
+ * Many of our IR passes rely on this in order to insert instructions at the
+ * end of execution. */
+static enum vkd3d_result vsir_program_ensure_ret(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    static const struct vkd3d_shader_location no_loc;
+    if (program->instructions.count
+            && program->instructions.elements[program->instructions.count - 1].opcode == VKD3DSIH_RET)
+        return VKD3D_OK;
+
+    if (!shader_instruction_array_insert_at(&program->instructions, program->instructions.count, 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    vsir_instruction_init(&program->instructions.elements[program->instructions.count - 1], &no_loc, VKD3DSIH_RET);
+    return VKD3D_OK;
+}
+
 static const struct vkd3d_shader_varying_map *find_varying_map(
         const struct vkd3d_shader_varying_map_info *varying_map, unsigned int signature_idx)
 {
@@ -2490,15 +2507,14 @@ static void VKD3D_PRINTF_FUNC(3, 4) cf_flattener_create_block_name(struct cf_fla
 static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener,
         struct vkd3d_shader_message_context *message_context)
 {
-    bool main_block_open, is_hull_shader, after_declarations_section;
     struct vkd3d_shader_instruction_array *instructions;
     struct vsir_program *program = flattener->program;
+    bool is_hull_shader, after_declarations_section;
     struct vkd3d_shader_instruction *dst_ins;
     size_t i;
 
     instructions = &program->instructions;
     is_hull_shader = program->shader_version.type == VKD3D_SHADER_TYPE_HULL;
-    main_block_open = !is_hull_shader;
     after_declarations_section = is_hull_shader;
 
     if (!cf_flattener_require_space(flattener, instructions->count + 1))
@@ -2822,8 +2838,6 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 
                 if (cf_info)
                     cf_info->inside_block = false;
-                else
-                    main_block_open = false;
                 break;
 
             default:
@@ -2831,14 +2845,6 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 break;
         }
-    }
-
-    if (main_block_open)
-    {
-        if (!(dst_ins = cf_flattener_require_space(flattener, 1)))
-            return VKD3D_ERROR_OUT_OF_MEMORY;
-        vsir_instruction_init(dst_ins, &flattener->location, VKD3DSIH_RET);
-        ++flattener->instruction_count;
     }
 
     return flattener->status;
@@ -8012,6 +8018,8 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
     }
     else
     {
+        vsir_transform(&ctx, vsir_program_ensure_ret);
+
         if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
             vsir_transform(&ctx, vsir_program_remap_output_signature);
 
