@@ -129,6 +129,19 @@ const struct vkd3d_shader_parameter1 *vsir_program_get_parameter(
     return NULL;
 }
 
+static struct signature_element *vsir_signature_find_element_by_name(
+        const struct shader_signature *signature, const char *semantic_name, unsigned int semantic_index)
+{
+    for (unsigned int i = 0; i < signature->element_count; ++i)
+    {
+        if (!ascii_strcasecmp(signature->elements[i].semantic_name, semantic_name)
+                && signature->elements[i].semantic_index == semantic_index)
+            return &signature->elements[i];
+    }
+
+    return NULL;
+}
+
 void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count)
 {
@@ -803,6 +816,81 @@ static enum vkd3d_result vsir_program_ensure_ret(struct vsir_program *program,
     if (!shader_instruction_array_insert_at(&program->instructions, program->instructions.count, 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
     vsir_instruction_init(&program->instructions.elements[program->instructions.count - 1], &no_loc, VKD3DSIH_RET);
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_program_add_diffuse_output(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    struct shader_signature *signature = &program->output_signature;
+    struct signature_element *new_elements, *e;
+
+    if (program->shader_version.type != VKD3D_SHADER_TYPE_VERTEX)
+        return VKD3D_OK;
+
+    if ((e = vsir_signature_find_element_by_name(signature, "COLOR", 0)))
+    {
+        program->diffuse_written_mask = e->mask;
+        e->mask = VKD3DSP_WRITEMASK_ALL;
+
+        return VKD3D_OK;
+    }
+
+    if (!(new_elements = vkd3d_realloc(signature->elements,
+            (signature->element_count + 1) * sizeof(*signature->elements))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    signature->elements = new_elements;
+    e = &signature->elements[signature->element_count++];
+    memset(e, 0, sizeof(*e));
+    e->semantic_name = vkd3d_strdup("COLOR");
+    e->sysval_semantic = VKD3D_SHADER_SV_NONE;
+    e->component_type = VKD3D_SHADER_COMPONENT_FLOAT;
+    e->register_count = 1;
+    e->mask = VKD3DSP_WRITEMASK_ALL;
+    e->used_mask = VKD3DSP_WRITEMASK_ALL;
+    e->register_index = SM1_COLOR_REGISTER_OFFSET;
+    e->target_location = SM1_COLOR_REGISTER_OFFSET;
+    e->interpolation_mode = VKD3DSIM_NONE;
+
+    return VKD3D_OK;
+}
+
+/* Uninitialized components of diffuse yield 1.0 in SM1-2. Implement this by
+ * always writing diffuse in those versions, even if the PS doesn't read it. */
+static enum vkd3d_result vsir_program_ensure_diffuse(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    static const struct vkd3d_shader_location no_loc;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int i;
+
+    if (program->shader_version.type != VKD3D_SHADER_TYPE_VERTEX
+            || program->diffuse_written_mask == VKD3DSP_WRITEMASK_ALL)
+        return VKD3D_OK;
+
+    /* Write the instruction after all LABEL, DCL, and NOP instructions.
+     * We need to skip NOP instructions because they might result from removed
+     * DCLs, and there could still be DCLs after NOPs. */
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        ins = &program->instructions.elements[i];
+
+        if (!vsir_instruction_is_dcl(ins) && ins->opcode != VKD3DSIH_LABEL && ins->opcode != VKD3DSIH_NOP)
+            break;
+    }
+
+    if (!shader_instruction_array_insert_at(&program->instructions, i, 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    ins = &program->instructions.elements[i];
+    vsir_instruction_init_with_params(program, ins, &no_loc, VKD3DSIH_MOV, 1, 1);
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_ATTROUT, VKD3D_DATA_FLOAT, 1);
+    ins->dst[0].reg.idx[0].offset = 0;
+    ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL & ~program->diffuse_written_mask;
+    vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+    ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    for (i = 0; i < 4; ++i)
+        ins->src[0].reg.u.immconst_f32[i] = 1.0f;
     return VKD3D_OK;
 }
 
@@ -8087,6 +8175,31 @@ static void vsir_transform_(
     }
 }
 
+/* Transformations which should happen at parse time, i.e. before scan
+ * information is returned to the user.
+ *
+ * In particular, some passes need to modify the signature, and
+ * vkd3d_shader_scan() should report the modified signature for the given
+ * target. */
+enum vkd3d_result vsir_program_transform_early(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
+{
+    struct vsir_transformation_context ctx =
+    {
+        .result = VKD3D_OK,
+        .program = program,
+        .config_flags = config_flags,
+        .compile_info = compile_info,
+        .message_context = message_context,
+    };
+
+    /* For vsir_program_ensure_diffuse(). */
+    if (program->shader_version.major <= 2)
+        vsir_transform(&ctx, vsir_program_add_diffuse_output);
+
+    return ctx.result;
+}
+
 enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
@@ -8112,6 +8225,9 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
     else
     {
         vsir_transform(&ctx, vsir_program_ensure_ret);
+
+        if (program->shader_version.major <= 2)
+            vsir_transform(&ctx, vsir_program_ensure_diffuse);
 
         if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
             vsir_transform(&ctx, vsir_program_remap_output_signature);

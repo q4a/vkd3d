@@ -719,8 +719,11 @@ static enum vkd3d_result vsir_parse(const struct vkd3d_shader_compile_info *comp
             vsir_program_trace(program);
 
         vsir_program_cleanup(program);
+        return ret;
     }
 
+    if (compile_info->target_type != VKD3D_SHADER_TARGET_NONE)
+        ret = vsir_program_transform_early(program, config_flags, compile_info, message_context);
     return ret;
 }
 
