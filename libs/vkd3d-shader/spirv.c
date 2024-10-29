@@ -34,6 +34,11 @@
 # include "vulkan/GLSL.std.450.h"
 #endif  /* HAVE_SPIRV_UNIFIED1_GLSL_STD_450_H */
 
+#define VKD3D_SPIRV_VERSION_1_0 0x00010000
+#define VKD3D_SPIRV_VERSION_1_3 0x00010300
+#define VKD3D_SPIRV_GENERATOR_ID 18
+#define VKD3D_SPIRV_GENERATOR_VERSION 14
+#define VKD3D_SPIRV_GENERATOR_MAGIC vkd3d_make_u32(VKD3D_SPIRV_GENERATOR_VERSION, VKD3D_SPIRV_GENERATOR_ID)
 #ifndef VKD3D_SHADER_UNSUPPORTED_SPIRV_PARSER
 # define VKD3D_SHADER_UNSUPPORTED_SPIRV_PARSER 0
 #endif
@@ -44,6 +49,11 @@
 #define VKD3D_SPIRV_VERSION_MAJOR_MASK              (0xffu << VKD3D_SPIRV_VERSION_MAJOR_SHIFT)
 #define VKD3D_SPIRV_VERSION_MINOR_SHIFT             8u
 #define VKD3D_SPIRV_VERSION_MINOR_MASK              (0xffu << VKD3D_SPIRV_VERSION_MINOR_SHIFT)
+
+#define VKD3D_SPIRV_GENERATOR_ID_SHIFT              16u
+#define VKD3D_SPIRV_GENERATOR_ID_MASK               (0xffffu << VKD3D_SPIRV_GENERATOR_ID_SHIFT)
+#define VKD3D_SPIRV_GENERATOR_VERSION_SHIFT         0u
+#define VKD3D_SPIRV_GENERATOR_VERSION_MASK          (0xffffu << VKD3D_SPIRV_GENERATOR_VERSION_SHIFT)
 
 #ifdef HAVE_SPIRV_TOOLS
 # include "spirv-tools/libspirv.h"
@@ -249,10 +259,35 @@ static void VKD3D_PRINTF_FUNC(2, 3) spirv_parser_print_comment(struct spirv_pars
     va_end(args);
 }
 
+static void spirv_parser_print_generator(struct spirv_parser *parser, uint32_t magic)
+{
+    unsigned int id, version;
+    const char *name;
+
+    id = (magic & VKD3D_SPIRV_GENERATOR_ID_MASK) >> VKD3D_SPIRV_GENERATOR_ID_SHIFT;
+    version = (magic & VKD3D_SPIRV_GENERATOR_VERSION_MASK) >> VKD3D_SPIRV_GENERATOR_VERSION_SHIFT;
+
+    switch (id)
+    {
+        case VKD3D_SPIRV_GENERATOR_ID:
+            name = "Wine VKD3D Shader Compiler";
+            break;
+
+        default:
+            name = NULL;
+            break;
+    }
+
+    if (name)
+        spirv_parser_print_comment(parser, "Generator: %s; %u", name, version);
+    else
+        spirv_parser_print_comment(parser, "Generator: Unknown (%#x); %u", id, version);
+}
+
 static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
 {
+    uint32_t magic, version, generator;
     unsigned int major, minor;
-    uint32_t magic, version;
 
     if (parser->pos > parser->size || parser->size - parser->pos < VKD3D_SPIRV_HEADER_SIZE)
     {
@@ -263,6 +298,7 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
 
     magic = spirv_parser_read_u32(parser);
     version = spirv_parser_read_u32(parser);
+    generator = spirv_parser_read_u32(parser);
 
     if (magic != SpvMagicNumber)
     {
@@ -291,6 +327,7 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
     {
         spirv_parser_print_comment(parser, "SPIR-V");
         spirv_parser_print_comment(parser, "Version: %u.%u", major, minor);
+        spirv_parser_print_generator(parser, generator);
     }
 
     return VKD3D_OK;
@@ -461,12 +498,6 @@ enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d
             return VKD3D_SIV_NONE;
     }
 }
-
-#define VKD3D_SPIRV_VERSION_1_0 0x00010000
-#define VKD3D_SPIRV_VERSION_1_3 0x00010300
-#define VKD3D_SPIRV_GENERATOR_ID 18
-#define VKD3D_SPIRV_GENERATOR_VERSION 14
-#define VKD3D_SPIRV_GENERATOR_MAGIC vkd3d_make_u32(VKD3D_SPIRV_GENERATOR_VERSION, VKD3D_SPIRV_GENERATOR_ID)
 
 struct vkd3d_spirv_stream
 {
