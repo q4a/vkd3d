@@ -3295,7 +3295,7 @@ static void fx_4_parse_shader_initializer(struct fx_parser *parser, unsigned int
 
     parse_fx_print_indent(parser);
     vkd3d_string_buffer_printf(&parser->buffer, "}");
-    if (object_type == FX_4_OBJECT_TYPE_GEOMETRY_SHADER && gs_so.sodecl)
+    if (object_type == FX_4_OBJECT_TYPE_GEOMETRY_SHADER_SO && gs_so.sodecl)
     {
         vkd3d_string_buffer_printf(&parser->buffer, "\n/* Stream output declaration: \"%s\" */",
                 fx_4_get_string(parser, gs_so.sodecl));
