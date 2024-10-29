@@ -286,7 +286,7 @@ static void spirv_parser_print_generator(struct spirv_parser *parser, uint32_t m
 
 static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
 {
-    uint32_t magic, version, generator;
+    uint32_t magic, version, generator, bound;
     unsigned int major, minor;
 
     if (parser->pos > parser->size || parser->size - parser->pos < VKD3D_SPIRV_HEADER_SIZE)
@@ -299,6 +299,7 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
     magic = spirv_parser_read_u32(parser);
     version = spirv_parser_read_u32(parser);
     generator = spirv_parser_read_u32(parser);
+    bound = spirv_parser_read_u32(parser);
 
     if (magic != SpvMagicNumber)
     {
@@ -323,11 +324,19 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
 
+    if (!bound)
+    {
+        spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
+                "Invalid zero id bound.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
     if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER)
     {
         spirv_parser_print_comment(parser, "SPIR-V");
         spirv_parser_print_comment(parser, "Version: %u.%u", major, minor);
         spirv_parser_print_generator(parser, generator);
+        spirv_parser_print_comment(parser, "Bound: %u", bound);
     }
 
     return VKD3D_OK;
