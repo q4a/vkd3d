@@ -820,14 +820,84 @@ static const struct vkd3d_shader_varying_map *find_varying_map(
     return NULL;
 }
 
+static bool target_allows_subset_masks(const struct vkd3d_shader_compile_info *info)
+{
+    const struct vkd3d_shader_spirv_target_info *spirv_info;
+    enum vkd3d_shader_spirv_environment environment;
+
+    switch (info->target_type)
+    {
+        case VKD3D_SHADER_TARGET_SPIRV_BINARY:
+            spirv_info = vkd3d_find_struct(info->next, SPIRV_TARGET_INFO);
+            environment = spirv_info ? spirv_info->environment : VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
+
+            switch (environment)
+            {
+                case VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5:
+                    return true;
+
+                case VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0:
+                case VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_1:
+                    /* FIXME: Allow KHR_maintenance4. */
+                    return false;
+
+                default:
+                    FIXME("Unrecognized environment %#x.\n", environment);
+                    return false;
+            }
+
+        default:
+            return true;
+    }
+}
+
+static void remove_unread_output_components(const struct shader_signature *signature,
+        struct vkd3d_shader_instruction *ins, struct vkd3d_shader_dst_param *dst)
+{
+    const struct signature_element *e;
+
+    switch (dst->reg.type)
+    {
+        case VKD3DSPR_OUTPUT:
+            e = vsir_signature_find_element_for_reg(signature, dst->reg.idx[0].offset, 0);
+            break;
+
+        case VKD3DSPR_ATTROUT:
+            e = vsir_signature_find_element_for_reg(signature,
+                    SM1_COLOR_REGISTER_OFFSET + dst->reg.idx[0].offset, 0);
+            break;
+
+        case VKD3DSPR_RASTOUT:
+            e = vsir_signature_find_element_for_reg(signature,
+                    SM1_RASTOUT_REGISTER_OFFSET + dst->reg.idx[0].offset, 0);
+            break;
+
+        default:
+            return;
+    }
+
+    /* We already changed the mask earlier. */
+    dst->write_mask &= e->mask;
+
+    if (!dst->write_mask)
+    {
+        if (ins->dst_count == 1)
+            vkd3d_shader_instruction_make_nop(ins);
+        else
+            vsir_dst_param_init(dst, VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+    }
+}
+
 static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
     const struct vkd3d_shader_location location = {.source_name = ctx->compile_info->source_name};
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     const struct vkd3d_shader_compile_info *compile_info = ctx->compile_info;
+    bool allows_subset_masks = target_allows_subset_masks(compile_info);
     struct shader_signature *signature = &program->output_signature;
     const struct vkd3d_shader_varying_map_info *varying_map;
+    unsigned int subset_varying_count = 0;
     unsigned int i;
 
     if (!(varying_map = vkd3d_find_struct(compile_info->next, VARYING_MAP_INFO)))
@@ -844,14 +914,21 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
 
             e->target_location = map->input_register_index;
 
-            /* It is illegal in Vulkan if the next shader uses the same varying
-             * location with a different mask. */
-            if (input_mask && input_mask != e->mask)
+            if ((input_mask & e->mask) == input_mask)
+            {
+                ++subset_varying_count;
+                if (!allows_subset_masks)
+                {
+                    e->mask = input_mask;
+                    e->used_mask &= input_mask;
+                }
+            }
+            else if (input_mask && input_mask != e->mask)
             {
                 vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                         "Aborting due to not yet implemented feature: "
-                        "Output mask %#x does not match input mask %#x.",
-                        e->mask, input_mask);
+                        "Input mask %#x reads components not written in output mask %#x.",
+                        input_mask, e->mask);
                 return VKD3D_ERROR_NOT_IMPLEMENTED;
             }
         }
@@ -870,6 +947,22 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
                     "The next stage consumes varyings not written by this stage.");
             return VKD3D_ERROR_NOT_IMPLEMENTED;
         }
+    }
+
+    /* Vulkan (without KHR_maintenance4) disallows any mismatching masks,
+     * including when the input mask is a proper subset of the output mask.
+     * Resolve this by rewriting the shader to remove unread components from
+     * any writes to the output variable. */
+
+    if (!subset_varying_count || allows_subset_masks)
+        return VKD3D_OK;
+
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        for (unsigned int j = 0; j < ins->dst_count; ++j)
+            remove_unread_output_components(signature, ins, &ins->dst[j]);
     }
 
     return VKD3D_OK;
