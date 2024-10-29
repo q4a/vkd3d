@@ -40,6 +40,11 @@
 
 #define VKD3D_SPIRV_HEADER_SIZE 5
 
+#define VKD3D_SPIRV_VERSION_MAJOR_SHIFT             16u
+#define VKD3D_SPIRV_VERSION_MAJOR_MASK              (0xffu << VKD3D_SPIRV_VERSION_MAJOR_SHIFT)
+#define VKD3D_SPIRV_VERSION_MINOR_SHIFT             8u
+#define VKD3D_SPIRV_VERSION_MINOR_MASK              (0xffu << VKD3D_SPIRV_VERSION_MINOR_SHIFT)
+
 #ifdef HAVE_SPIRV_TOOLS
 # include "spirv-tools/libspirv.h"
 
@@ -246,7 +251,8 @@ static void VKD3D_PRINTF_FUNC(2, 3) spirv_parser_print_comment(struct spirv_pars
 
 static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
 {
-    uint32_t magic;
+    unsigned int major, minor;
+    uint32_t magic, version;
 
     if (parser->pos > parser->size || parser->size - parser->pos < VKD3D_SPIRV_HEADER_SIZE)
     {
@@ -256,6 +262,7 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
     }
 
     magic = spirv_parser_read_u32(parser);
+    version = spirv_parser_read_u32(parser);
 
     if (magic != SpvMagicNumber)
     {
@@ -264,8 +271,27 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
+    if (version & ~(VKD3D_SPIRV_VERSION_MAJOR_MASK | VKD3D_SPIRV_VERSION_MINOR_MASK))
+    {
+        spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
+                "Invalid version token %#08x.", version);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    major = (version & VKD3D_SPIRV_VERSION_MAJOR_MASK) >> VKD3D_SPIRV_VERSION_MAJOR_SHIFT;
+    minor = (version & VKD3D_SPIRV_VERSION_MINOR_MASK) >> VKD3D_SPIRV_VERSION_MINOR_SHIFT;
+    if (major != 1 || minor > 0)
+    {
+        spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Unable to parse SPIR-V version %u.%u.", major, minor);
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+
     if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER)
+    {
         spirv_parser_print_comment(parser, "SPIR-V");
+        spirv_parser_print_comment(parser, "Version: %u.%u", major, minor);
+    }
 
     return VKD3D_OK;
 }
