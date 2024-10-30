@@ -1155,6 +1155,7 @@ struct hlsl_ctx
         struct hlsl_constant_register
         {
             uint32_t index;
+            uint32_t allocated_mask;
             struct hlsl_vec4 value;
             struct vkd3d_shader_location loc;
         } *regs;

@@ -5352,6 +5352,33 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx,
     }
 }
 
+static bool find_constant(struct hlsl_ctx *ctx, const float *f, unsigned int count, struct hlsl_reg *ret)
+{
+    struct hlsl_constant_defs *defs = &ctx->constant_defs;
+
+    for (size_t i = 0; i < defs->count; ++i)
+    {
+        const struct hlsl_constant_register *reg = &defs->regs[i];
+
+        for (size_t j = 0; j <= 4 - count; ++j)
+        {
+            unsigned int writemask = ((1u << count) - 1) << j;
+
+            if ((reg->allocated_mask & writemask) == writemask
+                    && !memcmp(f, &reg->value.f[j], count * sizeof(float)))
+            {
+                ret->id = reg->index;
+                ret->allocation_size = 1;
+                ret->writemask = writemask;
+                ret->allocated = true;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 static void record_constant(struct hlsl_ctx *ctx, unsigned int component_index, float f,
         const struct vkd3d_shader_location *loc)
 {
@@ -5365,6 +5392,7 @@ static void record_constant(struct hlsl_ctx *ctx, unsigned int component_index, 
         if (reg->index == (component_index / 4))
         {
             reg->value.f[component_index % 4] = f;
+            reg->allocated_mask |= (1u << (component_index % 4));
             return;
         }
     }
@@ -5375,6 +5403,7 @@ static void record_constant(struct hlsl_ctx *ctx, unsigned int component_index, 
     memset(reg, 0, sizeof(*reg));
     reg->index = component_index / 4;
     reg->value.f[component_index % 4] = f;
+    reg->allocated_mask = (1u << (component_index % 4));
     reg->loc = *loc;
 }
 
@@ -5391,50 +5420,57 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
             {
                 struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
                 const struct hlsl_type *type = instr->data_type;
-                unsigned int x, i;
-
-                constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
-                TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
+                float f[4] = {0};
 
                 VKD3D_ASSERT(hlsl_is_numeric_type(type));
                 VKD3D_ASSERT(type->e.numeric.dimy == 1);
-                VKD3D_ASSERT(constant->reg.writemask);
 
-                for (x = 0, i = 0; x < 4; ++x)
+                for (unsigned int i = 0; i < type->e.numeric.dimx; ++i)
                 {
                     const union hlsl_constant_value_component *value;
-                    float f = 0;
 
-                    if (!(constant->reg.writemask & (1u << x)))
-                        continue;
-                    value = &constant->value.u[i++];
+                    value = &constant->value.u[i];
 
                     switch (type->e.numeric.type)
                     {
                         case HLSL_TYPE_BOOL:
-                            f = !!value->u;
+                            f[i] = !!value->u;
                             break;
 
                         case HLSL_TYPE_FLOAT:
                         case HLSL_TYPE_HALF:
-                            f = value->f;
+                            f[i] = value->f;
                             break;
 
                         case HLSL_TYPE_INT:
-                            f = value->i;
+                            f[i] = value->i;
                             break;
 
                         case HLSL_TYPE_MIN16UINT:
                         case HLSL_TYPE_UINT:
-                            f = value->u;
+                            f[i] = value->u;
                             break;
 
                         case HLSL_TYPE_DOUBLE:
                             FIXME("Double constant.\n");
                             return;
                     }
+                }
 
-                    record_constant(ctx, constant->reg.id * 4 + x, f, &constant->node.loc);
+                if (find_constant(ctx, f, type->e.numeric.dimx, &constant->reg))
+                {
+                    TRACE("Reusing already allocated constant %s for @%u.\n",
+                            debug_register('c', constant->reg, type), instr->index);
+                    break;
+                }
+
+                constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
+                TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
+
+                for (unsigned int x = 0, i = 0; x < 4; ++x)
+                {
+                    if ((constant->reg.writemask & (1u << x)))
+                        record_constant(ctx, constant->reg.id * 4 + x, f[i++], &constant->node.loc);
                 }
 
                 break;
