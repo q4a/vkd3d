@@ -2716,6 +2716,329 @@ out:
     return progress;
 }
 
+struct vectorize_stores_state
+{
+    struct vectorizable_stores_group
+    {
+        struct hlsl_block *block;
+        /* We handle overlapping stores, because it's not really easier not to.
+         * In theory, then, we could collect an arbitrary number of stores here.
+         *
+         * In practice, overlapping stores are unlikely, and of course at most
+         * 4 stores can appear without overlap. Therefore, for simplicity, we
+         * just use a fixed array of 4.
+         *
+         * Since computing the writemask requires traversing the deref, and we
+         * need to do that anyway, we store it here for convenience. */
+        struct hlsl_ir_store *stores[4];
+        unsigned int path_len;
+        uint8_t writemasks[4];
+        uint8_t store_count;
+        bool dirty;
+    } *groups;
+    size_t count, capacity;
+};
+
+/* This must be a store to a subsection of a vector.
+ * In theory we can also vectorize stores to packed struct fields,
+ * but this requires target-specific knowledge and is probably best left
+ * to a VSIR pass. */
+static bool can_vectorize_store(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
+        unsigned int *path_len, uint8_t *writemask)
+{
+    struct hlsl_type *type = store->lhs.var->data_type;
+    unsigned int i;
+
+    if (store->rhs.node->data_type->class > HLSL_CLASS_VECTOR)
+        return false;
+
+    if (type->class == HLSL_CLASS_SCALAR)
+        return false;
+
+    for (i = 0; type->class != HLSL_CLASS_VECTOR && i < store->lhs.path_len; ++i)
+        type = hlsl_get_element_type_from_path_index(ctx, type, store->lhs.path[i].node);
+
+    if (type->class != HLSL_CLASS_VECTOR)
+        return false;
+
+    *path_len = i;
+
+    if (i < store->lhs.path_len)
+    {
+        struct hlsl_ir_constant *c;
+
+        /* This is a store to a scalar component of a vector, achieved via
+         * indexing. */
+
+        if (store->lhs.path[i].node->type != HLSL_IR_CONSTANT)
+            return false;
+        c = hlsl_ir_constant(store->lhs.path[i].node);
+        *writemask = (1u << c->value.u[0].u);
+    }
+    else
+    {
+        *writemask = store->writemask;
+    }
+
+    return true;
+}
+
+static bool derefs_are_same_vector(struct hlsl_ctx *ctx, const struct hlsl_deref *a, const struct hlsl_deref *b)
+{
+    struct hlsl_type *type = a->var->data_type;
+
+    if (a->var != b->var)
+        return false;
+
+    for (unsigned int i = 0; type->class != HLSL_CLASS_VECTOR && i < a->path_len && i < b->path_len; ++i)
+    {
+        if (a->path[i].node != b->path[i].node)
+            return false;
+        type = hlsl_get_element_type_from_path_index(ctx, type, a->path[i].node);
+    }
+
+    return true;
+}
+
+static void record_vectorizable_store(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_ir_store *store, struct vectorize_stores_state *state)
+{
+    unsigned int path_len;
+    uint8_t writemask;
+
+    if (!can_vectorize_store(ctx, store, &path_len, &writemask))
+    {
+        /* In the case of a dynamically indexed vector, we must invalidate
+         * any groups that statically index the same vector.
+         * For the sake of expediency, we go one step further and invalidate
+         * any groups that store to the same variable.
+         * (We also don't check that that was the reason why this store isn't
+         * vectorizable.)
+         * We could be more granular, but we'll defer that until it comes
+         * up in practice. */
+        for (size_t i = 0; i < state->count; ++i)
+        {
+            if (state->groups[i].stores[0]->lhs.var == store->lhs.var)
+                state->groups[i].dirty = true;
+        }
+        return;
+    }
+
+    for (size_t i = 0; i < state->count; ++i)
+    {
+        struct vectorizable_stores_group *group = &state->groups[i];
+        struct hlsl_ir_store *other = group->stores[0];
+
+        if (group->dirty)
+            continue;
+
+        if (derefs_are_same_vector(ctx, &store->lhs, &other->lhs))
+        {
+            /* Stores must be in the same CFG block. If they're not,
+             * they're not executed in exactly the same flow, and
+             * therefore can't be vectorized. */
+            if (group->block == block
+                    && is_same_vectorizable_source(store->rhs.node, other->rhs.node))
+            {
+                if (group->store_count < ARRAY_SIZE(group->stores))
+                {
+                    group->stores[group->store_count] = store;
+                    group->writemasks[group->store_count] = writemask;
+                    ++group->store_count;
+                    return;
+                }
+            }
+            else
+            {
+                /* A store to the same vector with a different source, or in
+                 * a different CFG block, invalidates any earlier store.
+                 *
+                 * A store to a component which *contains* the vector in
+                 * question would also invalidate, but we should have split all
+                 * of those by the time we get here. */
+                group->dirty = true;
+
+                /* Note that we do exit this loop early if we find a store A we
+                 * can vectorize with, but that's fine. If there was a store B
+                 * also in the state that we can't vectorize with, it would
+                 * already have invalidated A. */
+            }
+        }
+        else
+        {
+            /* This could still be a store to the same vector, if e.g. the
+             * vector is part of a dynamically indexed array, or the path has
+             * two equivalent instructions which refer to the same component.
+             * [CSE may help with the latter, but we don't have it yet,
+             * and we shouldn't depend on it anyway.]
+             * For the sake of expediency, we just invalidate it if it refers
+             * to the same variable at all.
+             * As above, we could be more granular, but we'll defer that until
+             * it comes up in practice. */
+            if (store->lhs.var == other->lhs.var)
+                group->dirty = true;
+
+            /* As above, we don't need to worry about exiting the loop early. */
+        }
+    }
+
+    if (!hlsl_array_reserve(ctx, (void **)&state->groups,
+            &state->capacity, state->count + 1, sizeof(*state->groups)))
+        return;
+    state->groups[state->count].block = block;
+    state->groups[state->count].stores[0] = store;
+    state->groups[state->count].path_len = path_len;
+    state->groups[state->count].writemasks[0] = writemask;
+    state->groups[state->count].store_count = 1;
+    state->groups[state->count].dirty = false;
+    ++state->count;
+}
+
+static void find_vectorizable_store_groups(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct vectorize_stores_state *state)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_STORE)
+        {
+            record_vectorizable_store(ctx, block, hlsl_ir_store(instr), state);
+        }
+        else if (instr->type == HLSL_IR_LOAD)
+        {
+            struct hlsl_ir_var *var = hlsl_ir_load(instr)->src.var;
+
+            /* By vectorizing store A with store B, we are effectively moving
+             * store A down to happen at the same time as store B.
+             * If there was a load of the same variable between the two, this
+             * would be incorrect.
+             * Therefore invalidate all stores to this variable. As above, we
+             * could be more granular if necessary. */
+
+            for (unsigned int i = 0; i < state->count; ++i)
+            {
+                if (state->groups[i].stores[0]->lhs.var == var)
+                    state->groups[i].dirty = true;
+            }
+        }
+        else if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            find_vectorizable_store_groups(ctx, &iff->then_block, state);
+            find_vectorizable_store_groups(ctx, &iff->else_block, state);
+        }
+        else if (instr->type == HLSL_IR_LOOP)
+        {
+            find_vectorizable_store_groups(ctx, &hlsl_ir_loop(instr)->body, state);
+        }
+        else if (instr->type == HLSL_IR_SWITCH)
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                find_vectorizable_store_groups(ctx, &c->body, state);
+        }
+    }
+}
+
+/* Combine sequences like
+ *
+ * 2: @1.yw
+ * 3: @1.zy
+ * 4: var.xy = @2
+ * 5: var.yw = @3
+ *
+ * to
+ *
+ * 2: @1.yzy
+ * 5: var.xyw = @2
+ *
+ * There are a lot of gotchas here. We need to make sure the two stores are to
+ * the same vector (which may be embedded in a complex variable), that they're
+ * always executed in the same control flow, and that there aren't any other
+ * stores or loads on the same vector in the middle. */
+static bool vectorize_stores(struct hlsl_ctx *ctx, struct hlsl_block *block)
+{
+    struct vectorize_stores_state state = {0};
+    bool progress = false;
+
+    find_vectorizable_store_groups(ctx, block, &state);
+
+    for (unsigned int i = 0; i < state.count; ++i)
+    {
+        struct vectorizable_stores_group *group = &state.groups[i];
+        uint32_t new_swizzle = 0, new_writemask = 0;
+        struct hlsl_ir_node *new_rhs, *value;
+        uint32_t swizzle_components[4];
+        unsigned int component_count;
+        struct hlsl_ir_store *store;
+        struct hlsl_block new_block;
+
+        if (group->store_count == 1)
+            continue;
+
+        hlsl_block_init(&new_block);
+
+        /* Compute the swizzle components. */
+        for (unsigned int j = 0; j < group->store_count; ++j)
+        {
+            unsigned int writemask = group->writemasks[j];
+            uint32_t rhs_swizzle;
+
+            store = group->stores[j];
+
+            if (store->rhs.node->type == HLSL_IR_SWIZZLE)
+                rhs_swizzle = hlsl_ir_swizzle(store->rhs.node)->u.vector;
+            else
+                rhs_swizzle = HLSL_SWIZZLE(X, Y, Z, W);
+
+            component_count = 0;
+            for (unsigned int k = 0; k < 4; ++k)
+            {
+                if (writemask & (1u << k))
+                    swizzle_components[k] = hlsl_swizzle_get_component(rhs_swizzle, component_count++);
+            }
+
+            new_writemask |= writemask;
+        }
+
+        /* Construct the new swizzle. */
+        component_count = 0;
+        for (unsigned int k = 0; k < 4; ++k)
+        {
+            if (new_writemask & (1u << k))
+                hlsl_swizzle_set_component(&new_swizzle, component_count++, swizzle_components[k]);
+        }
+
+        store = group->stores[0];
+        value = store->rhs.node;
+        if (value->type == HLSL_IR_SWIZZLE)
+            value = hlsl_ir_swizzle(value)->val.node;
+
+        new_rhs = hlsl_block_add_swizzle(ctx, &new_block, new_swizzle, component_count, value, &value->loc);
+        hlsl_block_add_store_parent(ctx, &new_block, &store->lhs,
+                group->path_len, new_rhs, new_writemask, &store->node.loc);
+
+        TRACE("Combining %u stores to %s.\n", group->store_count, store->lhs.var->name);
+
+        list_move_before(&group->stores[group->store_count - 1]->node.entry, &new_block.instrs);
+
+        for (unsigned int j = 0; j < group->store_count; ++j)
+        {
+            list_remove(&group->stores[j]->node.entry);
+            hlsl_free_instr(&group->stores[j]->node);
+        }
+
+        progress = true;
+    }
+
+    vkd3d_free(state.groups);
+    return progress;
+}
+
 static enum validation_result validate_component_index_range_from_deref(struct hlsl_ctx *ctx,
         const struct hlsl_deref *deref)
 {
@@ -13017,6 +13340,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         progress |= hlsl_transform_ir(ctx, dce, body, NULL);
         progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);
         progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
+        progress |= vectorize_stores(ctx, body);
     } while (progress);
 
     hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
