@@ -7808,6 +7808,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
 static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *block, struct vsir_program *program)
 {
     struct hlsl_ir_node *instr, *next;
+    struct hlsl_ir_switch_case *c;
 
     LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
     {
@@ -7832,6 +7833,20 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
             case HLSL_IR_EXPR:
                 if (sm4_generate_vsir_instr_expr(ctx, program, hlsl_ir_expr(instr)))
                     replace_instr_with_last_vsir_instr(ctx, program, instr);
+                break;
+
+            case HLSL_IR_IF:
+                sm4_generate_vsir_block(ctx, &hlsl_ir_if(instr)->then_block, program);
+                sm4_generate_vsir_block(ctx, &hlsl_ir_if(instr)->else_block, program);
+                break;
+
+            case HLSL_IR_LOOP:
+                sm4_generate_vsir_block(ctx, &hlsl_ir_loop(instr)->body, program);
+                break;
+
+            case HLSL_IR_SWITCH:
+                LIST_FOR_EACH_ENTRY(c, &hlsl_ir_switch(instr)->cases, struct hlsl_ir_switch_case, entry)
+                    sm4_generate_vsir_block(ctx, &c->body, program);
                 break;
 
             case HLSL_IR_SWIZZLE:
