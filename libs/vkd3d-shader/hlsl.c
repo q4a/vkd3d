@@ -192,18 +192,20 @@ bool hlsl_type_is_row_major(const struct hlsl_type *type)
 
 unsigned int hlsl_type_minor_size(const struct hlsl_type *type)
 {
+    VKD3D_ASSERT(hlsl_is_numeric_type(type));
     if (type->class != HLSL_CLASS_MATRIX || hlsl_type_is_row_major(type))
-        return type->dimx;
+        return type->e.numeric.dimx;
     else
-        return type->dimy;
+        return type->e.numeric.dimy;
 }
 
 unsigned int hlsl_type_major_size(const struct hlsl_type *type)
 {
+    VKD3D_ASSERT(hlsl_is_numeric_type(type));
     if (type->class != HLSL_CLASS_MATRIX || hlsl_type_is_row_major(type))
-        return type->dimy;
+        return type->e.numeric.dimy;
     else
-        return type->dimx;
+        return type->e.numeric.dimx;
 }
 
 unsigned int hlsl_type_element_count(const struct hlsl_type *type)
@@ -211,7 +213,7 @@ unsigned int hlsl_type_element_count(const struct hlsl_type *type)
     switch (type->class)
     {
         case HLSL_CLASS_VECTOR:
-            return type->dimx;
+            return type->e.numeric.dimx;
         case HLSL_CLASS_MATRIX:
             return hlsl_type_major_size(type);
         case HLSL_CLASS_ARRAY:
@@ -355,14 +357,24 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
-            type->reg_size[HLSL_REGSET_NUMERIC] = is_sm4 ? type->dimx : 4;
+            type->reg_size[HLSL_REGSET_NUMERIC] = is_sm4 ? type->e.numeric.dimx : 4;
             break;
 
         case HLSL_CLASS_MATRIX:
             if (hlsl_type_is_row_major(type))
-                type->reg_size[HLSL_REGSET_NUMERIC] = is_sm4 ? (4 * (type->dimy - 1) + type->dimx) : (4 * type->dimy);
+            {
+                if (is_sm4)
+                    type->reg_size[HLSL_REGSET_NUMERIC] = 4 * (type->e.numeric.dimy - 1) + type->e.numeric.dimx;
+                else
+                    type->reg_size[HLSL_REGSET_NUMERIC] = 4 * type->e.numeric.dimy;
+            }
             else
-                type->reg_size[HLSL_REGSET_NUMERIC] = is_sm4 ? (4 * (type->dimx - 1) + type->dimy) : (4 * type->dimx);
+            {
+                if (is_sm4)
+                    type->reg_size[HLSL_REGSET_NUMERIC] = 4 * (type->e.numeric.dimx - 1) + type->e.numeric.dimy;
+                else
+                    type->reg_size[HLSL_REGSET_NUMERIC] = 4 * type->e.numeric.dimx;
+            }
             break;
 
         case HLSL_CLASS_ARRAY:
@@ -387,7 +399,6 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         {
             unsigned int i;
 
-            type->dimx = 0;
             for (i = 0; i < type->e.record.field_count; ++i)
             {
                 struct hlsl_struct_field *field = &type->e.record.fields[i];
@@ -399,8 +410,6 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
                     field->reg_offset[k] = type->reg_size[k];
                     type->reg_size[k] += field->type->reg_size[k];
                 }
-
-                type->dimx += field->type->dimx * field->type->dimy * hlsl_get_multiarray_size(field->type);
             }
             break;
         }
@@ -483,8 +492,8 @@ static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, e
     }
     type->class = type_class;
     type->e.numeric.type = base_type;
-    type->dimx = dimx;
-    type->dimy = dimy;
+    type->e.numeric.dimx = dimx;
+    type->e.numeric.dimy = dimy;
     hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);
@@ -552,18 +561,19 @@ static unsigned int traverse_path_from_component_index(struct hlsl_ctx *ctx,
     switch (type->class)
     {
         case HLSL_CLASS_VECTOR:
-            VKD3D_ASSERT(index < type->dimx);
+            VKD3D_ASSERT(index < type->e.numeric.dimx);
             *type_ptr = hlsl_get_scalar_type(ctx, type->e.numeric.type);
             *index_ptr = 0;
             return index;
 
         case HLSL_CLASS_MATRIX:
         {
-            unsigned int y = index / type->dimx, x = index % type->dimx;
+            unsigned int y = index / type->e.numeric.dimx, x = index % type->e.numeric.dimx;
             bool row_major = hlsl_type_is_row_major(type);
 
-            VKD3D_ASSERT(index < type->dimx * type->dimy);
-            *type_ptr = hlsl_get_vector_type(ctx, type->e.numeric.type, row_major ? type->dimx : type->dimy);
+            VKD3D_ASSERT(index < type->e.numeric.dimx * type->e.numeric.dimy);
+            *type_ptr = hlsl_get_vector_type(ctx, type->e.numeric.type,
+                    row_major ? type->e.numeric.dimx : type->e.numeric.dimy);
             *index_ptr = row_major ? x : y;
             return row_major ? y : x;
         }
@@ -861,9 +871,9 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
 
         case HLSL_CLASS_MATRIX:
             if (hlsl_type_is_row_major(type))
-                return hlsl_get_vector_type(ctx, type->e.numeric.type, type->dimx);
+                return hlsl_get_vector_type(ctx, type->e.numeric.type, type->e.numeric.dimx);
             else
-                return hlsl_get_vector_type(ctx, type->e.numeric.type, type->dimy);
+                return hlsl_get_vector_type(ctx, type->e.numeric.type, type->e.numeric.dimy);
 
         case HLSL_CLASS_ARRAY:
             return type->e.array.type;
@@ -892,8 +902,6 @@ struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *ba
     type->modifiers = basic_type->modifiers;
     type->e.array.elements_count = array_size;
     type->e.array.type = basic_type;
-    type->dimx = basic_type->dimx;
-    type->dimy = basic_type->dimy;
     type->sampler_dim = basic_type->sampler_dim;
     hlsl_type_calculate_reg_size(ctx, type);
 
@@ -927,7 +935,6 @@ struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
         return NULL;
     type->class = HLSL_CLASS_STRUCT;
     type->name = name;
-    type->dimy = 1;
     type->e.record.fields = fields;
     type->e.record.field_count = field_count;
     hlsl_type_calculate_reg_size(ctx, type);
@@ -945,8 +952,6 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
     type->class = HLSL_CLASS_TEXTURE;
-    type->dimx = 4;
-    type->dimy = 1;
     type->sampler_dim = dim;
     type->e.resource.format = format;
     type->sample_count = sample_count;
@@ -963,8 +968,6 @@ struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim 
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
     type->class = HLSL_CLASS_UAV;
-    type->dimx = format->dimx;
-    type->dimy = 1;
     type->sampler_dim = dim;
     type->e.resource.format = format;
     type->e.resource.rasteriser_ordered = rasteriser_ordered;
@@ -980,7 +983,6 @@ struct hlsl_type *hlsl_new_cb_type(struct hlsl_ctx *ctx, struct hlsl_type *forma
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
     type->class = HLSL_CLASS_CONSTANT_BUFFER;
-    type->dimy = 1;
     type->e.resource.format = format;
     hlsl_type_calculate_reg_size(ctx, type);
     list_add_tail(&ctx->types, &type->entry);
@@ -1066,7 +1068,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_MATRIX:
-            return type->dimx * type->dimy;
+            return type->e.numeric.dimx * type->e.numeric.dimy;
 
         case HLSL_CLASS_STRUCT:
         {
@@ -1131,9 +1133,9 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
             if ((t1->modifiers & HLSL_MODIFIER_ROW_MAJOR)
                     != (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR))
                 return false;
-            if (t1->dimx != t2->dimx)
+            if (t1->e.numeric.dimx != t2->e.numeric.dimx)
                 return false;
-            if (t1->dimy != t2->dimy)
+            if (t1->e.numeric.dimy != t2->e.numeric.dimy)
                 return false;
             return true;
 
@@ -1224,8 +1226,6 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         }
     }
     type->class = old->class;
-    type->dimx = old->dimx;
-    type->dimy = old->dimy;
     type->modifiers = old->modifiers | modifiers;
     if (!(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
         type->modifiers |= default_majority;
@@ -1238,6 +1238,8 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_MATRIX:
+            type->e.numeric.dimx = old->e.numeric.dimx;
+            type->e.numeric.dimy = old->e.numeric.dimy;
             type->e.numeric.type = old->e.numeric.type;
             break;
 
@@ -1497,7 +1499,7 @@ struct hlsl_ir_node *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hls
     hlsl_src_from_node(&store->rhs, rhs);
 
     if (!writemask && type_is_single_reg(rhs->data_type))
-        writemask = (1 << rhs->data_type->dimx) - 1;
+        writemask = (1 << rhs->data_type->e.numeric.dimx) - 1;
     store->writemask = writemask;
 
     return &store->node;
@@ -1524,7 +1526,7 @@ bool hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
     hlsl_src_from_node(&store->rhs, rhs);
 
     if (type_is_single_reg(rhs->data_type))
-        store->writemask = (1 << rhs->data_type->dimx) - 1;
+        store->writemask = (1 << rhs->data_type->e.numeric.dimx) - 1;
 
     hlsl_block_add_instr(block, &store->node);
 
@@ -2064,7 +2066,7 @@ struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *v
     if (type->class == HLSL_CLASS_TEXTURE || type->class == HLSL_CLASS_UAV)
         type = type->e.resource.format;
     else if (type->class == HLSL_CLASS_MATRIX)
-        type = hlsl_get_vector_type(ctx, type->e.numeric.type, type->dimx);
+        type = hlsl_get_vector_type(ctx, type->e.numeric.type, type->e.numeric.dimx);
     else
         type = hlsl_get_element_type_from_path_index(ctx, type, idx);
 
@@ -2355,10 +2357,10 @@ static struct hlsl_ir_node *clone_swizzle(struct hlsl_ctx *ctx,
         struct clone_instr_map *map, struct hlsl_ir_swizzle *src)
 {
     if (src->val.node->data_type->class == HLSL_CLASS_MATRIX)
-        return hlsl_new_matrix_swizzle(ctx, src->u.matrix, src->node.data_type->dimx,
+        return hlsl_new_matrix_swizzle(ctx, src->u.matrix, src->node.data_type->e.numeric.dimx,
                 map_instr(map, src->val.node), &src->node.loc);
     else
-        return hlsl_new_swizzle(ctx, src->u.vector, src->node.data_type->dimx,
+        return hlsl_new_swizzle(ctx, src->u.vector, src->node.data_type->e.numeric.dimx,
                 map_instr(map, src->val.node), &src->node.loc);
 }
 
@@ -2778,12 +2780,13 @@ static void hlsl_dump_type(struct vkd3d_string_buffer *buffer, const struct hlsl
 
         case HLSL_CLASS_VECTOR:
             VKD3D_ASSERT(type->e.numeric.type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(buffer, "%s%u", base_types[type->e.numeric.type], type->dimx);
+            vkd3d_string_buffer_printf(buffer, "%s%u", base_types[type->e.numeric.type], type->e.numeric.dimx);
             return;
 
         case HLSL_CLASS_MATRIX:
             VKD3D_ASSERT(type->e.numeric.type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(buffer, "%s%ux%u", base_types[type->e.numeric.type], type->dimy, type->dimx);
+            vkd3d_string_buffer_printf(buffer, "%s%ux%u", base_types[type->e.numeric.type],
+                    type->e.numeric.dimy, type->e.numeric.dimx);
             return;
 
         case HLSL_CLASS_ARRAY:
@@ -3176,9 +3179,9 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
     struct hlsl_type *type = constant->node.data_type;
     unsigned int x;
 
-    if (type->dimx != 1)
+    if (type->e.numeric.dimx != 1)
         vkd3d_string_buffer_printf(buffer, "{");
-    for (x = 0; x < type->dimx; ++x)
+    for (x = 0; x < type->e.numeric.dimx; ++x)
     {
         const union hlsl_constant_value_component *value = &constant->value.u[x];
 
@@ -3206,7 +3209,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
                 break;
         }
     }
-    if (type->dimx != 1)
+    if (type->e.numeric.dimx != 1)
         vkd3d_string_buffer_printf(buffer, "}");
 }
 
@@ -3432,16 +3435,17 @@ static void dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const struct hls
     unsigned int i;
 
     dump_src(buffer, &swizzle->val);
-    if (swizzle->val.node->data_type->dimy > 1)
+    if (swizzle->val.node->data_type->e.numeric.dimy > 1)
     {
         vkd3d_string_buffer_printf(buffer, ".");
-        for (i = 0; i < swizzle->node.data_type->dimx; ++i)
+        for (i = 0; i < swizzle->node.data_type->e.numeric.dimx; ++i)
             vkd3d_string_buffer_printf(buffer, "_m%u%u",
                     swizzle->u.matrix.components[i].y, swizzle->u.matrix.components[i].x);
     }
     else
     {
-        vkd3d_string_buffer_printf(buffer, "%s", debug_hlsl_swizzle(swizzle->u.vector, swizzle->node.data_type->dimx));
+        vkd3d_string_buffer_printf(buffer, "%s",
+                debug_hlsl_swizzle(swizzle->u.vector, swizzle->node.data_type->e.numeric.dimx));
     }
 }
 
@@ -3655,10 +3659,15 @@ void hlsl_dump_var_default_values(const struct hlsl_ir_var *var)
 
 void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
 {
+    const struct hlsl_type *old_type = old->data_type, *new_type = new->data_type;
     struct hlsl_src *src, *next;
 
-    VKD3D_ASSERT(old->data_type == new->data_type || old->data_type->dimx == new->data_type->dimx);
-    VKD3D_ASSERT(old->data_type == new->data_type || old->data_type->dimy == new->data_type->dimy);
+    if (hlsl_is_numeric_type(old_type))
+    {
+        VKD3D_ASSERT(hlsl_is_numeric_type(new_type));
+        VKD3D_ASSERT(old_type->e.numeric.dimx == new_type->e.numeric.dimx);
+        VKD3D_ASSERT(old_type->e.numeric.dimy == new_type->e.numeric.dimy);
+    }
 
     LIST_FOR_EACH_ENTRY_SAFE(src, next, &old->uses, struct hlsl_src, entry)
     {
@@ -4328,7 +4337,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
 
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
-    ctx->builtin_types.null = hlsl_new_type(ctx, "NULL", HLSL_CLASS_NULL, HLSL_TYPE_UINT, 1, 1);
+    ctx->builtin_types.null = hlsl_new_simple_type(ctx, "NULL", HLSL_CLASS_NULL);
     ctx->builtin_types.string = hlsl_new_simple_type(ctx, "string", HLSL_CLASS_STRING);
     ctx->builtin_types.error = hlsl_new_simple_type(ctx, "<error type>", HLSL_CLASS_ERROR);
     hlsl_scope_add_type(ctx->globals, ctx->builtin_types.string);

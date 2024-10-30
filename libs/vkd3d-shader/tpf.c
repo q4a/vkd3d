@@ -3389,7 +3389,7 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     {
         VKD3D_ASSERT(array_type->class <= HLSL_CLASS_LAST_NUMERIC);
         type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm4_class(array_type), sm4_base_type(array_type)));
-        put_u32(buffer, vkd3d_make_u32(array_type->dimy, array_type->dimx));
+        put_u32(buffer, vkd3d_make_u32(array_type->e.numeric.dimy, array_type->e.numeric.dimx));
         put_u32(buffer, vkd3d_make_u32(array_size, 0));
         put_u32(buffer, 1);
     }
@@ -3495,9 +3495,9 @@ static unsigned int get_component_index_from_default_initializer_index(struct hl
     switch (type->class)
     {
         case HLSL_CLASS_MATRIX:
-            x = index / type->dimy;
-            y = index % type->dimy;
-            return y * type->dimx + x;
+            x = index / type->e.numeric.dimy;
+            y = index % type->e.numeric.dimy;
+            return y * type->e.numeric.dimx + x;
 
         case HLSL_CLASS_ARRAY:
             element_comp_count = hlsl_type_component_count(type->e.array.type);
@@ -3594,7 +3594,7 @@ void sm4_generate_rdef(struct hlsl_ctx *ctx, struct vkd3d_shader_code *rdef)
             put_u32(&buffer, sm4_resource_type(resource->component_type));
         if (resource->regset == HLSL_REGSET_TEXTURES || resource->regset == HLSL_REGSET_UAVS)
         {
-            unsigned int dimx = resource->component_type->e.resource.format->dimx;
+            unsigned int dimx = resource->component_type->e.resource.format->e.numeric.dimx;
 
             put_u32(&buffer, sm4_data_type(resource->component_type));
             put_u32(&buffer, sm4_rdef_resource_dimension(resource->component_type));

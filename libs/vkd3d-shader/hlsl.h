@@ -169,16 +169,6 @@ struct hlsl_type
      * Modifiers that don't fall inside this mask are to be stored in the variable in
      *   hlsl_ir_var.modifiers, or in the struct field in hlsl_ir_field.modifiers. */
     uint32_t modifiers;
-    /* Size of the type values on each dimension. For non-numeric types, they are set for the
-     *   convenience of the sm1/sm4 backends.
-     * If type is HLSL_CLASS_SCALAR, then both dimx = 1 and dimy = 1.
-     * If type is HLSL_CLASS_VECTOR, then dimx is the size of the vector, and dimy = 1.
-     * If type is HLSL_CLASS_MATRIX, then dimx is the number of columns, and dimy the number of rows.
-     * If type is HLSL_CLASS_ARRAY, then dimx and dimy have the same value as in the type of the array elements.
-     * If type is HLSL_CLASS_STRUCT, then dimx is the sum of (dimx * dimy) of every component, and dimy = 1.
-     */
-    unsigned int dimx;
-    unsigned int dimy;
     /* Sample count for HLSL_SAMPLER_DIM_2DMS or HLSL_SAMPLER_DIM_2DMSARRAY. */
     unsigned int sample_count;
 
@@ -188,6 +178,10 @@ struct hlsl_type
         struct
         {
             enum hlsl_base_type type;
+            /* For scalars, dimx == dimy == 1.
+             * For vectors, dimx == vector width; dimy == 1.
+             * For matrices, dimx == column count; dimy == row count. */
+            unsigned int dimx, dimy;
         } numeric;
         /* Additional information if type is HLSL_CLASS_STRUCT. */
         struct
