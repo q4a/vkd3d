@@ -1383,7 +1383,7 @@ static void check_type_desc_(const char *file, int line,
     ok_(file, line)(type->Elements == expect->Elements, "Got %u elements.\n", type->Elements);
     ok_(file, line)(type->Members == expect->Members, "Got %u members.\n", type->Members);
     ok_(file, line)(type->Offset == expect->Offset, "Got offset %u.\n", type->Offset);
-    ok_(file, line)(!strcmp(type->Name, expect->Name), "Got name \"%s\".\n", type->Name);
+    ok_(file, line)((!type->Name && !expect->Name) || !strcmp(type->Name, expect->Name), "Got name \"%s\".\n", type->Name);
 }
 
 static void test_reflection(void)
@@ -1674,6 +1674,27 @@ static void test_reflection(void)
         {"x", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .Space = 1, .uID = 4},
     };
 
+    static const char ps4_source[] =
+        "uniform float4 f;\n"
+        "float4 main() : sv_target\n"
+        "{\n"
+        "    return f;\n"
+        "}";
+
+    static const D3D12_SHADER_INPUT_BIND_DESC ps4_bindings[] =
+    {
+        {"$Globals", D3D_SIT_CBUFFER, 0, 1},
+    };
+
+    static const struct shader_variable ps4_globals_vars[] =
+    {
+        {{"f",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, NULL}},
+    };
+    static const struct shader_buffer ps4_buffers[] =
+    {
+        {{"$Globals", D3D_CT_CBUFFER, ARRAY_SIZE(ps4_globals_vars), 16}, ps4_globals_vars},
+    };
+
     static const struct
     {
         const char *source;
@@ -1689,7 +1710,8 @@ static void test_reflection(void)
     {
         {vs_source, "vs_5_0", 0x10050, vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
         {ps_source, "ps_5_0", 0x00050, ps_bindings, ARRAY_SIZE(ps_bindings), ps_buffers, ARRAY_SIZE(ps_buffers), D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY},
-        {ps51_source, "ps_5_1", 0x00051, ps51_bindings, ARRAY_SIZE(ps51_bindings), ps51_buffers, ARRAY_SIZE(ps51_buffers), 0}
+        {ps51_source, "ps_5_1", 0x00051, ps51_bindings, ARRAY_SIZE(ps51_bindings), ps51_buffers, ARRAY_SIZE(ps51_buffers), 0},
+        {ps4_source, "ps_4_0", 0x00040, ps4_bindings, ARRAY_SIZE(ps4_bindings), ps4_buffers, ARRAY_SIZE(ps4_buffers), 0},
     };
 
     for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
@@ -1745,12 +1767,12 @@ static void test_reflection(void)
                 ok(var_desc.Size == expect->var_desc.Size, "Got size %u.\n", var_desc.Size);
                 ok(var_desc.uFlags == expect->var_desc.uFlags, "Got flags %#x.\n", var_desc.uFlags);
                 ok(!var_desc.DefaultValue, "Got default value %p.\n", var_desc.DefaultValue);
-                todo ok(var_desc.StartTexture == expect->var_desc.StartTexture,
+                todo_if (t != 3) ok(var_desc.StartTexture == expect->var_desc.StartTexture,
                         "Got texture offset %u.\n", var_desc.StartTexture);
                 todo_if (expect->var_desc.TextureSize)
                     ok(var_desc.TextureSize == expect->var_desc.TextureSize,
                             "Got texture size %u.\n", var_desc.TextureSize);
-                todo ok(var_desc.StartSampler == expect->var_desc.StartSampler,
+                todo_if (t != 3) ok(var_desc.StartSampler == expect->var_desc.StartSampler,
                         "Got sampler offset %u.\n", var_desc.StartSampler);
                 ok(var_desc.SamplerSize == expect->var_desc.SamplerSize,
                         "Got sampler size %u.\n", var_desc.SamplerSize);
