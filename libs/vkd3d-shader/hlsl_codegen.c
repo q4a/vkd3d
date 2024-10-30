@@ -2491,6 +2491,231 @@ enum validation_result
     DEREF_VALIDATION_NOT_CONSTANT,
 };
 
+struct vectorize_exprs_state
+{
+    struct vectorizable_exprs_group
+    {
+        struct hlsl_block *block;
+        struct hlsl_ir_expr *exprs[4];
+        uint8_t expr_count, component_count;
+    } *groups;
+    size_t count, capacity;
+};
+
+static bool is_same_vectorizable_source(struct hlsl_ir_node *a, struct hlsl_ir_node *b)
+{
+    /* TODO: We can also vectorize different constants. */
+
+    if (a->type == HLSL_IR_SWIZZLE)
+        a = hlsl_ir_swizzle(a)->val.node;
+    if (b->type == HLSL_IR_SWIZZLE)
+        b = hlsl_ir_swizzle(b)->val.node;
+
+    return a == b;
+}
+
+static bool is_same_vectorizable_expr(struct hlsl_ir_expr *a, struct hlsl_ir_expr *b)
+{
+    if (a->op != b->op)
+        return false;
+
+    for (size_t j = 0; j < HLSL_MAX_OPERANDS; ++j)
+    {
+        if (!a->operands[j].node)
+            break;
+        if (!is_same_vectorizable_source(a->operands[j].node, b->operands[j].node))
+            return false;
+    }
+
+    return true;
+}
+
+static void record_vectorizable_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_ir_expr *expr, struct vectorize_exprs_state *state)
+{
+    if (expr->node.data_type->class > HLSL_CLASS_VECTOR)
+        return;
+
+    /* These are the only current ops that are not per-component. */
+    if (expr->op == HLSL_OP1_COS_REDUCED || expr->op == HLSL_OP1_SIN_REDUCED
+            || expr->op == HLSL_OP2_DOT || expr->op == HLSL_OP3_DP2ADD)
+        return;
+
+    for (size_t i = 0; i < state->count; ++i)
+    {
+        struct vectorizable_exprs_group *group = &state->groups[i];
+        struct hlsl_ir_expr *other = group->exprs[0];
+
+        /* These are SSA instructions, which means they have the same value
+         * regardless of what block they're in. However, being in different
+         * blocks may mean that one expression or the other is not always
+         * executed. */
+
+        if (expr->node.data_type->e.numeric.dimx + group->component_count <= 4
+                && group->block == block
+                && is_same_vectorizable_expr(expr, other))
+        {
+            group->exprs[group->expr_count++] = expr;
+            group->component_count += expr->node.data_type->e.numeric.dimx;
+            return;
+        }
+    }
+
+    if (!hlsl_array_reserve(ctx, (void **)&state->groups,
+            &state->capacity, state->count + 1, sizeof(*state->groups)))
+        return;
+    state->groups[state->count].block = block;
+    state->groups[state->count].exprs[0] = expr;
+    state->groups[state->count].expr_count = 1;
+    state->groups[state->count].component_count = expr->node.data_type->e.numeric.dimx;
+    ++state->count;
+}
+
+static void find_vectorizable_expr_groups(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct vectorize_exprs_state *state)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_EXPR)
+        {
+            record_vectorizable_expr(ctx, block, hlsl_ir_expr(instr), state);
+        }
+        else if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            find_vectorizable_expr_groups(ctx, &iff->then_block, state);
+            find_vectorizable_expr_groups(ctx, &iff->else_block, state);
+        }
+        else if (instr->type == HLSL_IR_LOOP)
+        {
+            find_vectorizable_expr_groups(ctx, &hlsl_ir_loop(instr)->body, state);
+        }
+        else if (instr->type == HLSL_IR_SWITCH)
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                find_vectorizable_expr_groups(ctx, &c->body, state);
+        }
+    }
+}
+
+/* Combine sequences like
+ *
+ * 3: @1.x
+ * 4: @2.x
+ * 5: @3 * @4
+ * 6: @1.y
+ * 7: @2.x
+ * 8: @6 * @7
+ *
+ * into
+ *
+ * 5_1: @1.xy
+ * 5_2: @2.xx
+ * 5_3: @5_1 * @5_2
+ * 5:   @5_3.x
+ * 8:   @5_3.y
+ *
+ * Each operand to an expression needs to refer to the same ultimate source
+ * (in this case @1 and @2 respectively), but can be a swizzle thereof.
+ *
+ * In practice the swizzles @5 and @8 can generally then be vectorized again,
+ * either as part of another expression, or as part of a store.
+ */
+static bool vectorize_exprs(struct hlsl_ctx *ctx, struct hlsl_block *block)
+{
+    struct vectorize_exprs_state state = {0};
+    bool progress = false;
+
+    find_vectorizable_expr_groups(ctx, block, &state);
+
+    for (unsigned int i = 0; i < state.count; ++i)
+    {
+        struct vectorizable_exprs_group *group = &state.groups[i];
+        struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+        uint32_t swizzles[HLSL_MAX_OPERANDS] = {0};
+        struct hlsl_ir_node *arg, *combined;
+        unsigned int component_count = 0;
+        struct hlsl_type *combined_type;
+        struct hlsl_block new_block;
+        struct hlsl_ir_expr *expr;
+
+        if (group->expr_count == 1)
+            continue;
+
+        hlsl_block_init(&new_block);
+
+        for (unsigned int j = 0; j < group->expr_count; ++j)
+        {
+            expr = group->exprs[j];
+
+            for (unsigned int a = 0; a < HLSL_MAX_OPERANDS; ++a)
+            {
+                uint32_t arg_swizzle;
+
+                if (!(arg = expr->operands[a].node))
+                    break;
+
+                if (arg->type == HLSL_IR_SWIZZLE)
+                    arg_swizzle = hlsl_ir_swizzle(arg)->u.vector;
+                else
+                    arg_swizzle = HLSL_SWIZZLE(X, Y, Z, W);
+
+                /* Mask out the invalid components. */
+                arg_swizzle &= (1u << VKD3D_SHADER_SWIZZLE_SHIFT(arg->data_type->e.numeric.dimx)) - 1;
+                swizzles[a] |= arg_swizzle << VKD3D_SHADER_SWIZZLE_SHIFT(component_count);
+            }
+
+            component_count += expr->node.data_type->e.numeric.dimx;
+        }
+
+        expr = group->exprs[0];
+        for (unsigned int a = 0; a < HLSL_MAX_OPERANDS; ++a)
+        {
+            if (!(arg = expr->operands[a].node))
+                break;
+            if (arg->type == HLSL_IR_SWIZZLE)
+                arg = hlsl_ir_swizzle(arg)->val.node;
+            args[a] = hlsl_block_add_swizzle(ctx, &new_block, swizzles[a], component_count, arg, &arg->loc);
+        }
+
+        combined_type = hlsl_get_vector_type(ctx, expr->node.data_type->e.numeric.type, component_count);
+        combined = hlsl_block_add_expr(ctx, &new_block, expr->op, args, combined_type, &expr->node.loc);
+
+        list_move_before(&expr->node.entry, &new_block.instrs);
+
+        TRACE("Combining %u %s instructions into %p.\n", group->expr_count,
+                debug_hlsl_expr_op(group->exprs[0]->op), combined);
+
+        component_count = 0;
+        for (unsigned int j = 0; j < group->expr_count; ++j)
+        {
+            struct hlsl_ir_node *replacement;
+
+            expr = group->exprs[j];
+
+            if (!(replacement = hlsl_new_swizzle(ctx,
+                    HLSL_SWIZZLE(X, Y, Z, W) >> VKD3D_SHADER_SWIZZLE_SHIFT(component_count),
+                    expr->node.data_type->e.numeric.dimx, combined, &expr->node.loc)))
+                goto out;
+            component_count += expr->node.data_type->e.numeric.dimx;
+            list_add_before(&expr->node.entry, &replacement->entry);
+            hlsl_replace_node(&expr->node, replacement);
+        }
+
+        progress = true;
+    }
+
+out:
+    vkd3d_free(state.groups);
+    return progress;
+}
+
 static enum validation_result validate_component_index_range_from_deref(struct hlsl_ctx *ctx,
         const struct hlsl_deref *deref)
 {
@@ -12589,6 +12814,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     struct recursive_call_ctx recursive_call_ctx;
     struct hlsl_ir_var *var;
     unsigned int i;
+    bool progress;
 
     ctx->is_patch_constant_func = entry_func == ctx->patch_constant_func;
 
@@ -12783,6 +13009,16 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         hlsl_transform_ir(ctx, lower_separate_samples, body, NULL);
 
     hlsl_transform_ir(ctx, validate_dereferences, body, NULL);
+
+    do
+    {
+        progress = vectorize_exprs(ctx, body);
+        compute_liveness(ctx, entry_func);
+        progress |= hlsl_transform_ir(ctx, dce, body, NULL);
+        progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);
+        progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
+    } while (progress);
+
     hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
 
     if (hlsl_version_ge(ctx, 4, 0))
