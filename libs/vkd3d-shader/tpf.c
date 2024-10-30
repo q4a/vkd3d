@@ -5545,18 +5545,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
                         "GetRenderTargetSampleCount() can only be used from a pixel shader using version 4.1 or higher.");
             break;
 
-        case HLSL_OP1_ABS:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3DSPSM_ABS);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s absolute value expression.", dst_type_string->buffer);
-            }
-            break;
-
         case HLSL_OP1_BIT_NOT:
             VKD3D_ASSERT(type_is_integer(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
