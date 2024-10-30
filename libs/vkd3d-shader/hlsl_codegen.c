@@ -5233,7 +5233,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                 for (x = 0, i = 0; x < 4; ++x)
                 {
                     const union hlsl_constant_value_component *value;
-                    float f;
+                    float f = 0;
 
                     if (!(constant->reg.writemask & (1u << x)))
                         continue;
@@ -5261,9 +5261,6 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                         case HLSL_TYPE_DOUBLE:
                             FIXME("Double constant.\n");
                             return;
-
-                        default:
-                            vkd3d_unreachable();
                     }
 
                     record_constant(ctx, constant->reg.id * 4 + x, f, &constant->node.loc);
@@ -6668,8 +6665,8 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_program *program,
         struct shader_signature *signature, bool output, bool is_patch_constant_func, struct hlsl_ir_var *var)
 {
+    enum vkd3d_shader_component_type component_type = VKD3D_SHADER_COMPONENT_VOID;
     enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
-    enum vkd3d_shader_component_type component_type;
     unsigned int register_index, mask, use_mask;
     const char *name = var->semantic.name;
     enum vkd3d_shader_register_type type;
@@ -6716,12 +6713,11 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
                 component_type = VKD3D_SHADER_COMPONENT_UINT;
                 break;
 
-            default:
+            case HLSL_TYPE_DOUBLE:
                 if ((string = hlsl_type_to_string(ctx, var->data_type)))
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Invalid data type %s for semantic variable %s.", string->buffer, var->name);
                 hlsl_release_string_buffer(ctx, string);
-                component_type = VKD3D_SHADER_COMPONENT_VOID;
                 break;
         }
 
@@ -7513,9 +7509,6 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                     hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "The 'double' type is not supported for the %s profile.", ctx->profile->name);
                     break;
-
-                default:
-                    vkd3d_unreachable();
             }
             break;
 
@@ -7539,9 +7532,6 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                 case HLSL_TYPE_DOUBLE:
                     hlsl_fixme(ctx, &instr->loc, "SM1 cast from double to integer.");
                     break;
-
-                default:
-                    vkd3d_unreachable();
             }
             break;
 
@@ -7566,7 +7556,6 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
 
         case HLSL_TYPE_BOOL:
             /* Casts to bool should have already been lowered. */
-        default:
             hlsl_fixme(ctx, &expr->node.loc, "SM1 cast from %s to %s.",
                 debug_hlsl_type(ctx, src_type), debug_hlsl_type(ctx, dst_type));
             break;
@@ -8196,9 +8185,8 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type, bool is_comb
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
                     return D3DXPT_INT;
-                default:
-                    vkd3d_unreachable();
             }
+            break;
 
         case HLSL_CLASS_SAMPLER:
             switch (type->sampler_dim)
@@ -8457,7 +8445,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
                         {
                             uint32_t u;
                             float f;
-                        } uni;
+                        } uni = {0};
 
                         switch (comp_type->e.numeric.type)
                         {
@@ -8481,9 +8469,6 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
                             case HLSL_TYPE_FLOAT:
                                 uni.u = var->default_values[k].number.u;
                                 break;
-
-                            default:
-                                vkd3d_unreachable();
                         }
 
                         set_u32(buffer, default_value_offset + comp_offset * sizeof(uint32_t), uni.u);
@@ -8734,9 +8719,6 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                 case HLSL_TYPE_DOUBLE:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to float.");
                     return false;
-
-                default:
-                    vkd3d_unreachable();
             }
             break;
 
@@ -8760,9 +8742,6 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                 case HLSL_TYPE_DOUBLE:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to int.");
                     return false;
-
-                default:
-                    vkd3d_unreachable();
             }
             break;
 
@@ -8786,9 +8765,6 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                 case HLSL_TYPE_DOUBLE:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to uint.");
                     return false;
-
-                default:
-                    vkd3d_unreachable();
             }
             break;
 
@@ -8798,9 +8774,10 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
 
         case HLSL_TYPE_BOOL:
             /* Casts to bool should have already been lowered. */
-        default:
-            vkd3d_unreachable();
+            break;
     }
+
+    vkd3d_unreachable();
 }
 
 static void sm4_generate_vsir_expr_with_two_destinations(struct hlsl_ctx *ctx, struct vsir_program *program,
@@ -10454,15 +10431,13 @@ static enum vkd3d_data_type sm4_generate_vsir_get_format_type(const struct hlsl_
 
         case HLSL_TYPE_INT:
             return VKD3D_DATA_INT;
-            break;
 
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_UINT:
             return VKD3D_DATA_UINT;
-
-        default:
-            vkd3d_unreachable();
     }
+
+    vkd3d_unreachable();
 }
 
 static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,

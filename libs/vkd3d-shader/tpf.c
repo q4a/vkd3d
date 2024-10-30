@@ -3328,9 +3328,8 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
             return D3D_SVT_INT;
         case HLSL_TYPE_UINT:
             return D3D_SVT_UINT;
-        default:
-            vkd3d_unreachable();
     }
+    vkd3d_unreachable();
 }
 
 static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type)
@@ -3446,10 +3445,9 @@ static enum vkd3d_sm4_data_type sm4_data_type(const struct hlsl_type *type)
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_UINT:
             return VKD3D_SM4_DATA_UINT;
-
-        default:
-            vkd3d_unreachable();
     }
+
+    vkd3d_unreachable();
 }
 
 static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *type)

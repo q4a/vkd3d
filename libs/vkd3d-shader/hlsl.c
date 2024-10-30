@@ -3204,9 +3204,6 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
             case HLSL_TYPE_UINT:
                 vkd3d_string_buffer_printf(buffer, "%u ", value->u);
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
     }
     if (type->dimx != 1)

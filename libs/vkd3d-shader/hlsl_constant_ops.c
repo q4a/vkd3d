@@ -143,10 +143,10 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
 {
     unsigned int k;
-    uint32_t u;
-    int32_t i;
-    double d;
-    float f;
+    uint32_t u = 0;
+    double d = 0.0;
+    float f = 0.0f;
+    int32_t i = 0;
 
     if (dst_type->dimx != src->node.data_type->dimx
             || dst_type->dimy != src->node.data_type->dimy)
@@ -195,9 +195,6 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
                 f = !!src->value.u[k].u;
                 d = !!src->value.u[k].u;
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
 
         switch (dst_type->e.numeric.type)
@@ -222,9 +219,6 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = u ? ~0u : 0u;
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
     }
     return true;
@@ -864,9 +858,6 @@ static bool fold_equal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, co
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u == src2->value.u[k].u;
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
 
         dst->u[k].u *= ~0u;
@@ -903,9 +894,6 @@ static bool fold_gequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u >= src2->value.u[k].u;
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
 
         dst->u[k].u *= ~0u;
@@ -942,9 +930,6 @@ static bool fold_less(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, con
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u < src2->value.u[k].u;
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
 
         dst->u[k].u *= ~0u;
@@ -1162,9 +1147,6 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u != src2->value.u[k].u;
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
 
         dst->u[k].u *= ~0u;
@@ -1424,9 +1406,6 @@ static bool constant_is_zero(struct hlsl_ir_constant *const_arg)
                 if (const_arg->value.u[k].u != 0)
                     return false;
                 break;
-
-            default:
-                return false;
         }
     }
     return true;
@@ -1462,9 +1441,6 @@ static bool constant_is_one(struct hlsl_ir_constant *const_arg)
                 if (const_arg->value.u[k].u != ~0)
                     return false;
                 break;
-
-            default:
-                return false;
         }
     }
     return true;
