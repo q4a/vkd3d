@@ -922,6 +922,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             fatal_error("Malformed dispatch arguments '%s'.\n", line);
 
         runner->last_render_failed = !runner->ops->dispatch(runner, x, y, z);
+        todo_if(runner->is_todo) ok(!runner->last_render_failed, "Dispatch failed.\n");
     }
     else if (match_string(line, "clear rtv", &line))
     {
@@ -1023,6 +1024,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         }
 
         runner->last_render_failed = !runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3, 1);
+        todo_if(runner->is_todo) ok(!runner->last_render_failed, "Draw failed.\n");
     }
     else if (match_string(line, "draw", &line))
     {
@@ -1067,6 +1069,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         }
 
         runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count, instance_count);
+        todo_if(runner->is_todo) ok(!runner->last_render_failed, "Draw failed.\n");
     }
     else if (match_string(line, "copy", &line))
     {
@@ -1085,8 +1088,8 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 || src->desc.sample_count != dst->desc.sample_count)
             fatal_error("Resource dimensions don't match.\n");
 
-        if (!(runner->ops->copy(runner, src, dst)))
-            fatal_error("Failed to copy resource.\n");
+        ret = runner->ops->copy(runner, src, dst);
+        todo_if(runner->is_todo) ok(ret, "Failed to copy resource.\n");
     }
     else if (match_string(line, "probe", &line))
     {
