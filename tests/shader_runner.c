@@ -1723,6 +1723,7 @@ static void trace_tags(const struct shader_runner_caps *caps)
 
 static void trace_shader_caps(const bool *caps)
 {
+    bool show_none = true;
     char buffer[80], *p;
     size_t rem;
     int rc;
@@ -1751,7 +1752,10 @@ static void trace_shader_caps(const bool *caps)
         }
         p += rc;
         rem -= rc;
+        show_none = false;
     }
+    if (show_none)
+        snprintf(p, rem, " (none)");
     trace("%s.\n", buffer);
 }
 
