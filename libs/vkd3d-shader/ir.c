@@ -6079,13 +6079,16 @@ static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *prog
 }
 
 static bool find_sysval_signature_idx(const struct shader_signature *signature,
-        enum vkd3d_shader_sysval_semantic sysval, uint32_t *idx)
+        enum vkd3d_shader_sysval_semantic sysval, unsigned int semantic_index, unsigned int *element_index)
 {
+    const struct signature_element *e;
+
     for (unsigned int i = 0; i < signature->element_count; ++i)
     {
-        if (signature->elements[i].sysval_semantic == sysval)
+        e = &signature->elements[i];
+        if (e->sysval_semantic == sysval && e->semantic_index == semantic_index)
         {
-            *idx = i;
+            *element_index = i;
             return true;
         }
     }
@@ -6148,7 +6151,7 @@ static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *pr
         }
     }
 
-    if (!find_sysval_signature_idx(signature, VKD3D_SHADER_SV_POSITION, &position_signature_idx))
+    if (!find_sysval_signature_idx(signature, VKD3D_SHADER_SV_POSITION, 0, &position_signature_idx))
     {
         vkd3d_shader_error(ctx->message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_MISSING_SEMANTIC,
                 "Shader does not write position.");
