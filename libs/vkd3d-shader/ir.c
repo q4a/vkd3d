@@ -142,6 +142,25 @@ static struct signature_element *vsir_signature_find_element_by_name(
     return NULL;
 }
 
+static bool vsir_signature_find_sysval(const struct shader_signature *signature,
+        enum vkd3d_shader_sysval_semantic sysval, unsigned int semantic_index, unsigned int *element_index)
+{
+    const struct signature_element *e;
+    unsigned int i;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        e = &signature->elements[i];
+        if (e->sysval_semantic == sysval && e->semantic_index == semantic_index)
+        {
+            *element_index = i;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count)
 {
@@ -5834,21 +5853,6 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(stru
     return VKD3D_OK;
 }
 
-static bool find_colour_signature_idx(const struct shader_signature *signature, uint32_t *index)
-{
-    for (unsigned int i = 0; i < signature->element_count; ++i)
-    {
-        if (signature->elements[i].sysval_semantic == VKD3D_SHADER_SV_TARGET
-                && !signature->elements[i].register_index)
-        {
-            *index = i;
-            return true;
-        }
-    }
-
-    return false;
-}
-
 static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *program,
         const struct vkd3d_shader_instruction *ret, enum vkd3d_shader_comparison_func compare_func,
         const struct vkd3d_shader_parameter1 *ref, uint32_t colour_signature_idx,
@@ -5960,7 +5964,7 @@ static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *pro
     if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
         return VKD3D_OK;
 
-    if (!find_colour_signature_idx(&program->output_signature, &colour_signature_idx)
+    if (!vsir_signature_find_sysval(&program->output_signature, VKD3D_SHADER_SV_TARGET, 0, &colour_signature_idx)
             || !(program->output_signature.elements[colour_signature_idx].mask & VKD3DSP_WRITEMASK_3))
         return VKD3D_OK;
 
@@ -6078,24 +6082,6 @@ static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *prog
     return VKD3D_OK;
 }
 
-static bool find_sysval_signature_idx(const struct shader_signature *signature,
-        enum vkd3d_shader_sysval_semantic sysval, unsigned int semantic_index, unsigned int *element_index)
-{
-    const struct signature_element *e;
-
-    for (unsigned int i = 0; i < signature->element_count; ++i)
-    {
-        e = &signature->elements[i];
-        if (e->sysval_semantic == sysval && e->semantic_index == semantic_index)
-        {
-            *element_index = i;
-            return true;
-        }
-    }
-
-    return false;
-}
-
 static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
@@ -6151,7 +6137,7 @@ static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *pr
         }
     }
 
-    if (!find_sysval_signature_idx(signature, VKD3D_SHADER_SV_POSITION, 0, &position_signature_idx))
+    if (!vsir_signature_find_sysval(signature, VKD3D_SHADER_SV_POSITION, 0, &position_signature_idx))
     {
         vkd3d_shader_error(ctx->message_context, &no_loc, VKD3D_SHADER_ERROR_VSIR_MISSING_SEMANTIC,
                 "Shader does not write position.");
