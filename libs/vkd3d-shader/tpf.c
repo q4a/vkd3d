@@ -2995,20 +2995,6 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
 
 static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *block);
 
-static bool type_is_integer(const struct hlsl_type *type)
-{
-    switch (type->e.numeric.type)
-    {
-        case HLSL_TYPE_BOOL:
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-            return true;
-
-        default:
-            return false;
-    }
-}
-
 bool sm4_register_from_semantic_name(const struct vkd3d_shader_version *version,
         const char *semantic_name, bool output, enum vkd3d_shader_register_type *type, bool *has_idx)
 {
@@ -5137,26 +5123,6 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_compiler 
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_ternary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
-        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2,
-        const struct hlsl_ir_node *src3)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = opcode;
-
-    sm4_dst_from_node(&instr.dsts[0], dst);
-    instr.dst_count = 1;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], src1, instr.dsts[0].write_mask);
-    sm4_src_from_node(tpf, &instr.srcs[1], src2, instr.dsts[0].write_mask);
-    sm4_src_from_node(tpf, &instr.srcs[2], src3, instr.dsts[0].write_mask);
-    instr.src_count = 3;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_ld(const struct tpf_compiler *tpf, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
         const struct hlsl_ir_node *sample_index, const struct hlsl_ir_node *texel_offset,
@@ -5526,7 +5492,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
     const struct vkd3d_shader_version *version = &tpf->program->shader_version;
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
     const struct hlsl_ir_node *arg2 = expr->operands[1].node;
-    const struct hlsl_ir_node *arg3 = expr->operands[2].node;
     const struct hlsl_type *dst_type = expr->node.data_type;
     struct vkd3d_string_buffer *dst_type_string;
 
@@ -5545,107 +5510,13 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
                         "GetRenderTargetSampleCount() can only be used from a pixel shader using version 4.1 or higher.");
             break;
 
-        case HLSL_OP1_BIT_NOT:
-            VKD3D_ASSERT(type_is_integer(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
-            break;
-
         case HLSL_OP1_CAST:
             write_sm4_cast(tpf, expr);
-            break;
-
-        case HLSL_OP1_CEIL:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_PI, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_COS:
             VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
-            break;
-
-        case HLSL_OP1_DSX:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_DERIV_RTX, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_DSX_COARSE:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTX_COARSE, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_DSX_FINE:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTX_FINE, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_DSY:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_DERIV_RTY, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_DSY_COARSE:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTY_COARSE, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_DSY_FINE:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTY_FINE, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_EXP2:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_EXP, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_F16TOF32:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            VKD3D_ASSERT(hlsl_version_ge(tpf->ctx, 5, 0));
-            write_sm4_unary_op(tpf, VKD3D_SM5_OP_F16TOF32, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_F32TOF16:
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_UINT);
-            VKD3D_ASSERT(hlsl_version_ge(tpf->ctx, 5, 0));
-            write_sm4_unary_op(tpf, VKD3D_SM5_OP_F32TOF16, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_FLOOR:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_NI, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_FRACT:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_FRC, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_LOG2:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_LOG, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_LOGIC_NOT:
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_NEG:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3DSPSM_NEG);
-                    break;
-
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_INEG, &expr->node, arg1, 0);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s negation expression.", dst_type_string->buffer);
-            }
             break;
 
         case HLSL_OP1_RCP:
@@ -5686,20 +5557,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
             }
             break;
 
-        case HLSL_OP1_REINTERPRET:
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_ROUND:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_NE, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_RSQ:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_RSQ, &expr->node, arg1, 0);
-            break;
-
         case HLSL_OP1_SAT:
             VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV
@@ -5710,48 +5567,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
         case HLSL_OP1_SIN:
             VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 0, arg1);
-            break;
-
-        case HLSL_OP1_SQRT:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_SQRT, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_TRUNC:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_Z, &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP2_ADD:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_ADD, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IADD, &expr->node, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s addition expression.", dst_type_string->buffer);
-            }
-            break;
-
-        case HLSL_OP2_BIT_AND:
-            VKD3D_ASSERT(type_is_integer(dst_type));
-            write_sm4_binary_op(tpf, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
-            break;
-
-        case HLSL_OP2_BIT_OR:
-            VKD3D_ASSERT(type_is_integer(dst_type));
-            write_sm4_binary_op(tpf, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
-            break;
-
-        case HLSL_OP2_BIT_XOR:
-            VKD3D_ASSERT(type_is_integer(dst_type));
-            write_sm4_binary_op(tpf, VKD3D_SM4_OP_XOR, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_DIV:
@@ -5799,146 +5614,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
             }
             break;
 
-        case HLSL_OP2_EQUAL:
-        {
-            const struct hlsl_type *src_type = arg1->data_type;
-
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
-
-            switch (src_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_EQ, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IEQ, &expr->node, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 equality between \"%s\" operands.",
-                            debug_hlsl_type(tpf->ctx, src_type));
-                    break;
-            }
-            break;
-        }
-
-        case HLSL_OP2_GEQUAL:
-        {
-            const struct hlsl_type *src_type = arg1->data_type;
-
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
-
-            switch (src_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_GE, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_INT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IGE, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_UGE, &expr->node, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 greater-than-or-equal between \"%s\" operands.",
-                            debug_hlsl_type(tpf->ctx, src_type));
-                    break;
-            }
-            break;
-        }
-
-        case HLSL_OP2_LESS:
-        {
-            const struct hlsl_type *src_type = arg1->data_type;
-
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
-
-            switch (src_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_LT, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_INT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_ILT, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_ULT, &expr->node, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 less-than between \"%s\" operands.",
-                            debug_hlsl_type(tpf->ctx, src_type));
-                    break;
-            }
-            break;
-        }
-
-        case HLSL_OP2_LOGIC_AND:
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
-            write_sm4_binary_op(tpf, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
-            break;
-
-        case HLSL_OP2_LOGIC_OR:
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
-            write_sm4_binary_op(tpf, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
-            break;
-
-        case HLSL_OP2_LSHIFT:
-            VKD3D_ASSERT(type_is_integer(dst_type));
-            VKD3D_ASSERT(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
-            write_sm4_binary_op(tpf, VKD3D_SM4_OP_ISHL, &expr->node, arg1, arg2);
-            break;
-
-        case HLSL_OP2_MAX:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_MAX, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_INT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IMAX, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_UMAX, &expr->node, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s maximum expression.", dst_type_string->buffer);
-            }
-            break;
-
-        case HLSL_OP2_MIN:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_MIN, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_INT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IMIN, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_UMIN, &expr->node, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s minimum expression.", dst_type_string->buffer);
-            }
-            break;
-
         case HLSL_OP2_MOD:
             switch (dst_type->e.numeric.type)
             {
@@ -5967,60 +5642,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
 
                 default:
                     hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s multiplication expression.", dst_type_string->buffer);
-            }
-            break;
-
-        case HLSL_OP2_NEQUAL:
-        {
-            const struct hlsl_type *src_type = arg1->data_type;
-
-            VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
-
-            switch (src_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_NE, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_INE, &expr->node, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 inequality between \"%s\" operands.",
-                            debug_hlsl_type(tpf->ctx, src_type));
-                    break;
-            }
-            break;
-        }
-
-        case HLSL_OP2_RSHIFT:
-            VKD3D_ASSERT(type_is_integer(dst_type));
-            VKD3D_ASSERT(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
-            write_sm4_binary_op(tpf, dst_type->e.numeric.type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
-                    &expr->node, arg1, arg2);
-            break;
-
-        case HLSL_OP3_TERNARY:
-            write_sm4_ternary_op(tpf, VKD3D_SM4_OP_MOVC, &expr->node, arg1, arg2, arg3);
-            break;
-
-        case HLSL_OP3_MAD:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_ternary_op(tpf, VKD3D_SM4_OP_MAD, &expr->node, arg1, arg2, arg3);
-                    break;
-
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    write_sm4_ternary_op(tpf, VKD3D_SM4_OP_IMAD, &expr->node, arg1, arg2, arg3);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s negation expression.", dst_type_string->buffer);
             }
             break;
 
@@ -6476,7 +6097,53 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
             tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_OUTPUT_SIV, &ins->declaration.register_semantic, 0);
             break;
 
+        case VKD3DSIH_ADD:
+        case VKD3DSIH_AND:
+        case VKD3DSIH_DSX:
+        case VKD3DSIH_DSX_COARSE:
+        case VKD3DSIH_DSX_FINE:
+        case VKD3DSIH_DSY:
+        case VKD3DSIH_DSY_COARSE:
+        case VKD3DSIH_DSY_FINE:
+        case VKD3DSIH_EQO:
+        case VKD3DSIH_EXP:
+        case VKD3DSIH_F16TOF32:
+        case VKD3DSIH_F32TOF16:
+        case VKD3DSIH_FRC:
+        case VKD3DSIH_GEO:
+        case VKD3DSIH_IADD:
+        case VKD3DSIH_IEQ:
+        case VKD3DSIH_IGE:
+        case VKD3DSIH_ILT:
+        case VKD3DSIH_INE:
+        case VKD3DSIH_IMAD:
+        case VKD3DSIH_IMAX:
+        case VKD3DSIH_IMIN:
+        case VKD3DSIH_INEG:
+        case VKD3DSIH_ISHL:
+        case VKD3DSIH_ISHR:
+        case VKD3DSIH_LOG:
+        case VKD3DSIH_LTO:
+        case VKD3DSIH_MAD:
+        case VKD3DSIH_MAX:
+        case VKD3DSIH_MIN:
         case VKD3DSIH_MOV:
+        case VKD3DSIH_MOVC:
+        case VKD3DSIH_NEU:
+        case VKD3DSIH_NOT:
+        case VKD3DSIH_OR:
+        case VKD3DSIH_ROUND_NE:
+        case VKD3DSIH_ROUND_NI:
+        case VKD3DSIH_ROUND_PI:
+        case VKD3DSIH_ROUND_Z:
+        case VKD3DSIH_RSQ:
+        case VKD3DSIH_SQRT:
+        case VKD3DSIH_UGE:
+        case VKD3DSIH_ULT:
+        case VKD3DSIH_UMAX:
+        case VKD3DSIH_UMIN:
+        case VKD3DSIH_USHR:
+        case VKD3DSIH_XOR:
             tpf_simple_instruction(tpf, ins);
             break;
 
