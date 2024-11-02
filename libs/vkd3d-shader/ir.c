@@ -8255,6 +8255,14 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
     switch (dst->reg.type)
     {
         case VKD3DSPR_SSA:
+            if (dst->reg.dimension == VSIR_DIMENSION_VEC4
+                    && dst->write_mask != VKD3DSP_WRITEMASK_0
+                    && dst->write_mask != (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1)
+                    && dst->write_mask != (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1 | VKD3DSP_WRITEMASK_2)
+                    && dst->write_mask != VKD3DSP_WRITEMASK_ALL)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK,
+                        "SSA register has invalid write mask %#x.", dst->write_mask);
+
             if (dst->reg.idx[0].offset < ctx->program->ssa_count)
             {
                 struct validation_context_ssa_data *data = &ctx->ssas[dst->reg.idx[0].offset];
