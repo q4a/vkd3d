@@ -2774,6 +2774,12 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             return string;
 
         case HLSL_CLASS_TEXTURE:
+            if (type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+            {
+                vkd3d_string_buffer_printf(string, "ByteAddressBuffer");
+                return string;
+            }
+
             if (type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
             {
                 vkd3d_string_buffer_printf(string, "Texture");

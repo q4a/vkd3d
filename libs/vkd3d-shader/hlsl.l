@@ -74,6 +74,7 @@ ANY                     (.)
 BlendState              {return KW_BLENDSTATE;          }
 break                   {return KW_BREAK;               }
 Buffer                  {return KW_BUFFER;              }
+ByteAddressBuffer       {return KW_BYTEADDRESSBUFFER;   }
 case                    {return KW_CASE;                }
 cbuffer                 {return KW_CBUFFER;             }
 centroid                {return KW_CENTROID;            }

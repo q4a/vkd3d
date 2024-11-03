@@ -6509,6 +6509,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_BLENDSTATE
 %token KW_BREAK
 %token KW_BUFFER
+%token KW_BYTEADDRESSBUFFER
 %token KW_CASE
 %token KW_CONSTANTBUFFER
 %token KW_CBUFFER
@@ -7877,6 +7878,10 @@ type_no_void:
             vkd3d_free($5);
 
             $$ = hlsl_new_texture_type(ctx, $1, $3, sample_count);
+        }
+    | KW_BYTEADDRESSBUFFER
+        {
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_RAW_BUFFER, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), 0);
         }
     | uav_type '<' resource_format '>'
         {
