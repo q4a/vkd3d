@@ -298,9 +298,13 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
     id<MTLRenderCommandEncoder> encoder;
     id<MTLCommandBuffer> command_buffer;
     MTLRenderPassDescriptor *pass_desc;
+    id<MTLArgumentEncoder> descriptors;
     MTLVertexDescriptor *vertex_desc;
     struct metal_resource *resource;
+    MTLArgumentDescriptor *cbv_desc;
     id<MTLRenderPipelineState> pso;
+    id<MTLBuffer> argument_buffer;
+    id<MTLBuffer> cb;
     NSError *err;
 
     struct
@@ -378,6 +382,28 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
 
         command_buffer = [runner->queue commandBuffer];
         encoder = [command_buffer renderCommandEncoderWithDescriptor:pass_desc];
+
+        if (r->uniform_count)
+        {
+            cb = [[device newBufferWithBytes:r->uniforms
+                    length:runner->r.uniform_count * sizeof(*runner->r.uniforms)
+                    options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
+
+            cbv_desc = [MTLArgumentDescriptor argumentDescriptor];
+            cbv_desc.dataType = MTLDataTypePointer;
+            cbv_desc.index = 0;
+            cbv_desc.access = MTLBindingAccessReadOnly;
+
+            descriptors = [[device newArgumentEncoderWithArguments:@[cbv_desc]] autorelease];
+            argument_buffer = [[device newBufferWithLength:descriptors.encodedLength
+                    options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
+            [descriptors setArgumentBuffer:argument_buffer offset:0];
+            [descriptors setBuffer:cb offset:0 atIndex:0];
+
+            [encoder setVertexBuffer:argument_buffer offset:0 atIndex:0];
+            [encoder setFragmentBuffer:argument_buffer offset:0 atIndex:0];
+            [encoder useResource:cb usage:MTLResourceUsageRead stages:MTLRenderStageVertex | MTLRenderStageFragment];
+        }
 
         if (runner->r.input_element_count > 32)
             fatal_error("Unsupported input element count %zu.\n", runner->r.input_element_count);
@@ -523,6 +549,24 @@ static bool check_msl_support(void)
     return false;
 }
 
+static bool check_argument_buffer_support(id<MTLDevice> device)
+{
+    MTLArgumentDescriptor *d;
+
+    d = [MTLArgumentDescriptor argumentDescriptor];
+    d.dataType = MTLDataTypePointer;
+
+    @try
+    {
+        [[device newArgumentEncoderWithArguments:@[d]] release];
+        return true;
+    }
+    @catch (NSException *e)
+    {
+        return false;
+    }
+}
+
 static bool metal_runner_init(struct metal_runner *runner)
 {
     NSArray<id<MTLDevice>> *devices;
@@ -554,6 +598,13 @@ static bool metal_runner_init(struct metal_runner *runner)
     [devices release];
 
     trace("GPU: %s\n", [[device name] UTF8String]);
+
+    if (!check_argument_buffer_support(device))
+    {
+        skip("Device does not have usable argument buffer support.\n");
+        [device release];
+        return false;
+    }
 
     if (!(runner->queue = [device newCommandQueue]))
     {
