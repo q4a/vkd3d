@@ -18,17 +18,48 @@
 
 #include "config.h"
 #import <Metal/Metal.h>
+#define COBJMACROS
 #define VKD3D_TEST_NO_DEFS
 /* Avoid conflicts with the Objective C BOOL definition. */
 #define BOOL VKD3D_BOOLEAN
 #include "shader_runner.h"
+#include "vkd3d_d3dcommon.h"
 #undef BOOL
 
 struct metal_runner
 {
     struct shader_runner r;
     struct shader_runner_caps caps;
+
+    id<MTLDevice> device;
 };
+
+static void trace_messages(const char *messages)
+{
+    const char *p, *end, *line;
+
+    if (!vkd3d_test_state.debug_level)
+        return;
+
+    p = messages;
+    end = &p[strlen(p)];
+
+    trace("Received messages:\n");
+    while (p < end)
+    {
+        line = p;
+        if ((p = memchr(line, '\n', end - line)))
+            ++p;
+        else
+            p = end;
+        trace("    %.*s", (int)(p - line), line);
+    }
+}
+
+static struct metal_runner *metal_runner(struct shader_runner *r)
+{
+    return CONTAINING_RECORD(r, struct metal_runner, r);
+}
 
 static struct resource *metal_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
@@ -45,6 +76,81 @@ static void metal_runner_destroy_resource(struct shader_runner *r, struct resour
     free(res);
 }
 
+static bool compile_shader(struct metal_runner *runner, enum shader_type type, struct vkd3d_shader_code *out)
+{
+    struct vkd3d_shader_interface_info interface_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO};
+    struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
+    struct vkd3d_shader_resource_binding *binding;
+    unsigned int descriptor_binding = 0;
+    ID3DBlob *d3d_blob;
+    char *messages;
+    int ret;
+
+    const struct vkd3d_shader_compile_option options[] =
+    {
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_13},
+        {VKD3D_SHADER_COMPILE_OPTION_FEATURE, shader_runner_caps_get_feature_flags(&runner->caps)},
+    };
+
+    if (!(d3d_blob = compile_hlsl(&runner->r, type)))
+        return false;
+
+    info.next = &interface_info;
+    info.source.code = ID3D10Blob_GetBufferPointer(d3d_blob);
+    info.source.size = ID3D10Blob_GetBufferSize(d3d_blob);
+    info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+    info.target_type = VKD3D_SHADER_TARGET_MSL;
+    info.options = options;
+    info.option_count = ARRAY_SIZE(options);
+    info.log_level = VKD3D_SHADER_LOG_WARNING;
+
+    if (runner->r.uniform_count)
+    {
+        binding = &bindings[interface_info.binding_count++];
+        binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_CBV;
+        binding->register_space = 0;
+        binding->register_index = 0;
+        binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
+        binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
+        binding->binding.set = 0;
+        binding->binding.binding = descriptor_binding++;
+        binding->binding.count = 1;
+    }
+
+    interface_info.bindings = bindings;
+
+    ret = vkd3d_shader_compile(&info, out, &messages);
+    if (messages)
+        trace_messages(messages);
+    vkd3d_shader_free_messages(messages);
+    ID3D10Blob_Release(d3d_blob);
+
+    return ret >= 0;
+}
+
+static id<MTLFunction> compile_stage(struct metal_runner *runner, enum shader_type type)
+{
+    struct vkd3d_shader_code out;
+    id<MTLFunction> function;
+    id<MTLLibrary> library;
+    NSString *src;
+    NSError *err;
+
+    if (!compile_shader(runner, type, &out))
+        return nil;
+    src = [[[NSString alloc] initWithBytes:out.code length:out.size encoding:NSUTF8StringEncoding] autorelease];
+    library = [[runner->device newLibraryWithSource:src options:nil error:&err] autorelease];
+    ok(library, "Failed to create MTLLibrary.\n");
+    if (err)
+        trace_messages([err.localizedDescription UTF8String]);
+    function = [library newFunctionWithName:@"shader_entry"];
+    ok(function, "Failed to create MTLFunction.\n");
+    vkd3d_shader_free_shader_code(&out);
+
+    return [function autorelease];
+}
+
 static bool metal_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
 {
     return false;
@@ -58,6 +164,38 @@ static void metal_runner_clear(struct shader_runner *r, struct resource *res, co
 static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY primitive_topology,
         unsigned int vertex_count, unsigned int instance_count)
 {
+    struct metal_runner *runner = metal_runner(r);
+    MTLRenderPipelineDescriptor *pipeline_desc;
+    id<MTLDevice> device = runner->device;
+    id<MTLRenderPipelineState> pso;
+    NSError *err;
+
+    @autoreleasepool
+    {
+        pipeline_desc = [[[MTLRenderPipelineDescriptor alloc] init] autorelease];
+
+        if (!(pipeline_desc.vertexFunction = compile_stage(runner, SHADER_TYPE_VS)))
+        {
+            trace("Failed to compile vertex function.\n");
+            goto done;
+        }
+
+        if (!(pipeline_desc.fragmentFunction = compile_stage(runner, SHADER_TYPE_PS)))
+        {
+            trace("Failed to compile fragment function.\n");
+            goto done;
+        }
+
+        if (!(pso = [[device newRenderPipelineStateWithDescriptor:pipeline_desc error:&err] autorelease]))
+        {
+            trace("Failed to compile pipeline state.\n");
+            if (err)
+                trace_messages([err.localizedDescription UTF8String]);
+            goto done;
+        }
+    }
+
+done:
     return false;
 }
 
@@ -89,6 +227,21 @@ static const struct shader_runner_ops metal_runner_ops =
     .release_readback = metal_runner_release_readback,
 };
 
+static bool check_msl_support(void)
+{
+    const enum vkd3d_shader_target_type *target_types;
+    unsigned int count, i;
+
+    target_types = vkd3d_shader_get_supported_target_types(VKD3D_SHADER_SOURCE_DXBC_TPF, &count);
+    for (i = 0; i < count; ++i)
+    {
+        if (target_types[i] == VKD3D_SHADER_TARGET_MSL)
+            return true;
+    }
+
+    return false;
+}
+
 static bool metal_runner_init(struct metal_runner *runner)
 {
     NSArray<id<MTLDevice>> *devices;
@@ -98,6 +251,13 @@ static bool metal_runner_init(struct metal_runner *runner)
     {
         "msl",
     };
+
+    if (!check_msl_support())
+    {
+        skip("MSL support is not enabled. If this is unintentional, "
+                "add -DVKD3D_SHADER_UNSUPPORTED_MSL to CPPFLAGS.\n");
+        return false;
+    }
 
     memset(runner, 0, sizeof(*runner));
 
@@ -109,6 +269,7 @@ static bool metal_runner_init(struct metal_runner *runner)
         return false;
     }
     device = [devices objectAtIndex:0];
+    runner->device = [device retain];
     [devices release];
 
     trace("GPU: %s\n", [[device name] UTF8String]);
@@ -124,7 +285,7 @@ static bool metal_runner_init(struct metal_runner *runner)
 
 static void metal_runner_cleanup(struct metal_runner *runner)
 {
-    /* Nothing to do. */
+    [runner->device release];
 }
 
 void run_shader_tests_metal(void)
