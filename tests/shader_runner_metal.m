@@ -32,7 +32,21 @@ struct metal_runner
     struct shader_runner_caps caps;
 
     id<MTLDevice> device;
+
+    ID3D10Blob *d3d_blobs[SHADER_TYPE_COUNT];
+    struct vkd3d_shader_scan_signature_info signatures[SHADER_TYPE_COUNT];
 };
+
+static MTLVertexFormat get_metal_attribute_format(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+        case DXGI_FORMAT_R32G32_FLOAT:
+            return MTLVertexFormatFloat2;
+        default:
+            return MTLVertexFormatInvalid;
+    }
+}
 
 static void trace_messages(const char *messages)
 {
@@ -83,7 +97,6 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
     struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
     struct vkd3d_shader_resource_binding *binding;
     unsigned int descriptor_binding = 0;
-    ID3DBlob *d3d_blob;
     char *messages;
     int ret;
 
@@ -93,12 +106,12 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
         {VKD3D_SHADER_COMPILE_OPTION_FEATURE, shader_runner_caps_get_feature_flags(&runner->caps)},
     };
 
-    if (!(d3d_blob = compile_hlsl(&runner->r, type)))
+    if (!(runner->d3d_blobs[type] = compile_hlsl(&runner->r, type)))
         return false;
 
     info.next = &interface_info;
-    info.source.code = ID3D10Blob_GetBufferPointer(d3d_blob);
-    info.source.size = ID3D10Blob_GetBufferSize(d3d_blob);
+    info.source.code = ID3D10Blob_GetBufferPointer(runner->d3d_blobs[type]);
+    info.source.size = ID3D10Blob_GetBufferSize(runner->d3d_blobs[type]);
     info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     info.target_type = VKD3D_SHADER_TARGET_MSL;
     info.options = options;
@@ -119,12 +132,14 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
     }
 
     interface_info.bindings = bindings;
+    interface_info.next = &runner->signatures[type];
+    runner->signatures[type].type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
+    runner->signatures[type].next = NULL;
 
     ret = vkd3d_shader_compile(&info, out, &messages);
     if (messages)
         trace_messages(messages);
     vkd3d_shader_free_messages(messages);
-    ID3D10Blob_Release(d3d_blob);
 
     return ret >= 0;
 }
@@ -166,13 +181,24 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
 {
     struct metal_runner *runner = metal_runner(r);
     MTLRenderPipelineDescriptor *pipeline_desc;
+    MTLVertexBufferLayoutDescriptor *binding;
     id<MTLDevice> device = runner->device;
+    size_t attribute_offsets[32], stride;
+    MTLVertexDescriptor *vertex_desc;
     id<MTLRenderPipelineState> pso;
+    struct resource *resource;
+    unsigned int vb_idx, i, j;
     NSError *err;
+
+    struct
+    {
+        unsigned int idx;
+    } vb_info[MAX_RESOURCES];
 
     @autoreleasepool
     {
         pipeline_desc = [[[MTLRenderPipelineDescriptor alloc] init] autorelease];
+        vertex_desc = [MTLVertexDescriptor vertexDescriptor];
 
         if (!(pipeline_desc.vertexFunction = compile_stage(runner, SHADER_TYPE_VS)))
         {
@@ -186,6 +212,59 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
             goto done;
         }
 
+        /* [[buffer(0)]] is used for the descriptor argument buffer. */
+        vb_idx = 1;
+        for (i = 0; i < runner->r.resource_count; ++i)
+        {
+            resource = runner->r.resources[i];
+            switch (resource->desc.type)
+            {
+                case RESOURCE_TYPE_VERTEX_BUFFER:
+                    assert(resource->desc.slot < ARRAY_SIZE(vb_info));
+                    for (j = 0, stride = 0; j < runner->r.input_element_count; ++j)
+                    {
+                        if (runner->r.input_elements[j].slot != resource->desc.slot)
+                            continue;
+                        assert(j < ARRAY_SIZE(attribute_offsets));
+                        attribute_offsets[j] = stride;
+                        stride += runner->r.input_elements[j].texel_size;
+                    }
+                    if (!stride)
+                        break;
+                    vb_info[resource->desc.slot].idx = vb_idx;
+                    binding = [vertex_desc.layouts objectAtIndexedSubscript:vb_idx];
+                    binding.stepFunction = MTLVertexStepFunctionPerVertex;
+                    binding.stride = stride;
+                    ++vb_idx;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        if (runner->r.input_element_count > 32)
+            fatal_error("Unsupported input element count %zu.\n", runner->r.input_element_count);
+
+        for (i = 0; i < runner->r.input_element_count; ++i)
+        {
+            const struct input_element *element = &runner->r.input_elements[i];
+            const struct vkd3d_shader_signature_element *signature_element;
+            MTLVertexAttributeDescriptor *attribute;
+
+            signature_element = vkd3d_shader_find_signature_element(&runner->signatures[SHADER_TYPE_VS].input,
+                    element->name, element->index, 0);
+            ok(signature_element, "Cannot find signature element %s%u.\n", element->name, element->index);
+
+            attribute = [vertex_desc.attributes objectAtIndexedSubscript:signature_element->register_index];
+            attribute.bufferIndex = vb_info[element->slot].idx;
+            attribute.format = get_metal_attribute_format(element->format);
+            ok(attribute.format != MTLVertexFormatInvalid, "Unhandled attribute format %#x.\n", element->format);
+            attribute.offset = attribute_offsets[i];
+        }
+
+        pipeline_desc.vertexDescriptor = vertex_desc;
+
         if (!(pso = [[device newRenderPipelineStateWithDescriptor:pipeline_desc error:&err] autorelease]))
         {
             trace("Failed to compile pipeline state.\n");
@@ -196,6 +275,16 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
     }
 
 done:
+    for (i = 0; i < SHADER_TYPE_COUNT; ++i)
+    {
+        if (!runner->d3d_blobs[i])
+            continue;
+
+        vkd3d_shader_free_scan_signature_info(&runner->signatures[i]);
+        ID3D10Blob_Release(runner->d3d_blobs[i]);
+        runner->d3d_blobs[i] = NULL;
+    }
+
     return false;
 }
 
