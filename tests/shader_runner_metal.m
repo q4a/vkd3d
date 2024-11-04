@@ -86,6 +86,18 @@ static MTLVertexFormat get_metal_attribute_format(DXGI_FORMAT format)
     }
 }
 
+static MTLPrimitiveType get_metal_primitive_type(D3D_PRIMITIVE_TOPOLOGY topology)
+{
+    switch (topology)
+    {
+        case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST:
+            return MTLPrimitiveTypeTriangle;
+
+        default:
+            fatal_error("Unhandled topology %#x.\n", topology);
+    }
+}
+
 static void trace_messages(const char *messages)
 {
     const char *p, *end, *line;
@@ -284,7 +296,7 @@ static void metal_runner_clear(struct shader_runner *r, struct resource *res, co
     return;
 }
 
-static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY primitive_topology,
+static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY topology,
         unsigned int vertex_count, unsigned int instance_count)
 {
     MTLViewport viewport = {0.0, 0.0, 0.0, 0.0, 0.0, 1.0};
@@ -305,6 +317,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
     id<MTLRenderPipelineState> pso;
     id<MTLBuffer> argument_buffer;
     id<MTLBuffer> cb;
+    bool ret = false;
     NSError *err;
 
     struct
@@ -444,10 +457,15 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
 
         [encoder setRenderPipelineState:pso];
         [encoder setViewport:viewport];
+        [encoder drawPrimitives:get_metal_primitive_type(topology)
+                vertexStart:0
+                vertexCount:vertex_count
+                instanceCount:instance_count];
         [encoder endEncoding];
 
         [command_buffer commit];
         [command_buffer waitUntilCompleted];
+        ret = true;
     }
 
 done:
@@ -461,7 +479,7 @@ done:
         runner->d3d_blobs[i] = NULL;
     }
 
-    return false;
+    return ret;
 }
 
 static bool metal_runner_copy(struct shader_runner *r, struct resource *src, struct resource *dst)
