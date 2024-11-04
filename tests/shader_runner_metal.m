@@ -26,16 +26,43 @@
 #include "vkd3d_d3dcommon.h"
 #undef BOOL
 
+struct metal_resource
+{
+    struct resource r;
+
+    id<MTLTexture> texture;
+};
+
 struct metal_runner
 {
     struct shader_runner r;
     struct shader_runner_caps caps;
 
     id<MTLDevice> device;
+    id<MTLCommandQueue> queue;
 
     ID3D10Blob *d3d_blobs[SHADER_TYPE_COUNT];
     struct vkd3d_shader_scan_signature_info signatures[SHADER_TYPE_COUNT];
 };
+
+static MTLPixelFormat get_metal_pixel_format(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+        case DXGI_FORMAT_R32G32B32A32_FLOAT:
+            return MTLPixelFormatRGBA32Float;
+        case DXGI_FORMAT_R32G32B32A32_UINT:
+            return MTLPixelFormatRGBA32Uint;
+        case DXGI_FORMAT_R32G32B32A32_SINT:
+            return MTLPixelFormatRGBA32Sint;
+        case DXGI_FORMAT_R32_FLOAT:
+            return MTLPixelFormatR32Float;
+        case DXGI_FORMAT_R32_UINT:
+            return MTLPixelFormatR32Uint;
+        default:
+            return MTLPixelFormatInvalid;
+    }
+}
 
 static MTLVertexFormat get_metal_attribute_format(DXGI_FORMAT format)
 {
@@ -70,24 +97,78 @@ static void trace_messages(const char *messages)
     }
 }
 
+static struct metal_resource *metal_resource(struct resource *r)
+{
+    return CONTAINING_RECORD(r, struct metal_resource, r);
+}
+
 static struct metal_runner *metal_runner(struct shader_runner *r)
 {
     return CONTAINING_RECORD(r, struct metal_runner, r);
 }
 
+static void init_resource_texture(struct metal_runner *runner,
+        struct metal_resource *resource, const struct resource_params *params)
+{
+    id<MTLDevice> device = runner->device;
+    MTLTextureDescriptor *desc;
+
+    if (params->desc.type != RESOURCE_TYPE_RENDER_TARGET)
+        return;
+
+    if (params->desc.sample_count > 1)
+    {
+        if (params->desc.level_count > 1)
+            fatal_error("Multisampled texture has multiple levels.\n");
+
+        if (![device supportsTextureSampleCount:params->desc.sample_count])
+        {
+            skip("Format #%x with sample count %u is not supported; skipping.\n", params->desc.format,
+                    params->desc.sample_count);
+            return;
+        }
+    }
+
+    if (params->data)
+        fatal_error("Initial texture resource data not implemented.\n");
+
+    desc = [[MTLTextureDescriptor alloc] init];
+    if (params->desc.sample_count > 1)
+        desc.textureType = MTLTextureType2DMultisample;
+    desc.pixelFormat = get_metal_pixel_format(params->desc.format);
+    ok(desc.pixelFormat != MTLPixelFormatInvalid, "Unhandled pixel format %#x.\n", params->desc.format);
+    desc.width = params->desc.width;
+    desc.height = params->desc.height;
+    desc.mipmapLevelCount = params->desc.level_count;
+    desc.sampleCount = max(params->desc.sample_count, 1);
+    desc.storageMode = MTLStorageModePrivate;
+    desc.usage = MTLTextureUsageRenderTarget;
+
+    resource->texture = [device newTextureWithDescriptor:desc];
+    ok(resource->texture, "Failed to create texture.\n");
+    [desc release];
+}
+
 static struct resource *metal_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
-    struct resource *resource;
+    struct metal_runner *runner = metal_runner(r);
+    struct metal_resource *resource;
 
     resource = calloc(1, sizeof(*resource));
-    init_resource(resource, params);
+    init_resource(&resource->r, params);
 
-    return resource;
+    if (params->desc.dimension != RESOURCE_DIMENSION_BUFFER)
+        init_resource_texture(runner, resource, params);
+
+    return &resource->r;
 }
 
 static void metal_runner_destroy_resource(struct shader_runner *r, struct resource *res)
 {
-    free(res);
+    struct metal_resource *resource = metal_resource(res);
+
+    [resource->texture release];
+    free(resource);
 }
 
 static bool compile_shader(struct metal_runner *runner, enum shader_type type, struct vkd3d_shader_code *out)
@@ -179,15 +260,20 @@ static void metal_runner_clear(struct shader_runner *r, struct resource *res, co
 static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY primitive_topology,
         unsigned int vertex_count, unsigned int instance_count)
 {
+    MTLViewport viewport = {0.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+    MTLRenderPassColorAttachmentDescriptor *attachment;
+    unsigned int fb_width, fb_height, vb_idx, i, j;
     struct metal_runner *runner = metal_runner(r);
     MTLRenderPipelineDescriptor *pipeline_desc;
     MTLVertexBufferLayoutDescriptor *binding;
     id<MTLDevice> device = runner->device;
     size_t attribute_offsets[32], stride;
+    id<MTLRenderCommandEncoder> encoder;
+    id<MTLCommandBuffer> command_buffer;
+    MTLRenderPassDescriptor *pass_desc;
     MTLVertexDescriptor *vertex_desc;
+    struct metal_resource *resource;
     id<MTLRenderPipelineState> pso;
-    struct resource *resource;
-    unsigned int vb_idx, i, j;
     NSError *err;
 
     struct
@@ -197,6 +283,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
 
     @autoreleasepool
     {
+        pass_desc = [MTLRenderPassDescriptor renderPassDescriptor];
         pipeline_desc = [[[MTLRenderPipelineDescriptor alloc] init] autorelease];
         vertex_desc = [MTLVertexDescriptor vertexDescriptor];
 
@@ -212,18 +299,32 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
             goto done;
         }
 
+        fb_width = ~0u;
+        fb_height = ~0u;
         /* [[buffer(0)]] is used for the descriptor argument buffer. */
         vb_idx = 1;
         for (i = 0; i < runner->r.resource_count; ++i)
         {
-            resource = runner->r.resources[i];
-            switch (resource->desc.type)
+            resource = metal_resource(runner->r.resources[i]);
+            switch (resource->r.desc.type)
             {
+                case RESOURCE_TYPE_RENDER_TARGET:
+                    pipeline_desc.colorAttachments[resource->r.desc.slot].pixelFormat = resource->texture.pixelFormat;
+                    attachment = pass_desc.colorAttachments[resource->r.desc.slot];
+                    attachment.loadAction = MTLLoadActionLoad;
+                    attachment.storeAction = MTLStoreActionStore;
+                    attachment.texture = resource->texture;
+                    if (resource->r.desc.width < fb_width)
+                        fb_width = resource->r.desc.width;
+                    if (resource->r.desc.height < fb_height)
+                        fb_height = resource->r.desc.height;
+                    break;
+
                 case RESOURCE_TYPE_VERTEX_BUFFER:
-                    assert(resource->desc.slot < ARRAY_SIZE(vb_info));
+                    assert(resource->r.desc.slot < ARRAY_SIZE(vb_info));
                     for (j = 0, stride = 0; j < runner->r.input_element_count; ++j)
                     {
-                        if (runner->r.input_elements[j].slot != resource->desc.slot)
+                        if (runner->r.input_elements[j].slot != resource->r.desc.slot)
                             continue;
                         assert(j < ARRAY_SIZE(attribute_offsets));
                         attribute_offsets[j] = stride;
@@ -231,7 +332,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
                     }
                     if (!stride)
                         break;
-                    vb_info[resource->desc.slot].idx = vb_idx;
+                    vb_info[resource->r.desc.slot].idx = vb_idx;
                     binding = [vertex_desc.layouts objectAtIndexedSubscript:vb_idx];
                     binding.stepFunction = MTLVertexStepFunctionPerVertex;
                     binding.stride = stride;
@@ -242,6 +343,11 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
                     break;
             }
         }
+        viewport.width = fb_width;
+        viewport.height = fb_height;
+
+        command_buffer = [runner->queue commandBuffer];
+        encoder = [command_buffer renderCommandEncoderWithDescriptor:pass_desc];
 
         if (runner->r.input_element_count > 32)
             fatal_error("Unsupported input element count %zu.\n", runner->r.input_element_count);
@@ -270,8 +376,16 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
             trace("Failed to compile pipeline state.\n");
             if (err)
                 trace_messages([err.localizedDescription UTF8String]);
+            [encoder endEncoding];
             goto done;
         }
+
+        [encoder setRenderPipelineState:pso];
+        [encoder setViewport:viewport];
+        [encoder endEncoding];
+
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
     }
 
 done:
@@ -363,6 +477,13 @@ static bool metal_runner_init(struct metal_runner *runner)
 
     trace("GPU: %s\n", [[device name] UTF8String]);
 
+    if (!(runner->queue = [device newCommandQueue]))
+    {
+        skip("Failed to create command queue.\n");
+        [device release];
+        return false;
+    }
+
     runner->caps.runner = "Metal";
     runner->caps.tags = tags;
     runner->caps.tag_count = ARRAY_SIZE(tags);
@@ -374,6 +495,7 @@ static bool metal_runner_init(struct metal_runner *runner)
 
 static void metal_runner_cleanup(struct metal_runner *runner)
 {
+    [runner->queue release];
     [runner->device release];
 }
 
