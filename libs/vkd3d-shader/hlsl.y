@@ -5603,6 +5603,55 @@ static bool raise_invalid_method_object_type(struct hlsl_ctx *ctx, const struct 
     return false;
 }
 
+static bool add_raw_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
+    struct hlsl_ir_node *load;
+    unsigned int value_dim;
+
+    if (params->args_count != 1 && params->args_count != 2)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method 'Load': expected between 1 and 2, but got %u.",
+                params->args_count);
+        return false;
+    }
+
+    if (params->args_count == 2)
+    {
+        hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+        return false;
+    }
+
+    if (params->args[0]->data_type->class != HLSL_CLASS_SCALAR)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Scalar address argument expected for '%s'.", name);
+        return false;
+    }
+
+    if (!strcmp(name, "Load"))
+        value_dim = 1;
+    else if (!strcmp(name, "Load2"))
+        value_dim = 2;
+    else if (!strcmp(name, "Load3"))
+        value_dim = 3;
+    else
+        value_dim = 4;
+
+    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[0],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
+        return false;
+
+    load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, value_dim);
+    load_params.resource = object;
+
+    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    hlsl_block_add_instr(block, load);
+    return true;
+}
+
 static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -5611,6 +5660,9 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
     unsigned int sampler_dim, offset_dim;
     struct hlsl_ir_node *load;
     bool multisampled;
+
+    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+        return add_raw_load_method_call(ctx, block, object, name, params, loc);
 
     if (object_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
     {
@@ -6264,7 +6316,10 @@ texture_methods[] =
 
     { "GetDimensions",      add_getdimensions_method_call, "00111111111110" },
 
-    { "Load",               add_load_method_call,          "00111011110110" },
+    { "Load",               add_load_method_call,          "00111011110111" },
+    { "Load2",              add_raw_load_method_call,      "00000000000001" },
+    { "Load3",              add_raw_load_method_call,      "00000000000001" },
+    { "Load4",              add_raw_load_method_call,      "00000000000001" },
 
     { "Sample",             add_sample_method_call,        "00111111001000" },
     { "SampleBias",         add_sample_lod_method_call,    "00111111001000" },
