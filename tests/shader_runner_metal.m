@@ -38,6 +38,12 @@ struct metal_resource
     id<MTLTexture> texture;
 };
 
+struct metal_resource_readback
+{
+    struct resource_readback rb;
+    id<MTLBuffer> buffer;
+};
+
 struct metal_runner
 {
     struct shader_runner r;
@@ -439,12 +445,54 @@ static bool metal_runner_copy(struct shader_runner *r, struct resource *src, str
 
 static struct resource_readback *metal_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
-    return NULL;
+    struct metal_resource *resource = metal_resource(res);
+    struct metal_runner *runner = metal_runner(r);
+    id<MTLCommandBuffer> command_buffer;
+    struct metal_resource_readback *rb;
+    id<MTLBlitCommandEncoder> blit;
+
+    if (resource->r.desc.dimension != RESOURCE_DIMENSION_2D)
+        fatal_error("Unhandled resource dimension %#x.\n", resource->r.desc.dimension);
+    if (resource->r.desc.sample_count > 1)
+        fatal_error("Unhandled sample count %u.\n", resource->r.desc.sample_count);
+
+    rb = malloc(sizeof(*rb));
+    rb->rb.width = resource->r.desc.width;
+    rb->rb.height = resource->r.desc.height;
+    rb->rb.depth = 1;
+    rb->rb.row_pitch = rb->rb.width * resource->r.desc.texel_size;
+    rb->buffer = [runner->device newBufferWithLength:rb->rb.row_pitch * rb->rb.height
+            options:DEFAULT_BUFFER_RESOURCE_OPTIONS];
+
+    @autoreleasepool
+    {
+        command_buffer = [runner->queue commandBuffer];
+
+        blit = [command_buffer blitCommandEncoder];
+        [blit copyFromTexture:resource->texture
+                sourceSlice:0
+                sourceLevel:0
+                sourceOrigin:MTLOriginMake(0, 0, 0)
+                sourceSize:MTLSizeMake(rb->rb.width, rb->rb.height, rb->rb.depth)
+                toBuffer:rb->buffer
+                destinationOffset:0
+                destinationBytesPerRow:rb->rb.row_pitch
+                destinationBytesPerImage:0];
+        [blit endEncoding];
+
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+    }
+    rb->rb.data = rb->buffer.contents;
+
+    return &rb->rb;
 }
 
 static void metal_runner_release_readback(struct shader_runner *r, struct resource_readback *rb)
 {
-    free(rb->data);
+    struct metal_resource_readback *metal_rb = CONTAINING_RECORD(rb, struct metal_resource_readback, rb);
+
+    [metal_rb->buffer release];
     free(rb);
 }
 
