@@ -1719,7 +1719,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_RT_PRIMID,                  VKD3DSPR_PRIMID,          VKD3D_SM4_SWIZZLE_NONE},
         {VKD3D_SM4_RT_DEPTHOUT,                VKD3DSPR_DEPTHOUT,        VKD3D_SM4_SWIZZLE_VEC4},
         {VKD3D_SM4_RT_NULL,                    VKD3DSPR_NULL,            VKD3D_SM4_SWIZZLE_INVALID},
-        {VKD3D_SM4_RT_RASTERIZER,              VKD3DSPR_RASTERIZER,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_RASTERIZER,              VKD3DSPR_RASTERIZER,      VKD3D_SM4_SWIZZLE_SCALAR},
         {VKD3D_SM4_RT_OMASK,                   VKD3DSPR_SAMPLEMASK,      VKD3D_SM4_SWIZZLE_VEC4},
         {VKD3D_SM5_RT_STREAM,                  VKD3DSPR_STREAM,          VKD3D_SM4_SWIZZLE_VEC4},
         {VKD3D_SM5_RT_FUNCTION_BODY,           VKD3DSPR_FUNCTIONBODY,    VKD3D_SM4_SWIZZLE_VEC4},
