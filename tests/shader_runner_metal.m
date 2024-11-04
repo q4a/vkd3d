@@ -26,10 +26,15 @@
 #include "vkd3d_d3dcommon.h"
 #undef BOOL
 
+static const MTLResourceOptions DEFAULT_BUFFER_RESOURCE_OPTIONS = MTLResourceCPUCacheModeDefaultCache
+        | MTLResourceStorageModeShared
+        | MTLResourceHazardTrackingModeDefault;
+
 struct metal_resource
 {
     struct resource r;
 
+    id<MTLBuffer> buffer;
     id<MTLTexture> texture;
 };
 
@@ -107,6 +112,19 @@ static struct metal_runner *metal_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct metal_runner, r);
 }
 
+static void init_resource_buffer(struct metal_runner *runner,
+        struct metal_resource *resource, const struct resource_params *params)
+{
+    id<MTLDevice> device = runner->device;
+
+    if (params->data)
+        resource->buffer = [device newBufferWithBytes:params->data
+                length:params->data_size
+                options:DEFAULT_BUFFER_RESOURCE_OPTIONS];
+    else
+        resource->buffer = [device newBufferWithLength:params->data_size options:DEFAULT_BUFFER_RESOURCE_OPTIONS];
+}
+
 static void init_resource_texture(struct metal_runner *runner,
         struct metal_resource *resource, const struct resource_params *params)
 {
@@ -157,7 +175,9 @@ static struct resource *metal_runner_create_resource(struct shader_runner *r, co
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
-    if (params->desc.dimension != RESOURCE_DIMENSION_BUFFER)
+    if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
+        init_resource_buffer(runner, resource, params);
+    else
         init_resource_texture(runner, resource, params);
 
     return &resource->r;
@@ -168,6 +188,7 @@ static void metal_runner_destroy_resource(struct shader_runner *r, struct resour
     struct metal_resource *resource = metal_resource(res);
 
     [resource->texture release];
+    [resource->buffer release];
     free(resource);
 }
 
@@ -278,6 +299,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
 
     struct
     {
+        id<MTLBuffer> buffer;
         unsigned int idx;
     } vb_info[MAX_RESOURCES];
 
@@ -303,6 +325,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
         fb_height = ~0u;
         /* [[buffer(0)]] is used for the descriptor argument buffer. */
         vb_idx = 1;
+        memset(vb_info, 0, sizeof(vb_info));
         for (i = 0; i < runner->r.resource_count; ++i)
         {
             resource = metal_resource(runner->r.resources[i]);
@@ -332,6 +355,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
                     }
                     if (!stride)
                         break;
+                    vb_info[resource->r.desc.slot].buffer = resource->buffer;
                     vb_info[resource->r.desc.slot].idx = vb_idx;
                     binding = [vertex_desc.layouts objectAtIndexedSubscript:vb_idx];
                     binding.stepFunction = MTLVertexStepFunctionPerVertex;
@@ -367,6 +391,12 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY pr
             attribute.format = get_metal_attribute_format(element->format);
             ok(attribute.format != MTLVertexFormatInvalid, "Unhandled attribute format %#x.\n", element->format);
             attribute.offset = attribute_offsets[i];
+        }
+        for (i = 0; i < ARRAY_SIZE(vb_info); ++i)
+        {
+            if (!vb_info[i].buffer)
+                continue;
+            [encoder setVertexBuffer:vb_info[i].buffer offset:0 atIndex:vb_info[i].idx];
         }
 
         pipeline_desc.vertexDescriptor = vertex_desc;
