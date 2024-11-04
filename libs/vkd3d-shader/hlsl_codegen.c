@@ -6817,6 +6817,16 @@ static void vsir_src_from_hlsl_node(struct vkd3d_shader_src_param *src,
     }
 }
 
+static void vsir_dst_from_hlsl_node(struct vkd3d_shader_dst_param *dst,
+        struct hlsl_ctx *ctx, struct hlsl_ir_node *instr)
+{
+    VKD3D_ASSERT(instr->reg.allocated);
+    vsir_dst_param_init(dst, VKD3DSPR_TEMP, vsir_data_type_from_hlsl_instruction(ctx, instr), 1);
+    dst->reg.idx[0].offset = instr->reg.id;
+    dst->reg.dimension = VSIR_DIMENSION_VEC4;
+    dst->write_mask = instr->reg.writemask;
+}
+
 static void sm1_generate_vsir_instr_constant(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_constant *constant)
 {
@@ -6840,6 +6850,25 @@ static void sm1_generate_vsir_instr_constant(struct hlsl_ctx *ctx,
     vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
     dst_param->reg.idx[0].offset = instr->reg.id;
     dst_param->write_mask = instr->reg.writemask;
+}
+
+static void sm4_generate_vsir_rasterizer_sample_count(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_expr *expr)
+{
+    struct vkd3d_shader_src_param *src_param;
+    struct hlsl_ir_node *instr = &expr->node;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_SAMPLE_INFO, 1, 1)))
+        return;
+    ins->flags = VKD3DSI_SAMPLE_INFO_UINT;
+
+    vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
+
+    src_param = &ins->src[0];
+    vsir_src_param_init(src_param, VKD3DSPR_RASTERIZER, VKD3D_DATA_UNUSED, 0);
+    src_param->reg.dimension = VSIR_DIMENSION_VEC4;
+    src_param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
 }
 
 /* Translate ops that can be mapped to a single vsir instruction with only one dst register. */
@@ -6866,10 +6895,7 @@ static void generate_vsir_instr_expr_single_instr_op(struct hlsl_ctx *ctx,
         return;
 
     dst_param = &ins->dst[0];
-    vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, vsir_data_type_from_hlsl_instruction(ctx, instr), 1);
-    dst_param->reg.idx[0].offset = instr->reg.id;
-    dst_param->reg.dimension = VSIR_DIMENSION_VEC4;
-    dst_param->write_mask = instr->reg.writemask;
+    vsir_dst_from_hlsl_node(dst_param, ctx, instr);
     dst_param->modifiers = dst_mod;
 
     for (i = 0; i < src_count; ++i)
@@ -7815,6 +7841,10 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
 
     switch (expr->op)
     {
+        case HLSL_OP0_RASTERIZER_SAMPLE_COUNT:
+            sm4_generate_vsir_rasterizer_sample_count(ctx, program, expr);
+            return true;
+
         case HLSL_OP1_ABS:
             VKD3D_ASSERT(type_is_float(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, VKD3DSPSM_ABS, 0, true);

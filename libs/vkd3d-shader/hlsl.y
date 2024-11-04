@@ -5175,6 +5175,10 @@ static bool intrinsic_GetRenderTargetSampleCount(struct hlsl_ctx *ctx,
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_ir_node *expr;
 
+    if (ctx->profile->type != VKD3D_SHADER_TYPE_PIXEL || hlsl_version_lt(ctx, 4, 1))
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "GetRenderTargetSampleCount() can only be used from a pixel shader using version 4.1 or higher.");
+
     if (!(expr = hlsl_new_expr(ctx, HLSL_OP0_RASTERIZER_SAMPLE_COUNT,
             operands, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
         return false;

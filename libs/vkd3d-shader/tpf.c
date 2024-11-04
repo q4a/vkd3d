@@ -5468,25 +5468,6 @@ static void write_sm4_cast(const struct tpf_compiler *tpf, const struct hlsl_ir_
     }
 }
 
-static void write_sm4_rasterizer_sample_count(const struct tpf_compiler *tpf, const struct hlsl_ir_node *dst)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_SAMPLE_INFO;
-    instr.extra_bits |= VKD3DSI_SAMPLE_INFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
-
-    sm4_dst_from_node(&instr.dsts[0], dst);
-    instr.dst_count = 1;
-
-    instr.srcs[0].reg.type = VKD3DSPR_RASTERIZER;
-    instr.srcs[0].reg.dimension = VSIR_DIMENSION_VEC4;
-    instr.srcs[0].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
-    instr.src_count = 1;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
 {
     const struct vkd3d_shader_version *version = &tpf->program->shader_version;
@@ -5502,14 +5483,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP0_RASTERIZER_SAMPLE_COUNT:
-            if (version->type == VKD3D_SHADER_TYPE_PIXEL && vkd3d_shader_ver_ge(version, 4, 1))
-                write_sm4_rasterizer_sample_count(tpf, &expr->node);
-            else
-                hlsl_error(tpf->ctx, &expr->node.loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
-                        "GetRenderTargetSampleCount() can only be used from a pixel shader using version 4.1 or higher.");
-            break;
-
         case HLSL_OP1_CAST:
             write_sm4_cast(tpf, expr);
             break;
@@ -6042,6 +6015,7 @@ static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_
     }
 
     instr.opcode = info->opcode;
+    instr.extra_bits = ins->flags << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
     instr.dst_count = ins->dst_count;
     instr.src_count = ins->src_count;
 
@@ -6137,6 +6111,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_ROUND_PI:
         case VKD3DSIH_ROUND_Z:
         case VKD3DSIH_RSQ:
+        case VKD3DSIH_SAMPLE_INFO:
         case VKD3DSIH_SQRT:
         case VKD3DSIH_UGE:
         case VKD3DSIH_ULT:
