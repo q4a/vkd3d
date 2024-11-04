@@ -2235,7 +2235,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
     return true;
 }
 
-static bool shader_sm4_is_scalar_register(const struct vkd3d_shader_register *reg)
+bool shader_sm4_is_scalar_register(const struct vkd3d_shader_register *reg)
 {
     switch (reg->type)
     {
@@ -4856,114 +4856,6 @@ static void write_sm4_dcl_textures(const struct tpf_compiler *tpf, const struct 
     }
 }
 
-static void tpf_write_dcl_semantic(const struct tpf_compiler *tpf,
-        const struct hlsl_ir_var *var, bool is_patch_constant_func)
-{
-    const struct vkd3d_shader_version *version = &tpf->program->shader_version;
-    const bool output = var->is_output_semantic;
-    enum vkd3d_shader_sysval_semantic semantic;
-    bool has_idx;
-
-    struct sm4_instruction instr =
-    {
-        .dsts[0].reg.dimension = VSIR_DIMENSION_VEC4,
-        .dst_count = 1,
-    };
-
-    if (sm4_register_from_semantic_name(version, var->semantic.name, output, &instr.dsts[0].reg.type, &has_idx))
-    {
-        if (has_idx)
-        {
-            instr.dsts[0].reg.idx[0].offset = var->semantic.index;
-            instr.dsts[0].reg.idx_count = 1;
-        }
-        else
-        {
-            instr.dsts[0].reg.idx_count = 0;
-        }
-        instr.dsts[0].write_mask = (1 << var->data_type->dimx) - 1;
-    }
-    else
-    {
-        if (output)
-            instr.dsts[0].reg.type = VKD3DSPR_OUTPUT;
-        else if (version->type == VKD3D_SHADER_TYPE_DOMAIN)
-            instr.dsts[0].reg.type = VKD3DSPR_PATCHCONST;
-        else
-            instr.dsts[0].reg.type = VKD3DSPR_INPUT;
-
-        instr.dsts[0].reg.idx[0].offset = var->regs[HLSL_REGSET_NUMERIC].id;
-        instr.dsts[0].reg.idx_count = 1;
-        instr.dsts[0].write_mask = var->regs[HLSL_REGSET_NUMERIC].writemask;
-    }
-
-    if (shader_sm4_is_scalar_register(&instr.dsts[0].reg))
-        instr.dsts[0].reg.dimension = VSIR_DIMENSION_SCALAR;
-
-    sm4_sysval_semantic_from_semantic_name(&semantic, version, tpf->ctx->semantic_compat_mapping,
-            tpf->ctx->domain, var->semantic.name, var->semantic.index, output, is_patch_constant_func);
-    if (semantic == ~0u)
-        semantic = VKD3D_SHADER_SV_NONE;
-
-    if (var->is_input_semantic)
-    {
-        switch (semantic)
-        {
-            case VKD3D_SHADER_SV_NONE:
-                instr.opcode = (version->type == VKD3D_SHADER_TYPE_PIXEL)
-                        ? VKD3D_SM4_OP_DCL_INPUT_PS : VKD3D_SM4_OP_DCL_INPUT;
-                break;
-
-            case VKD3D_SHADER_SV_INSTANCE_ID:
-            case VKD3D_SHADER_SV_IS_FRONT_FACE:
-            case VKD3D_SHADER_SV_PRIMITIVE_ID:
-            case VKD3D_SHADER_SV_SAMPLE_INDEX:
-            case VKD3D_SHADER_SV_VERTEX_ID:
-                instr.opcode = (version->type == VKD3D_SHADER_TYPE_PIXEL)
-                        ? VKD3D_SM4_OP_DCL_INPUT_PS_SGV : VKD3D_SM4_OP_DCL_INPUT_SGV;
-                break;
-
-            default:
-                instr.opcode = (version->type == VKD3D_SHADER_TYPE_PIXEL)
-                        ? VKD3D_SM4_OP_DCL_INPUT_PS_SIV : VKD3D_SM4_OP_DCL_INPUT_SIV;
-                break;
-        }
-
-        if (version->type == VKD3D_SHADER_TYPE_PIXEL)
-        {
-            enum vkd3d_shader_interpolation_mode mode;
-
-            mode  = sm4_get_interpolation_mode(var->data_type, var->storage_modifiers);
-            instr.extra_bits |= mode << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
-        }
-    }
-    else
-    {
-        if (semantic == VKD3D_SHADER_SV_NONE || version->type == VKD3D_SHADER_TYPE_PIXEL)
-            instr.opcode = VKD3D_SM4_OP_DCL_OUTPUT;
-        else
-            instr.opcode = VKD3D_SM4_OP_DCL_OUTPUT_SIV;
-    }
-
-    if (instr.opcode == VKD3D_SM4_OP_DCL_OUTPUT)
-    {
-        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || semantic == VKD3D_SHADER_SV_TARGET
-                || instr.dsts[0].reg.type != VKD3DSPR_OUTPUT);
-    }
-    else if (instr.opcode == VKD3D_SM4_OP_DCL_INPUT || instr.opcode == VKD3D_SM4_OP_DCL_INPUT_PS)
-    {
-        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE);
-    }
-    else
-    {
-        VKD3D_ASSERT(semantic != VKD3D_SHADER_SV_NONE);
-        instr.idx_count = 1;
-        instr.idx[0] = vkd3d_siv_from_sysval_indexed(semantic, var->semantic.index);
-    }
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void tpf_dcl_temps(const struct tpf_compiler *tpf, unsigned int count)
 {
     struct sm4_instruction instr =
@@ -4985,6 +4877,41 @@ static void tpf_dcl_indexable_temp(const struct tpf_compiler *tpf, const struct 
 
         .idx = {temp->register_idx, temp->register_size, temp->component_count},
         .idx_count = 3,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_dcl_semantic(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
+        const struct vkd3d_shader_dst_param *dst, uint32_t interpolation_flags)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = opcode,
+
+        .dsts[0] = *dst,
+        .dst_count = 1,
+
+        .extra_bits = interpolation_flags << VKD3D_SM4_INTERPOLATION_MODE_SHIFT,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_dcl_siv_semantic(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
+        const struct vkd3d_shader_register_semantic *semantic, uint32_t interpolation_flags)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = opcode,
+
+        .dsts[0] = semantic->reg,
+        .dst_count = 1,
+
+        .idx[0] = semantic->sysval_semantic,
+        .idx_count = 1,
+
+        .extra_bits = interpolation_flags << VKD3D_SM4_INTERPOLATION_MODE_SHIFT,
     };
 
     write_sm4_instruction(tpf, &instr);
@@ -6529,6 +6456,38 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
             tpf_dcl_indexable_temp(tpf, &ins->declaration.indexable_temp);
             break;
 
+        case VKD3DSIH_DCL_INPUT:
+            tpf_dcl_semantic(tpf, VKD3D_SM4_OP_DCL_INPUT, &ins->declaration.dst, 0);
+            break;
+
+        case VKD3DSIH_DCL_INPUT_PS:
+            tpf_dcl_semantic(tpf, VKD3D_SM4_OP_DCL_INPUT_PS, &ins->declaration.dst, ins->flags);
+            break;
+
+        case VKD3DSIH_DCL_INPUT_PS_SGV:
+            tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_INPUT_PS_SGV, &ins->declaration.register_semantic, 0);
+            break;
+
+        case VKD3DSIH_DCL_INPUT_PS_SIV:
+            tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_INPUT_PS_SIV, &ins->declaration.register_semantic, ins->flags);
+            break;
+
+        case VKD3DSIH_DCL_INPUT_SGV:
+            tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_INPUT_SGV, &ins->declaration.register_semantic, 0);
+            break;
+
+        case VKD3DSIH_DCL_INPUT_SIV:
+            tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_INPUT_SIV, &ins->declaration.register_semantic, 0);
+            break;
+
+        case VKD3DSIH_DCL_OUTPUT:
+            tpf_dcl_semantic(tpf, VKD3D_SM4_OP_DCL_OUTPUT, &ins->declaration.dst, 0);
+            break;
+
+        case VKD3DSIH_DCL_OUTPUT_SIV:
+            tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_OUTPUT_SIV, &ins->declaration.register_semantic, 0);
+            break;
+
         case VKD3DSIH_MOV:
             tpf_simple_instruction(tpf, ins);
             break;
@@ -6621,16 +6580,6 @@ static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *b
 
 static void tpf_write_shader_function(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *func)
 {
-    struct hlsl_ctx *ctx = tpf->ctx;
-    const struct hlsl_ir_var *var;
-
-    LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        if ((var->is_input_semantic && var->last_read)
-                || (var->is_output_semantic && var->first_write))
-            tpf_write_dcl_semantic(tpf, var, func == ctx->patch_constant_func);
-    }
-
     if (tpf->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
         tpf_dcl_thread_group(tpf, &tpf->program->thread_group_size);
 

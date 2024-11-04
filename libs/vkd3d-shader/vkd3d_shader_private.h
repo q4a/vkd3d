@@ -1620,6 +1620,7 @@ bool sm1_usage_from_semantic_name(const char *semantic_name,
         uint32_t semantic_index, enum vkd3d_decl_usage *usage, uint32_t *usage_idx);
 bool sm4_register_from_semantic_name(const struct vkd3d_shader_version *version,
         const char *semantic_name, bool output, enum vkd3d_shader_register_type *type, bool *has_idx);
+bool shader_sm4_is_scalar_register(const struct vkd3d_shader_register *reg);
 bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *sysval_semantic,
         const struct vkd3d_shader_version *version, bool semantic_compat_mapping, enum vkd3d_tessellator_domain domain,
         const char *semantic_name, unsigned int semantic_idx, bool output, bool is_patch_constant_func);
