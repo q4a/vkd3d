@@ -1,6 +1,10 @@
 [require]
 shader model >= 4.0
 
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
+
 [pixel shader]
 uniform float a;
 
