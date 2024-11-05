@@ -179,6 +179,7 @@ struct shader_runner
     const struct shader_runner_caps *caps;
 
     bool is_todo;
+    bool is_bug;
 
     char *shader_source[SHADER_TYPE_COUNT];
     enum shader_model minimum_shader_model;

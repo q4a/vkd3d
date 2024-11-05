@@ -1,3 +1,8 @@
+% Many of these tests fail on MoltenVK because of a bug in Metal, which causes
+% SIMD operations (i.e., wave operations for Apple) to be hoisted out of the
+% "if"statement, thereby changing which threads (i.e., wave groups for Apple)
+% appear as active. This was reported to Apple as FB15624583.
+
 [require]
 shader model >= 6.0
 format r32-uint uav-load
@@ -59,25 +64,25 @@ void main(uint id : SV_GroupIndex)
 [test]
 dispatch 1 1 1
 probe uav 2 (0) rui (0xf01)
-probe uav 2 (1) rui (0x503)
+bug(mvk) probe uav 2 (1) rui (0x503)
 probe uav 2 (2) rui (0x511)
-probe uav 2 (3) rui (0x113)
+bug(mvk) probe uav 2 (3) rui (0x113)
 probe uav 2 (4) rui (0xf24)
 
 probe uav 2 (5) rui (0xf01)
-probe uav 2 (6) rui (0xa02)
+bug(mvk) probe uav 2 (6) rui (0xa02)
 probe uav 2 (7) rui (0xf04)
 probe uav 2 (8) rui (0)
 probe uav 2 (9) rui (0)
 
 probe uav 2 (10) rui (0xf01)
-probe uav 2 (11) rui (0x503)
+bug(mvk) probe uav 2 (11) rui (0x503)
 probe uav 2 (12) rui (0x511)
-probe uav 2 (13) rui (0x412)
+bug(mvk) probe uav 2 (13) rui (0x412)
 probe uav 2 (14) rui (0xf14)
 
 probe uav 2 (15) rui (0xf01)
-probe uav 2 (16) rui (0xa02)
+bug(mvk) probe uav 2 (16) rui (0xa02)
 probe uav 2 (17) rui (0xf04)
 probe uav 2 (18) rui (0)
 probe uav 2 (19) rui (0)
@@ -127,21 +132,21 @@ void main(uint id : SV_GroupIndex)
 [test]
 dispatch 1 1 1
 probe uav 2 (0) rui (0x701)
-probe uav 2 (1) rui (0x503)
+bug(mvk) probe uav 2 (1) rui (0x503)
 probe uav 2 (2) rui (0x511)
-probe uav 2 (3) rui (0x113)
+bug(mvk) probe uav 2 (3) rui (0x113)
 probe uav 2 (4) rui (0x724)
 
 probe uav 2 (5) rui (0x701)
-probe uav 2 (6) rui (0x202)
+bug(mvk) probe uav 2 (6) rui (0x202)
 probe uav 2 (7) rui (0x704)
 probe uav 2 (8) rui (0)
 probe uav 2 (9) rui (0)
 
 probe uav 2 (10) rui (0x701)
-probe uav 2 (11) rui (0x503)
+bug(mvk) probe uav 2 (11) rui (0x503)
 probe uav 2 (12) rui (0x511)
-probe uav 2 (13) rui (0x412)
+bug(mvk) probe uav 2 (13) rui (0x412)
 probe uav 2 (14) rui (0x714)
 
 probe uav 2 (15) rui (0)
