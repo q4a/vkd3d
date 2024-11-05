@@ -6833,7 +6833,7 @@ static void vsir_src_from_hlsl_node(struct vkd3d_shader_src_param *src,
 }
 
 static void vsir_dst_from_hlsl_node(struct vkd3d_shader_dst_param *dst,
-        struct hlsl_ctx *ctx, struct hlsl_ir_node *instr)
+        struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr)
 {
     VKD3D_ASSERT(instr->reg.allocated);
     vsir_dst_param_init(dst, VKD3DSPR_TEMP, vsir_data_type_from_hlsl_instruction(ctx, instr), 1);
@@ -7854,6 +7854,140 @@ static bool type_is_integer(const struct hlsl_type *type)
             || type->e.numeric.type == HLSL_TYPE_UINT;
 }
 
+static void sm4_generate_vsir_cast_from_bool(struct hlsl_ctx *ctx, struct vsir_program *program,
+        const struct hlsl_ir_expr *expr, uint32_t bits)
+{
+    struct hlsl_ir_node *operand = expr->operands[0].node;
+    const struct hlsl_ir_node *instr = &expr->node;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct hlsl_constant_value value = {0};
+    struct vkd3d_shader_instruction *ins;
+
+    VKD3D_ASSERT(instr->reg.allocated);
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_AND, 1, 2)))
+        return;
+
+    dst_param = &ins->dst[0];
+    vsir_dst_from_hlsl_node(dst_param, ctx, instr);
+
+    vsir_src_from_hlsl_node(&ins->src[0], ctx, operand, dst_param->write_mask);
+
+    value.u[0].u = bits;
+    vsir_src_from_hlsl_constant_value(&ins->src[1], ctx, &value, VKD3D_DATA_UINT, 1, 0);
+}
+
+static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_expr *expr)
+{
+    const struct hlsl_ir_node *arg1 = expr->operands[0].node;
+    const struct hlsl_type *dst_type = expr->node.data_type;
+    const struct hlsl_type *src_type = arg1->data_type;
+
+    static const union
+    {
+        uint32_t u;
+        float f;
+    } one = { .f = 1.0 };
+
+    /* Narrowing casts were already lowered. */
+    VKD3D_ASSERT(src_type->dimx == dst_type->dimx);
+
+    switch (dst_type->e.numeric.type)
+    {
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_FLOAT:
+            switch (src_type->e.numeric.type)
+            {
+                case HLSL_TYPE_HALF:
+                case HLSL_TYPE_FLOAT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_INT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_ITOF, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_UINT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_UTOF, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_BOOL:
+                    sm4_generate_vsir_cast_from_bool(ctx, program, expr, one.u);
+                    return true;
+
+                case HLSL_TYPE_DOUBLE:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to float.");
+                    return false;
+
+                default:
+                    vkd3d_unreachable();
+            }
+            break;
+
+        case HLSL_TYPE_INT:
+            switch (src_type->e.numeric.type)
+            {
+                case HLSL_TYPE_HALF:
+                case HLSL_TYPE_FLOAT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_FTOI, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_BOOL:
+                    sm4_generate_vsir_cast_from_bool(ctx, program, expr, 1u);
+                    return true;
+
+                case HLSL_TYPE_DOUBLE:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to int.");
+                    return false;
+
+                default:
+                    vkd3d_unreachable();
+            }
+            break;
+
+        case HLSL_TYPE_UINT:
+            switch (src_type->e.numeric.type)
+            {
+                case HLSL_TYPE_HALF:
+                case HLSL_TYPE_FLOAT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_FTOU, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_BOOL:
+                    sm4_generate_vsir_cast_from_bool(ctx, program, expr, 1u);
+                    return true;
+
+                case HLSL_TYPE_DOUBLE:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to uint.");
+                    return false;
+
+                default:
+                    vkd3d_unreachable();
+            }
+            break;
+
+        case HLSL_TYPE_DOUBLE:
+            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to double.");
+            return false;
+
+        case HLSL_TYPE_BOOL:
+            /* Casts to bool should have already been lowered. */
+        default:
+            vkd3d_unreachable();
+    }
+}
+
 static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_expr *expr, const char *dst_type_name)
 {
@@ -7879,6 +8013,9 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             VKD3D_ASSERT(type_is_integer(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_NOT, 0, 0, true);
             return true;
+
+        case HLSL_OP1_CAST:
+            return sm4_generate_vsir_instr_expr_cast(ctx, program, expr);
 
         case HLSL_OP1_CEIL:
             VKD3D_ASSERT(type_is_float(dst_type));

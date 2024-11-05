@@ -5350,135 +5350,6 @@ static bool type_is_float(const struct hlsl_type *type)
     return type->e.numeric.type == HLSL_TYPE_FLOAT || type->e.numeric.type == HLSL_TYPE_HALF;
 }
 
-static void write_sm4_cast_from_bool(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr,
-        const struct hlsl_ir_node *arg, uint32_t mask)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_AND;
-
-    sm4_dst_from_node(&instr.dsts[0], &expr->node);
-    instr.dst_count = 1;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], arg, instr.dsts[0].write_mask);
-    instr.srcs[1].reg.type = VKD3DSPR_IMMCONST;
-    instr.srcs[1].reg.dimension = VSIR_DIMENSION_SCALAR;
-    instr.srcs[1].reg.u.immconst_u32[0] = mask;
-    instr.src_count = 2;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
-static void write_sm4_cast(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
-{
-    static const union
-    {
-        uint32_t u;
-        float f;
-    } one = { .f = 1.0 };
-    const struct hlsl_ir_node *arg1 = expr->operands[0].node;
-    const struct hlsl_type *dst_type = expr->node.data_type;
-    const struct hlsl_type *src_type = arg1->data_type;
-
-    /* Narrowing casts were already lowered. */
-    VKD3D_ASSERT(src_type->dimx == dst_type->dimx);
-
-    switch (dst_type->e.numeric.type)
-    {
-        case HLSL_TYPE_HALF:
-        case HLSL_TYPE_FLOAT:
-            switch (src_type->e.numeric.type)
-            {
-                case HLSL_TYPE_HALF:
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
-                    break;
-
-                case HLSL_TYPE_INT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_ITOF, &expr->node, arg1, 0);
-                    break;
-
-                case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_UTOF, &expr->node, arg1, 0);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                    write_sm4_cast_from_bool(tpf, expr, arg1, one.u);
-                    break;
-
-                case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast from double to float.");
-                    break;
-
-                default:
-                    vkd3d_unreachable();
-            }
-            break;
-
-        case HLSL_TYPE_INT:
-            switch (src_type->e.numeric.type)
-            {
-                case HLSL_TYPE_HALF:
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_FTOI, &expr->node, arg1, 0);
-                    break;
-
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                    write_sm4_cast_from_bool(tpf, expr, arg1, 1);
-                    break;
-
-                case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast from double to int.");
-                    break;
-
-                default:
-                    vkd3d_unreachable();
-            }
-            break;
-
-        case HLSL_TYPE_UINT:
-            switch (src_type->e.numeric.type)
-            {
-                case HLSL_TYPE_HALF:
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_FTOU, &expr->node, arg1, 0);
-                    break;
-
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                    write_sm4_cast_from_bool(tpf, expr, arg1, 1);
-                    break;
-
-                case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast from double to uint.");
-                    break;
-
-                default:
-                    vkd3d_unreachable();
-            }
-            break;
-
-        case HLSL_TYPE_DOUBLE:
-            hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast to double.");
-            break;
-
-        case HLSL_TYPE_BOOL:
-            /* Casts to bool should have already been lowered. */
-        default:
-            vkd3d_unreachable();
-    }
-}
-
 static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
 {
     const struct vkd3d_shader_version *version = &tpf->program->shader_version;
@@ -5494,10 +5365,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP1_CAST:
-            write_sm4_cast(tpf, expr);
-            break;
-
         case HLSL_OP1_COS:
             VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
@@ -6095,18 +5962,21 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_F16TOF32:
         case VKD3DSIH_F32TOF16:
         case VKD3DSIH_FRC:
+        case VKD3DSIH_FTOI:
+        case VKD3DSIH_FTOU:
         case VKD3DSIH_GEO:
         case VKD3DSIH_IADD:
         case VKD3DSIH_IEQ:
         case VKD3DSIH_IGE:
         case VKD3DSIH_ILT:
-        case VKD3DSIH_INE:
         case VKD3DSIH_IMAD:
         case VKD3DSIH_IMAX:
         case VKD3DSIH_IMIN:
+        case VKD3DSIH_INE:
         case VKD3DSIH_INEG:
         case VKD3DSIH_ISHL:
         case VKD3DSIH_ISHR:
+        case VKD3DSIH_ITOF:
         case VKD3DSIH_LOG:
         case VKD3DSIH_LTO:
         case VKD3DSIH_MAD:
@@ -6129,6 +5999,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_UMAX:
         case VKD3DSIH_UMIN:
         case VKD3DSIH_USHR:
+        case VKD3DSIH_UTOF:
         case VKD3DSIH_XOR:
             tpf_simple_instruction(tpf, ins);
             break;
