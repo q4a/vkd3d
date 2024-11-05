@@ -514,6 +514,8 @@ enum fx_4_type_constants
     FX_4_OBJECT_TYPE_TEXTURE_2DMSARRAY = 0xf,
     FX_4_OBJECT_TYPE_TEXTURE_3D = 0x10,
     FX_4_OBJECT_TYPE_TEXTURE_CUBE = 0x11,
+    FX_4_OBJECT_TYPE_RTV = 0x13,
+    FX_4_OBJECT_TYPE_DSV = 0x14,
     FX_4_OBJECT_TYPE_TEXTURE_CUBEARRAY = 0x17,
 
     FX_5_OBJECT_TYPE_GEOMETRY_SHADER = 0x1b,
@@ -527,7 +529,12 @@ enum fx_4_type_constants
     FX_5_OBJECT_TYPE_UAV_2DARRAY = 0x22,
     FX_5_OBJECT_TYPE_UAV_3D = 0x23,
     FX_5_OBJECT_TYPE_UAV_BUFFER = 0x24,
+    FX_5_OBJECT_TYPE_SRV_RAW_BUFFER = 0x25,
+    FX_5_OBJECT_TYPE_UAV_RAW_BUFFER = 0x26,
+    FX_5_OBJECT_TYPE_SRV_STRUCTURED_BUFFER = 0x27,
     FX_5_OBJECT_TYPE_UAV_STRUCTURED_BUFFER = 0x28,
+    FX_5_OBJECT_TYPE_SRV_APPEND_STRUCTURED_BUFFER = 0x2b,
+    FX_5_OBJECT_TYPE_SRV_CONSUME_STRUCTURED_BUFFER = 0x2c,
 
     /* Types */
     FX_4_TYPE_CLASS_NUMERIC = 1,
@@ -613,6 +620,7 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         [HLSL_SAMPLER_DIM_3D]                = "RWTexture3D",
         [HLSL_SAMPLER_DIM_BUFFER]            = "RWBuffer",
         [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = "RWStructuredBuffer",
+        [HLSL_SAMPLER_DIM_RAW_BUFFER]        = "RWByteAddressBuffer",
     };
 
     switch (type->class)
@@ -821,17 +829,18 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             [HLSL_SAMPLER_DIM_3D]                = FX_5_OBJECT_TYPE_UAV_3D,
             [HLSL_SAMPLER_DIM_BUFFER]            = FX_5_OBJECT_TYPE_UAV_BUFFER,
             [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = FX_5_OBJECT_TYPE_UAV_STRUCTURED_BUFFER,
+            [HLSL_SAMPLER_DIM_RAW_BUFFER]        = FX_5_OBJECT_TYPE_UAV_RAW_BUFFER,
         };
 
         put_u32_unaligned(buffer, uav_type[element_type->sampler_dim]);
     }
     else if (element_type->class == HLSL_CLASS_DEPTH_STENCIL_VIEW)
     {
-        put_u32_unaligned(buffer, 20);
+        put_u32_unaligned(buffer, FX_4_OBJECT_TYPE_DSV);
     }
     else if (element_type->class == HLSL_CLASS_RENDER_TARGET_VIEW)
     {
-        put_u32_unaligned(buffer, 19);
+        put_u32_unaligned(buffer, FX_4_OBJECT_TYPE_RTV);
     }
     else if (element_type->class == HLSL_CLASS_PIXEL_SHADER)
     {
@@ -3315,27 +3324,19 @@ static void fx_4_parse_shader_initializer(struct fx_parser *parser, unsigned int
     vkd3d_shader_free_shader_code(&output);
 }
 
-static bool fx_4_is_shader_resource(const struct fx_4_binary_type *type)
+static bool fx_4_object_has_initializer(const struct fx_4_binary_type *type)
 {
     switch (type->typeinfo)
     {
-        case FX_4_OBJECT_TYPE_TEXTURE:
-        case FX_4_OBJECT_TYPE_TEXTURE_1D:
-        case FX_4_OBJECT_TYPE_TEXTURE_1DARRAY:
-        case FX_4_OBJECT_TYPE_TEXTURE_2D:
-        case FX_4_OBJECT_TYPE_TEXTURE_2DARRAY:
-        case FX_4_OBJECT_TYPE_TEXTURE_2DMS:
-        case FX_4_OBJECT_TYPE_TEXTURE_2DMSARRAY:
-        case FX_4_OBJECT_TYPE_TEXTURE_3D:
-        case FX_4_OBJECT_TYPE_TEXTURE_CUBE:
-        case FX_4_OBJECT_TYPE_TEXTURE_CUBEARRAY:
-        case FX_5_OBJECT_TYPE_UAV_1D:
-        case FX_5_OBJECT_TYPE_UAV_1DARRAY:
-        case FX_5_OBJECT_TYPE_UAV_2D:
-        case FX_5_OBJECT_TYPE_UAV_2DARRAY:
-        case FX_5_OBJECT_TYPE_UAV_3D:
-        case FX_5_OBJECT_TYPE_UAV_BUFFER:
-        case FX_5_OBJECT_TYPE_UAV_STRUCTURED_BUFFER:
+        case FX_4_OBJECT_TYPE_STRING:
+        case FX_4_OBJECT_TYPE_PIXEL_SHADER:
+        case FX_4_OBJECT_TYPE_VERTEX_SHADER:
+        case FX_4_OBJECT_TYPE_GEOMETRY_SHADER:
+        case FX_4_OBJECT_TYPE_GEOMETRY_SHADER_SO:
+        case FX_5_OBJECT_TYPE_GEOMETRY_SHADER:
+        case FX_5_OBJECT_TYPE_COMPUTE_SHADER:
+        case FX_5_OBJECT_TYPE_HULL_SHADER:
+        case FX_5_OBJECT_TYPE_DOMAIN_SHADER:
             return true;
         default:
             return false;
@@ -3346,6 +3347,9 @@ static void fx_4_parse_object_initializer(struct fx_parser *parser, const struct
 {
     unsigned int i, element_count;
     uint32_t value;
+
+    if (!fx_4_object_has_initializer(type))
+        return;
 
     vkd3d_string_buffer_printf(&parser->buffer, " = {\n");
     element_count = max(type->element_count, 1);
@@ -3407,8 +3411,7 @@ static void fx_4_parse_objects(struct fx_parser *parser)
         if (type.element_count)
             vkd3d_string_buffer_printf(&parser->buffer, "[%u]", type.element_count);
 
-        if (!fx_4_is_shader_resource(&type))
-            fx_4_parse_object_initializer(parser, &type);
+        fx_4_parse_object_initializer(parser, &type);
         vkd3d_string_buffer_printf(&parser->buffer, ";\n");
 
         fx_parse_fx_4_annotations(parser);
