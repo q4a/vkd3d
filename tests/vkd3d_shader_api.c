@@ -438,7 +438,7 @@ static void check_signature_element(const struct vkd3d_shader_signature_element 
     ok(element->component_type == expect->component_type, "Got component type %#x.\n", element->component_type);
     ok(element->register_index == expect->register_index, "Got register index %u.\n", element->register_index);
     ok(element->mask == expect->mask, "Got mask %#x.\n", element->mask);
-    todo_if (expect->used_mask != expect->mask)
+    todo_if (expect->used_mask != expect->mask && strcmp(expect->semantic_name, "PSIZE"))
         ok(element->used_mask == expect->used_mask, "Got used mask %#x.\n", element->used_mask);
     ok(element->min_precision == expect->min_precision, "Got minimum precision %#x.\n", element->min_precision);
 }
@@ -574,8 +574,7 @@ static void test_scan_signatures(void)
         {"TEXCOORD",        2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
         {"COLOR",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 4, 0xf, 0xf},
         {"FOG",             0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 5, 0xf, 0xf},
-        /* FIXME: This doesn't match native, which always declares and writes all 4 components. */
-        {"PSIZE",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 6, 0x1, 0x1},
+        {"PSIZE",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 6, 0xf, 0x1},
     };
 
     static const char ps1_source[] =

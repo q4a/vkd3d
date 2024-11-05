@@ -6519,16 +6519,22 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
                 sysval = VKD3D_SHADER_SV_POSITION;
         }
 
+        mask = (1 << var->data_type->dimx) - 1;
+
         if (!ascii_strcasecmp(var->semantic.name, "PSIZE") && output
-                && program->shader_version.type == VKD3D_SHADER_TYPE_VERTEX && var->data_type->dimx > 1)
-            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
-                    "PSIZE output must have only 1 component in this shader model.");
+                && program->shader_version.type == VKD3D_SHADER_TYPE_VERTEX)
+        {
+            if (var->data_type->dimx > 1)
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                        "PSIZE output must have only 1 component in this shader model.");
+            /* For some reason the writemask has all components set. */
+            mask = VKD3DSP_WRITEMASK_ALL;
+        }
         if (!ascii_strcasecmp(var->semantic.name, "FOG") && output && program->shader_version.major < 3
                 && program->shader_version.type == VKD3D_SHADER_TYPE_VERTEX && var->data_type->dimx > 1)
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "FOG output must have only 1 component in this shader model.");
 
-        mask = (1 << var->data_type->dimx) - 1;
         use_mask = mask; /* FIXME: retrieve use mask accurately. */
         component_type = VKD3D_SHADER_COMPONENT_FLOAT;
     }
@@ -7251,6 +7257,8 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
 
     if (deref->var->is_output_semantic)
     {
+        const char *semantic_name = deref->var->semantic.name;
+
         version.major = ctx->profile->major_version;
         version.minor = ctx->profile->minor_version;
         version.type = ctx->profile->type;
@@ -7260,7 +7268,7 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
             type = VKD3DSPR_TEMP;
             register_index = 0;
         }
-        else if (!sm1_register_from_semantic_name(&version, deref->var->semantic.name,
+        else if (!sm1_register_from_semantic_name(&version, semantic_name,
                 deref->var->semantic.index, true, &type, &register_index))
         {
             VKD3D_ASSERT(reg.allocated);
@@ -7269,6 +7277,14 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
         }
         else
             writemask = (1u << deref->var->data_type->dimx) - 1;
+
+        if (version.type == VKD3D_SHADER_TYPE_PIXEL && (!ascii_strcasecmp(semantic_name, "PSIZE")
+                || (!ascii_strcasecmp(semantic_name, "FOG") && version.major < 3)))
+        {
+            /* These are always 1-component, but for some reason are written
+             * with a writemask containing all components. */
+            writemask = VKD3DSP_WRITEMASK_ALL;
+        }
     }
     else
         VKD3D_ASSERT(reg.allocated);
