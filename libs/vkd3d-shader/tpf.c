@@ -5050,27 +5050,6 @@ static void write_sm4_unary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_op
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_unary_op_with_two_destinations(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
-        const struct hlsl_ir_node *dst, unsigned int dst_idx, const struct hlsl_ir_node *src)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = opcode;
-
-    VKD3D_ASSERT(dst_idx < ARRAY_SIZE(instr.dsts));
-    sm4_dst_from_node(&instr.dsts[dst_idx], dst);
-    instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
-    instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
-    instr.dsts[1 - dst_idx].reg.idx_count = 0;
-    instr.dst_count = 2;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], src, instr.dsts[dst_idx].write_mask);
-    instr.src_count = 1;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_binary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
@@ -5365,11 +5344,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP1_COS:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
-            break;
-
         case HLSL_OP1_RCP:
             switch (dst_type->e.numeric.type)
             {
@@ -5413,11 +5387,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV
                     | (VKD3D_SM4_INSTRUCTION_FLAG_SATURATE << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT),
                     &expr->node, arg1, 0);
-            break;
-
-        case HLSL_OP1_SIN:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 0, arg1);
             break;
 
         case HLSL_OP2_DIV:
@@ -5993,6 +5962,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_ROUND_Z:
         case VKD3DSIH_RSQ:
         case VKD3DSIH_SAMPLE_INFO:
+        case VKD3DSIH_SINCOS:
         case VKD3DSIH_SQRT:
         case VKD3DSIH_UGE:
         case VKD3DSIH_ULT:

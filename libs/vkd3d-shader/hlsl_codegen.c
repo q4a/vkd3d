@@ -7988,6 +7988,36 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
     }
 }
 
+static void sm4_generate_vsir_expr_with_two_destinations(struct hlsl_ctx *ctx, struct vsir_program *program,
+        enum vkd3d_shader_opcode opcode, const struct hlsl_ir_expr *expr, unsigned int dst_idx)
+{
+    struct vkd3d_shader_dst_param *dst_param, *null_param;
+    const struct hlsl_ir_node *instr = &expr->node;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int i, src_count;
+
+    VKD3D_ASSERT(instr->reg.allocated);
+
+    for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
+    {
+        if (expr->operands[i].node)
+            src_count = i + 1;
+    }
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode, 2, src_count)))
+        return;
+
+    dst_param = &ins->dst[dst_idx];
+    vsir_dst_from_hlsl_node(dst_param, ctx, instr);
+
+    null_param = &ins->dst[1 - dst_idx];
+    vsir_dst_param_init(null_param, VKD3DSPR_NULL, VKD3D_DATA_FLOAT, 0);
+    null_param->reg.dimension = VSIR_DIMENSION_NONE;
+
+    for (i = 0; i < src_count; ++i)
+        vsir_src_from_hlsl_node(&ins->src[i], ctx, expr->operands[i].node, dst_param->write_mask);
+}
+
 static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_expr *expr, const char *dst_type_name)
 {
@@ -8020,6 +8050,11 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
         case HLSL_OP1_CEIL:
             VKD3D_ASSERT(type_is_float(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_ROUND_PI, 0, 0, true);
+            return true;
+
+        case HLSL_OP1_COS:
+            VKD3D_ASSERT(type_is_float(dst_type));
+            sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_SINCOS, expr, 1);
             return true;
 
         case HLSL_OP1_DSX:
@@ -8118,6 +8153,11 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
         case HLSL_OP1_RSQ:
             VKD3D_ASSERT(type_is_float(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_RSQ, 0, 0, true);
+            return true;
+
+        case HLSL_OP1_SIN:
+            VKD3D_ASSERT(type_is_float(dst_type));
+            sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_SINCOS, expr, 0);
             return true;
 
         case HLSL_OP1_SQRT:
