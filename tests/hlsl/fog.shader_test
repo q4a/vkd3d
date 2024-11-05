@@ -1,0 +1,29 @@
+[require]
+shader model < 3.0
+
+[vertex shader fail todo]
+void main(float4 pos : position, out float2 fog : fog, out float4 out_pos : sv_position)
+{
+    fog = 0.5;
+    out_pos = pos;
+}
+
+[require]
+shader model >= 3.0
+
+[vertex shader]
+void main(float4 pos : position, out float2 fog : fog, out float4 out_pos : sv_position)
+{
+    fog = float2(0.1, 0.2);
+    out_pos = pos;
+}
+
+[pixel shader]
+float4 main(float2 fog : fog) : sv_target
+{
+    return float4(fog, 0, 1);
+}
+
+[test]
+draw quad
+probe (0, 0) rgba (0.1, 0.2, 0, 1)
