@@ -8198,6 +8198,11 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_RSQ, 0, 0, true);
             return true;
 
+        case HLSL_OP1_SAT:
+            VKD3D_ASSERT(type_is_float(dst_type));
+            generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, VKD3DSPDM_SATURATE, true);
+            return true;
+
         case HLSL_OP1_SIN:
             VKD3D_ASSERT(type_is_float(dst_type));
             sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_SINCOS, expr, 0);

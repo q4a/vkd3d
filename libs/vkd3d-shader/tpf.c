@@ -5032,24 +5032,6 @@ static void write_sm4_ret(const struct tpf_compiler *tpf)
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_unary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
-        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src, enum vkd3d_shader_src_modifier src_mod)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = opcode;
-
-    sm4_dst_from_node(&instr.dsts[0], dst);
-    instr.dst_count = 1;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], src, instr.dsts[0].write_mask);
-    instr.srcs[0].modifiers = src_mod;
-    instr.src_count = 1;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_binary_op(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
@@ -5324,11 +5306,6 @@ static void write_sm4_resinfo(const struct tpf_compiler *tpf, const struct hlsl_
     write_sm4_instruction(tpf, &instr);
 }
 
-static bool type_is_float(const struct hlsl_type *type)
-{
-    return type->e.numeric.type == HLSL_TYPE_FLOAT || type->e.numeric.type == HLSL_TYPE_HALF;
-}
-
 static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
 {
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
@@ -5343,13 +5320,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP1_SAT:
-            VKD3D_ASSERT(type_is_float(dst_type));
-            write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV
-                    | (VKD3D_SM4_INSTRUCTION_FLAG_SATURATE << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT),
-                    &expr->node, arg1, 0);
-            break;
-
         case HLSL_OP2_DIV:
             switch (dst_type->e.numeric.type)
             {
@@ -5828,7 +5798,17 @@ static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_
     instr.src_count = ins->src_count;
 
     for (unsigned int i = 0; i < ins->dst_count; ++i)
+    {
         instr.dsts[i] = ins->dst[i];
+
+        if (instr.dsts[i].modifiers & VKD3DSPDM_SATURATE)
+        {
+            /* For vsir SATURATE is a dst modifier, while for tpf it is an instruction flag. */
+            VKD3D_ASSERT(ins->dst_count == 1);
+            instr.dsts[i].modifiers &= ~VKD3DSPDM_SATURATE;
+            instr.extra_bits |= VKD3D_SM4_INSTRUCTION_FLAG_SATURATE << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
+        }
+    }
     for (unsigned int i = 0; i < ins->src_count; ++i)
         instr.srcs[i] = ins->src[i];
 
