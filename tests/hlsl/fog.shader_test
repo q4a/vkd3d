@@ -1,7 +1,7 @@
 [require]
 shader model < 3.0
 
-[vertex shader fail todo]
+[vertex shader fail]
 void main(float4 pos : position, out float2 fog : fog, out float4 out_pos : sv_position)
 {
     fog = 0.5;
