@@ -8904,15 +8904,20 @@ static void spirv_compiler_emit_ld_raw_structured_srv_uav(struct spirv_compiler 
     uint32_t base_coordinate_id, component_idx;
     uint32_t constituents[VKD3D_VEC4_SIZE];
     struct vkd3d_shader_image image;
+    bool storage_buffer_uav = false;
     uint32_t indices[2];
     unsigned int i, j;
     SpvOp op;
 
     resource = &src[instruction->src_count - 1];
-    resource_symbol = spirv_compiler_find_resource(compiler, &resource->reg);
 
-    if (resource->reg.type == VKD3DSPR_UAV
-            && spirv_compiler_use_storage_buffer(compiler, &resource_symbol->info.resource))
+    if (resource->reg.type == VKD3DSPR_UAV)
+    {
+        resource_symbol = spirv_compiler_find_resource(compiler, &resource->reg);
+        storage_buffer_uav = spirv_compiler_use_storage_buffer(compiler, &resource_symbol->info.resource);
+    }
+
+    if (storage_buffer_uav)
     {
         texel_type_id = vkd3d_spirv_get_type_id(builder, resource_symbol->info.resource.sampled_type, 1);
         ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassUniform, texel_type_id);
