@@ -8018,6 +8018,33 @@ static void sm4_generate_vsir_expr_with_two_destinations(struct hlsl_ctx *ctx, s
         vsir_src_from_hlsl_node(&ins->src[i], ctx, expr->operands[i].node, dst_param->write_mask);
 }
 
+static void sm4_generate_vsir_rcp_using_div(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_ir_expr *expr)
+{
+    struct hlsl_ir_node *operand = expr->operands[0].node;
+    const struct hlsl_ir_node *instr = &expr->node;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct hlsl_constant_value value = {0};
+    struct vkd3d_shader_instruction *ins;
+
+    VKD3D_ASSERT(type_is_float(expr->node.data_type));
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_DIV, 1, 2)))
+        return;
+
+    dst_param = &ins->dst[0];
+    vsir_dst_from_hlsl_node(dst_param, ctx, instr);
+
+    value.u[0].f = 1.0f;
+    value.u[1].f = 1.0f;
+    value.u[2].f = 1.0f;
+    value.u[3].f = 1.0f;
+    vsir_src_from_hlsl_constant_value(&ins->src[0], ctx, &value,
+            VKD3D_DATA_FLOAT, instr->data_type->dimx, dst_param->write_mask);
+
+    vsir_src_from_hlsl_node(&ins->src[1], ctx, operand, dst_param->write_mask);
+}
+
 static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_expr *expr, const char *dst_type_name)
 {
@@ -8138,6 +8165,22 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
 
                 default:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 %s negation expression.", dst_type_name);
+                    return false;
+            }
+
+        case HLSL_OP1_RCP:
+            switch (dst_type->e.numeric.type)
+            {
+                case HLSL_TYPE_FLOAT:
+                    /* SM5 comes with a RCP opcode */
+                    if (hlsl_version_ge(ctx, 5, 0))
+                        generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_RCP, 0, 0, true);
+                    else
+                        sm4_generate_vsir_rcp_using_div(ctx, program, expr);
+                    return true;
+
+                default:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s rcp expression.", dst_type_name);
                     return false;
             }
 

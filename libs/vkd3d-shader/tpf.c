@@ -5331,7 +5331,6 @@ static bool type_is_float(const struct hlsl_type *type)
 
 static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
 {
-    const struct vkd3d_shader_version *version = &tpf->program->shader_version;
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
     const struct hlsl_ir_node *arg2 = expr->operands[1].node;
     const struct hlsl_type *dst_type = expr->node.data_type;
@@ -5344,44 +5343,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP1_RCP:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    /* SM5 comes with a RCP opcode */
-                    if (vkd3d_shader_ver_ge(version, 5, 0))
-                    {
-                        write_sm4_unary_op(tpf, VKD3D_SM5_OP_RCP, &expr->node, arg1, 0);
-                    }
-                    else
-                    {
-                        /* For SM4, implement as DIV dst, 1.0, src */
-                        struct sm4_instruction instr;
-                        struct hlsl_constant_value one;
-
-                        VKD3D_ASSERT(type_is_float(dst_type));
-
-                        memset(&instr, 0, sizeof(instr));
-                        instr.opcode = VKD3D_SM4_OP_DIV;
-
-                        sm4_dst_from_node(&instr.dsts[0], &expr->node);
-                        instr.dst_count = 1;
-
-                        for (unsigned int i = 0; i < 4; i++)
-                            one.u[i].f = 1.0f;
-                        sm4_src_from_constant_value(&instr.srcs[0], &one, dst_type->dimx, instr.dsts[0].write_mask);
-                        sm4_src_from_node(tpf, &instr.srcs[1], arg1, instr.dsts[0].write_mask);
-                        instr.src_count = 2;
-
-                        write_sm4_instruction(tpf, &instr);
-                    }
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s rcp expression.", dst_type_string->buffer);
-            }
-            break;
-
         case HLSL_OP1_SAT:
             VKD3D_ASSERT(type_is_float(dst_type));
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV
@@ -5920,6 +5881,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
 
         case VKD3DSIH_ADD:
         case VKD3DSIH_AND:
+        case VKD3DSIH_DIV:
         case VKD3DSIH_DSX:
         case VKD3DSIH_DSX_COARSE:
         case VKD3DSIH_DSX_FINE:
@@ -5956,6 +5918,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_NEU:
         case VKD3DSIH_NOT:
         case VKD3DSIH_OR:
+        case VKD3DSIH_RCP:
         case VKD3DSIH_ROUND_NE:
         case VKD3DSIH_ROUND_NI:
         case VKD3DSIH_ROUND_PI:
