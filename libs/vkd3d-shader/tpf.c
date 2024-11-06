@@ -5032,25 +5032,6 @@ static void write_sm4_ret(const struct tpf_compiler *tpf)
     write_sm4_instruction(tpf, &instr);
 }
 
-/* dp# instructions don't map the swizzle. */
-static void write_sm4_binary_op_dot(const struct tpf_compiler *tpf, enum vkd3d_sm4_opcode opcode,
-        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = opcode;
-
-    sm4_dst_from_node(&instr.dsts[0], dst);
-    instr.dst_count = 1;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], src1, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_node(tpf, &instr.srcs[1], src2, VKD3DSP_WRITEMASK_ALL);
-    instr.src_count = 2;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_binary_op_with_two_destinations(const struct tpf_compiler *tpf,
         enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned int dst_idx,
         const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
@@ -5302,35 +5283,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
 
     switch (expr->op)
     {
-        case HLSL_OP2_DOT:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    switch (arg1->data_type->dimx)
-                    {
-                        case 4:
-                            write_sm4_binary_op_dot(tpf, VKD3D_SM4_OP_DP4, &expr->node, arg1, arg2);
-                            break;
-
-                        case 3:
-                            write_sm4_binary_op_dot(tpf, VKD3D_SM4_OP_DP3, &expr->node, arg1, arg2);
-                            break;
-
-                        case 2:
-                            write_sm4_binary_op_dot(tpf, VKD3D_SM4_OP_DP2, &expr->node, arg1, arg2);
-                            break;
-
-                        case 1:
-                        default:
-                            vkd3d_unreachable();
-                    }
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s dot expression.", dst_type_string->buffer);
-            }
-            break;
-
         case HLSL_OP2_MOD:
             switch (dst_type->e.numeric.type)
             {
@@ -5809,6 +5761,9 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_ADD:
         case VKD3DSIH_AND:
         case VKD3DSIH_DIV:
+        case VKD3DSIH_DP2:
+        case VKD3DSIH_DP3:
+        case VKD3DSIH_DP4:
         case VKD3DSIH_DSX:
         case VKD3DSIH_DSX_COARSE:
         case VKD3DSIH_DSX_FINE:

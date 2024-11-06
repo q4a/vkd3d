@@ -8266,6 +8266,34 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return false;
             }
 
+        case HLSL_OP2_DOT:
+            switch (dst_type->e.numeric.type)
+            {
+                case HLSL_TYPE_FLOAT:
+                    switch (expr->operands[0].node->data_type->dimx)
+                    {
+                        case 4:
+                            generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DP4, 0, 0, false);
+                            return true;
+
+                        case 3:
+                            generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DP3, 0, 0, false);
+                            return true;
+
+                        case 2:
+                            generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DP2, 0, 0, false);
+                            return true;
+
+                        case 1:
+                        default:
+                            vkd3d_unreachable();
+                    }
+
+                default:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s dot expression.", dst_type_name);
+                    return false;
+            }
+
         case HLSL_OP2_EQUAL:
             VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
