@@ -8250,6 +8250,22 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_XOR, 0, 0, true);
             return true;
 
+        case HLSL_OP2_DIV:
+            switch (dst_type->e.numeric.type)
+            {
+                case HLSL_TYPE_FLOAT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DIV, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_UINT:
+                    sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_UDIV, expr, 0);
+                    return true;
+
+                default:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s division expression.", dst_type_name);
+                    return false;
+            }
+
         case HLSL_OP2_EQUAL:
             VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
