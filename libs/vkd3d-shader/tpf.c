@@ -5377,25 +5377,6 @@ static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_
             }
             break;
 
-        case HLSL_OP2_MUL:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_MUL, &expr->node, arg1, arg2);
-                    break;
-
-                case HLSL_TYPE_INT:
-                case HLSL_TYPE_UINT:
-                    /* Using IMUL instead of UMUL because we're taking the low
-                     * bits, and the native compiler generates IMUL. */
-                    write_sm4_binary_op_with_two_destinations(tpf, VKD3D_SM4_OP_IMUL, &expr->node, 1, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s multiplication expression.", dst_type_string->buffer);
-            }
-            break;
-
         default:
             hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s expression.", debug_hlsl_expr_op(expr->op));
     }
@@ -5883,6 +5864,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_IMAD:
         case VKD3DSIH_IMAX:
         case VKD3DSIH_IMIN:
+        case VKD3DSIH_IMUL:
         case VKD3DSIH_INE:
         case VKD3DSIH_INEG:
         case VKD3DSIH_ISHL:
@@ -5895,6 +5877,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_MIN:
         case VKD3DSIH_MOV:
         case VKD3DSIH_MOVC:
+        case VKD3DSIH_MUL:
         case VKD3DSIH_NEU:
         case VKD3DSIH_NOT:
         case VKD3DSIH_OR:

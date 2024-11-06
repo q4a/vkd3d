@@ -8392,6 +8392,25 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return false;
             }
 
+        case HLSL_OP2_MUL:
+            switch (dst_type->e.numeric.type)
+            {
+                case HLSL_TYPE_FLOAT:
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MUL, 0, 0, true);
+                    return true;
+
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                    /* Using IMUL instead of UMUL because we're taking the low
+                     * bits, and the native compiler generates IMUL. */
+                    sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_IMUL, expr, 1);
+                    return true;
+
+                default:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s multiplication expression.", dst_type_name);
+                    return false;
+            }
+
         case HLSL_OP2_NEQUAL:
             VKD3D_ASSERT(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
