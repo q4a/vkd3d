@@ -5032,29 +5032,6 @@ static void write_sm4_ret(const struct tpf_compiler *tpf)
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_binary_op_with_two_destinations(const struct tpf_compiler *tpf,
-        enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned int dst_idx,
-        const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
-{
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = opcode;
-
-    VKD3D_ASSERT(dst_idx < ARRAY_SIZE(instr.dsts));
-    sm4_dst_from_node(&instr.dsts[dst_idx], dst);
-    instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
-    instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
-    instr.dsts[1 - dst_idx].reg.idx_count = 0;
-    instr.dst_count = 2;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], src1, instr.dsts[dst_idx].write_mask);
-    sm4_src_from_node(tpf, &instr.srcs[1], src2, instr.dsts[dst_idx].write_mask);
-    instr.src_count = 2;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_ld(const struct tpf_compiler *tpf, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
         const struct hlsl_ir_node *sample_index, const struct hlsl_ir_node *texel_offset,
@@ -5267,39 +5244,6 @@ static void write_sm4_resinfo(const struct tpf_compiler *tpf, const struct hlsl_
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
-}
-
-static void write_sm4_expr(const struct tpf_compiler *tpf, const struct hlsl_ir_expr *expr)
-{
-    const struct hlsl_ir_node *arg1 = expr->operands[0].node;
-    const struct hlsl_ir_node *arg2 = expr->operands[1].node;
-    const struct hlsl_type *dst_type = expr->node.data_type;
-    struct vkd3d_string_buffer *dst_type_string;
-
-    VKD3D_ASSERT(expr->node.reg.allocated);
-
-    if (!(dst_type_string = hlsl_type_to_string(tpf->ctx, dst_type)))
-        return;
-
-    switch (expr->op)
-    {
-        case HLSL_OP2_MOD:
-            switch (dst_type->e.numeric.type)
-            {
-                case HLSL_TYPE_UINT:
-                    write_sm4_binary_op_with_two_destinations(tpf, VKD3D_SM4_OP_UDIV, &expr->node, 1, arg1, arg2);
-                    break;
-
-                default:
-                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s modulus expression.", dst_type_string->buffer);
-            }
-            break;
-
-        default:
-            hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s expression.", debug_hlsl_expr_op(expr->op));
-    }
-
-    hlsl_release_string_buffer(tpf->ctx, dst_type_string);
 }
 
 static void write_sm4_if(struct tpf_compiler *tpf, const struct hlsl_ir_if *iff)
@@ -5856,10 +5800,6 @@ static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *b
             case HLSL_IR_CALL:
             case HLSL_IR_CONSTANT:
                 vkd3d_unreachable();
-
-            case HLSL_IR_EXPR:
-                write_sm4_expr(tpf, hlsl_ir_expr(instr));
-                break;
 
             case HLSL_IR_IF:
                 write_sm4_if(tpf, hlsl_ir_if(instr));

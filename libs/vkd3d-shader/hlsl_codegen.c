@@ -8436,6 +8436,18 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return false;
             }
 
+        case HLSL_OP2_MOD:
+            switch (dst_type->e.numeric.type)
+            {
+                case HLSL_TYPE_UINT:
+                    sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_UDIV, expr, 1);
+                    return true;
+
+                default:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s modulus expression.", dst_type_name);
+                    return false;
+            }
+
         case HLSL_OP2_MUL:
             switch (dst_type->e.numeric.type)
             {
@@ -8488,6 +8500,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             return true;
 
         default:
+            hlsl_fixme(ctx, &expr->node.loc, "SM4 %s expression.", debug_hlsl_expr_op(expr->op));
             return false;
     }
 }
