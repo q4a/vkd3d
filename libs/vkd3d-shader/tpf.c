@@ -5528,25 +5528,6 @@ static void write_sm4_resource_store(const struct tpf_compiler *tpf, const struc
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_store(const struct tpf_compiler *tpf, const struct hlsl_ir_store *store)
-{
-    const struct hlsl_ir_node *rhs = store->rhs.node;
-    struct sm4_instruction instr;
-    uint32_t writemask;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_MOV;
-
-    sm4_register_from_deref(tpf, &instr.dsts[0].reg, &writemask, &store->lhs, &instr);
-    instr.dsts[0].write_mask = hlsl_combine_writemasks(writemask, store->writemask);
-    instr.dst_count = 1;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], rhs, instr.dsts[0].write_mask);
-    instr.src_count = 1;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_switch(struct tpf_compiler *tpf, const struct hlsl_ir_switch *s)
 {
     const struct hlsl_ir_node *selector = s->selector.node;
@@ -5802,10 +5783,6 @@ static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *b
 
             case HLSL_IR_LOOP:
                 write_sm4_loop(tpf, hlsl_ir_loop(instr));
-                break;
-
-            case HLSL_IR_STORE:
-                write_sm4_store(tpf, hlsl_ir_store(instr));
                 break;
 
             case HLSL_IR_SWITCH:
