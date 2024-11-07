@@ -5438,45 +5438,6 @@ static void write_sm4_resource_load(const struct tpf_compiler *tpf, const struct
     }
 }
 
-static void write_sm4_resource_store(const struct tpf_compiler *tpf, const struct hlsl_ir_resource_store *store)
-{
-    struct hlsl_type *resource_type = hlsl_deref_get_type(tpf->ctx, &store->resource);
-    struct hlsl_ir_node *coords = store->coords.node, *value = store->value.node;
-    struct sm4_instruction instr;
-
-    if (!store->resource.var->is_uniform)
-    {
-        hlsl_fixme(tpf->ctx, &store->node.loc, "Store to non-uniform resource variable.");
-        return;
-    }
-
-    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
-    {
-        hlsl_fixme(tpf->ctx, &store->node.loc, "Structured buffers store is not implemented.");
-        return;
-    }
-
-    memset(&instr, 0, sizeof(instr));
-
-    sm4_register_from_deref(tpf, &instr.dsts[0].reg, &instr.dsts[0].write_mask, &store->resource, &instr);
-    instr.dst_count = 1;
-    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
-    {
-        instr.opcode = VKD3D_SM5_OP_STORE_RAW;
-        instr.dsts[0].write_mask = vkd3d_write_mask_from_component_count(value->data_type->dimx);
-    }
-    else
-    {
-        instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
-    }
-
-    sm4_src_from_node(tpf, &instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_node(tpf, &instr.srcs[1], value, VKD3DSP_WRITEMASK_ALL);
-    instr.src_count = 2;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_switch(struct tpf_compiler *tpf, const struct hlsl_ir_switch *s)
 {
     const struct hlsl_ir_node *selector = s->selector.node;
@@ -5664,6 +5625,8 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_SAMPLE_INFO:
         case VKD3DSIH_SINCOS:
         case VKD3DSIH_SQRT:
+        case VKD3DSIH_STORE_RAW:
+        case VKD3DSIH_STORE_UAV_TYPED:
         case VKD3DSIH_UDIV:
         case VKD3DSIH_UGE:
         case VKD3DSIH_ULT:
@@ -5720,10 +5683,6 @@ static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *b
 
             case HLSL_IR_RESOURCE_LOAD:
                 write_sm4_resource_load(tpf, hlsl_ir_resource_load(instr));
-                break;
-
-            case HLSL_IR_RESOURCE_STORE:
-                write_sm4_resource_store(tpf, hlsl_ir_resource_store(instr));
                 break;
 
             case HLSL_IR_LOOP:

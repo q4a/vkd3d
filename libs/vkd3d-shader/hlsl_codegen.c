@@ -8822,6 +8822,53 @@ static bool sm4_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
     return true;
 }
 
+static bool sm4_generate_vsir_instr_resource_store(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_resource_store *store)
+{
+    struct hlsl_type *resource_type = hlsl_deref_get_type(ctx, &store->resource);
+    struct hlsl_ir_node *coords = store->coords.node, *value = store->value.node;
+    struct hlsl_ir_node *instr = &store->node;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int writemask;
+
+    if (!store->resource.var->is_uniform)
+    {
+        hlsl_fixme(ctx, &store->node.loc, "Store to non-uniform resource variable.");
+        return false;
+    }
+
+    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+    {
+        hlsl_fixme(ctx, &store->node.loc, "Structured buffers store is not implemented.");
+        return false;
+    }
+
+    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+    {
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_STORE_RAW, 1, 2)))
+            return false;
+
+        writemask = vkd3d_write_mask_from_component_count(value->data_type->dimx);
+        if (!sm4_generate_vsir_init_dst_param_from_deref(ctx, program,
+                &ins->dst[0], &store->resource, &instr->loc, writemask))
+            return false;
+    }
+    else
+    {
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_STORE_UAV_TYPED, 1, 2)))
+            return false;
+
+        if (!sm4_generate_vsir_init_dst_param_from_deref(ctx, program,
+                &ins->dst[0], &store->resource, &instr->loc, VKD3DSP_WRITEMASK_ALL))
+            return false;
+    }
+
+    vsir_src_from_hlsl_node(&ins->src[0], ctx, coords, VKD3DSP_WRITEMASK_ALL);
+    vsir_src_from_hlsl_node(&ins->src[1], ctx, value, VKD3DSP_WRITEMASK_ALL);
+
+    return true;
+}
+
 static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *block, struct vsir_program *program)
 {
     struct vkd3d_string_buffer *dst_type_string;
@@ -8870,6 +8917,11 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
 
             case HLSL_IR_LOOP:
                 sm4_generate_vsir_block(ctx, &hlsl_ir_loop(instr)->body, program);
+                break;
+
+            case HLSL_IR_RESOURCE_STORE:
+                if (sm4_generate_vsir_instr_resource_store(ctx, program, hlsl_ir_resource_store(instr)))
+                    replace_instr_with_last_vsir_instr(ctx, program, instr);
                 break;
 
             case HLSL_IR_STORE:
