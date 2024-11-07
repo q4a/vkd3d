@@ -5312,57 +5312,6 @@ static void write_sm4_jump(const struct tpf_compiler *tpf, const struct hlsl_ir_
     write_sm4_instruction(tpf, &instr);
 }
 
-/* Does this variable's data come directly from the API user, rather than being
- * temporary or from a previous shader stage?
- * I.e. is it a uniform or VS input? */
-static bool var_is_user_input(const struct vkd3d_shader_version *version, const struct hlsl_ir_var *var)
-{
-    if (var->is_uniform)
-        return true;
-
-    return var->is_input_semantic && version->type == VKD3D_SHADER_TYPE_VERTEX;
-}
-
-static void write_sm4_load(const struct tpf_compiler *tpf, const struct hlsl_ir_load *load)
-{
-    const struct vkd3d_shader_version *version = &tpf->program->shader_version;
-    const struct hlsl_type *type = load->node.data_type;
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-
-    sm4_dst_from_node(&instr.dsts[0], &load->node);
-    instr.dst_count = 1;
-
-    VKD3D_ASSERT(hlsl_is_numeric_type(type));
-    if (type->e.numeric.type == HLSL_TYPE_BOOL && var_is_user_input(version, load->src.var))
-    {
-        struct hlsl_constant_value value;
-
-        /* Uniform bools can be specified as anything, but internal bools always
-         * have 0 for false and ~0 for true. Normalize that here. */
-
-        instr.opcode = VKD3D_SM4_OP_MOVC;
-
-        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask, &instr);
-
-        memset(&value, 0xff, sizeof(value));
-        sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].write_mask);
-        memset(&value, 0, sizeof(value));
-        sm4_src_from_constant_value(&instr.srcs[2], &value, type->dimx, instr.dsts[0].write_mask);
-        instr.src_count = 3;
-    }
-    else
-    {
-        instr.opcode = VKD3D_SM4_OP_MOV;
-
-        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask, &instr);
-        instr.src_count = 1;
-    }
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_loop(struct tpf_compiler *tpf, const struct hlsl_ir_loop *loop)
 {
     struct sm4_instruction instr =
@@ -5767,10 +5716,6 @@ static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *b
 
             case HLSL_IR_JUMP:
                 write_sm4_jump(tpf, hlsl_ir_jump(instr));
-                break;
-
-            case HLSL_IR_LOAD:
-                write_sm4_load(tpf, hlsl_ir_load(instr));
                 break;
 
             case HLSL_IR_RESOURCE_LOAD:

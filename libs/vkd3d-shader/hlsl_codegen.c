@@ -7045,6 +7045,18 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
     return true;
 }
 
+static bool sm4_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx, struct vsir_program *program,
+        struct vkd3d_shader_src_param *src_param, const struct hlsl_deref *deref,
+        unsigned int dst_writemask, const struct vkd3d_shader_location *loc)
+{
+    uint32_t writemask;
+
+    if (!sm4_generate_vsir_reg_from_deref(ctx, program, &src_param->reg, &writemask, deref))
+        return false;
+    src_param->swizzle = generate_vsir_get_src_swizzle(writemask, dst_writemask);
+    return true;
+}
+
 static bool sm4_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx, struct vsir_program *program,
         struct vkd3d_shader_dst_param *dst_param, const struct hlsl_deref *deref,
         const struct vkd3d_shader_location *loc, unsigned int writemask)
@@ -8752,6 +8764,64 @@ static bool sm4_generate_vsir_instr_store(struct hlsl_ctx *ctx,
     return true;
 }
 
+/* Does this variable's data come directly from the API user, rather than
+ * being temporary or from a previous shader stage? I.e. is it a uniform or
+ * VS input? */
+static bool var_is_user_input(const struct vkd3d_shader_version *version, const struct hlsl_ir_var *var)
+{
+    if (var->is_uniform)
+        return true;
+
+    return var->is_input_semantic && version->type == VKD3D_SHADER_TYPE_VERTEX;
+}
+
+static bool sm4_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_program *program, struct hlsl_ir_load *load)
+{
+    const struct vkd3d_shader_version *version = &program->shader_version;
+    const struct hlsl_type *type = load->node.data_type;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct hlsl_ir_node *instr = &load->node;
+    struct vkd3d_shader_instruction *ins;
+    struct hlsl_constant_value value;
+
+    VKD3D_ASSERT(hlsl_is_numeric_type(type));
+    if (type->e.numeric.type == HLSL_TYPE_BOOL && var_is_user_input(version, load->src.var))
+    {
+        /* Uniform bools can be specified as anything, but internal bools
+         * always have 0 for false and ~0 for true. Normalise that here. */
+
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_MOVC, 1, 3)))
+            return false;
+
+        dst_param = &ins->dst[0];
+        vsir_dst_from_hlsl_node(dst_param, ctx, instr);
+
+        if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
+                &ins->src[0], &load->src, dst_param->write_mask, &instr->loc))
+            return false;
+
+        memset(&value, 0xff, sizeof(value));
+        vsir_src_from_hlsl_constant_value(&ins->src[1], ctx, &value,
+                VKD3D_DATA_UINT, type->dimx, dst_param->write_mask);
+        memset(&value, 0x00, sizeof(value));
+        vsir_src_from_hlsl_constant_value(&ins->src[2], ctx, &value,
+                VKD3D_DATA_UINT, type->dimx, dst_param->write_mask);
+    }
+    else
+    {
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_MOV, 1, 1)))
+            return false;
+
+        dst_param = &ins->dst[0];
+        vsir_dst_from_hlsl_node(dst_param, ctx, instr);
+
+        if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
+                &ins->src[0], &load->src, dst_param->write_mask, &instr->loc))
+            return false;
+    }
+    return true;
+}
+
 static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *block, struct vsir_program *program)
 {
     struct vkd3d_string_buffer *dst_type_string;
@@ -8791,6 +8861,11 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
             case HLSL_IR_IF:
                 sm4_generate_vsir_block(ctx, &hlsl_ir_if(instr)->then_block, program);
                 sm4_generate_vsir_block(ctx, &hlsl_ir_if(instr)->else_block, program);
+                break;
+
+            case HLSL_IR_LOAD:
+                if (sm4_generate_vsir_instr_load(ctx, program, hlsl_ir_load(instr)))
+                    replace_instr_with_last_vsir_instr(ctx, program, instr);
                 break;
 
             case HLSL_IR_LOOP:
