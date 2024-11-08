@@ -707,6 +707,7 @@ struct vkd3d_sm4_opcode_info
     char src_info[SM4_MAX_SRC_COUNT];
     void (*read_opcode_func)(struct vkd3d_shader_instruction *ins, uint32_t opcode, uint32_t opcode_token,
             const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv);
+    bool is_conditional_op;
 };
 
 static const enum vkd3d_primitive_type output_primitive_type_table[] =
@@ -1440,18 +1441,18 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_AND,                              VKD3DSIH_AND,                              "u",    "uu"},
         {VKD3D_SM4_OP_BREAK,                            VKD3DSIH_BREAK,                            "",     ""},
         {VKD3D_SM4_OP_BREAKC,                           VKD3DSIH_BREAKP,                           "",     "u",
-                shader_sm4_read_conditional_op},
+                shader_sm4_read_conditional_op, true},
         {VKD3D_SM4_OP_CASE,                             VKD3DSIH_CASE,                             "",     "u",
                 shader_sm4_read_case_condition},
         {VKD3D_SM4_OP_CONTINUE,                         VKD3DSIH_CONTINUE,                         "",     ""},
         {VKD3D_SM4_OP_CONTINUEC,                        VKD3DSIH_CONTINUEP,                        "",     "u",
-                shader_sm4_read_conditional_op},
+                shader_sm4_read_conditional_op, true},
         {VKD3D_SM4_OP_CUT,                              VKD3DSIH_CUT,                              "",     ""},
         {VKD3D_SM4_OP_DEFAULT,                          VKD3DSIH_DEFAULT,                          "",     ""},
         {VKD3D_SM4_OP_DERIV_RTX,                        VKD3DSIH_DSX,                              "f",    "f"},
         {VKD3D_SM4_OP_DERIV_RTY,                        VKD3DSIH_DSY,                              "f",    "f"},
         {VKD3D_SM4_OP_DISCARD,                          VKD3DSIH_DISCARD,                          "",     "u",
-                shader_sm4_read_conditional_op},
+                shader_sm4_read_conditional_op, true},
         {VKD3D_SM4_OP_DIV,                              VKD3DSIH_DIV,                              "f",    "ff"},
         {VKD3D_SM4_OP_DP2,                              VKD3DSIH_DP2,                              "f",    "ff"},
         {VKD3D_SM4_OP_DP3,                              VKD3DSIH_DP3,                              "f",    "ff"},
@@ -1469,7 +1470,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_GE,                               VKD3DSIH_GEO,                              "u",    "ff"},
         {VKD3D_SM4_OP_IADD,                             VKD3DSIH_IADD,                             "i",    "ii"},
         {VKD3D_SM4_OP_IF,                               VKD3DSIH_IF,                               "",     "u",
-                shader_sm4_read_conditional_op},
+                shader_sm4_read_conditional_op, true},
         {VKD3D_SM4_OP_IEQ,                              VKD3DSIH_IEQ,                              "u",    "ii"},
         {VKD3D_SM4_OP_IGE,                              VKD3DSIH_IGE,                              "u",    "ii"},
         {VKD3D_SM4_OP_ILT,                              VKD3DSIH_ILT,                              "u",    "ii"},
@@ -1503,7 +1504,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
         {VKD3D_SM4_OP_RESINFO,                          VKD3DSIH_RESINFO,                          "f",    "i*"},
         {VKD3D_SM4_OP_RET,                              VKD3DSIH_RET,                              "",     ""},
         {VKD3D_SM4_OP_RETC,                             VKD3DSIH_RETP,                             "",     "u",
-                shader_sm4_read_conditional_op},
+                shader_sm4_read_conditional_op, true},
         {VKD3D_SM4_OP_ROUND_NE,                         VKD3DSIH_ROUND_NE,                         "f",    "f"},
         {VKD3D_SM4_OP_ROUND_NI,                         VKD3DSIH_ROUND_NI,                         "f",    "f"},
         {VKD3D_SM4_OP_ROUND_PI,                         VKD3DSIH_ROUND_PI,                         "f",    "f"},
@@ -4917,7 +4918,7 @@ static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         modifier->u.aoffimmi.w = ins->texel_offset.w;
     }
 
-    if (ins->opcode == VKD3DSIH_DISCARD)
+    if (info->is_conditional_op)
     {
         if (ins->flags == VKD3D_SHADER_CONDITIONAL_OP_NZ)
             instr.extra_bits = VKD3D_SM4_CONDITIONAL_NZ;
