@@ -4804,42 +4804,6 @@ static void write_sm4_if(struct tpf_compiler *tpf, const struct hlsl_ir_if *iff)
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_jump(const struct tpf_compiler *tpf, const struct hlsl_ir_jump *jump)
-{
-    struct sm4_instruction instr = {0};
-
-    switch (jump->type)
-    {
-        case HLSL_IR_JUMP_BREAK:
-            instr.opcode = VKD3D_SM4_OP_BREAK;
-            break;
-
-        case HLSL_IR_JUMP_CONTINUE:
-            instr.opcode = VKD3D_SM4_OP_CONTINUE;
-            break;
-
-        case HLSL_IR_JUMP_DISCARD_NZ:
-        {
-            instr.opcode = VKD3D_SM4_OP_DISCARD;
-            instr.extra_bits = VKD3D_SM4_CONDITIONAL_NZ;
-
-            memset(&instr.srcs[0], 0, sizeof(*instr.srcs));
-            instr.src_count = 1;
-            sm4_src_from_node(tpf, &instr.srcs[0], jump->condition.node, VKD3DSP_WRITEMASK_ALL);
-            break;
-        }
-
-        case HLSL_IR_JUMP_RETURN:
-            vkd3d_unreachable();
-
-        default:
-            hlsl_fixme(tpf->ctx, &jump->node.loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
-            return;
-    }
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void write_sm4_loop(struct tpf_compiler *tpf, const struct hlsl_ir_loop *loop)
 {
     struct sm4_instruction instr =
@@ -4953,6 +4917,12 @@ static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         modifier->u.aoffimmi.w = ins->texel_offset.w;
     }
 
+    if (ins->opcode == VKD3DSIH_DISCARD)
+    {
+        if (ins->flags == VKD3D_SHADER_CONDITIONAL_OP_NZ)
+            instr.extra_bits = VKD3D_SM4_CONDITIONAL_NZ;
+    }
+
     write_sm4_instruction(tpf, &instr);
 }
 
@@ -5002,6 +4972,9 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
 
         case VKD3DSIH_ADD:
         case VKD3DSIH_AND:
+        case VKD3DSIH_BREAK:
+        case VKD3DSIH_CONTINUE:
+        case VKD3DSIH_DISCARD:
         case VKD3DSIH_DIV:
         case VKD3DSIH_DP2:
         case VKD3DSIH_DP3:
@@ -5117,10 +5090,6 @@ static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *b
 
             case HLSL_IR_IF:
                 write_sm4_if(tpf, hlsl_ir_if(instr));
-                break;
-
-            case HLSL_IR_JUMP:
-                write_sm4_jump(tpf, hlsl_ir_jump(instr));
                 break;
 
             case HLSL_IR_LOOP:

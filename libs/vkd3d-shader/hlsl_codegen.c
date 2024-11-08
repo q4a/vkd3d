@@ -9280,6 +9280,37 @@ static bool sm4_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
     }
 }
 
+static bool sm4_generate_vsir_instr_jump(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_ir_jump *jump)
+{
+    const struct hlsl_ir_node *instr = &jump->node;
+    struct vkd3d_shader_instruction *ins;
+
+    switch (jump->type)
+    {
+        case HLSL_IR_JUMP_BREAK:
+            return generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_BREAK, 0, 0);
+
+        case HLSL_IR_JUMP_CONTINUE:
+            return generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_CONTINUE, 0, 0);
+
+        case HLSL_IR_JUMP_DISCARD_NZ:
+            if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_DISCARD, 0, 1)))
+                return false;
+            ins->flags = VKD3D_SHADER_CONDITIONAL_OP_NZ;
+
+            vsir_src_from_hlsl_node(&ins->src[0], ctx, jump->condition.node, VKD3DSP_WRITEMASK_ALL);
+            return true;
+
+        case HLSL_IR_JUMP_RETURN:
+            vkd3d_unreachable();
+
+        default:
+            hlsl_fixme(ctx, &jump->node.loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
+            return false;
+    }
+}
+
 static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *block, struct vsir_program *program)
 {
     struct vkd3d_string_buffer *dst_type_string;
@@ -9337,6 +9368,11 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
 
             case HLSL_IR_RESOURCE_STORE:
                 if (sm4_generate_vsir_instr_resource_store(ctx, program, hlsl_ir_resource_store(instr)))
+                    replace_instr_with_last_vsir_instr(ctx, program, instr);
+                break;
+
+            case HLSL_IR_JUMP:
+                if (sm4_generate_vsir_instr_jump(ctx, program, hlsl_ir_jump(instr)))
                     replace_instr_with_last_vsir_instr(ctx, program, instr);
                 break;
 
