@@ -5587,27 +5587,6 @@ static void write_sm4_switch(struct tpf_compiler *tpf, const struct hlsl_ir_swit
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_swizzle(const struct tpf_compiler *tpf, const struct hlsl_ir_swizzle *swizzle)
-{
-    unsigned int hlsl_swizzle;
-    struct sm4_instruction instr;
-    uint32_t writemask;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_MOV;
-
-    sm4_dst_from_node(&instr.dsts[0], &swizzle->node);
-    instr.dst_count = 1;
-
-    sm4_register_from_node(&instr.srcs[0].reg, &writemask, swizzle->val.node);
-    hlsl_swizzle = hlsl_map_swizzle(hlsl_combine_swizzles(hlsl_swizzle_from_writemask(writemask),
-            swizzle->swizzle, swizzle->node.data_type->dimx), instr.dsts[0].write_mask);
-    instr.srcs[0].swizzle = swizzle_from_sm4(hlsl_swizzle);
-    instr.src_count = 1;
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_sm4_opcode_info *info;
@@ -5831,10 +5810,6 @@ static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *b
 
             case HLSL_IR_SWITCH:
                 write_sm4_switch(tpf, hlsl_ir_switch(instr));
-                break;
-
-            case HLSL_IR_SWIZZLE:
-                write_sm4_swizzle(tpf, hlsl_ir_swizzle(instr));
                 break;
 
             case HLSL_IR_VSIR_INSTRUCTION_REF:
