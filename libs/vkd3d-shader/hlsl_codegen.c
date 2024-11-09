@@ -7925,40 +7925,6 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     sm1_generate_vsir_block(ctx, &entry_func->body, program);
 }
 
-static void add_last_vsir_instr_to_block(struct hlsl_ctx *ctx, struct vsir_program *program, struct hlsl_block *block)
-{
-    struct vkd3d_shader_location *loc;
-    struct hlsl_ir_node *vsir_instr;
-
-    loc = &program->instructions.elements[program->instructions.count - 1].location;
-
-    if (!(vsir_instr = hlsl_new_vsir_instruction_ref(ctx, program->instructions.count - 1, NULL, NULL, loc)))
-    {
-        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
-        return;
-    }
-    hlsl_block_add_instr(block, vsir_instr);
-}
-
-static void replace_instr_with_last_vsir_instr(struct hlsl_ctx *ctx,
-        struct vsir_program *program, struct hlsl_ir_node *instr)
-{
-    struct vkd3d_shader_location *loc;
-    struct hlsl_ir_node *vsir_instr;
-
-    loc = &program->instructions.elements[program->instructions.count - 1].location;
-
-    if (!(vsir_instr = hlsl_new_vsir_instruction_ref(ctx,
-            program->instructions.count - 1, instr->data_type, &instr->reg, loc)))
-    {
-        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
-        return;
-    }
-
-    list_add_before(&instr->entry, &vsir_instr->entry);
-    hlsl_replace_node(instr, vsir_instr);
-}
-
 static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vsir_program *program,
         const struct hlsl_ir_var *var, bool is_patch_constant_func, struct hlsl_block *block,
         const struct vkd3d_shader_location *loc)
@@ -8072,8 +8038,6 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
 
     if (var->is_input_semantic && version->type == VKD3D_SHADER_TYPE_PIXEL)
         ins->flags = sm4_get_interpolation_mode(var->data_type, var->storage_modifiers);
-
-    add_last_vsir_instr_to_block(ctx, program, block);
 }
 
 static void sm4_generate_vsir_instr_dcl_temps(struct hlsl_ctx *ctx, struct vsir_program *program,
@@ -8085,8 +8049,6 @@ static void sm4_generate_vsir_instr_dcl_temps(struct hlsl_ctx *ctx, struct vsir_
         return;
 
     ins->declaration.count = temp_count;
-
-    add_last_vsir_instr_to_block(ctx, program, block);
 }
 
 static void sm4_generate_vsir_instr_dcl_indexable_temp(struct hlsl_ctx *ctx,
@@ -8104,8 +8066,6 @@ static void sm4_generate_vsir_instr_dcl_indexable_temp(struct hlsl_ctx *ctx,
     ins->declaration.indexable_temp.data_type = VKD3D_DATA_FLOAT;
     ins->declaration.indexable_temp.component_count = comp_count;
     ins->declaration.indexable_temp.has_function_scope = false;
-
-    add_last_vsir_instr_to_block(ctx, program, block);
 }
 
 static bool type_is_float(const struct hlsl_type *type)
@@ -9311,11 +9271,88 @@ static bool sm4_generate_vsir_instr_jump(struct hlsl_ctx *ctx,
     }
 }
 
+static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *block, struct vsir_program *program);
+
+static void sm4_generate_vsir_instr_if(struct hlsl_ctx *ctx, struct vsir_program *program, struct hlsl_ir_if *iff)
+{
+    struct hlsl_ir_node *instr = &iff->node;
+    struct vkd3d_shader_instruction *ins;
+
+    VKD3D_ASSERT(iff->condition.node->data_type->dimx == 1);
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_IF, 0, 1)))
+        return;
+    ins->flags = VKD3D_SHADER_CONDITIONAL_OP_NZ;
+
+    vsir_src_from_hlsl_node(&ins->src[0], ctx, iff->condition.node, VKD3DSP_WRITEMASK_ALL);
+
+    sm4_generate_vsir_block(ctx, &iff->then_block, program);
+
+    if (!list_empty(&iff->else_block.instrs))
+    {
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_ELSE, 0, 0)))
+            return;
+        sm4_generate_vsir_block(ctx, &iff->else_block, program);
+    }
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_ENDIF, 0, 0)))
+        return;
+}
+
+static void sm4_generate_vsir_instr_loop(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_loop *loop)
+{
+    struct hlsl_ir_node *instr = &loop->node;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_LOOP, 0, 0)))
+        return;
+
+    sm4_generate_vsir_block(ctx, &loop->body, program);
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_ENDLOOP, 0, 0)))
+        return;
+}
+
+static void sm4_generate_vsir_instr_switch(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_switch *swi)
+{
+    const struct hlsl_ir_node *selector = swi->selector.node;
+    struct hlsl_ir_node *instr = &swi->node;
+    struct vkd3d_shader_instruction *ins;
+    struct hlsl_ir_switch_case *cas;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_SWITCH, 0, 1)))
+        return;
+    vsir_src_from_hlsl_node(&ins->src[0], ctx, selector, VKD3DSP_WRITEMASK_ALL);
+
+    LIST_FOR_EACH_ENTRY(cas, &swi->cases, struct hlsl_ir_switch_case, entry)
+    {
+        if (cas->is_default)
+        {
+            if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_DEFAULT, 0, 0)))
+                return;
+        }
+        else
+        {
+            struct hlsl_constant_value value = {.u[0].u = cas->value};
+
+            if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_CASE, 0, 1)))
+                return;
+            vsir_src_from_hlsl_constant_value(&ins->src[0], ctx, &value, VKD3D_DATA_UINT, 1, VKD3DSP_WRITEMASK_ALL);
+        }
+
+        sm4_generate_vsir_block(ctx, &cas->body, program);
+    }
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_ENDSWITCH, 0, 0)))
+        return;
+}
+
 static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *block, struct vsir_program *program)
 {
     struct vkd3d_string_buffer *dst_type_string;
     struct hlsl_ir_node *instr, *next;
-    struct hlsl_ir_switch_case *c;
 
     LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
     {
@@ -9340,55 +9377,44 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
             case HLSL_IR_EXPR:
                 if (!(dst_type_string = hlsl_type_to_string(ctx, instr->data_type)))
                     break;
-
-                if (sm4_generate_vsir_instr_expr(ctx, program, hlsl_ir_expr(instr), dst_type_string->buffer))
-                    replace_instr_with_last_vsir_instr(ctx, program, instr);
-
+                sm4_generate_vsir_instr_expr(ctx, program, hlsl_ir_expr(instr), dst_type_string->buffer);
                 hlsl_release_string_buffer(ctx, dst_type_string);
                 break;
 
             case HLSL_IR_IF:
-                sm4_generate_vsir_block(ctx, &hlsl_ir_if(instr)->then_block, program);
-                sm4_generate_vsir_block(ctx, &hlsl_ir_if(instr)->else_block, program);
+                sm4_generate_vsir_instr_if(ctx, program, hlsl_ir_if(instr));
                 break;
 
             case HLSL_IR_LOAD:
-                if (sm4_generate_vsir_instr_load(ctx, program, hlsl_ir_load(instr)))
-                    replace_instr_with_last_vsir_instr(ctx, program, instr);
+                sm4_generate_vsir_instr_load(ctx, program, hlsl_ir_load(instr));
                 break;
 
             case HLSL_IR_LOOP:
-                sm4_generate_vsir_block(ctx, &hlsl_ir_loop(instr)->body, program);
+                sm4_generate_vsir_instr_loop(ctx, program, hlsl_ir_loop(instr));
                 break;
 
             case HLSL_IR_RESOURCE_LOAD:
-                if (sm4_generate_vsir_instr_resource_load(ctx, program, hlsl_ir_resource_load(instr)))
-                    replace_instr_with_last_vsir_instr(ctx, program, instr);
+                sm4_generate_vsir_instr_resource_load(ctx, program, hlsl_ir_resource_load(instr));
                 break;
 
             case HLSL_IR_RESOURCE_STORE:
-                if (sm4_generate_vsir_instr_resource_store(ctx, program, hlsl_ir_resource_store(instr)))
-                    replace_instr_with_last_vsir_instr(ctx, program, instr);
+                sm4_generate_vsir_instr_resource_store(ctx, program, hlsl_ir_resource_store(instr));
                 break;
 
             case HLSL_IR_JUMP:
-                if (sm4_generate_vsir_instr_jump(ctx, program, hlsl_ir_jump(instr)))
-                    replace_instr_with_last_vsir_instr(ctx, program, instr);
+                sm4_generate_vsir_instr_jump(ctx, program, hlsl_ir_jump(instr));
                 break;
 
             case HLSL_IR_STORE:
-                if (sm4_generate_vsir_instr_store(ctx, program, hlsl_ir_store(instr)))
-                    replace_instr_with_last_vsir_instr(ctx, program, instr);
+                sm4_generate_vsir_instr_store(ctx, program, hlsl_ir_store(instr));
                 break;
 
             case HLSL_IR_SWITCH:
-                LIST_FOR_EACH_ENTRY(c, &hlsl_ir_switch(instr)->cases, struct hlsl_ir_switch_case, entry)
-                    sm4_generate_vsir_block(ctx, &c->body, program);
+                sm4_generate_vsir_instr_switch(ctx, program, hlsl_ir_switch(instr));
                 break;
 
             case HLSL_IR_SWIZZLE:
                 generate_vsir_instr_swizzle(ctx, program, hlsl_ir_swizzle(instr));
-                replace_instr_with_last_vsir_instr(ctx, program, instr);
                 break;
 
             default:
@@ -9449,6 +9475,8 @@ static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
     hlsl_block_cleanup(&block);
 
     sm4_generate_vsir_block(ctx, &func->body, program);
+
+    generate_vsir_add_program_instruction(ctx, program, &func->loc, VKD3DSIH_RET, 0, 0);
 }
 
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
@@ -9480,9 +9508,16 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         program->thread_group_size.z = ctx->thread_count[2];
     }
 
+    if (version.type == VKD3D_SHADER_TYPE_HULL)
+        generate_vsir_add_program_instruction(ctx, program,
+                &ctx->patch_constant_func->loc, VKD3DSIH_HS_CONTROL_POINT_PHASE, 0, 0);
     sm4_generate_vsir_add_function(ctx, func, config_flags, program);
     if (version.type == VKD3D_SHADER_TYPE_HULL)
+    {
+        generate_vsir_add_program_instruction(ctx, program,
+                &ctx->patch_constant_func->loc, VKD3DSIH_HS_FORK_PHASE, 0, 0);
         sm4_generate_vsir_add_function(ctx, ctx->patch_constant_func, config_flags, program);
+    }
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,

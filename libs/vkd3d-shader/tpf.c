@@ -1969,16 +1969,6 @@ static const struct vkd3d_sm4_register_type_info *get_info_from_vkd3d_register_t
     return lookup->register_type_info_from_vkd3d[vkd3d_type];
 }
 
-static enum vkd3d_sm4_swizzle_type vkd3d_sm4_get_default_swizzle_type(
-        const struct vkd3d_sm4_lookup_tables *lookup, enum vkd3d_shader_register_type vkd3d_type)
-{
-    const struct vkd3d_sm4_register_type_info *register_type_info =
-            get_info_from_vkd3d_register_type(lookup, vkd3d_type);
-
-    VKD3D_ASSERT(register_type_info);
-    return register_type_info->default_src_swizzle_type;
-}
-
 static enum vkd3d_sm4_stat_field get_stat_field_from_sm4_opcode(
         const struct vkd3d_sm4_lookup_tables *lookup, enum vkd3d_sm4_opcode sm4_opcode)
 {
@@ -2994,8 +2984,6 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
 
     return VKD3D_OK;
 }
-
-static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *block);
 
 bool sm4_register_from_semantic_name(const struct vkd3d_shader_version *version,
         const char *semantic_name, bool output, enum vkd3d_shader_register_type *type, bool *has_idx)
@@ -4099,64 +4087,6 @@ struct sm4_instruction
     unsigned int idx_src_count;
 };
 
-static void sm4_register_from_node(struct vkd3d_shader_register *reg, uint32_t *writemask,
-        const struct hlsl_ir_node *instr)
-{
-    VKD3D_ASSERT(instr->reg.allocated);
-    reg->type = VKD3DSPR_TEMP;
-    reg->dimension = VSIR_DIMENSION_VEC4;
-    reg->idx[0].offset = instr->reg.id;
-    reg->idx_count = 1;
-    *writemask = instr->reg.writemask;
-}
-
-static void sm4_src_from_constant_value(struct vkd3d_shader_src_param *src,
-        const struct hlsl_constant_value *value, unsigned int width, unsigned int map_writemask)
-{
-    src->swizzle = 0;
-    src->reg.type = VKD3DSPR_IMMCONST;
-    if (width == 1)
-    {
-        src->reg.dimension = VSIR_DIMENSION_SCALAR;
-        src->reg.u.immconst_u32[0] = value->u[0].u;
-    }
-    else
-    {
-        unsigned int i, j = 0;
-
-        src->reg.dimension = VSIR_DIMENSION_VEC4;
-        for (i = 0; i < 4; ++i)
-        {
-            if ((map_writemask & (1u << i)) && (j < width))
-                src->reg.u.immconst_u32[i] = value->u[j++].u;
-            else
-                src->reg.u.immconst_u32[i] = 0;
-        }
-    }
-}
-
-static void sm4_src_from_node(const struct tpf_compiler *tpf, struct vkd3d_shader_src_param *src,
-        const struct hlsl_ir_node *instr, uint32_t map_writemask)
-{
-    unsigned int hlsl_swizzle;
-    uint32_t writemask;
-
-    if (instr->type == HLSL_IR_CONSTANT)
-    {
-        struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
-
-        sm4_src_from_constant_value(src, &constant->value, instr->data_type->dimx, map_writemask);
-        return;
-    }
-
-    sm4_register_from_node(&src->reg, &writemask, instr);
-    if (vkd3d_sm4_get_default_swizzle_type(&tpf->lookup, src->reg.type) == VKD3D_SM4_SWIZZLE_VEC4)
-    {
-        hlsl_swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
-        src->swizzle = swizzle_from_sm4(hlsl_swizzle);
-    }
-}
-
 static unsigned int sm4_get_index_addressing_from_reg(const struct vkd3d_shader_register *reg,
         unsigned int i)
 {
@@ -4688,26 +4618,6 @@ static void tpf_write_hs_decls(const struct tpf_compiler *tpf)
     write_sm4_instruction(tpf, &instr);
 }
 
-static void tpf_write_hs_control_point_phase(const struct tpf_compiler *tpf)
-{
-    struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM5_OP_HS_CONTROL_POINT_PHASE,
-    };
-
-    write_sm4_instruction(tpf, &instr);
-}
-
-static void tpf_write_hs_fork_phase(const struct tpf_compiler *tpf)
-{
-    struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM5_OP_HS_FORK_PHASE,
-    };
-
-    write_sm4_instruction(tpf, &instr);
-}
-
 static void tpf_write_dcl_input_control_point_count(const struct tpf_compiler *tpf, const uint32_t count)
 {
     struct sm4_instruction instr =
@@ -4761,101 +4671,6 @@ static void tpf_write_dcl_tessellator_output_primitive(const struct tpf_compiler
         .opcode = VKD3D_SM5_OP_DCL_TESSELLATOR_OUTPUT_PRIMITIVE,
         .extra_bits = output_primitive << VKD3D_SM5_TESSELLATOR_SHIFT,
     };
-
-    write_sm4_instruction(tpf, &instr);
-}
-
-static void write_sm4_ret(const struct tpf_compiler *tpf)
-{
-    struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM4_OP_RET,
-    };
-
-    write_sm4_instruction(tpf, &instr);
-}
-
-static void write_sm4_if(struct tpf_compiler *tpf, const struct hlsl_ir_if *iff)
-{
-    struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM4_OP_IF,
-        .extra_bits = VKD3D_SM4_CONDITIONAL_NZ,
-        .src_count = 1,
-    };
-
-    VKD3D_ASSERT(iff->condition.node->data_type->dimx == 1);
-
-    sm4_src_from_node(tpf, &instr.srcs[0], iff->condition.node, VKD3DSP_WRITEMASK_ALL);
-    write_sm4_instruction(tpf, &instr);
-
-    write_sm4_block(tpf, &iff->then_block);
-
-    if (!list_empty(&iff->else_block.instrs))
-    {
-        instr.opcode = VKD3D_SM4_OP_ELSE;
-        instr.src_count = 0;
-        write_sm4_instruction(tpf, &instr);
-
-        write_sm4_block(tpf, &iff->else_block);
-    }
-
-    instr.opcode = VKD3D_SM4_OP_ENDIF;
-    instr.src_count = 0;
-    write_sm4_instruction(tpf, &instr);
-}
-
-static void write_sm4_loop(struct tpf_compiler *tpf, const struct hlsl_ir_loop *loop)
-{
-    struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM4_OP_LOOP,
-    };
-
-    write_sm4_instruction(tpf, &instr);
-
-    write_sm4_block(tpf, &loop->body);
-
-    instr.opcode = VKD3D_SM4_OP_ENDLOOP;
-    write_sm4_instruction(tpf, &instr);
-}
-
-static void write_sm4_switch(struct tpf_compiler *tpf, const struct hlsl_ir_switch *s)
-{
-    const struct hlsl_ir_node *selector = s->selector.node;
-    struct hlsl_ir_switch_case *c;
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_SWITCH;
-
-    sm4_src_from_node(tpf, &instr.srcs[0], selector, VKD3DSP_WRITEMASK_ALL);
-    instr.src_count = 1;
-
-    write_sm4_instruction(tpf, &instr);
-
-    LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
-    {
-        memset(&instr, 0, sizeof(instr));
-        if (c->is_default)
-        {
-            instr.opcode = VKD3D_SM4_OP_DEFAULT;
-        }
-        else
-        {
-            struct hlsl_constant_value value = { .u[0].u = c->value };
-
-            instr.opcode = VKD3D_SM4_OP_CASE;
-            sm4_src_from_constant_value(&instr.srcs[0], &value, 1, VKD3DSP_WRITEMASK_ALL);
-            instr.src_count = 1;
-        }
-
-        write_sm4_instruction(tpf, &instr);
-        write_sm4_block(tpf, &c->body);
-    }
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_ENDSWITCH;
 
     write_sm4_instruction(tpf, &instr);
 }
@@ -4974,7 +4789,9 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_ADD:
         case VKD3DSIH_AND:
         case VKD3DSIH_BREAK:
+        case VKD3DSIH_CASE:
         case VKD3DSIH_CONTINUE:
+        case VKD3DSIH_DEFAULT:
         case VKD3DSIH_DISCARD:
         case VKD3DSIH_DIV:
         case VKD3DSIH_DP2:
@@ -4986,6 +4803,10 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_DSY:
         case VKD3DSIH_DSY_COARSE:
         case VKD3DSIH_DSY_FINE:
+        case VKD3DSIH_ELSE:
+        case VKD3DSIH_ENDIF:
+        case VKD3DSIH_ENDLOOP:
+        case VKD3DSIH_ENDSWITCH:
         case VKD3DSIH_EQO:
         case VKD3DSIH_EXP:
         case VKD3DSIH_F16TOF32:
@@ -4996,8 +4817,11 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_GATHER4:
         case VKD3DSIH_GATHER4_PO:
         case VKD3DSIH_GEO:
+        case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+        case VKD3DSIH_HS_FORK_PHASE:
         case VKD3DSIH_IADD:
         case VKD3DSIH_IEQ:
+        case VKD3DSIH_IF:
         case VKD3DSIH_IGE:
         case VKD3DSIH_ILT:
         case VKD3DSIH_IMAD:
@@ -5014,6 +4838,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_LD_RAW:
         case VKD3DSIH_LD_UAV_TYPED:
         case VKD3DSIH_LOG:
+        case VKD3DSIH_LOOP:
         case VKD3DSIH_LTO:
         case VKD3DSIH_MAD:
         case VKD3DSIH_MAX:
@@ -5026,6 +4851,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_OR:
         case VKD3DSIH_RCP:
         case VKD3DSIH_RESINFO:
+        case VKD3DSIH_RET:
         case VKD3DSIH_ROUND_NE:
         case VKD3DSIH_ROUND_NI:
         case VKD3DSIH_ROUND_PI:
@@ -5042,6 +4868,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_SQRT:
         case VKD3DSIH_STORE_RAW:
         case VKD3DSIH_STORE_UAV_TYPED:
+        case VKD3DSIH_SWITCH:
         case VKD3DSIH_UDIV:
         case VKD3DSIH_UGE:
         case VKD3DSIH_ULT:
@@ -5059,67 +4886,15 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
     }
 }
 
-static void write_sm4_block(struct tpf_compiler *tpf, const struct hlsl_block *block)
+static void tpf_write_program(struct tpf_compiler *tpf, const struct vsir_program *program)
 {
-    const struct hlsl_ir_node *instr;
-    unsigned int vsir_instr_idx;
+    unsigned int i;
 
-    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
-    {
-        if (instr->data_type)
-        {
-            if (instr->data_type->class != HLSL_CLASS_SCALAR && instr->data_type->class != HLSL_CLASS_VECTOR)
-            {
-                hlsl_fixme(tpf->ctx, &instr->loc, "Class %#x should have been lowered or removed.",
-                        instr->data_type->class);
-                break;
-            }
-
-            if (!instr->reg.allocated)
-            {
-                VKD3D_ASSERT(instr->type == HLSL_IR_CONSTANT);
-                continue;
-            }
-        }
-
-        switch (instr->type)
-        {
-            case HLSL_IR_CALL:
-            case HLSL_IR_CONSTANT:
-            case HLSL_IR_RESOURCE_LOAD:
-                vkd3d_unreachable();
-
-            case HLSL_IR_IF:
-                write_sm4_if(tpf, hlsl_ir_if(instr));
-                break;
-
-            case HLSL_IR_LOOP:
-                write_sm4_loop(tpf, hlsl_ir_loop(instr));
-                break;
-
-            case HLSL_IR_SWITCH:
-                write_sm4_switch(tpf, hlsl_ir_switch(instr));
-                break;
-
-            case HLSL_IR_VSIR_INSTRUCTION_REF:
-                vsir_instr_idx = hlsl_ir_vsir_instruction_ref(instr)->vsir_instr_idx;
-                tpf_handle_instruction(tpf, &tpf->program->instructions.elements[vsir_instr_idx]);
-                break;
-
-            default:
-                hlsl_fixme(tpf->ctx, &instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
-        }
-    }
-}
-
-static void tpf_write_shader_function(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *func)
-{
     if (tpf->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
         tpf_dcl_thread_group(tpf, &tpf->program->thread_group_size);
 
-    write_sm4_block(tpf, &func->body);
-
-    write_sm4_ret(tpf);
+    for (i = 0; i < program->instructions.count; ++i)
+        tpf_handle_instruction(tpf, &program->instructions.elements[i]);
 }
 
 static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *entry_func)
@@ -5208,16 +4983,7 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
             write_sm4_dcl_textures(tpf, resource, true);
     }
 
-    if (version->type == VKD3D_SHADER_TYPE_HULL)
-        tpf_write_hs_control_point_phase(tpf);
-
-    tpf_write_shader_function(tpf, entry_func);
-
-    if (version->type == VKD3D_SHADER_TYPE_HULL)
-    {
-        tpf_write_hs_fork_phase(tpf);
-        tpf_write_shader_function(tpf, ctx->patch_constant_func);
-    }
+    tpf_write_program(tpf, tpf->program);
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
