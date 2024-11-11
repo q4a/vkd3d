@@ -8502,8 +8502,9 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
     const struct vkd3d_shader_index_range *range = &instruction->declaration.index_range;
+    unsigned int i, j, base_register_idx, effective_write_mask = 0, control_point_count;
+    enum vkd3d_shader_sysval_semantic sysval = ~0u;
     const struct shader_signature *signature;
-    unsigned int control_point_count;
     bool has_control_point;
 
     if (ctx->program->normalisation_level >= VSIR_FULLY_NORMALISED_IO)
@@ -8542,15 +8543,101 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
                 "Invalid relative address in DCL_INDEX_RANGE instruction.");
 
-    if (has_control_point && range->dst.reg.idx[0].offset != control_point_count)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
-                "Invalid control point index %u in DCL_INDEX_RANGE instruction, expected %u.",
-                range->dst.reg.idx[0].offset, control_point_count);
+    if (has_control_point)
+    {
+        if (range->dst.reg.idx[0].offset != control_point_count)
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                    "Invalid control point index %u in DCL_INDEX_RANGE instruction, expected %u.",
+                    range->dst.reg.idx[0].offset, control_point_count);
+        }
+
+        base_register_idx = range->dst.reg.idx[1].offset;
+    }
+    else
+    {
+        base_register_idx = range->dst.reg.idx[0].offset;
+    }
 
     if (range->register_count < 2)
+    {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_RANGE,
                 "Invalid register count %u in DCL_INDEX_RANGE instruction, expected at least 2.",
                 range->register_count);
+        return;
+    }
+
+    /* Check that for each register in the range the write mask intersects at
+     * most one (and possibly zero) signature elements. Keep track of the union
+     * of all signature element masks. */
+    for (i = 0; i < range->register_count; ++i)
+    {
+        bool found = false;
+
+        for (j = 0; j < signature->element_count; ++j)
+        {
+            const struct signature_element *element = &signature->elements[j];
+
+            if (base_register_idx + i != element->register_index || !(range->dst.write_mask & element->mask))
+                continue;
+
+            if (found)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK,
+                        "Invalid write mask %#x on a DCL_INDEX_RANGE destination parameter.",
+                        range->dst.write_mask);
+
+            found = true;
+
+            effective_write_mask |= element->mask;
+        }
+    }
+
+    /* Check again to have at most one intersection for each register, but this
+     * time using the effective write mask. This important for being able to
+     * merge all the signature elements in a single one without conflicts. */
+    for (i = 0; i < range->register_count; ++i)
+    {
+        bool found = false;
+
+        for (j = 0; j < signature->element_count; ++j)
+        {
+            const struct signature_element *element = &signature->elements[j];
+
+            if (base_register_idx + i != element->register_index || !(effective_write_mask & element->mask))
+                continue;
+
+            if (element->sysval_semantic != VKD3D_SHADER_SV_NONE
+                    && !vsir_sysval_semantic_is_tess_factor(element->sysval_semantic))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "Invalid sysval semantic %#x on a signature element touched by DCL_INDEX_RANGE.",
+                        element->sysval_semantic);
+
+            if (sysval == ~0u)
+            {
+                sysval = element->sysval_semantic;
+                /* Line density and line detail can be arrayed together. */
+                if (sysval == VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN)
+                    sysval = VKD3D_SHADER_SV_TESS_FACTOR_LINEDET;
+            }
+            else
+            {
+                if (sysval != element->sysval_semantic)
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                            "Inconsistent sysval semantic %#x on a signature element touched by DCL_INDEX_RANGE, "
+                            "%#x was already seen.",
+                            element->sysval_semantic, sysval);
+            }
+
+            if (found)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK,
+                        "Invalid write mask %#x on a DCL_INDEX_RANGE destination parameter.",
+                        range->dst.write_mask);
+
+            found = true;
+        }
+    }
+
+    VKD3D_ASSERT(sysval != ~0u);
 }
 
 static void vsir_validate_dcl_input(struct validation_context *ctx,
