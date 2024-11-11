@@ -8498,6 +8498,61 @@ static void vsir_validate_dcl_hs_max_tessfactor(struct validation_context *ctx,
                 instruction->declaration.max_tessellation_factor);
 }
 
+static void vsir_validate_dcl_index_range(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    const struct vkd3d_shader_index_range *range = &instruction->declaration.index_range;
+    const struct shader_signature *signature;
+    unsigned int control_point_count;
+    bool has_control_point;
+
+    if (ctx->program->normalisation_level >= VSIR_FULLY_NORMALISED_IO)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
+                "DCL_INDEX_RANGE is not allowed with fully normalised input/output.");
+        return;
+    }
+
+    if (range->dst.modifiers != VKD3DSPDM_NONE)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS,
+                "Invalid modifier %#x on a DCL_INDEX_RANGE destination parameter.", range->dst.modifiers);
+
+    if (range->dst.shift != 0)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT,
+                "Invalid shift %u on a DCL_INDEX_RANGE destination parameter.", range->dst.shift);
+
+    signature = vsir_signature_from_register_type(ctx, range->dst.reg.type, &has_control_point, &control_point_count);
+    if (!signature)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                "Invalid register type %#x in DCL_INDEX_RANGE instruction.",
+                range->dst.reg.type);
+        return;
+    }
+
+    if (range->dst.reg.idx_count != 1 + !!has_control_point)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid index count %u in DCL_INDEX_RANGE instruction.",
+                range->dst.reg.idx_count);
+        return;
+    }
+
+    if (range->dst.reg.idx[0].rel_addr || (has_control_point && range->dst.reg.idx[1].rel_addr))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Invalid relative address in DCL_INDEX_RANGE instruction.");
+
+    if (has_control_point && range->dst.reg.idx[0].offset != control_point_count)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Invalid control point index %u in DCL_INDEX_RANGE instruction, expected %u.",
+                range->dst.reg.idx[0].offset, control_point_count);
+
+    if (range->register_count < 2)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_RANGE,
+                "Invalid register count %u in DCL_INDEX_RANGE instruction, expected at least 2.",
+                range->register_count);
+}
+
 static void vsir_validate_dcl_input(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -8960,6 +9015,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_HS_JOIN_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_DCL_GS_INSTANCES] =                 {0,   0, vsir_validate_dcl_gs_instances},
     [VKD3DSIH_DCL_HS_MAX_TESSFACTOR] =            {0,   0, vsir_validate_dcl_hs_max_tessfactor},
+    [VKD3DSIH_DCL_INDEX_RANGE] =                  {0,   0, vsir_validate_dcl_index_range},
     [VKD3DSIH_DCL_INPUT] =                        {0,   0, vsir_validate_dcl_input},
     [VKD3DSIH_DCL_INPUT_PRIMITIVE] =              {0,   0, vsir_validate_dcl_input_primitive},
     [VKD3DSIH_DCL_INPUT_PS] =                     {0,   0, vsir_validate_dcl_input_ps},
