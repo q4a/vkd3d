@@ -7192,31 +7192,27 @@ static void vsir_validate_register_without_indices(struct validation_context *ct
                 reg->idx_count, reg->type);
 }
 
-static void vsir_validate_io_register(struct validation_context *ctx,
-        const struct vkd3d_shader_register *reg)
+static const struct shader_signature *vsir_signature_from_register_type(struct validation_context *ctx,
+        enum vkd3d_shader_register_type register_type, bool *has_control_point, unsigned int *control_point_count)
 {
-    unsigned int control_point_count = 0, control_point_index;
-    const struct shader_signature *signature;
-    bool has_control_point = false;
+    *has_control_point = false;
 
-    switch (reg->type)
+    switch (register_type)
     {
         case VKD3DSPR_INPUT:
-            signature = &ctx->program->input_signature;
-
             switch (ctx->program->shader_version.type)
             {
                 case VKD3D_SHADER_TYPE_GEOMETRY:
                 case VKD3D_SHADER_TYPE_HULL:
                 case VKD3D_SHADER_TYPE_DOMAIN:
-                    has_control_point = true;
-                    control_point_count = ctx->program->input_control_point_count;
+                    *has_control_point = true;
+                    *control_point_count = ctx->program->input_control_point_count;
                     break;
 
                 default:
                     break;
             }
-            break;
+            return &ctx->program->input_signature;
 
         case VKD3DSPR_OUTPUT:
             switch (ctx->program->shader_version.type)
@@ -7225,41 +7221,45 @@ static void vsir_validate_io_register(struct validation_context *ctx,
                     if (ctx->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE
                             || ctx->program->normalisation_level >= VSIR_FULLY_NORMALISED_IO)
                     {
-                        signature = &ctx->program->output_signature;
-                        has_control_point = ctx->program->normalisation_level >= VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
-                        control_point_count = ctx->program->output_control_point_count;
+                        *has_control_point = ctx->program->normalisation_level >= VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
+                        *control_point_count = ctx->program->output_control_point_count;
+                        return &ctx->program->output_signature;
                     }
                     else
                     {
-                        signature = &ctx->program->patch_constant_signature;
+                        return &ctx->program->patch_constant_signature;
                     }
-                    break;
 
                 default:
-                    signature = &ctx->program->output_signature;
-                    break;
+                    return &ctx->program->output_signature;
             }
-            break;
 
         case VKD3DSPR_INCONTROLPOINT:
-            signature = &ctx->program->input_signature;
-            has_control_point = true;
-            control_point_count = ctx->program->input_control_point_count;
-            break;
+            *has_control_point = true;
+            *control_point_count = ctx->program->input_control_point_count;
+            return &ctx->program->input_signature;
 
         case VKD3DSPR_OUTCONTROLPOINT:
-            signature = &ctx->program->output_signature;
-            has_control_point = true;
-            control_point_count = ctx->program->output_control_point_count;
-            break;
+            *has_control_point = true;
+            *control_point_count = ctx->program->output_control_point_count;
+            return &ctx->program->output_signature;
 
         case VKD3DSPR_PATCHCONST:
-            signature = &ctx->program->patch_constant_signature;
-            break;
+            return &ctx->program->patch_constant_signature;
 
         default:
-            vkd3d_unreachable();
+            return NULL;
     }
+}
+
+static void vsir_validate_io_register(struct validation_context *ctx, const struct vkd3d_shader_register *reg)
+{
+    unsigned int control_point_index, control_point_count;
+    const struct shader_signature *signature;
+    bool has_control_point;
+
+    signature = vsir_signature_from_register_type(ctx, reg->type, &has_control_point, &control_point_count);
+    VKD3D_ASSERT(signature);
 
     if (ctx->program->normalisation_level < VSIR_FULLY_NORMALISED_IO)
     {
