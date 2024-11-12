@@ -9520,6 +9520,47 @@ static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
         program->global_flags |= VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL;
 }
 
+static void sm4_generate_vsir_add_dcl_sampler(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct extern_resource *resource)
+{
+    struct vkd3d_shader_src_param *src_param;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int i;
+
+    VKD3D_ASSERT(resource->regset == HLSL_REGSET_SAMPLERS);
+    VKD3D_ASSERT(hlsl_version_lt(ctx, 5, 1) || resource->bind_count == 1);
+
+    for (i = 0; i < resource->bind_count; ++i)
+    {
+        unsigned int array_first = resource->index + i;
+        unsigned int array_last = resource->index + i; /* FIXME: array end. */
+
+        if (resource->var && !resource->var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
+            continue;
+
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &resource->loc, VKD3DSIH_DCL_SAMPLER, 0, 0)))
+        {
+            ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+            return;
+        }
+
+        if (resource->component_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
+            ins->flags |= VKD3DSI_SAMPLER_COMPARISON_MODE;
+
+        src_param = &ins->declaration.sampler.src;
+        vsir_src_param_init(src_param, VKD3DSPR_SAMPLER, VKD3D_DATA_UNUSED, 0);
+
+        ins->declaration.sampler.range.first = array_first;
+        ins->declaration.sampler.range.last = array_last;
+        ins->declaration.sampler.range.space = resource->space;
+
+        src_param->reg.idx[0].offset = resource->id;
+        src_param->reg.idx[1].offset = array_first;
+        src_param->reg.idx[2].offset = array_last;
+        src_param->reg.idx_count = 3;
+    }
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program, so it can be used as input to tpf_compile() without relying
  * on ctx and entry_func. */
@@ -9527,6 +9568,8 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         uint64_t config_flags, struct vsir_program *program)
 {
     struct vkd3d_shader_version version = {0};
+    struct extern_resource *extern_resources;
+    unsigned int extern_resources_count;
 
     version.major = ctx->profile->major_version;
     version.minor = ctx->profile->minor_version;
@@ -9548,6 +9591,16 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         program->thread_group_size.y = ctx->thread_count[1];
         program->thread_group_size.z = ctx->thread_count[2];
     }
+
+    extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
+    for (unsigned int i = 0; i < extern_resources_count; ++i)
+    {
+        const struct extern_resource *resource = &extern_resources[i];
+
+        if (resource->regset == HLSL_REGSET_SAMPLERS)
+            sm4_generate_vsir_add_dcl_sampler(ctx, program, resource);
+    }
+    sm4_free_extern_resources(extern_resources, extern_resources_count);
 
     if (version.type == VKD3D_SHADER_TYPE_HULL)
         generate_vsir_add_program_instruction(ctx, program,

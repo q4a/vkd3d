@@ -4349,47 +4349,6 @@ static void write_sm4_dcl_constant_buffer(const struct tpf_compiler *tpf, const 
     write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_samplers(const struct tpf_compiler *tpf, const struct extern_resource *resource)
-{
-    unsigned int i;
-    struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
-
-        .dsts[0].reg.type = VKD3DSPR_SAMPLER,
-        .dst_count = 1,
-    };
-
-    VKD3D_ASSERT(resource->regset == HLSL_REGSET_SAMPLERS);
-
-    if (resource->component_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
-        instr.extra_bits |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
-
-    for (i = 0; i < resource->bind_count; ++i)
-    {
-        if (resource->var && !resource->var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
-            continue;
-
-        if (hlsl_version_ge(tpf->ctx, 5, 1))
-        {
-            VKD3D_ASSERT(!i);
-            instr.dsts[0].reg.idx[0].offset = resource->id;
-            instr.dsts[0].reg.idx[1].offset = resource->index;
-            instr.dsts[0].reg.idx[2].offset = resource->index; /* FIXME: array end */
-            instr.dsts[0].reg.idx_count = 3;
-
-            instr.idx[0] = resource->space;
-            instr.idx_count = 1;
-        }
-        else
-        {
-            instr.dsts[0].reg.idx[0].offset = resource->index + i;
-            instr.dsts[0].reg.idx_count = 1;
-        }
-        write_sm4_instruction(tpf, &instr);
-    }
-}
-
 static void write_sm4_dcl_textures(const struct tpf_compiler *tpf, const struct extern_resource *resource,
         bool uav)
 {
@@ -4557,6 +4516,37 @@ static void tpf_dcl_thread_group(const struct tpf_compiler *tpf, const struct vs
         .idx = {group_size->x, group_size->y, group_size->z},
         .idx_count = 3,
     };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_dcl_sampler(const struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
+{
+    const struct vkd3d_shader_sampler *sampler = &ins->declaration.sampler;
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
+        .extra_bits = ins->flags << VKD3D_SM4_SAMPLER_MODE_SHIFT,
+
+        .dsts[0].reg.type = VKD3DSPR_SAMPLER,
+        .dst_count = 1,
+    };
+
+    if (vkd3d_shader_ver_ge(&tpf->program->shader_version, 5, 1))
+    {
+        instr.dsts[0].reg.idx[0].offset = sampler->src.reg.idx[0].offset;
+        instr.dsts[0].reg.idx[1].offset = sampler->range.first;
+        instr.dsts[0].reg.idx[2].offset = sampler->range.last;
+        instr.dsts[0].reg.idx_count = 3;
+
+        instr.idx[0] = ins->declaration.sampler.range.space;
+        instr.idx_count = 1;
+    }
+    else
+    {
+        instr.dsts[0].reg.idx[0].offset = sampler->range.first;
+        instr.dsts[0].reg.idx_count = 1;
+    }
 
     write_sm4_instruction(tpf, &instr);
 }
@@ -4750,6 +4740,10 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
             tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_OUTPUT_SIV, &ins->declaration.register_semantic, 0);
             break;
 
+        case VKD3DSIH_DCL_SAMPLER:
+            tpf_dcl_sampler(tpf, ins);
+            break;
+
         case VKD3DSIH_ADD:
         case VKD3DSIH_AND:
         case VKD3DSIH_BREAK:
@@ -4920,9 +4914,7 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
     {
         const struct extern_resource *resource = &extern_resources[i];
 
-        if (resource->regset == HLSL_REGSET_SAMPLERS)
-            write_sm4_dcl_samplers(tpf, resource);
-        else if (resource->regset == HLSL_REGSET_TEXTURES)
+        if (resource->regset == HLSL_REGSET_TEXTURES)
             write_sm4_dcl_textures(tpf, resource, false);
         else if (resource->regset == HLSL_REGSET_UAVS)
             write_sm4_dcl_textures(tpf, resource, true);
