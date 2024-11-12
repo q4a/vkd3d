@@ -9490,6 +9490,36 @@ static void generate_vsir_scan_required_features(struct hlsl_ctx *ctx, struct vs
      * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
 }
 
+static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_ir_function_decl *entry_func)
+{
+    const struct vkd3d_shader_version *version = &program->shader_version;
+    struct extern_resource *extern_resources;
+    unsigned int extern_resources_count, i;
+
+    extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
+
+    if (version->major == 4)
+    {
+        for (i = 0; i < extern_resources_count; ++i)
+        {
+            const struct extern_resource *resource = &extern_resources[i];
+            const struct hlsl_type *type = resource->component_type;
+
+            if (type && type->class == HLSL_CLASS_TEXTURE && type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+            {
+                program->global_flags |= VKD3DSGF_ENABLE_RAW_AND_STRUCTURED_BUFFERS;
+                break;
+            }
+        }
+    }
+
+    sm4_free_extern_resources(extern_resources, extern_resources_count);
+
+    if (entry_func->early_depth_test && vkd3d_shader_ver_ge(version, 5, 0))
+        program->global_flags |= VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL;
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program, so it can be used as input to tpf_compile() without relying
  * on ctx and entry_func. */
@@ -9531,6 +9561,7 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     }
 
     generate_vsir_scan_required_features(ctx, program);
+    generate_vsir_scan_global_flags(ctx, program, func);
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,

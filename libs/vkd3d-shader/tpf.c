@@ -4870,7 +4870,6 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
     const struct hlsl_buffer *cbuffer;
     struct hlsl_ctx *ctx = tpf->ctx;
     size_t token_count_position;
-    uint32_t global_flags = 0;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
     {
@@ -4892,26 +4891,8 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
     put_u32(&buffer, vkd3d_make_u32((version->major << 4) | version->minor, shader_types[version->type]));
     token_count_position = put_u32(&buffer, 0);
 
-    if (version->major == 4)
-    {
-        for (i = 0; i < extern_resources_count; ++i)
-        {
-            const struct extern_resource *resource = &extern_resources[i];
-            const struct hlsl_type *type = resource->component_type;
-
-            if (type && type->class == HLSL_CLASS_TEXTURE && type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
-            {
-                global_flags |= VKD3DSGF_ENABLE_RAW_AND_STRUCTURED_BUFFERS;
-                break;
-            }
-        }
-    }
-
-    if (entry_func->early_depth_test && vkd3d_shader_ver_ge(version, 5, 0))
-        global_flags |= VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL;
-
-    if (global_flags)
-        write_sm4_dcl_global_flags(tpf, global_flags);
+    if (tpf->program->global_flags)
+        write_sm4_dcl_global_flags(tpf, tpf->program->global_flags);
 
     if (version->type == VKD3D_SHADER_TYPE_HULL)
     {
