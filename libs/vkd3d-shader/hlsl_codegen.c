@@ -9473,6 +9473,23 @@ static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
     generate_vsir_add_program_instruction(ctx, program, &func->loc, VKD3DSIH_RET, 0, 0);
 }
 
+static void generate_vsir_scan_required_features(struct hlsl_ctx *ctx, struct vsir_program *program)
+{
+    struct extern_resource *extern_resources;
+    unsigned int extern_resources_count;
+
+    extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
+    for (unsigned int i = 0; i < extern_resources_count; ++i)
+    {
+        if (extern_resources[i].component_type && extern_resources[i].component_type->e.resource.rasteriser_ordered)
+            program->features.rovs = true;
+    }
+    sm4_free_extern_resources(extern_resources, extern_resources_count);
+
+    /* FIXME: We also emit code that should require UAVS_AT_EVERY_STAGE,
+     * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program, so it can be used as input to tpf_compile() without relying
  * on ctx and entry_func. */
@@ -9512,6 +9529,8 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
                 &ctx->patch_constant_func->loc, VKD3DSIH_HS_FORK_PHASE, 0, 0);
         sm4_generate_vsir_add_function(ctx, ctx->patch_constant_func, config_flags, program);
     }
+
+    generate_vsir_scan_required_features(ctx, program);
 }
 
 static struct hlsl_ir_jump *loop_unrolling_find_jump(struct hlsl_block *block, struct hlsl_ir_node *stop_point,

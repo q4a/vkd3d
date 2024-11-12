@@ -3484,28 +3484,6 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
     }
 }
 
-struct extern_resource
-{
-    /* var is only not NULL if this resource is a whole variable, so it may be responsible for more
-     * than one component. */
-    const struct hlsl_ir_var *var;
-    const struct hlsl_buffer *buffer;
-
-    char *name;
-    bool is_user_packed;
-
-    /* The data type of a single component of the resource.
-     * This might be different from the data type of the resource itself in 4.0
-     * profiles, where an array (or multi-dimensional array) is handled as a
-     * single resource, unlike in 5.0. */
-    struct hlsl_type *component_type;
-
-    enum hlsl_regset regset;
-    unsigned int id, space, index, bind_count;
-
-    struct vkd3d_shader_location loc;
-};
-
 static int sm4_compare_extern_resources(const void *a, const void *b)
 {
     const struct extern_resource *aa = (const struct extern_resource *)a;
@@ -3521,7 +3499,7 @@ static int sm4_compare_extern_resources(const void *a, const void *b)
     return vkd3d_u32_compare(aa->index, bb->index);
 }
 
-static void sm4_free_extern_resources(struct extern_resource *extern_resources, unsigned int count)
+void sm4_free_extern_resources(struct extern_resource *extern_resources, unsigned int count)
 {
     unsigned int i;
 
@@ -3537,7 +3515,7 @@ static const char *string_skip_tag(const char *string)
     return string;
 }
 
-static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
+struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
 {
     bool separate_components = ctx->profile->major_version == 5 && ctx->profile->minor_version == 0;
     struct extern_resource *extern_resources = NULL;
@@ -4981,20 +4959,12 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
 
 static void tpf_write_sfi0(struct tpf_compiler *tpf)
 {
-    struct extern_resource *extern_resources;
-    unsigned int extern_resources_count;
-    struct hlsl_ctx *ctx = tpf->ctx;
     uint64_t *flags;
 
     flags = vkd3d_calloc(1, sizeof(*flags));
 
-    extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
-    for (unsigned int i = 0; i < extern_resources_count; ++i)
-    {
-        if (extern_resources[i].component_type && extern_resources[i].component_type->e.resource.rasteriser_ordered)
-            *flags |= DXBC_SFI0_REQUIRES_ROVS;
-    }
-    sm4_free_extern_resources(extern_resources, extern_resources_count);
+    if (tpf->program->features.rovs)
+        *flags |= DXBC_SFI0_REQUIRES_ROVS;
 
     /* FIXME: We also emit code that should require UAVS_AT_EVERY_STAGE,
      * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */

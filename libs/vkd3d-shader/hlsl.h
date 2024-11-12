@@ -1650,6 +1650,30 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, const struct vkd3d_shader_code *ctab,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
+struct extern_resource
+{
+    /* "var" is only not NULL if this resource is a whole variable, so it may
+     * be responsible for more than one component. */
+    const struct hlsl_ir_var *var;
+    const struct hlsl_buffer *buffer;
+
+    char *name;
+    bool is_user_packed;
+
+    /* The data type of a single component of the resource. This might be
+     * different from the data type of the resource itself in 4.0 profiles,
+     * where an array (or multi-dimensional array) is handled as a single
+     * resource, unlike in 5.0. */
+    struct hlsl_type *component_type;
+
+    enum hlsl_regset regset;
+    unsigned int id, space, index, bind_count;
+
+    struct vkd3d_shader_location loc;
+};
+
+struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count);
+void sm4_free_extern_resources(struct extern_resource *extern_resources, unsigned int count);
 int tpf_compile(struct vsir_program *program, uint64_t config_flags,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func);
