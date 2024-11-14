@@ -30,6 +30,9 @@
 #include "vulkan_utils.h"
 #include "vkd3d_test.h"
 
+#define LOG2_E 1.44269504f
+#define SQRT_LOG2_E 1.20112241f
+
 struct vulkan_resource
 {
     struct resource r;
@@ -274,6 +277,8 @@ static enum vkd3d_shader_fog_fragment_mode get_fog_fragment_mode(enum fog_mode m
         case FOG_MODE_DISABLE: return VKD3D_SHADER_FOG_FRAGMENT_NONE;
         case FOG_MODE_NONE: return VKD3D_SHADER_FOG_FRAGMENT_LINEAR;
         case FOG_MODE_LINEAR: return VKD3D_SHADER_FOG_FRAGMENT_LINEAR;
+        case FOG_MODE_EXP: return VKD3D_SHADER_FOG_FRAGMENT_EXP;
+        case FOG_MODE_EXP2: return VKD3D_SHADER_FOG_FRAGMENT_EXP2;
         default: fatal_error("Unhandled fog mode %#x.\n", mode);
     }
 }
@@ -510,15 +515,28 @@ static bool compile_d3d_code(struct vulkan_shader_runner *runner,
     parameters[20].type = VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT;
     parameters[20].data_type = VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32;
 
-    if (runner->r.fog_mode == FOG_MODE_NONE)
+    switch (runner->r.fog_mode)
     {
-        parameters[19].u.immediate_constant.u.f32 = 0.0f;
-        parameters[20].u.immediate_constant.u.f32 = -1.0f;
-    }
-    else
-    {
-        parameters[19].u.immediate_constant.u.f32 = runner->r.fog_end;
-        parameters[20].u.immediate_constant.u.f32 = 1.0 / (runner->r.fog_end - runner->r.fog_start);
+        case FOG_MODE_NONE:
+            parameters[19].u.immediate_constant.u.f32 = 0.0f;
+            parameters[20].u.immediate_constant.u.f32 = -1.0f;
+            break;
+
+        case FOG_MODE_LINEAR:
+            parameters[19].u.immediate_constant.u.f32 = runner->r.fog_end;
+            parameters[20].u.immediate_constant.u.f32 = 1.0 / (runner->r.fog_end - runner->r.fog_start);
+            break;
+
+        case FOG_MODE_EXP:
+            parameters[20].u.immediate_constant.u.f32 = runner->r.fog_density * LOG2_E;
+            break;
+
+        case FOG_MODE_EXP2:
+            parameters[20].u.immediate_constant.u.f32 = runner->r.fog_density * SQRT_LOG2_E;
+            break;
+
+        case FOG_MODE_DISABLE:
+            break;
     }
 
     parameters[21].name = VKD3D_SHADER_PARAMETER_NAME_FOG_SOURCE;

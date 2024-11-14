@@ -501,6 +501,32 @@ enum vkd3d_shader_fog_fragment_mode
      */
     VKD3D_SHADER_FOG_FRAGMENT_NONE = 0x0,
     /**
+     * The fog interpolation factor is 2^-(k * c).
+     *
+     * In order to implement traditional exponential fog, as present in
+     * Direct3D and OpenGL, i.e.
+     *
+     *     e^-(density * c)
+     *
+     * set
+     *
+     *     k = density * log₂(e)
+     */
+    VKD3D_SHADER_FOG_FRAGMENT_EXP = 0x1,
+    /**
+     * The fog interpolation factor is 2^-((k * c)²).
+     *
+     * In order to implement traditional square-exponential fog, as present in
+     * Direct3D and OpenGL, i.e.
+     *
+     *     e^-((density * c)²)
+     *
+     * set
+     *
+     *     k = density * √log₂(e)
+     */
+    VKD3D_SHADER_FOG_FRAGMENT_EXP2 = 0x2,
+    /**
      * The fog interpolation factor is (E - c) * k.
      *
      * In order to implement traditional linear fog, as present in Direct3D and
@@ -871,7 +897,7 @@ enum vkd3d_shader_parameter_name
      */
     VKD3D_SHADER_PARAMETER_NAME_FOG_END,
     /**
-     * Scale value for linear fog.
+     * Scale value for fog.
      * See VKD3D_SHADER_PARAMETER_NAME_FOG_FRAGMENT_MODE for documentation of
      * fog.
      *
