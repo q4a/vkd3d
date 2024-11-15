@@ -5847,13 +5847,15 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(stru
 }
 
 static bool use_flat_interpolation(const struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vkd3d_shader_message_context *message_context, bool *flat)
 {
     static const struct vkd3d_shader_location no_loc;
     const struct vkd3d_shader_parameter1 *parameter;
 
+    *flat = false;
+
     if (!(parameter = vsir_program_get_parameter(program, VKD3D_SHADER_PARAMETER_NAME_FLAT_INTERPOLATION)))
-        return false;
+        return true;
 
     if (parameter->type != VKD3D_SHADER_PARAMETER_TYPE_IMMEDIATE_CONSTANT)
     {
@@ -5868,16 +5870,23 @@ static bool use_flat_interpolation(const struct vsir_program *program,
         return false;
     }
 
-    return parameter->u.immediate_constant.u.u32;
+    *flat = parameter->u.immediate_constant.u.u32;
+    return true;
 }
 
 static enum vkd3d_result vsir_program_apply_flat_interpolation(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
     unsigned int i;
+    bool flat;
 
-    if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL || program->shader_version.major >= 4
-            || !use_flat_interpolation(program, ctx->message_context))
+    if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL || program->shader_version.major >= 4)
+        return VKD3D_OK;
+
+    if (!use_flat_interpolation(program, ctx->message_context, &flat))
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+
+    if (!flat)
         return VKD3D_OK;
 
     for (i = 0; i < program->input_signature.element_count; ++i)
