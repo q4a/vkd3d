@@ -7577,6 +7577,12 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
 
     if (expected_tess_domain != VKD3D_TESSELLATOR_DOMAIN_INVALID)
     {
+        if (signature_type != SIGNATURE_TYPE_PATCH_CONSTANT)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                    "element %u of %s signature: System value semantic %#x is only valid "
+                    "in the patch constant signature.",
+                    idx, signature_type_name, element->sysval_semantic);
+
         if (ctx->program->tess_domain != expected_tess_domain)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                     "element %u of %s signature: Invalid system value semantic %#x for tessellator domain %#x.",
