@@ -6665,6 +6665,9 @@ struct validation_context
     enum vkd3d_shader_opcode *blocks;
     size_t depth;
     size_t blocks_capacity;
+
+    unsigned int outer_tess_idxs[4];
+    unsigned int inner_tess_idxs[2];
 };
 
 static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *ctx,
@@ -7471,8 +7474,8 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
 {
     const char *signature_type_name = signature_type_names[signature_type];
     const struct signature_element *element = &signature->elements[idx];
+    bool integer_type = false, is_outer = false;
     unsigned int semantic_index_max = 0;
-    bool integer_type = false;
 
     if (element->register_count == 0)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
@@ -7534,23 +7537,28 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
 
         case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
             semantic_index_max = 4;
+            is_outer = true;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_QUADINT:
             semantic_index_max = 2;
+            is_outer = false;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE:
             semantic_index_max = 3;
+            is_outer = true;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_TRIINT:
             semantic_index_max = 1;
+            is_outer = false;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_LINEDET:
         case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
             semantic_index_max = 2;
+            is_outer = true;
             break;
 
         default:
@@ -7560,10 +7568,26 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
             break;
     }
 
-    if (semantic_index_max != 0 && element->semantic_index >= semantic_index_max)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
-                "element %u of %s signature: Invalid semantic index %u for system value semantic %#x.",
-                idx, signature_type_name, element->semantic_index, element->sysval_semantic);
+    if (semantic_index_max != 0)
+    {
+        if (element->semantic_index >= semantic_index_max)
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                    "element %u of %s signature: Invalid semantic index %u for system value semantic %#x.",
+                    idx, signature_type_name, element->semantic_index, element->sysval_semantic);
+        }
+        else
+        {
+            unsigned int *idx_pos = &(is_outer ? ctx->outer_tess_idxs : ctx->inner_tess_idxs)[element->semantic_index];
+
+            if (*idx_pos != ~0u)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "element %u of %s signature: Duplicate semantic index %u for system value semantic %#x.",
+                        idx, signature_type_name, element->semantic_index, element->sysval_semantic);
+            else
+                *idx_pos = idx;
+        }
+    }
 
     if (element->sysval_semantic < ARRAY_SIZE(sysval_validation_data))
     {
@@ -8198,6 +8222,12 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
         .status = VKD3D_OK,
         .phase = VKD3DSIH_INVALID,
         .invalid_instruction_idx = true,
+        .outer_tess_idxs[0] = ~0u,
+        .outer_tess_idxs[1] = ~0u,
+        .outer_tess_idxs[2] = ~0u,
+        .outer_tess_idxs[3] = ~0u,
+        .inner_tess_idxs[0] = ~0u,
+        .inner_tess_idxs[1] = ~0u,
     };
     unsigned int i;
 
