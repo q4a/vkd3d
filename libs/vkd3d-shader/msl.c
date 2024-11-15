@@ -313,6 +313,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
     switch (ins->opcode)
     {
         case VKD3DSIH_DCL_INPUT:
+        case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
             break;
         case VKD3DSIH_MOV:
