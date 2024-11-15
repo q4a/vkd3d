@@ -7473,6 +7473,7 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         const struct shader_signature *signature, enum vsir_signature_type signature_type,
         unsigned int idx)
 {
+    enum vkd3d_tessellator_domain expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_INVALID;
     const char *signature_type_name = signature_type_names[signature_type];
     const struct signature_element *element = &signature->elements[idx];
     bool integer_type = false, is_outer = false;
@@ -7537,27 +7538,32 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
+            expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_QUAD;
             semantic_index_max = 4;
             is_outer = true;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_QUADINT:
+            expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_QUAD;
             semantic_index_max = 2;
             is_outer = false;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE:
+            expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_TRIANGLE;
             semantic_index_max = 3;
             is_outer = true;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_TRIINT:
+            expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_TRIANGLE;
             semantic_index_max = 1;
             is_outer = false;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_LINEDET:
         case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
+            expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_LINE;
             semantic_index_max = 2;
             is_outer = true;
             break;
@@ -7569,8 +7575,13 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
             break;
     }
 
-    if (semantic_index_max != 0)
+    if (expected_tess_domain != VKD3D_TESSELLATOR_DOMAIN_INVALID)
     {
+        if (ctx->program->tess_domain != expected_tess_domain)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                    "element %u of %s signature: Invalid system value semantic %#x for tessellator domain %#x.",
+                    idx, signature_type_name, element->sysval_semantic, ctx->program->tess_domain);
+
         if (element->semantic_index >= semantic_index_max)
         {
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
