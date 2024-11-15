@@ -7471,6 +7471,7 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
 {
     const char *signature_type_name = signature_type_names[signature_type];
     const struct signature_element *element = &signature->elements[idx];
+    unsigned int semantic_index_max = 0;
     bool integer_type = false;
 
     if (element->register_count == 0)
@@ -7523,12 +7524,6 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         case VKD3D_SHADER_SV_INSTANCE_ID:
         case VKD3D_SHADER_SV_IS_FRONT_FACE:
         case VKD3D_SHADER_SV_SAMPLE_INDEX:
-        case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
-        case VKD3D_SHADER_SV_TESS_FACTOR_QUADINT:
-        case VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE:
-        case VKD3D_SHADER_SV_TESS_FACTOR_TRIINT:
-        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDET:
-        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
         case VKD3D_SHADER_SV_TARGET:
         case VKD3D_SHADER_SV_DEPTH:
         case VKD3D_SHADER_SV_COVERAGE:
@@ -7537,12 +7532,38 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         case VKD3D_SHADER_SV_STENCIL_REF:
             break;
 
+        case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
+            semantic_index_max = 4;
+            break;
+
+        case VKD3D_SHADER_SV_TESS_FACTOR_QUADINT:
+            semantic_index_max = 2;
+            break;
+
+        case VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE:
+            semantic_index_max = 3;
+            break;
+
+        case VKD3D_SHADER_SV_TESS_FACTOR_TRIINT:
+            semantic_index_max = 1;
+            break;
+
+        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDET:
+        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
+            semantic_index_max = 2;
+            break;
+
         default:
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                     "element %u of %s signature: Invalid system value semantic %#x.",
                     idx, signature_type_name, element->sysval_semantic);
             break;
     }
+
+    if (semantic_index_max != 0 && element->semantic_index >= semantic_index_max)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid semantic index %u for system value semantic %#x.",
+                idx, signature_type_name, element->semantic_index, element->sysval_semantic);
 
     if (element->sysval_semantic < ARRAY_SIZE(sysval_validation_data))
     {
