@@ -201,6 +201,14 @@ static void src_param_init_const_uint(struct vkd3d_shader_src_param *src, uint32
     src->reg.u.immconst_u32[0] = value;
 }
 
+static void vsir_src_param_init_io(struct vkd3d_shader_src_param *src,
+        enum vkd3d_shader_register_type reg_type, const struct signature_element *e, unsigned int idx_count)
+{
+    vsir_src_param_init(src, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
+    src->reg.dimension = VSIR_DIMENSION_VEC4;
+    src->swizzle = vsir_swizzle_from_writemask(e->mask);
+}
+
 void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
 {
     vsir_src_param_init(param, VKD3DSPR_LABEL, VKD3D_DATA_UNUSED, 1);
@@ -276,6 +284,14 @@ void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader
     param->write_mask = VKD3DSP_WRITEMASK_0;
     param->modifiers = VKD3DSPDM_NONE;
     param->shift = 0;
+}
+
+static void vsir_dst_param_init_io(struct vkd3d_shader_dst_param *dst, enum vkd3d_shader_register_type reg_type,
+        const struct signature_element *e, unsigned int idx_count)
+{
+    vsir_dst_param_init(dst, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
+    dst->reg.dimension = VSIR_DIMENSION_VEC4;
+    dst->write_mask = e->mask;
 }
 
 static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
@@ -1370,26 +1386,17 @@ static void shader_dst_param_normalise_outpointid(struct vkd3d_shader_dst_param 
     }
 }
 
-static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param, const struct signature_element *e,
-        enum vkd3d_shader_register_type reg_type, unsigned int idx_count)
-{
-    param->write_mask = e->mask;
-    param->modifiers = 0;
-    param->shift = 0;
-    vsir_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
-}
-
 static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_point_normaliser *normaliser,
         const struct shader_signature *s, unsigned int input_control_point_count, unsigned int dst,
         const struct vkd3d_shader_location *location)
 {
     struct vkd3d_shader_instruction *ins;
-    struct vkd3d_shader_dst_param *param;
     const struct signature_element *e;
-    unsigned int i, count;
+    unsigned int i, count, stride = 0;
 
-    for (i = 0, count = 1; i < s->element_count; ++i)
-        count += !!s->elements[i].used_mask;
+    for (i = 0; i < s->element_count; ++i)
+        stride += !!s->elements[i].used_mask;
+    count = 2 + 3 * stride;
 
     if (!shader_instruction_array_reserve(&normaliser->instructions, normaliser->instructions.count + count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -1400,31 +1407,75 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 
     ins = &normaliser->instructions.elements[dst];
     vsir_instruction_init(ins, location, VKD3DSIH_HS_CONTROL_POINT_PHASE);
-    ins->flags = 1;
-    ++ins;
+
+    ins = &normaliser->instructions.elements[dst + 1 + 3 * stride];
+    vsir_instruction_init(ins, location, VKD3DSIH_RET);
+
+    ins = &normaliser->instructions.elements[dst + 1];
 
     for (i = 0; i < s->element_count; ++i)
     {
+        struct vkd3d_shader_instruction *ins_in, *ins_out, *ins_mov;
+        struct vkd3d_shader_dst_param *param_in, *param_out;
+
         e = &s->elements[i];
         if (!e->used_mask)
             continue;
 
+        ins_in = ins;
+        ins_out = &ins[stride];
+        ins_mov = &ins[2 * stride];
+
         if (e->sysval_semantic != VKD3D_SHADER_SV_NONE)
         {
-            vsir_instruction_init(ins, location, VKD3DSIH_DCL_INPUT_SIV);
-            param = &ins->declaration.register_semantic.reg;
-            ins->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
+            vsir_instruction_init(ins_in, location, VKD3DSIH_DCL_INPUT_SIV);
+            param_in = &ins_in->declaration.register_semantic.reg;
+            ins_in->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
+
+            vsir_instruction_init(ins_out, location, VKD3DSIH_DCL_OUTPUT_SIV);
+            param_out = &ins_out->declaration.register_semantic.reg;
+            ins_out->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
         }
         else
         {
-            vsir_instruction_init(ins, location, VKD3DSIH_DCL_INPUT);
-            param = &ins->declaration.dst;
+            vsir_instruction_init(ins_in, location, VKD3DSIH_DCL_INPUT);
+            param_in = &ins_in->declaration.dst;
+
+            vsir_instruction_init(ins_out, location, VKD3DSIH_DCL_OUTPUT);
+            param_out = &ins_out->declaration.dst;
         }
 
-        shader_dst_param_io_init(param, e, VKD3DSPR_INPUT, 2);
-        param->reg.idx[0].offset = input_control_point_count;
-        param->reg.idx[1].offset = e->register_index;
-        param->write_mask = e->mask;
+        vsir_dst_param_init_io(param_in, VKD3DSPR_INPUT, e, 2);
+        param_in->reg.idx[0].offset = input_control_point_count;
+        param_in->reg.idx[1].offset = e->register_index;
+        param_in->write_mask = e->mask;
+
+        vsir_dst_param_init_io(param_out, VKD3DSPR_OUTPUT, e, 2);
+        param_out->reg.idx[0].offset = input_control_point_count;
+        param_out->reg.idx[1].offset = e->register_index;
+        param_out->write_mask = e->mask;
+
+        vsir_instruction_init(ins_mov, location, VKD3DSIH_MOV);
+        ins_mov->dst = shader_dst_param_allocator_get(&normaliser->instructions.dst_params, 1);
+        ins_mov->dst_count = 1;
+        ins_mov->src = shader_src_param_allocator_get(&normaliser->instructions.src_params, 1);
+        ins_mov->src_count = 1;
+
+        if (!ins_mov->dst || ! ins_mov->src)
+        {
+            WARN("Failed to allocate dst/src param.\n");
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+
+        vsir_dst_param_init_io(&ins_mov->dst[0], VKD3DSPR_OUTPUT, e, 2);
+        ins_mov->dst[0].reg.idx[0].offset = 0;
+        ins_mov->dst[0].reg.idx[0].rel_addr = normaliser->outpointid_param;
+        ins_mov->dst[0].reg.idx[1].offset = e->register_index;
+
+        vsir_src_param_init_io(&ins_mov->src[0], VKD3DSPR_INPUT, e, 2);
+        ins_mov->src[0].reg.idx[0].offset = 0;
+        ins_mov->src[0].reg.idx[0].rel_addr = normaliser->outpointid_param;
+        ins_mov->src[0].reg.idx[1].offset = e->register_index;
 
         ++ins;
     }
