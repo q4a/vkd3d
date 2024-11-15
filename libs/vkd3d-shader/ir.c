@@ -743,6 +743,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_DCL_GLOBAL_FLAGS:
             case VKD3DSIH_DCL_SAMPLER:
             case VKD3DSIH_DCL_TEMPS:
+            case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
             case VKD3DSIH_DCL_THREAD_GROUP:
             case VKD3DSIH_DCL_UAV_TYPED:
                 vkd3d_shader_instruction_make_nop(ins);
@@ -7846,6 +7847,11 @@ static void vsir_validate_dcl_tessellator_domain(struct validation_context *ctx,
             || instruction->declaration.tessellator_domain >= VKD3D_TESSELLATOR_DOMAIN_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
                 "Tessellator domain %#x is invalid.", instruction->declaration.tessellator_domain);
+
+    if (instruction->declaration.tessellator_domain != ctx->program->tess_domain)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                "DCL_TESSELLATOR_DOMAIN argument %#x doesn't match the shader tessellator domain %#x.",
+                instruction->declaration.tessellator_domain, ctx->program->tess_domain);
 }
 
 static void vsir_validate_dcl_tessellator_output_primitive(struct validation_context *ctx,
@@ -8238,12 +8244,20 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
     {
         case VKD3D_SHADER_TYPE_HULL:
         case VKD3D_SHADER_TYPE_DOMAIN:
+            if (program->tess_domain == VKD3D_TESSELLATOR_DOMAIN_INVALID
+                    || program->tess_domain >= VKD3D_TESSELLATOR_DOMAIN_COUNT)
+                validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                        "Invalid tessellation domain %#x.", program->tess_domain);
             break;
 
         default:
             if (program->patch_constant_signature.element_count != 0)
                 validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                         "Patch constant signature is only valid for hull and domain shaders.");
+
+            if (program->tess_domain != VKD3D_TESSELLATOR_DOMAIN_INVALID)
+                validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                        "Invalid tessellation domain %#x.", program->tess_domain);
     }
 
     switch (program->shader_version.type)
