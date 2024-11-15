@@ -38,33 +38,33 @@ static struct resource *metal_runner_create_resource(struct shader_runner *r, co
     init_resource(resource, params);
 
     return resource;
-};
+}
 
 static void metal_runner_destroy_resource(struct shader_runner *r, struct resource *res)
 {
     free(res);
-};
+}
 
 static bool metal_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
 {
     return false;
-};
+}
 
 static void metal_runner_clear(struct shader_runner *r, struct resource *res, const struct vec4 *clear_value)
 {
     return;
-};
+}
 
 static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY primitive_topology,
         unsigned int vertex_count, unsigned int instance_count)
 {
     return false;
-};
+}
 
 static bool metal_runner_copy(struct shader_runner *r, struct resource *src, struct resource *dst)
 {
     return false;
-};
+}
 
 static struct resource_readback *metal_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
