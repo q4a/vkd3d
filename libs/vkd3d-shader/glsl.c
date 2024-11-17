@@ -1507,12 +1507,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             shader_glsl_dcl_indexable_temp(gen, ins);
             break;
-        case VKD3DSIH_DCL_INPUT:
-        case VKD3DSIH_DCL_INPUT_PS:
         case VKD3DSIH_DCL_INPUT_PS_SGV:
         case VKD3DSIH_DCL_INPUT_PS_SIV:
         case VKD3DSIH_DCL_INPUT_SGV:
-        case VKD3DSIH_DCL_OUTPUT:
         case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
             break;

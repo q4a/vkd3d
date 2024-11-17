@@ -2547,6 +2547,33 @@ static void trace_signature(const struct shader_signature *signature, const char
     vkd3d_string_buffer_cleanup(&buffer);
 }
 
+static void trace_io_declarations(const struct vsir_program *program)
+{
+    struct vkd3d_string_buffer buffer;
+    bool empty = true;
+    unsigned int i;
+
+    vkd3d_string_buffer_init(&buffer);
+
+    vkd3d_string_buffer_printf(&buffer, "Input/output declarations:");
+
+    for (i = 0; i < sizeof(program->io_dcls) * CHAR_BIT; ++i)
+    {
+        if (bitmap_is_set(program->io_dcls, i))
+        {
+            empty = false;
+            vkd3d_string_buffer_printf(&buffer, " %u", i);
+        }
+    }
+
+    if (empty)
+        vkd3d_string_buffer_printf(&buffer, " empty");
+
+    TRACE("%s\n", buffer.buffer);
+
+    vkd3d_string_buffer_cleanup(&buffer);
+}
+
 void vsir_program_trace(const struct vsir_program *program)
 {
     const unsigned int flags = VSIR_ASM_FLAG_DUMP_TYPES | VSIR_ASM_FLAG_DUMP_ALL_INDICES;
@@ -2556,6 +2583,7 @@ void vsir_program_trace(const struct vsir_program *program)
     trace_signature(&program->input_signature, "Input");
     trace_signature(&program->output_signature, "Output");
     trace_signature(&program->patch_constant_signature, "Patch-constant");
+    trace_io_declarations(program);
 
     if (d3d_asm_compile(program, NULL, &code, flags) != VKD3D_OK)
         return;

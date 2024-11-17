@@ -1433,6 +1433,7 @@ struct vsir_program
     enum vsir_control_flow_type cf_type;
     enum vsir_normalisation_level normalisation_level;
     enum vkd3d_tessellator_domain tess_domain;
+    uint32_t io_dcls[VKD3D_BITMAP_SIZE(VKD3DSPR_COUNT)];
 
     const char **block_names;
     size_t block_name_count;

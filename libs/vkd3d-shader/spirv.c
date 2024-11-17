@@ -5801,16 +5801,6 @@ static void spirv_compiler_emit_shader_epilogue_function(struct spirv_compiler *
     compiler->epilogue_function_id = 0;
 }
 
-static void spirv_compiler_emit_hull_shader_builtins(struct spirv_compiler *compiler)
-{
-    struct vkd3d_shader_dst_param dst;
-
-    memset(&dst, 0, sizeof(dst));
-    vsir_register_init(&dst.reg, VKD3DSPR_OUTPOINTID, VKD3D_DATA_FLOAT, 0);
-    dst.write_mask = VKD3DSP_WRITEMASK_0;
-    spirv_compiler_emit_io_register(compiler, &dst);
-}
-
 static void spirv_compiler_emit_initial_declarations(struct spirv_compiler *compiler)
 {
     const struct vkd3d_shader_transform_feedback_info *xfb_info = compiler->xfb_info;
@@ -5823,7 +5813,6 @@ static void spirv_compiler_emit_initial_declarations(struct spirv_compiler *comp
             break;
         case VKD3D_SHADER_TYPE_HULL:
             vkd3d_spirv_set_execution_model(builder, SpvExecutionModelTessellationControl);
-            spirv_compiler_emit_hull_shader_builtins(compiler);
             break;
         case VKD3D_SHADER_TYPE_DOMAIN:
             vkd3d_spirv_set_execution_model(builder, SpvExecutionModelTessellationEvaluation);
@@ -6641,27 +6630,6 @@ static void spirv_compiler_emit_dcl_tgsm_structured(struct spirv_compiler *compi
     unsigned int stride = tgsm_structured->byte_stride / 4;
     spirv_compiler_emit_workgroup_memory(compiler, &tgsm_structured->reg.reg, tgsm_structured->alignment,
             tgsm_structured->structure_count * stride, stride, tgsm_structured->zero_init);
-}
-
-static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_dst_param *dst = &instruction->declaration.dst;
-
-    /* INPUT and PATCHCONST are handled in spirv_compiler_emit_io_declarations().
-     * OUTPOINTID is handled in spirv_compiler_emit_hull_shader_builtins(). */
-    if (dst->reg.type != VKD3DSPR_INPUT && dst->reg.type != VKD3DSPR_PATCHCONST
-            && dst->reg.type != VKD3DSPR_OUTPOINTID)
-        spirv_compiler_emit_io_register(compiler, dst);
-}
-
-static void spirv_compiler_emit_dcl_output(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_dst_param *dst = &instruction->declaration.dst;
-
-    if (dst->reg.type != VKD3DSPR_OUTPUT && dst->reg.type != VKD3DSPR_PATCHCONST)
-        spirv_compiler_emit_io_register(compiler, dst);
 }
 
 static void spirv_compiler_emit_dcl_stream(struct spirv_compiler *compiler,
@@ -10089,13 +10057,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_TGSM_STRUCTURED:
             spirv_compiler_emit_dcl_tgsm_structured(compiler, instruction);
             break;
-        case VKD3DSIH_DCL_INPUT_PS:
-        case VKD3DSIH_DCL_INPUT:
-            spirv_compiler_emit_dcl_input(compiler, instruction);
-            break;
-        case VKD3DSIH_DCL_OUTPUT:
-            spirv_compiler_emit_dcl_output(compiler, instruction);
-            break;
         case VKD3DSIH_DCL_STREAM:
             spirv_compiler_emit_dcl_stream(compiler, instruction);
             break;
@@ -10458,6 +10419,8 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
 
 static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
 {
+    struct vkd3d_shader_dst_param dst;
+
     for (unsigned int i = 0; i < compiler->input_signature.element_count; ++i)
         spirv_compiler_emit_input(compiler, VKD3DSPR_INPUT, i);
 
@@ -10481,8 +10444,6 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
 
     if (compiler->program->has_point_size)
     {
-        struct vkd3d_shader_dst_param dst;
-
         vsir_dst_param_init(&dst, VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
         dst.reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
         spirv_compiler_emit_io_register(compiler, &dst);
@@ -10490,10 +10451,20 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
 
     if (compiler->program->has_point_coord)
     {
-        struct vkd3d_shader_dst_param dst;
-
         vsir_dst_param_init(&dst, VKD3DSPR_POINT_COORD, VKD3D_DATA_FLOAT, 0);
         spirv_compiler_emit_io_register(compiler, &dst);
+    }
+
+    for (unsigned int i = 0; i < sizeof(compiler->program->io_dcls) * CHAR_BIT; ++i)
+    {
+        /* For hull shaders we internally generate references to OUTPOINTID,
+         * so that must always be enabled. */
+        if (bitmap_is_set(compiler->program->io_dcls, i)
+                || (compiler->program->shader_version.type == VKD3D_SHADER_TYPE_HULL && i == VKD3DSPR_OUTPOINTID))
+        {
+            vsir_dst_param_init(&dst, i, VKD3D_DATA_FLOAT, 0);
+            spirv_compiler_emit_io_register(compiler, &dst);
+        }
     }
 }
 
