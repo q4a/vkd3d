@@ -9561,6 +9561,173 @@ static void sm4_generate_vsir_add_dcl_sampler(struct hlsl_ctx *ctx,
     }
 }
 
+static enum vkd3d_shader_resource_type sm4_generate_vsir_get_resource_type(const struct hlsl_type *type)
+{
+    switch (type->sampler_dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_1D;
+        case HLSL_SAMPLER_DIM_2D:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+        case HLSL_SAMPLER_DIM_3D:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_3D;
+        case HLSL_SAMPLER_DIM_CUBE:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_CUBE;
+        case HLSL_SAMPLER_DIM_1DARRAY:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY;
+        case HLSL_SAMPLER_DIM_2DARRAY:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY;
+        case HLSL_SAMPLER_DIM_2DMS:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_2DMS;
+        case HLSL_SAMPLER_DIM_2DMSARRAY:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY;
+        case HLSL_SAMPLER_DIM_CUBEARRAY:
+            return VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY;
+        case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_RAW_BUFFER:
+        case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
+            return VKD3D_SHADER_RESOURCE_BUFFER;
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static enum vkd3d_data_type sm4_generate_vsir_get_format_type(const struct hlsl_type *type)
+{
+    const struct hlsl_type *format = type->e.resource.format;
+
+    switch (format->e.numeric.type)
+    {
+        case HLSL_TYPE_DOUBLE:
+            return VKD3D_DATA_DOUBLE;
+
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+            if (format->modifiers & HLSL_MODIFIER_UNORM)
+                return VKD3D_DATA_UNORM;
+            if (format->modifiers & HLSL_MODIFIER_SNORM)
+                return VKD3D_DATA_SNORM;
+            return VKD3D_DATA_FLOAT;
+
+        case HLSL_TYPE_INT:
+            return VKD3D_DATA_INT;
+            break;
+
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_UINT:
+            return VKD3D_DATA_UINT;
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct extern_resource *resource,
+        bool uav)
+{
+    enum hlsl_regset regset = uav ? HLSL_REGSET_UAVS : HLSL_REGSET_TEXTURES;
+    struct vkd3d_shader_structured_resource *structured_resource;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_semantic *semantic;
+    struct vkd3d_shader_instruction *ins;
+    struct hlsl_type *component_type;
+    enum vkd3d_shader_opcode opcode;
+    bool multisampled;
+    unsigned int i, j;
+
+    VKD3D_ASSERT(resource->regset == regset);
+    VKD3D_ASSERT(hlsl_version_lt(ctx, 5, 1) || resource->bind_count == 1);
+
+    component_type = resource->component_type;
+
+    for (i = 0; i < resource->bind_count; ++i)
+    {
+        unsigned int array_first = resource->index + i;
+        unsigned int array_last = resource->index + i; /* FIXME: array end. */
+
+        if (resource->var && !resource->var->objects_usage[regset][i].used)
+            continue;
+
+        if (uav)
+        {
+            switch (component_type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
+                    opcode = VKD3DSIH_DCL_UAV_STRUCTURED;
+                    break;
+                case HLSL_SAMPLER_DIM_RAW_BUFFER:
+                    opcode = VKD3DSIH_DCL_UAV_RAW;
+                    break;
+                default:
+                    opcode = VKD3DSIH_DCL_UAV_TYPED;
+                    break;
+            }
+        }
+        else
+        {
+            switch (component_type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_RAW_BUFFER:
+                    opcode = VKD3DSIH_DCL_RESOURCE_RAW;
+                    break;
+                default:
+                    opcode = VKD3DSIH_DCL;
+                    break;
+            }
+        }
+
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &resource->loc, opcode, 0, 0)))
+        {
+            ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+            return;
+        }
+        semantic = &ins->declaration.semantic;
+        structured_resource = &ins->declaration.structured_resource;
+        dst_param = &semantic->resource.reg;
+        vsir_dst_param_init(dst_param, uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VKD3D_DATA_UNUSED, 0);
+
+        if (uav && component_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+            structured_resource->byte_stride = 4 * component_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC];
+        if (uav && component_type->e.resource.rasteriser_ordered)
+            ins->flags = VKD3DSUF_RASTERISER_ORDERED_VIEW;
+
+        multisampled = component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
+                || component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY;
+
+        if (!hlsl_version_ge(ctx, 4, 1) && multisampled && !component_type->sample_count)
+        {
+            hlsl_error(ctx, &resource->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Multisampled texture object declaration needs sample count for profile %u.%u.",
+                    ctx->profile->major_version, ctx->profile->minor_version);
+        }
+
+        for (j = 0; j < 4; ++j)
+            semantic->resource_data_type[j] = sm4_generate_vsir_get_format_type(component_type);
+
+        semantic->resource.range.first = array_first;
+        semantic->resource.range.last = array_last;
+        semantic->resource.range.space = resource->space;
+
+        dst_param->reg.idx[0].offset = resource->id;
+        dst_param->reg.idx[1].offset = array_first;
+        dst_param->reg.idx[2].offset = array_last;
+        dst_param->reg.idx_count = 3;
+
+        ins->resource_type = sm4_generate_vsir_get_resource_type(resource->component_type);
+        if (resource->component_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+            ins->raw = true;
+        if (resource->component_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+        {
+            ins->structured = true;
+            ins->resource_stride = 4 * component_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC];
+        }
+
+        if (multisampled)
+            semantic->sample_count = component_type->sample_count;
+    }
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program, so it can be used as input to tpf_compile() without relying
  * on ctx and entry_func. */
@@ -9599,6 +9766,10 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
 
         if (resource->regset == HLSL_REGSET_SAMPLERS)
             sm4_generate_vsir_add_dcl_sampler(ctx, program, resource);
+        else if (resource->regset == HLSL_REGSET_TEXTURES)
+            sm4_generate_vsir_add_dcl_texture(ctx, program, resource, false);
+        else if (resource->regset == HLSL_REGSET_UAVS)
+            sm4_generate_vsir_add_dcl_texture(ctx, program, resource, true);
     }
     sm4_free_extern_resources(extern_resources, extern_resources_count);
 
