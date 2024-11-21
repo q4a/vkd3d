@@ -8098,6 +8098,29 @@ static void vsir_validate_dcl_input_siv(struct validation_context *ctx,
     }
 }
 
+static void vsir_validate_dcl_output(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    switch (instruction->declaration.dst.reg.type)
+    {
+        /* Signature output registers. */
+        case VKD3DSPR_OUTPUT:
+        case VKD3DSPR_PATCHCONST:
+        /* Non-signature output registers. */
+        case VKD3DSPR_DEPTHOUT:
+        case VKD3DSPR_SAMPLEMASK:
+        case VKD3DSPR_DEPTHOUTGE:
+        case VKD3DSPR_DEPTHOUTLE:
+        case VKD3DSPR_OUTSTENCILREF:
+            break;
+
+        default:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Invalid register type %#x in instruction DCL_OUTPUT.",
+                    instruction->declaration.dst.reg.type);
+    }
+}
+
 static void vsir_validate_dcl_output_control_point_count(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -8410,6 +8433,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_DCL_INPUT_PS_SIV] =                 {0,   0, vsir_validate_dcl_input_ps_siv},
     [VKD3DSIH_DCL_INPUT_SGV] =                    {0,   0, vsir_validate_dcl_input_sgv},
     [VKD3DSIH_DCL_INPUT_SIV] =                    {0,   0, vsir_validate_dcl_input_siv},
+    [VKD3DSIH_DCL_OUTPUT] =                       {0,   0, vsir_validate_dcl_output},
     [VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT] =   {0,   0, vsir_validate_dcl_output_control_point_count},
     [VKD3DSIH_DCL_OUTPUT_TOPOLOGY] =              {0,   0, vsir_validate_dcl_output_topology},
     [VKD3DSIH_DCL_TEMPS] =                        {0,   0, vsir_validate_dcl_temps},
