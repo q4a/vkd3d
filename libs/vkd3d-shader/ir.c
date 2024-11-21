@@ -7189,6 +7189,10 @@ static void vsir_validate_register(struct validation_context *ctx,
             vsir_validate_register_without_indices(ctx, reg);
             break;
 
+        case VKD3DSPR_PRIMID:
+            vsir_validate_register_without_indices(ctx, reg);
+            break;
+
         case VKD3DSPR_NULL:
             vsir_validate_register_without_indices(ctx, reg);
             break;
