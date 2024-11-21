@@ -8130,6 +8130,22 @@ static void vsir_validate_dcl_output_control_point_count(struct validation_conte
                 instruction->declaration.count);
 }
 
+static void vsir_validate_dcl_output_siv(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    switch (instruction->declaration.register_semantic.reg.reg.type)
+    {
+        case VKD3DSPR_OUTPUT:
+        case VKD3DSPR_PATCHCONST:
+            break;
+
+        default:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Invalid register type %#x in instruction DCL_OUTPUT_SIV.",
+                    instruction->declaration.register_semantic.reg.reg.type);
+    }
+}
+
 static void vsir_validate_dcl_output_topology(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -8435,6 +8451,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_DCL_INPUT_SIV] =                    {0,   0, vsir_validate_dcl_input_siv},
     [VKD3DSIH_DCL_OUTPUT] =                       {0,   0, vsir_validate_dcl_output},
     [VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT] =   {0,   0, vsir_validate_dcl_output_control_point_count},
+    [VKD3DSIH_DCL_OUTPUT_SIV] =                   {0,   0, vsir_validate_dcl_output_siv},
     [VKD3DSIH_DCL_OUTPUT_TOPOLOGY] =              {0,   0, vsir_validate_dcl_output_topology},
     [VKD3DSIH_DCL_TEMPS] =                        {0,   0, vsir_validate_dcl_temps},
     [VKD3DSIH_DCL_TESSELLATOR_DOMAIN] =           {0,   0, vsir_validate_dcl_tessellator_domain},
