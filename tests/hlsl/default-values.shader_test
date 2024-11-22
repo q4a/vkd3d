@@ -111,7 +111,7 @@ if(sm<4)  uniform 8 float4 70 90 0 0
 if(sm<4)  uniform 12 float4 80 100 0 0
 if(sm>=4) uniform 8 int4 70 90 0 0
 if(sm>=4) uniform 12 int4 80 100 0 0
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (70, 80, 90, 100)
 
 
@@ -216,7 +216,7 @@ if(sm<4)  uniform 8 float4 70 90 0 0
 if(sm<4)  uniform 12 float4 80 100 0 0
 if(sm>=4) uniform 8 int4 70 90 0 0
 if(sm>=4) uniform 12 int4 80 100 0 0
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (70, 80, 90, 100)
 
 

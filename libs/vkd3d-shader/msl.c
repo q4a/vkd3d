@@ -425,6 +425,25 @@ static void msl_relop(struct msl_generator *gen, const struct vkd3d_shader_instr
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void msl_cast(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *constructor)
+{
+    unsigned int component_count;
+    struct msl_src src;
+    struct msl_dst dst;
+    uint32_t mask;
+
+    mask = msl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    msl_src_init(&src, gen, &ins->src[0], mask);
+
+    if ((component_count = vsir_write_mask_component_count(mask)) > 1)
+        msl_print_assignment(gen, &dst, "%s%u(%s)", constructor, component_count, src.str->buffer);
+    else
+        msl_print_assignment(gen, &dst, "%s(%s)", constructor, src.str->buffer);
+
+    msl_src_cleanup(&src, &gen->string_buffers);
+    msl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void msl_mov(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct msl_src src;
@@ -500,6 +519,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:
             msl_relop(gen, ins, "!=");
+            break;
+        case VKD3DSIH_ITOF:
+            msl_cast(gen, ins, "float");
             break;
         case VKD3DSIH_MOV:
             msl_mov(gen, ins);
