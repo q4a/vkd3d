@@ -1271,12 +1271,6 @@ static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normal
         vkd3d_shader_instruction_make_nop(ins);
         return;
     }
-    else if (ins->opcode == VKD3DSIH_DCL_INPUT && shader_register_is_phase_instance_id(
-            &ins->declaration.dst.reg))
-    {
-        vkd3d_shader_instruction_make_nop(ins);
-        return;
-    }
 
     if (normaliser->phase == VKD3DSIH_INVALID || vsir_instruction_is_dcl(ins))
         return;
@@ -9257,6 +9251,7 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
     };
 
     vsir_transform(&ctx, vsir_program_lower_instructions);
+    vsir_transform(&ctx, vsir_program_remove_io_decls);
 
     if (program->shader_version.major >= 6)
     {
@@ -9265,7 +9260,6 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_structurize);
         vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
         vsir_transform(&ctx, vsir_program_materialize_undominated_ssas_to_temps);
-        vsir_transform(&ctx, vsir_program_remove_io_decls);
     }
     else
     {
@@ -9280,7 +9274,6 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
         if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
             vsir_transform(&ctx, vsir_program_flatten_hull_shader_phases);
 
-        vsir_transform(&ctx, vsir_program_remove_io_decls);
         vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
         vsir_transform(&ctx, vsir_program_normalise_flat_constants);
