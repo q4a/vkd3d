@@ -513,6 +513,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_FRC:
             msl_intrinsic(gen, ins, "fract");
             break;
+        case VKD3DSIH_FTOI:
+            msl_cast(gen, ins, "int");
+            break;
         case VKD3DSIH_GEO:
             msl_relop(gen, ins, ">=");
             break;
