@@ -451,6 +451,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_MOV:
             msl_mov(gen, ins);
             break;
+        case VKD3DSIH_MUL:
+            msl_binop(gen, ins, "*");
+            break;
         case VKD3DSIH_RET:
             msl_ret(gen, ins);
             break;
