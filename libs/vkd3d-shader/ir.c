@@ -1433,11 +1433,10 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 {
     struct vkd3d_shader_instruction *ins;
     const struct signature_element *e;
-    unsigned int i, count, stride = 0;
+    unsigned int i, count = 2;
 
     for (i = 0; i < s->element_count; ++i)
-        stride += !!s->elements[i].used_mask;
-    count = 2 + 3 * stride;
+        count += !!s->elements[i].used_mask;
 
     if (!shader_instruction_array_reserve(&normaliser->instructions, normaliser->instructions.count + count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -1449,77 +1448,42 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
     ins = &normaliser->instructions.elements[dst];
     vsir_instruction_init(ins, location, VKD3DSIH_HS_CONTROL_POINT_PHASE);
 
-    ins = &normaliser->instructions.elements[dst + 1 + 3 * stride];
-    vsir_instruction_init(ins, location, VKD3DSIH_RET);
-
-    ins = &normaliser->instructions.elements[dst + 1];
+    ++ins;
 
     for (i = 0; i < s->element_count; ++i)
     {
-        struct vkd3d_shader_instruction *ins_in, *ins_out, *ins_mov;
-        struct vkd3d_shader_dst_param *param_in, *param_out;
-
         e = &s->elements[i];
         if (!e->used_mask)
             continue;
 
-        ins_in = ins;
-        ins_out = &ins[stride];
-        ins_mov = &ins[2 * stride];
+        vsir_instruction_init(ins, location, VKD3DSIH_MOV);
+        ins->dst = shader_dst_param_allocator_get(&normaliser->instructions.dst_params, 1);
+        ins->dst_count = 1;
+        ins->src = shader_src_param_allocator_get(&normaliser->instructions.src_params, 1);
+        ins->src_count = 1;
 
-        if (e->sysval_semantic != VKD3D_SHADER_SV_NONE)
-        {
-            vsir_instruction_init(ins_in, location, VKD3DSIH_DCL_INPUT_SIV);
-            param_in = &ins_in->declaration.register_semantic.reg;
-            ins_in->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
-
-            vsir_instruction_init(ins_out, location, VKD3DSIH_DCL_OUTPUT_SIV);
-            param_out = &ins_out->declaration.register_semantic.reg;
-            ins_out->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
-        }
-        else
-        {
-            vsir_instruction_init(ins_in, location, VKD3DSIH_DCL_INPUT);
-            param_in = &ins_in->declaration.dst;
-
-            vsir_instruction_init(ins_out, location, VKD3DSIH_DCL_OUTPUT);
-            param_out = &ins_out->declaration.dst;
-        }
-
-        vsir_dst_param_init_io(param_in, VKD3DSPR_INPUT, e, 2);
-        param_in->reg.idx[0].offset = input_control_point_count;
-        param_in->reg.idx[1].offset = e->register_index;
-        param_in->write_mask = e->mask;
-
-        vsir_dst_param_init_io(param_out, VKD3DSPR_OUTPUT, e, 2);
-        param_out->reg.idx[0].offset = input_control_point_count;
-        param_out->reg.idx[1].offset = e->register_index;
-        param_out->write_mask = e->mask;
-
-        vsir_instruction_init(ins_mov, location, VKD3DSIH_MOV);
-        ins_mov->dst = shader_dst_param_allocator_get(&normaliser->instructions.dst_params, 1);
-        ins_mov->dst_count = 1;
-        ins_mov->src = shader_src_param_allocator_get(&normaliser->instructions.src_params, 1);
-        ins_mov->src_count = 1;
-
-        if (!ins_mov->dst || ! ins_mov->src)
+        if (!ins->dst || ! ins->src)
         {
             WARN("Failed to allocate dst/src param.\n");
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
 
-        vsir_dst_param_init_io(&ins_mov->dst[0], VKD3DSPR_OUTPUT, e, 2);
-        ins_mov->dst[0].reg.idx[0].offset = 0;
-        ins_mov->dst[0].reg.idx[0].rel_addr = normaliser->outpointid_param;
-        ins_mov->dst[0].reg.idx[1].offset = e->register_index;
+        vsir_dst_param_init_io(&ins->dst[0], VKD3DSPR_OUTPUT, e, 2);
+        ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+        ins->dst[0].reg.idx[0].offset = 0;
+        ins->dst[0].reg.idx[0].rel_addr = normaliser->outpointid_param;
+        ins->dst[0].reg.idx[1].offset = e->register_index;
 
-        vsir_src_param_init_io(&ins_mov->src[0], VKD3DSPR_INPUT, e, 2);
-        ins_mov->src[0].reg.idx[0].offset = 0;
-        ins_mov->src[0].reg.idx[0].rel_addr = normaliser->outpointid_param;
-        ins_mov->src[0].reg.idx[1].offset = e->register_index;
+        vsir_src_param_init_io(&ins->src[0], VKD3DSPR_INPUT, e, 2);
+        ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+        ins->src[0].reg.idx[0].offset = 0;
+        ins->src[0].reg.idx[0].rel_addr = normaliser->outpointid_param;
+        ins->src[0].reg.idx[1].offset = e->register_index;
 
         ++ins;
     }
+
+    vsir_instruction_init(ins, location, VKD3DSIH_RET);
 
     return VKD3D_OK;
 }
@@ -9316,8 +9280,8 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
         if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
             vsir_transform(&ctx, vsir_program_flatten_hull_shader_phases);
 
-        vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
         vsir_transform(&ctx, vsir_program_remove_io_decls);
+        vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
         vsir_transform(&ctx, vsir_program_normalise_flat_constants);
         vsir_transform(&ctx, vsir_program_remove_dead_code);
