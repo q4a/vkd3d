@@ -81,6 +81,8 @@ static MTLVertexFormat get_metal_attribute_format(DXGI_FORMAT format)
 {
     switch (format)
     {
+        case DXGI_FORMAT_R32G32B32A32_FLOAT:
+            return MTLVertexFormatFloat4;
         case DXGI_FORMAT_R32G32_FLOAT:
             return MTLVertexFormatFloat2;
         default:
@@ -94,6 +96,8 @@ static MTLPrimitiveType get_metal_primitive_type(D3D_PRIMITIVE_TOPOLOGY topology
     {
         case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST:
             return MTLPrimitiveTypeTriangle;
+        case D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP:
+            return MTLPrimitiveTypeTriangleStrip;
 
         default:
             fatal_error("Unhandled topology %#x.\n", topology);

@@ -768,13 +768,6 @@ static void msl_generate_input_struct_declarations(struct msl_generator *gen)
             continue;
         }
 
-        if (e->interpolation_mode != VKD3DSIM_NONE)
-        {
-            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-                    "Internal compiler error: Unhandled interpolation mode %#x.", e->interpolation_mode);
-            continue;
-        }
-
         if(e->register_count > 1)
         {
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
@@ -815,6 +808,18 @@ static void msl_generate_input_struct_declarations(struct msl_generator *gen)
             default:
                 msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                         "Internal compiler error: Unhandled shader type %#x.", type);
+                break;
+        }
+
+        switch (e->interpolation_mode)
+        {
+            /* The default interpolation attribute. */
+            case VKD3DSIM_LINEAR:
+            case VKD3DSIM_NONE:
+                break;
+            default:
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled interpolation mode %#x.", e->interpolation_mode);
                 break;
         }
 

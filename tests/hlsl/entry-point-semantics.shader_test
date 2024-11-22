@@ -36,7 +36,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 [pixel shader fail(sm>=6)]
@@ -46,7 +46,7 @@ float4 main(float tex : texcoord) : semantic : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 [pixel shader]
@@ -59,7 +59,7 @@ float4 main(float tex : texcoord) : sv_target
 float4 main(float tex : bogus) : bogus;
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 
@@ -95,7 +95,7 @@ float4 main(in apple a) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
 
 
@@ -112,7 +112,7 @@ float4 main(in apple a) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (10.0, 11.0, 30.0, 31.0)
 
 
@@ -136,7 +136,7 @@ float4 main(in apple aps[2][2]) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (10.0, 10.0, 20.0, 20.0)
 
 
@@ -158,7 +158,7 @@ float4 main(in banana bans[2]) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 todo(sm>=6) probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
 
 
@@ -222,7 +222,7 @@ float4 main(in float4 tex0 : TEXCOORD0, in float4 tex1 : TEXCOORD1) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
 
 
@@ -285,7 +285,7 @@ float4 main(in float4 t1 : TEXCOORD0, in float4 t2 : TEXCOORD0) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 todo(sm>=6) probe (0, 0) rgba (99.0, 99.0, 10.0, 11.0)
 
 
@@ -297,7 +297,7 @@ float4 main(in float4 a : TEXCOORD0, in float3 b : TEXCOORD1) : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
 
 
