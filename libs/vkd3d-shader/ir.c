@@ -2042,12 +2042,11 @@ static unsigned int shader_register_normalise_arrayed_addressing(struct vkd3d_sh
     return id_idx;
 }
 
-static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_param, bool is_io_dcl,
+static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_param,
          struct io_normaliser *normaliser)
  {
     unsigned int id_idx, reg_idx, write_mask, element_idx;
     struct vkd3d_shader_register *reg = &dst_param->reg;
-    struct vkd3d_shader_dst_param **dcl_params;
     const struct shader_signature *signature;
     const struct signature_element *e;
 
@@ -2063,26 +2062,22 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
                 /* Convert patch constant outputs to the patch constant register type to avoid the need
                  * to convert compiler symbols when accessed as inputs in a later stage. */
                 reg->type = VKD3DSPR_PATCHCONST;
-                dcl_params = normaliser->pc_dcl_params;
             }
             else
             {
                 signature = normaliser->output_signature;
-                dcl_params = normaliser->output_dcl_params;
             }
             break;
 
         case VKD3DSPR_PATCHCONST:
             reg_idx = reg->idx[reg->idx_count - 1].offset;
             signature = normaliser->patch_constant_signature;
-            dcl_params = normaliser->pc_dcl_params;
             break;
 
         case VKD3DSPR_COLOROUT:
             reg_idx = reg->idx[0].offset;
             signature = normaliser->output_signature;
             reg->type = VKD3DSPR_OUTPUT;
-            dcl_params = normaliser->output_dcl_params;
             break;
 
         case VKD3DSPR_INCONTROLPOINT:
@@ -2090,14 +2085,12 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
             reg_idx = reg->idx[reg->idx_count - 1].offset;
             signature = normaliser->input_signature;
             reg->type = VKD3DSPR_INPUT;
-            dcl_params = normaliser->input_dcl_params;
             break;
 
         case VKD3DSPR_ATTROUT:
             reg_idx = SM1_COLOR_REGISTER_OFFSET + reg->idx[0].offset;
             signature = normaliser->output_signature;
             reg->type = VKD3DSPR_OUTPUT;
-            dcl_params = normaliser->output_dcl_params;
             break;
 
         case VKD3DSPR_RASTOUT:
@@ -2107,7 +2100,6 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
             reg_idx = SM1_RASTOUT_REGISTER_OFFSET + reg->idx[0].offset;
             signature = normaliser->output_signature;
             reg->type = VKD3DSPR_OUTPUT;
-            dcl_params = normaliser->output_dcl_params;
             /* Fog and point size are scalar, but fxc/d3dcompiler emits a full
              * write mask when writing to them. */
             if (reg->idx[0].offset > 0)
@@ -2123,54 +2115,15 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
         vkd3d_unreachable();
     e = &signature->elements[element_idx];
 
-    if (is_io_dcl)
-    {
-        /* Validated in the TPF reader. */
-        VKD3D_ASSERT(element_idx < ARRAY_SIZE(normaliser->input_dcl_params));
-
-        if (dcl_params[element_idx])
-        {
-            /* Merge split declarations into a single one. */
-            dcl_params[element_idx]->write_mask |= dst_param->write_mask;
-            /* Turn this into a nop. */
-            return false;
-        }
-        else
-        {
-            dcl_params[element_idx] = dst_param;
-        }
-    }
-
     if (io_normaliser_is_in_control_point_phase(normaliser) && reg->type == VKD3DSPR_OUTPUT)
     {
-        if (is_io_dcl)
-        {
-            /* Emit an array size for the control points for consistency with inputs. */
-            reg->idx[0].offset = normaliser->output_control_point_count;
-        }
-        else
-        {
-            /* The control point id param. */
-            VKD3D_ASSERT(reg->idx[0].rel_addr);
-        }
+        /* The control point id param. */
+        VKD3D_ASSERT(reg->idx[0].rel_addr);
         id_idx = 1;
     }
 
     if ((e->register_count > 1 || vsir_sysval_semantic_is_tess_factor(e->sysval_semantic)))
-    {
-        if (is_io_dcl)
-        {
-            /* For control point I/O, idx 0 contains the control point count.
-             * Ensure it is moved up to the next slot. */
-            reg->idx[id_idx].offset = reg->idx[0].offset;
-            reg->idx[0].offset = e->register_count;
-            ++id_idx;
-        }
-        else
-        {
-            id_idx = shader_register_normalise_arrayed_addressing(reg, id_idx, e->register_index);
-        }
-    }
+        id_idx = shader_register_normalise_arrayed_addressing(reg, id_idx, e->register_index);
 
     /* Replace the register index with the signature element index */
     reg->idx[id_idx].offset = element_idx;
@@ -2264,37 +2217,10 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
 static void shader_instruction_normalise_io_params(struct vkd3d_shader_instruction *ins,
         struct io_normaliser *normaliser)
 {
-    struct vkd3d_shader_register *reg;
     unsigned int i;
 
     switch (ins->opcode)
     {
-        case VKD3DSIH_DCL_INPUT:
-            if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
-            {
-                reg = &ins->declaration.dst.reg;
-
-                /* We don't need to keep OUTCONTROLPOINT or PATCHCONST input declarations since their
-                * equivalents were declared earlier, but INCONTROLPOINT may be the first occurrence. */
-                if (reg->type == VKD3DSPR_OUTCONTROLPOINT || reg->type == VKD3DSPR_PATCHCONST)
-                    vkd3d_shader_instruction_make_nop(ins);
-                else if (reg->type == VKD3DSPR_INCONTROLPOINT)
-                    reg->type = VKD3DSPR_INPUT;
-            }
-            /* fall through */
-        case VKD3DSIH_DCL_INPUT_PS:
-        case VKD3DSIH_DCL_OUTPUT:
-            if (!shader_dst_param_io_normalise(&ins->declaration.dst, true, normaliser))
-                vkd3d_shader_instruction_make_nop(ins);
-            break;
-        case VKD3DSIH_DCL_INPUT_SGV:
-        case VKD3DSIH_DCL_INPUT_SIV:
-        case VKD3DSIH_DCL_INPUT_PS_SGV:
-        case VKD3DSIH_DCL_INPUT_PS_SIV:
-        case VKD3DSIH_DCL_OUTPUT_SIV:
-            if (!shader_dst_param_io_normalise(&ins->declaration.register_semantic.reg, true, normaliser))
-                vkd3d_shader_instruction_make_nop(ins);
-            break;
         case VKD3DSIH_HS_CONTROL_POINT_PHASE:
         case VKD3DSIH_HS_FORK_PHASE:
         case VKD3DSIH_HS_JOIN_PHASE:
@@ -2307,7 +2233,7 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
             if (vsir_instruction_is_dcl(ins))
                 break;
             for (i = 0; i < ins->dst_count; ++i)
-                shader_dst_param_io_normalise(&ins->dst[i], false, normaliser);
+                shader_dst_param_io_normalise(&ins->dst[i], normaliser);
             for (i = 0; i < ins->src_count; ++i)
                 shader_src_param_io_normalise(&ins->src[i], normaliser);
             break;
@@ -9375,6 +9301,7 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_structurize);
         vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
         vsir_transform(&ctx, vsir_program_materialize_undominated_ssas_to_temps);
+        vsir_transform(&ctx, vsir_program_remove_io_decls);
     }
     else
     {
@@ -9390,6 +9317,7 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
             vsir_transform(&ctx, vsir_program_flatten_hull_shader_phases);
 
         vsir_transform(&ctx, instruction_array_normalise_hull_shader_control_point_io);
+        vsir_transform(&ctx, vsir_program_remove_io_decls);
         vsir_transform(&ctx, vsir_program_normalise_io_registers);
         vsir_transform(&ctx, vsir_program_normalise_flat_constants);
         vsir_transform(&ctx, vsir_program_remove_dead_code);
@@ -9407,8 +9335,6 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
     vsir_transform(&ctx, vsir_program_insert_point_coord);
     vsir_transform(&ctx, vsir_program_insert_fragment_fog);
     vsir_transform(&ctx, vsir_program_insert_vertex_fog);
-
-    vsir_transform(&ctx, vsir_program_remove_io_decls);
 
     if (TRACE_ON())
         vsir_program_trace(program);
