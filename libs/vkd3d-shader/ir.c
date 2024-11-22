@@ -750,6 +750,76 @@ static enum vkd3d_result vsir_program_lower_texldd(struct vsir_program *program,
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_dcl_input(struct vsir_program *program,
+        struct vkd3d_shader_instruction *ins, struct vsir_transformation_context *ctx)
+{
+    switch (ins->declaration.dst.reg.type)
+    {
+        case VKD3DSPR_INPUT:
+        case VKD3DSPR_OUTPUT:
+        case VKD3DSPR_PATCHCONST:
+        case VKD3DSPR_INCONTROLPOINT:
+        case VKD3DSPR_OUTCONTROLPOINT:
+            break;
+
+        case VKD3DSPR_PRIMID:
+        case VKD3DSPR_FORKINSTID:
+        case VKD3DSPR_JOININSTID:
+        case VKD3DSPR_THREADID:
+        case VKD3DSPR_THREADGROUPID:
+        case VKD3DSPR_LOCALTHREADID:
+        case VKD3DSPR_LOCALTHREADINDEX:
+        case VKD3DSPR_COVERAGE:
+        case VKD3DSPR_TESSCOORD:
+        case VKD3DSPR_OUTPOINTID:
+        case VKD3DSPR_GSINSTID:
+        case VKD3DSPR_WAVELANECOUNT:
+        case VKD3DSPR_WAVELANEINDEX:
+            bitmap_set(program->io_dcls, ins->declaration.dst.reg.type);
+            break;
+
+        default:
+            vkd3d_shader_error(ctx->message_context, &ins->location,
+                    VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Internal compiler error: invalid register type %#x for DCL_INPUT.",
+                    ins->declaration.dst.reg.type);
+            return VKD3D_ERROR;
+    }
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_program_lower_dcl_output(struct vsir_program *program,
+        struct vkd3d_shader_instruction *ins, struct vsir_transformation_context *ctx)
+{
+    switch (ins->declaration.dst.reg.type)
+    {
+        case VKD3DSPR_INPUT:
+        case VKD3DSPR_OUTPUT:
+        case VKD3DSPR_PATCHCONST:
+        case VKD3DSPR_INCONTROLPOINT:
+        case VKD3DSPR_OUTCONTROLPOINT:
+            break;
+
+        case VKD3DSPR_DEPTHOUT:
+        case VKD3DSPR_SAMPLEMASK:
+        case VKD3DSPR_DEPTHOUTGE:
+        case VKD3DSPR_DEPTHOUTLE:
+        case VKD3DSPR_OUTSTENCILREF:
+            bitmap_set(program->io_dcls, ins->declaration.dst.reg.type);
+            break;
+
+        default:
+            vkd3d_shader_error(ctx->message_context, &ins->location,
+                    VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                    "Internal compiler error: invalid register type %#x for DCL_OUTPUT.",
+                    ins->declaration.dst.reg.type);
+            return VKD3D_ERROR;
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
@@ -787,6 +857,25 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
             case VKD3DSIH_DCL_THREAD_GROUP:
             case VKD3DSIH_DCL_UAV_TYPED:
+                vkd3d_shader_instruction_make_nop(ins);
+                break;
+
+            case VKD3DSIH_DCL_INPUT:
+                vsir_program_lower_dcl_input(program, ins, ctx);
+                vkd3d_shader_instruction_make_nop(ins);
+                break;
+
+            case VKD3DSIH_DCL_OUTPUT:
+                vsir_program_lower_dcl_output(program, ins, ctx);
+                vkd3d_shader_instruction_make_nop(ins);
+                break;
+
+            case VKD3DSIH_DCL_INPUT_SGV:
+            case VKD3DSIH_DCL_INPUT_SIV:
+            case VKD3DSIH_DCL_INPUT_PS:
+            case VKD3DSIH_DCL_INPUT_PS_SGV:
+            case VKD3DSIH_DCL_INPUT_PS_SIV:
+            case VKD3DSIH_DCL_OUTPUT_SIV:
                 vkd3d_shader_instruction_make_nop(ins);
                 break;
 
@@ -7027,89 +7116,6 @@ static enum vkd3d_result vsir_program_insert_vertex_fog(struct vsir_program *pro
     return VKD3D_OK;
 }
 
-static enum vkd3d_result vsir_program_remove_io_decls(struct vsir_program *program,
-        struct vsir_transformation_context *ctx)
-{
-    enum vkd3d_result ret = VKD3D_OK;
-    size_t i;
-
-    for (i = 0; i < program->instructions.count; ++i)
-    {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-
-        if (ins->opcode == VKD3DSIH_DCL_INPUT || ins->opcode == VKD3DSIH_DCL_INPUT_PS)
-        {
-            switch (ins->declaration.dst.reg.type)
-            {
-                case VKD3DSPR_INPUT:
-                case VKD3DSPR_OUTPUT:
-                case VKD3DSPR_PATCHCONST:
-                case VKD3DSPR_INCONTROLPOINT:
-                case VKD3DSPR_OUTCONTROLPOINT:
-                    break;
-
-                case VKD3DSPR_PRIMID:
-                case VKD3DSPR_FORKINSTID:
-                case VKD3DSPR_JOININSTID:
-                case VKD3DSPR_THREADID:
-                case VKD3DSPR_THREADGROUPID:
-                case VKD3DSPR_LOCALTHREADID:
-                case VKD3DSPR_LOCALTHREADINDEX:
-                case VKD3DSPR_COVERAGE:
-                case VKD3DSPR_TESSCOORD:
-                case VKD3DSPR_OUTPOINTID:
-                case VKD3DSPR_GSINSTID:
-                case VKD3DSPR_WAVELANECOUNT:
-                case VKD3DSPR_WAVELANEINDEX:
-                    bitmap_set(program->io_dcls, ins->declaration.dst.reg.type);
-                    break;
-
-                default:
-                    vkd3d_shader_error(ctx->message_context, &ins->location,
-                            VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                            "Internal compiler error: invalid register type %#x for input declaration.",
-                            ins->declaration.dst.reg.type);
-                    ret = VKD3D_ERROR;
-                    break;
-            }
-
-            vkd3d_shader_instruction_make_nop(ins);
-        }
-        else if (ins->opcode == VKD3DSIH_DCL_OUTPUT)
-        {
-            switch (ins->declaration.dst.reg.type)
-            {
-                case VKD3DSPR_INPUT:
-                case VKD3DSPR_OUTPUT:
-                case VKD3DSPR_PATCHCONST:
-                case VKD3DSPR_INCONTROLPOINT:
-                case VKD3DSPR_OUTCONTROLPOINT:
-                    break;
-
-                case VKD3DSPR_DEPTHOUT:
-                case VKD3DSPR_SAMPLEMASK:
-                case VKD3DSPR_DEPTHOUTGE:
-                case VKD3DSPR_DEPTHOUTLE:
-                case VKD3DSPR_OUTSTENCILREF:
-                    bitmap_set(program->io_dcls, ins->declaration.dst.reg.type);
-                    break;
-
-                default:
-                    vkd3d_shader_error(ctx->message_context, &ins->location,
-                            VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                            "Internal compiler error: invalid register type %#x for output declaration.",
-                            ins->declaration.dst.reg.type);
-                    ret = VKD3D_ERROR;
-                    break;
-            }
-
-            vkd3d_shader_instruction_make_nop(ins);
-        }
-    }
-
-    return ret;
-}
-
 struct validation_context
 {
     struct vkd3d_shader_message_context *message_context;
@@ -9251,7 +9257,6 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
     };
 
     vsir_transform(&ctx, vsir_program_lower_instructions);
-    vsir_transform(&ctx, vsir_program_remove_io_decls);
 
     if (program->shader_version.major >= 6)
     {
