@@ -445,6 +445,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_DCL_OUTPUT_SIV:
         case VKD3DSIH_NOP:
             break;
+        case VKD3DSIH_DIV:
+            msl_binop(gen, ins, "/");
+            break;
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:
             msl_relop(gen, ins, "!=");
