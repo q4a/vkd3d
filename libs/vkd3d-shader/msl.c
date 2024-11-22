@@ -440,6 +440,31 @@ static void msl_mov(struct msl_generator *gen, const struct vkd3d_shader_instruc
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void msl_movc(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    unsigned int component_count;
+    struct msl_src src[3];
+    struct msl_dst dst;
+    uint32_t mask;
+
+    mask = msl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    msl_src_init(&src[0], gen, &ins->src[0], mask);
+    msl_src_init(&src[1], gen, &ins->src[1], mask);
+    msl_src_init(&src[2], gen, &ins->src[2], mask);
+
+    if ((component_count = vsir_write_mask_component_count(mask)) > 1)
+        msl_print_assignment(gen, &dst, "select(%s, %s, bool%u(%s))",
+                src[2].str->buffer, src[1].str->buffer, component_count, src[0].str->buffer);
+    else
+        msl_print_assignment(gen, &dst, "select(%s, %s, bool(%s))",
+                src[2].str->buffer, src[1].str->buffer, src[0].str->buffer);
+
+    msl_src_cleanup(&src[2], &gen->string_buffers);
+    msl_src_cleanup(&src[1], &gen->string_buffers);
+    msl_src_cleanup(&src[0], &gen->string_buffers);
+    msl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void msl_ret(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     msl_print_indent(gen->buffer, gen->indent);
@@ -478,6 +503,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_MOV:
             msl_mov(gen, ins);
+            break;
+        case VKD3DSIH_MOVC:
+            msl_movc(gen, ins);
             break;
         case VKD3DSIH_MUL:
             msl_binop(gen, ins, "*");
