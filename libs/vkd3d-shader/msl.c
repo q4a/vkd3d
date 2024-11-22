@@ -387,6 +387,21 @@ static void msl_binop(struct msl_generator *gen, const struct vkd3d_shader_instr
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void msl_intrinsic(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *op)
+{
+    struct msl_src src;
+    struct msl_dst dst;
+    uint32_t mask;
+
+    mask = msl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    msl_src_init(&src, gen, &ins->src[0], mask);
+
+    msl_print_assignment(gen, &dst, "%s(%s)", op, src.str->buffer);
+
+    msl_src_cleanup(&src, &gen->string_buffers);
+    msl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void msl_relop(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *op)
 {
     unsigned int mask_size;
@@ -450,6 +465,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_DIV:
             msl_binop(gen, ins, "/");
+            break;
+        case VKD3DSIH_FRC:
+            msl_intrinsic(gen, ins, "fract");
             break;
         case VKD3DSIH_GEO:
             msl_relop(gen, ins, ">=");
