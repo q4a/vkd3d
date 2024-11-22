@@ -548,6 +548,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_ROUND_PI:
             msl_intrinsic(gen, ins, "ceil");
             break;
+        case VKD3DSIH_ROUND_Z:
+            msl_intrinsic(gen, ins, "trunc");
+            break;
         default:
             msl_unhandled(gen, ins);
             break;
