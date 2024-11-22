@@ -294,6 +294,9 @@ static void msl_src_init(struct msl_src *msl_src, struct msl_generator *gen,
     {
         case VKD3DSPSM_NONE:
             break;
+        case VKD3DSPSM_NEG:
+            vkd3d_string_buffer_printf(msl_src->str, "-%s", str->buffer);
+            break;
         case VKD3DSPSM_ABS:
             vkd3d_string_buffer_printf(msl_src->str, "abs(%s)", str->buffer);
             break;
