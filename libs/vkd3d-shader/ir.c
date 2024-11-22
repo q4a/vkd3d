@@ -2181,6 +2181,8 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
 
         case VKD3DSPR_OUTCONTROLPOINT:
             reg->type = VKD3DSPR_OUTPUT;
+            if (io_normaliser_is_in_fork_or_join_phase(normaliser))
+                normaliser->use_vocp = true;
             /* fall through */
         case VKD3DSPR_OUTPUT:
             reg_idx = reg->idx[reg->idx_count - 1].offset;
@@ -2230,9 +2232,6 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
             if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
             {
                 reg = &ins->declaration.dst.reg;
-
-                if (reg->type == VKD3DSPR_OUTCONTROLPOINT)
-                    normaliser->use_vocp = true;
 
                 /* We don't need to keep OUTCONTROLPOINT or PATCHCONST input declarations since their
                 * equivalents were declared earlier, but INCONTROLPOINT may be the first occurrence. */
