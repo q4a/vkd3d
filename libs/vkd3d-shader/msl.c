@@ -41,6 +41,8 @@ struct msl_generator
     const char *prefix;
     bool failed;
 
+    bool write_depth;
+
     const struct vkd3d_shader_interface_info *interface_info;
     const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info;
 };
@@ -151,6 +153,14 @@ static void msl_print_register_name(struct vkd3d_string_buffer *buffer,
             }
             vkd3d_string_buffer_printf(buffer, "o[%u]", reg->idx[0].offset);
             msl_print_register_datatype(buffer, gen, reg->data_type);
+            break;
+
+        case VKD3DSPR_DEPTHOUT:
+            if (gen->program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled depth output in shader type #%x.",
+                        gen->program->shader_version.type);
+            vkd3d_string_buffer_printf(buffer, "o_depth");
             break;
 
         case VKD3DSPR_IMMCONST:
@@ -335,7 +345,8 @@ static uint32_t msl_dst_init(struct msl_dst *msl_dst, struct msl_generator *gen,
     msl_dst->mask = vkd3d_string_buffer_get(&gen->string_buffers);
 
     msl_print_register_name(msl_dst->register_name, gen, &vsir_dst->reg);
-    msl_print_write_mask(msl_dst->mask, write_mask);
+    if (vsir_dst->reg.dimension == VSIR_DIMENSION_VEC4)
+        msl_print_write_mask(msl_dst->mask, write_mask);
 
     return write_mask;
 }
@@ -827,6 +838,14 @@ static void msl_generate_output_struct_declarations(struct msl_generator *gen)
     {
         e = &signature->elements[i];
 
+        if (e->sysval_semantic == VKD3D_SHADER_SV_DEPTH)
+        {
+            gen->write_depth = true;
+            msl_print_indent(gen->buffer, 1);
+            vkd3d_string_buffer_printf(buffer, "float shader_out_depth [[depth(any)]];\n");
+            continue;
+        }
+
         if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
             continue;
 
@@ -936,6 +955,12 @@ static void msl_generate_entrypoint_epilogue(struct msl_generator *gen)
     {
         e = &signature->elements[i];
 
+        if (e->sysval_semantic == VKD3D_SHADER_SV_DEPTH)
+        {
+            vkd3d_string_buffer_printf(buffer, "    output.shader_out_depth = shader_out_depth;\n");
+            continue;
+        }
+
         if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
             continue;
 
@@ -995,9 +1020,14 @@ static void msl_generate_entrypoint(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_out[%u];\n", gen->prefix, 32);
     vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_%s_out output;\n", gen->prefix);
 
+    if (gen->write_depth)
+        vkd3d_string_buffer_printf(gen->buffer, "    float shader_out_depth;\n");
+
     msl_generate_entrypoint_prologue(gen);
 
     vkd3d_string_buffer_printf(gen->buffer, "    %s_main(%s_in, %s_out", gen->prefix, gen->prefix, gen->prefix);
+    if (gen->write_depth)
+        vkd3d_string_buffer_printf(gen->buffer, ", shader_out_depth");
     if (gen->descriptor_info->descriptor_count)
         vkd3d_string_buffer_printf(gen->buffer, ", descriptors");
     vkd3d_string_buffer_printf(gen->buffer, ");\n");
@@ -1035,6 +1065,8 @@ static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader
             "void %s_main(thread vkd3d_vec4 *v, "
             "thread vkd3d_vec4 *o",
             gen->prefix);
+    if (gen->write_depth)
+        vkd3d_string_buffer_printf(gen->buffer, ", thread float& o_depth");
     if (gen->descriptor_info->descriptor_count)
         vkd3d_string_buffer_printf(gen->buffer, ", constant vkd3d_%s_descriptors& descriptors", gen->prefix);
     vkd3d_string_buffer_printf(gen->buffer, ")\n{\n");
