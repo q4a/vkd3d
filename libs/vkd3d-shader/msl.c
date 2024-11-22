@@ -398,6 +398,28 @@ static void msl_binop(struct msl_generator *gen, const struct vkd3d_shader_instr
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void msl_dot(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, uint32_t src_mask)
+{
+    unsigned int component_count;
+    struct msl_src src[2];
+    struct msl_dst dst;
+    uint32_t dst_mask;
+
+    dst_mask = msl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    msl_src_init(&src[0], gen, &ins->src[0], src_mask);
+    msl_src_init(&src[1], gen, &ins->src[1], src_mask);
+
+    if ((component_count = vsir_write_mask_component_count(dst_mask)) > 1)
+        msl_print_assignment(gen, &dst, "float%u(dot(%s, %s))",
+                component_count, src[0].str->buffer, src[1].str->buffer);
+    else
+        msl_print_assignment(gen, &dst, "dot(%s, %s)", src[0].str->buffer, src[1].str->buffer);
+
+    msl_src_cleanup(&src[1], &gen->string_buffers);
+    msl_src_cleanup(&src[0], &gen->string_buffers);
+    msl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void msl_intrinsic(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *op)
 {
     struct msl_src src;
@@ -517,6 +539,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_DIV:
             msl_binop(gen, ins, "/");
+            break;
+        case VKD3DSIH_DP3:
+            msl_dot(gen, ins, vkd3d_write_mask_from_component_count(3));
             break;
         case VKD3DSIH_FRC:
             msl_intrinsic(gen, ins, "fract");
