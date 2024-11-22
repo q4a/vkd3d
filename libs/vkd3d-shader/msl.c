@@ -524,6 +524,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             msl_relop(gen, ins, "!=");
             break;
         case VKD3DSIH_ITOF:
+        case VKD3DSIH_UTOF:
             msl_cast(gen, ins, "float");
             break;
         case VKD3DSIH_MOV:
