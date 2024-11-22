@@ -543,6 +543,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_DP3:
             msl_dot(gen, ins, vkd3d_write_mask_from_component_count(3));
             break;
+        case VKD3DSIH_DP4:
+            msl_dot(gen, ins, VKD3DSP_WRITEMASK_ALL);
+            break;
         case VKD3DSIH_FRC:
             msl_intrinsic(gen, ins, "fract");
             break;
