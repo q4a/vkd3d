@@ -9643,6 +9643,37 @@ static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
         program->global_flags |= VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL;
 }
 
+static void sm4_generate_vsir_add_dcl_constant_buffer(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_buffer *cbuffer)
+{
+    unsigned int array_first = cbuffer->reg.index;
+    unsigned int array_last = cbuffer->reg.index; /* FIXME: array end. */
+    struct vkd3d_shader_src_param *src_param;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &cbuffer->loc, VKD3DSIH_DCL_CONSTANT_BUFFER, 0, 0)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+
+    ins->declaration.cb.size = cbuffer->size;
+
+    src_param = &ins->declaration.cb.src;
+    vsir_src_param_init(src_param, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 0);
+    src_param->reg.dimension = VSIR_DIMENSION_VEC4;
+    src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+
+    ins->declaration.cb.range.space = cbuffer->reg.space;
+    ins->declaration.cb.range.first = array_first;
+    ins->declaration.cb.range.last = array_last;
+
+    src_param->reg.idx[0].offset = cbuffer->reg.id;
+    src_param->reg.idx[1].offset = array_first;
+    src_param->reg.idx[2].offset = array_last;
+    src_param->reg.idx_count = 3;
+}
+
 static void sm4_generate_vsir_add_dcl_sampler(struct hlsl_ctx *ctx,
         struct vsir_program *program, const struct extern_resource *resource)
 {
@@ -9860,6 +9891,7 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     struct vkd3d_shader_version version = {0};
     struct extern_resource *extern_resources;
     unsigned int extern_resources_count;
+    const struct hlsl_buffer *cbuffer;
 
     version.major = ctx->profile->major_version;
     version.minor = ctx->profile->minor_version;
@@ -9880,6 +9912,12 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         program->thread_group_size.x = ctx->thread_count[0];
         program->thread_group_size.y = ctx->thread_count[1];
         program->thread_group_size.z = ctx->thread_count[2];
+    }
+
+    LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
+    {
+        if (cbuffer->reg.allocated)
+            sm4_generate_vsir_add_dcl_constant_buffer(ctx, program, cbuffer);
     }
 
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);

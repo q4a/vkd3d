@@ -4312,37 +4312,39 @@ static void write_sm4_instruction(const struct tpf_compiler *tpf, const struct s
     sm4_update_stat_counters(tpf, instr);
 }
 
-static void write_sm4_dcl_constant_buffer(const struct tpf_compiler *tpf, const struct hlsl_buffer *cbuffer)
+static void tpf_dcl_constant_buffer(const struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
 {
-    size_t size = (cbuffer->used_size + 3) / 4;
+    const struct vkd3d_shader_constant_buffer *cb = &ins->declaration.cb;
+    size_t size = (cb->size + 3) / 4;
 
     struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM4_OP_DCL_CONSTANT_BUFFER,
 
-        .srcs[0].reg.dimension = VSIR_DIMENSION_VEC4,
-        .srcs[0].reg.type = VKD3DSPR_CONSTBUFFER,
-        .srcs[0].swizzle = VKD3D_SHADER_NO_SWIZZLE,
+        .srcs[0] = cb->src,
         .src_count = 1,
     };
 
-    if (hlsl_version_ge(tpf->ctx, 5, 1))
+    if (vkd3d_shader_ver_ge(&tpf->program->shader_version, 5, 1))
     {
-        instr.srcs[0].reg.idx[0].offset = cbuffer->reg.id;
-        instr.srcs[0].reg.idx[1].offset = cbuffer->reg.index;
-        instr.srcs[0].reg.idx[2].offset = cbuffer->reg.index; /* FIXME: array end */
+        instr.srcs[0].reg.idx[0].offset = cb->src.reg.idx[0].offset;
+        instr.srcs[0].reg.idx[1].offset = cb->range.first;
+        instr.srcs[0].reg.idx[2].offset = cb->range.last;
         instr.srcs[0].reg.idx_count = 3;
 
         instr.idx[0] = size;
-        instr.idx[1] = cbuffer->reg.space;
+        instr.idx[1] = cb->range.space;
         instr.idx_count = 2;
     }
     else
     {
-        instr.srcs[0].reg.idx[0].offset = cbuffer->reg.index;
+        instr.srcs[0].reg.idx[0].offset = cb->range.first;
         instr.srcs[0].reg.idx[1].offset = size;
         instr.srcs[0].reg.idx_count = 2;
     }
+
+    if (ins->flags & VKD3DSI_INDEXED_DYNAMIC)
+        instr.extra_bits |= VKD3D_SM4_INDEX_TYPE_MASK;
 
     write_sm4_instruction(tpf, &instr);
 }
@@ -4664,6 +4666,10 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
 {
     switch (ins->opcode)
     {
+        case VKD3DSIH_DCL_CONSTANT_BUFFER:
+            tpf_dcl_constant_buffer(tpf, ins);
+            break;
+
         case VKD3DSIH_DCL_TEMPS:
             tpf_dcl_temps(tpf, ins->declaration.count);
             break;
@@ -4831,7 +4837,6 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
 {
     const struct vkd3d_shader_version *version = &tpf->program->shader_version;
     struct vkd3d_bytecode_buffer buffer = {0};
-    const struct hlsl_buffer *cbuffer;
     struct hlsl_ctx *ctx = tpf->ctx;
     size_t token_count_position;
 
@@ -4870,12 +4875,6 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
     {
         tpf_write_dcl_input_control_point_count(tpf, 0); /* TODO: Obtain from OutputPatch */
         tpf_write_dcl_tessellator_domain(tpf, ctx->domain);
-    }
-
-    LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
-    {
-        if (cbuffer->reg.allocated)
-            write_sm4_dcl_constant_buffer(tpf, cbuffer);
     }
 
     tpf_write_program(tpf, tpf->program);
