@@ -3824,7 +3824,7 @@ static void src_params_init_from_operands(struct vkd3d_shader_src_param *src_par
 }
 
 static enum vkd3d_shader_register_type register_type_from_dxil_semantic_kind(
-        enum vkd3d_shader_sysval_semantic sysval_semantic)
+        enum vkd3d_shader_sysval_semantic sysval_semantic, bool is_input)
 {
     switch (sysval_semantic)
     {
@@ -3834,7 +3834,7 @@ static enum vkd3d_shader_register_type register_type_from_dxil_semantic_kind(
         case VKD3D_SHADER_SV_SAMPLE_INDEX:
             return VKD3DSPR_NULL;
         case VKD3D_SHADER_SV_COVERAGE:
-            return VKD3DSPR_COVERAGE;
+            return is_input ? VKD3DSPR_COVERAGE : VKD3DSPR_SAMPLEMASK;
         case VKD3D_SHADER_SV_DEPTH:
             return VKD3DSPR_DEPTHOUT;
         case VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL:
@@ -3884,7 +3884,7 @@ static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shade
         param = &params[i];
 
         if (e->register_index == UINT_MAX
-                && (io_reg_type = register_type_from_dxil_semantic_kind(e->sysval_semantic)) != VKD3DSPR_NULL)
+                && (io_reg_type = register_type_from_dxil_semantic_kind(e->sysval_semantic, is_input)) != VKD3DSPR_NULL)
         {
             dst_param_io_init(param, e, io_reg_type);
             continue;
@@ -9348,7 +9348,7 @@ static void signature_element_read_additional_element_values(struct signature_el
 }
 
 static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const struct sm6_metadata_value *m,
-        struct shader_signature *s, enum vkd3d_tessellator_domain tessellator_domain)
+        struct shader_signature *s, enum vkd3d_tessellator_domain tessellator_domain, bool is_input)
 {
     unsigned int i, j, column_count, operand_count, index;
     const struct sm6_metadata_node *node, *element_node;
@@ -9466,7 +9466,7 @@ static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const
 
         if ((is_register = e->register_index == UINT_MAX))
         {
-            if (register_type_from_dxil_semantic_kind(e->sysval_semantic) == VKD3DSPR_INVALID)
+            if (register_type_from_dxil_semantic_kind(e->sysval_semantic, is_input) == VKD3DSPR_INVALID)
             {
                 WARN("Unhandled I/O register semantic kind %u.\n", j);
                 vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_SIGNATURE,
@@ -9578,17 +9578,17 @@ static enum vkd3d_result sm6_parser_signatures_init(struct sm6_parser *sm6, cons
     }
 
     if (m->u.node->operand_count && (ret = sm6_parser_read_signature(sm6, m->u.node->operands[0],
-            &program->input_signature, tessellator_domain)) < 0)
+            &program->input_signature, tessellator_domain, true)) < 0)
     {
         return ret;
     }
     if (m->u.node->operand_count > 1 && (ret = sm6_parser_read_signature(sm6, m->u.node->operands[1],
-            &program->output_signature, tessellator_domain)) < 0)
+            &program->output_signature, tessellator_domain, false)) < 0)
     {
         return ret;
     }
     if (m->u.node->operand_count > 1 && (ret = sm6_parser_read_signature(sm6, m->u.node->operands[2],
-            &program->patch_constant_signature, tessellator_domain)) < 0)
+            &program->patch_constant_signature, tessellator_domain, false)) < 0)
     {
         return ret;
     }
