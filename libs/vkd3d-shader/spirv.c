@@ -2406,6 +2406,7 @@ struct vkd3d_hull_shader_variables
 struct ssa_register_info
 {
     enum vkd3d_data_type data_type;
+    uint8_t write_mask;
     uint32_t id;
 };
 
@@ -3573,6 +3574,24 @@ static bool spirv_compiler_get_register_info(struct spirv_compiler *compiler,
         register_info->is_aggregate = false;
         return true;
     }
+    else if (reg->type == VKD3DSPR_SSA)
+    {
+        const struct ssa_register_info *ssa = &compiler->ssa_register_info[reg->idx[0].offset];
+
+        if (!ssa->id)
+        {
+            /* Should only be from a missing instruction implementation. */
+            VKD3D_ASSERT(compiler->failed);
+            return 0;
+        }
+
+        memset(register_info, 0, sizeof(*register_info));
+        register_info->id = ssa->id;
+        register_info->storage_class = SpvStorageClassMax;
+        register_info->component_type = vkd3d_component_type_from_data_type(ssa->data_type);
+        register_info->write_mask = ssa->write_mask;
+        return true;
+    }
 
     vkd3d_symbol_make_register(&reg_symbol, reg);
     if (!(entry = rb_get(&compiler->symbol_table, &reg_symbol)))
@@ -4180,67 +4199,14 @@ static uint32_t spirv_compiler_emit_constant_array(struct spirv_compiler *compil
     return const_id;
 }
 
-static const struct ssa_register_info *spirv_compiler_get_ssa_register_info(const struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg)
-{
-    VKD3D_ASSERT(reg->idx[0].offset < compiler->ssa_register_count);
-    VKD3D_ASSERT(reg->idx_count == 1);
-    return &compiler->ssa_register_info[reg->idx[0].offset];
-}
-
 static void spirv_compiler_set_ssa_register_info(const struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg, uint32_t val_id)
+        const struct vkd3d_shader_register *reg, uint32_t write_mask, uint32_t val_id)
 {
     unsigned int i = reg->idx[0].offset;
     VKD3D_ASSERT(i < compiler->ssa_register_count);
     compiler->ssa_register_info[i].data_type = reg->data_type;
     compiler->ssa_register_info[i].id = val_id;
-}
-
-static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg, enum vkd3d_shader_component_type component_type,
-        uint32_t swizzle)
-{
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    enum vkd3d_shader_component_type reg_component_type;
-    const struct ssa_register_info *ssa;
-    unsigned int component_idx;
-    uint32_t type_id, val_id;
-
-    ssa = spirv_compiler_get_ssa_register_info(compiler, reg);
-    val_id = ssa->id;
-    if (!val_id)
-    {
-        /* Should only be from a missing instruction implementation. */
-        VKD3D_ASSERT(compiler->failed);
-        return 0;
-    }
-    VKD3D_ASSERT(vkd3d_swizzle_is_scalar(swizzle, reg));
-
-    reg_component_type = vkd3d_component_type_from_data_type(ssa->data_type);
-
-    if (reg->dimension == VSIR_DIMENSION_SCALAR)
-    {
-        if (component_type != reg_component_type)
-        {
-            type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
-            val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
-        }
-
-        return val_id;
-    }
-
-    if (component_type != reg_component_type)
-    {
-        /* Required for resource loads with sampled type int, because DXIL has no signedness.
-         * Only 128-bit vector sizes are used. */
-        type_id = vkd3d_spirv_get_type_id(builder, component_type, VKD3D_VEC4_SIZE);
-        val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
-    }
-
-    type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
-    component_idx = vsir_swizzle_get_component(swizzle, 0);
-    return vkd3d_spirv_build_op_composite_extract1(builder, type_id, val_id, component_idx);
+    compiler->ssa_register_info[i].write_mask = write_mask;
 }
 
 static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
@@ -4266,9 +4232,6 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
     component_count = vsir_write_mask_component_count(write_mask);
     component_type = vkd3d_component_type_from_data_type(reg->data_type);
 
-    if (reg->type == VKD3DSPR_SSA)
-        return spirv_compiler_emit_load_ssa_reg(compiler, reg, component_type, swizzle);
-
     if (!spirv_compiler_get_register_info(compiler, reg, &reg_info))
     {
         type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
@@ -4293,9 +4256,9 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
         type_id = vkd3d_spirv_get_type_id(builder,
                 reg_info.component_type, vsir_write_mask_component_count(reg_info.write_mask));
         val_id = vkd3d_spirv_build_op_load(builder, type_id, reg_info.id, SpvMemoryAccessMaskNone);
+        swizzle = data_type_is_64_bit(reg->data_type) ? vsir_swizzle_32_from_64(swizzle) : swizzle;
     }
 
-    swizzle = data_type_is_64_bit(reg->data_type) ? vsir_swizzle_32_from_64(swizzle) : swizzle;
     val_id = spirv_compiler_emit_swizzle(compiler,
             val_id, reg_info.write_mask, reg_info.component_type, swizzle, val_write_mask);
 
@@ -4496,7 +4459,7 @@ static void spirv_compiler_emit_store_reg(struct spirv_compiler *compiler,
 
     if (reg->type == VKD3DSPR_SSA)
     {
-        spirv_compiler_set_ssa_register_info(compiler, reg, val_id);
+        spirv_compiler_set_ssa_register_info(compiler, reg, write_mask, val_id);
         return;
     }
 
@@ -7431,7 +7394,7 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
 
 general_implementation:
     write_mask = dst->write_mask;
-    if (src->reg.type == VKD3DSPR_IMMCONST64 && !data_type_is_64_bit(dst->reg.data_type))
+    if (data_type_is_64_bit(src->reg.data_type) && !data_type_is_64_bit(dst->reg.data_type))
         write_mask = vsir_write_mask_64_from_32(write_mask);
     else if (!data_type_is_64_bit(src->reg.data_type) && data_type_is_64_bit(dst->reg.data_type))
         write_mask = vsir_write_mask_32_from_64(write_mask);
