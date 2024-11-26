@@ -35,6 +35,35 @@
 #include <term.h>
 #endif
 
+static enum vkd3d_result vkd3d_shader_locate_dxbc_section(const struct vkd3d_shader_code *dxbc, uint32_t tag,
+        struct vkd3d_shader_code *section, char **messages)
+{
+    struct vkd3d_shader_dxbc_desc desc;
+    enum vkd3d_result ret;
+    unsigned int i;
+
+    memset(section, 0, sizeof(*section));
+
+    if ((ret = vkd3d_shader_parse_dxbc(dxbc, 0, &desc, messages)) < 0)
+        return ret;
+
+    for (i = 0; i < desc.section_count; ++i)
+    {
+        if (tag == desc.sections[i].tag)
+        {
+            *section = desc.sections[i].data;
+            break;
+        }
+    }
+
+    vkd3d_shader_free_dxbc(&desc);
+
+    if (!section->code)
+        return VKD3D_ERROR_NOT_FOUND;
+
+    return VKD3D_OK;
+}
+
 enum
 {
     OPTION_HELP = CHAR_MAX + 1,
@@ -429,20 +458,29 @@ static enum vkd3d_shader_target_type parse_target_type(const char *target)
     return VKD3D_SHADER_TARGET_NONE;
 }
 
-static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source, enum vkd3d_shader_source_type *type)
+static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source, struct vkd3d_shader_code *code,
+        enum vkd3d_shader_source_type *type)
 {
     char *messages;
     int ret;
 
-    if ((ret = vkd3d_shader_parse_dxbc_source_type(source, type, &messages)) < 0)
+    if ((ret = vkd3d_shader_parse_dxbc_source_type(source, type, NULL)) >= 0)
     {
-        fprintf(stderr, "Failed to detect dxbc source type, ret %d.\n", ret);
-        if (messages)
-            fputs(messages, stderr);
-        vkd3d_shader_free_messages(messages);
-        return false;
+        *code = *source;
+        return true;
     }
-    return true;
+
+    if ((ret = vkd3d_shader_locate_dxbc_section(source, TAG_FX10, code, &messages)) >= 0)
+    {
+        *type = VKD3D_SHADER_SOURCE_FX;
+        return true;
+    }
+
+    fprintf(stderr, "Failed to detect dxbc source type, ret %d.\n", ret);
+    if (messages)
+        fputs(messages, stderr);
+    vkd3d_shader_free_messages(messages);
+    return false;
 }
 
 static const struct source_type_info *get_source_type_info(enum vkd3d_shader_source_type type)
@@ -741,9 +779,9 @@ int main(int argc, char **argv)
 {
     struct vkd3d_shader_spirv_target_info spirv_target_info = {0};
     struct vkd3d_shader_hlsl_source_info hlsl_source_info = {0};
+    struct vkd3d_shader_code output_code, source = { 0 };
     bool close_input = false, close_output = false;
     struct vkd3d_shader_compile_info info = {0};
-    struct vkd3d_shader_code output_code;
     struct options options;
     FILE *input, *output;
     char *messages;
@@ -792,26 +830,27 @@ int main(int argc, char **argv)
     if (!(input = open_input(options.filename, &close_input)))
         goto done;
 
-    if (!read_shader(&info.source, input))
+    if (!read_shader(&source, input))
     {
         fprintf(stderr, "Failed to read input shader.\n");
         goto done;
     }
 
+    info.source = source;
     if (options.source_type == VKD3D_SHADER_SOURCE_NONE)
     {
         uint32_t token;
 
-        if (options.preprocess_only || info.source.size < sizeof(token))
+        if (options.preprocess_only || source.size < sizeof(token))
         {
             options.source_type = VKD3D_SHADER_SOURCE_HLSL;
         }
         else
         {
-            memcpy(&token, info.source.code, sizeof(token));
+            memcpy(&token, source.code, sizeof(token));
             if (token == TAG_DXBC)
             {
-                if (!parse_dxbc_source_type(&info.source, &options.source_type))
+                if (!parse_dxbc_source_type(&source, &info.source, &options.source_type))
                     goto done;
             }
             else if ((token & 0xfffe0000) == 0xfffe0000)
@@ -918,7 +957,7 @@ int main(int argc, char **argv)
     fail = 0;
     vkd3d_shader_free_shader_code(&output_code);
 done:
-    vkd3d_shader_free_shader_code(&info.source);
+    vkd3d_shader_free_shader_code(&source);
     free(options.compile_options);
     if (close_output)
         fclose(output);
