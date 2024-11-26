@@ -9902,6 +9902,19 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         program->thread_group_size.y = ctx->thread_count[1];
         program->thread_group_size.z = ctx->thread_count[2];
     }
+    else if (version.type == VKD3D_SHADER_TYPE_HULL)
+    {
+        program->input_control_point_count = 1; /* TODO: Obtain from InputPatch */
+        program->output_control_point_count = ctx->output_control_point_count;
+        program->tess_domain = ctx->domain;
+        program->tess_partitioning = ctx->partitioning;
+        program->tess_output_primitive = ctx->output_primitive;
+    }
+    else if (version.type == VKD3D_SHADER_TYPE_DOMAIN)
+    {
+        program->input_control_point_count = 0; /* TODO: Obtain from OutputPatch */
+        program->tess_domain = ctx->domain;
+    }
 
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {

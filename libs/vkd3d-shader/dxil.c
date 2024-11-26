@@ -9745,6 +9745,8 @@ static void sm6_parser_emit_dcl_tessellator_partitioning(struct sm6_parser *sm6,
 
     ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_TESSELLATOR_PARTITIONING);
     ins->declaration.tessellator_partitioning = tessellator_partitioning;
+
+    sm6->p.program->tess_partitioning = tessellator_partitioning;
 }
 
 static void sm6_parser_emit_dcl_tessellator_output_primitive(struct sm6_parser *sm6,
@@ -9761,6 +9763,8 @@ static void sm6_parser_emit_dcl_tessellator_output_primitive(struct sm6_parser *
 
     ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_TESSELLATOR_OUTPUT_PRIMITIVE);
     ins->declaration.tessellator_output_primitive = primitive;
+
+    sm6->p.program->tess_output_primitive = primitive;
 }
 
 static void sm6_parser_emit_dcl_max_tessellation_factor(struct sm6_parser *sm6, struct sm6_metadata_value *m)

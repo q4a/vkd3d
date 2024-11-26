@@ -1444,6 +1444,8 @@ struct vsir_program
     enum vsir_control_flow_type cf_type;
     enum vsir_normalisation_level normalisation_level;
     enum vkd3d_tessellator_domain tess_domain;
+    enum vkd3d_shader_tessellator_partitioning tess_partitioning;
+    enum vkd3d_shader_tessellator_output_primitive tess_output_primitive;
     uint32_t io_dcls[VKD3D_BITMAP_SIZE(VKD3DSPR_COUNT)];
 
     struct vsir_features features;

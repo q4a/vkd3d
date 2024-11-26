@@ -1262,6 +1262,7 @@ static void shader_sm5_read_dcl_tessellator_partitioning(struct vkd3d_shader_ins
 {
     ins->declaration.tessellator_partitioning = (opcode_token & VKD3D_SM5_TESSELLATOR_MASK)
             >> VKD3D_SM5_TESSELLATOR_SHIFT;
+    priv->p.program->tess_partitioning = ins->declaration.tessellator_partitioning;
 }
 
 static void shader_sm5_read_dcl_tessellator_output_primitive(struct vkd3d_shader_instruction *ins, uint32_t opcode,
@@ -1269,6 +1270,7 @@ static void shader_sm5_read_dcl_tessellator_output_primitive(struct vkd3d_shader
 {
     ins->declaration.tessellator_output_primitive = (opcode_token & VKD3D_SM5_TESSELLATOR_MASK)
             >> VKD3D_SM5_TESSELLATOR_SHIFT;
+    priv->p.program->tess_output_primitive = ins->declaration.tessellator_output_primitive;
 }
 
 static void shader_sm5_read_dcl_hs_max_tessfactor(struct vkd3d_shader_instruction *ins, uint32_t opcode,
@@ -4842,7 +4844,8 @@ static void tpf_write_program(struct tpf_compiler *tpf, const struct vsir_progra
 
 static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *entry_func)
 {
-    const struct vkd3d_shader_version *version = &tpf->program->shader_version;
+    const struct vsir_program *program = tpf->program;
+    const struct vkd3d_shader_version *version;
     struct vkd3d_bytecode_buffer buffer = {0};
     struct hlsl_ctx *ctx = tpf->ctx;
     size_t token_count_position;
@@ -4862,29 +4865,30 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
 
     tpf->buffer = &buffer;
 
+    version = &program->shader_version;
     put_u32(&buffer, vkd3d_make_u32((version->major << 4) | version->minor, shader_types[version->type]));
     token_count_position = put_u32(&buffer, 0);
 
-    if (tpf->program->global_flags)
-        write_sm4_dcl_global_flags(tpf, tpf->program->global_flags);
+    if (program->global_flags)
+        write_sm4_dcl_global_flags(tpf, program->global_flags);
 
     if (version->type == VKD3D_SHADER_TYPE_HULL)
     {
         tpf_write_hs_decls(tpf);
 
-        tpf_write_dcl_input_control_point_count(tpf, 1); /* TODO: Obtain from InputPatch */
-        tpf_write_dcl_output_control_point_count(tpf, ctx->output_control_point_count);
-        tpf_write_dcl_tessellator_domain(tpf, ctx->domain);
-        tpf_write_dcl_tessellator_partitioning(tpf, ctx->partitioning);
-        tpf_write_dcl_tessellator_output_primitive(tpf, ctx->output_primitive);
+        tpf_write_dcl_input_control_point_count(tpf, program->input_control_point_count);
+        tpf_write_dcl_output_control_point_count(tpf, program->output_control_point_count);
+        tpf_write_dcl_tessellator_domain(tpf, program->tess_domain);
+        tpf_write_dcl_tessellator_partitioning(tpf, program->tess_partitioning);
+        tpf_write_dcl_tessellator_output_primitive(tpf, program->tess_output_primitive);
     }
     else if (version->type == VKD3D_SHADER_TYPE_DOMAIN)
     {
-        tpf_write_dcl_input_control_point_count(tpf, 0); /* TODO: Obtain from OutputPatch */
-        tpf_write_dcl_tessellator_domain(tpf, ctx->domain);
+        tpf_write_dcl_input_control_point_count(tpf, program->input_control_point_count);
+        tpf_write_dcl_tessellator_domain(tpf, program->tess_domain);
     }
 
-    tpf_write_program(tpf, tpf->program);
+    tpf_write_program(tpf, program);
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
