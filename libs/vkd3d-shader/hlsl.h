@@ -1678,7 +1678,8 @@ struct extern_resource
 
 struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count);
 void sm4_free_extern_resources(struct extern_resource *extern_resources, unsigned int count);
-int tpf_compile(struct vsir_program *program, uint64_t config_flags,
+void sm4_generate_rdef(struct hlsl_ctx *ctx, struct vkd3d_shader_code *rdef);
+int tpf_compile(struct vsir_program *program, uint64_t config_flags, const struct vkd3d_shader_code *rdef,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func);
 

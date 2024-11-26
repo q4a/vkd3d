@@ -10586,18 +10586,25 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         case VKD3D_SHADER_TARGET_DXBC_TPF:
         {
             uint32_t config_flags = vkd3d_shader_init_config_flags();
+            struct vkd3d_shader_code rdef = {0};
             struct vsir_program program;
             int result;
+
+            sm4_generate_rdef(ctx, &rdef);
+            if (ctx->result)
+                return ctx->result;
 
             sm4_generate_vsir(ctx, entry_func, config_flags, &program);
             if (ctx->result)
             {
                 vsir_program_cleanup(&program);
+                vkd3d_shader_free_shader_code(&rdef);
                 return ctx->result;
             }
 
-            result = tpf_compile(&program, config_flags, out, ctx->message_context, ctx, entry_func);
+            result = tpf_compile(&program, config_flags, &rdef, out, ctx->message_context, ctx, entry_func);
             vsir_program_cleanup(&program);
+            vkd3d_shader_free_shader_code(&rdef);
             return result;
         }
 

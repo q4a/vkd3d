@@ -3725,7 +3725,7 @@ static unsigned int get_component_index_from_default_initializer_index(struct hl
     vkd3d_unreachable();
 }
 
-static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
+void sm4_generate_rdef(struct hlsl_ctx *ctx, struct vkd3d_shader_code *rdef)
 {
     uint32_t binding_desc_size = (hlsl_version_ge(ctx, 5, 1) ? 10 : 8) * sizeof(uint32_t);
     size_t cbuffers_offset, resources_offset, creator_offset, string_offset;
@@ -3955,9 +3955,16 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     creator_offset = put_string(&buffer, vkd3d_shader_get_version(NULL, NULL));
     set_u32(&buffer, creator_position, creator_offset);
 
-    add_section(ctx, dxbc, TAG_RDEF, &buffer);
-
     sm4_free_extern_resources(extern_resources, extern_resources_count);
+
+    if (buffer.status)
+    {
+        vkd3d_free(buffer.data);
+        ctx->result = buffer.status;
+        return;
+    }
+    rdef->code = buffer.data;
+    rdef->size = buffer.size;
 }
 
 static enum vkd3d_sm4_resource_type sm4_resource_dimension(enum vkd3d_shader_resource_type resource_type)
@@ -4954,10 +4961,18 @@ static void tpf_write_stat(struct tpf_compiler *tpf)
     add_section(ctx, &tpf->dxbc, TAG_STAT, &buffer);
 }
 
+static void tpf_write_section(struct tpf_compiler *tpf, uint32_t tag, const struct vkd3d_shader_code *code)
+{
+    struct vkd3d_bytecode_buffer buffer = {0};
+
+    bytecode_put_bytes(&buffer, code->code, code->size);
+    add_section(tpf->ctx, &tpf->dxbc, tag, &buffer);
+}
+
 /* OBJECTIVE: Stop relying on ctx and entry_func on this function, receiving
  * data from the other parameters instead, so they can be removed from the
  * arguments and this function can be independent of HLSL structs.  */
-int tpf_compile(struct vsir_program *program, uint64_t config_flags,
+int tpf_compile(struct vsir_program *program, uint64_t config_flags, const struct vkd3d_shader_code *rdef,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
         struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
@@ -4978,7 +4993,7 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags,
     tpf_write_signature(&tpf, &program->output_signature, TAG_OSGN);
     if (shader_type == VKD3D_SHADER_TYPE_HULL || shader_type == VKD3D_SHADER_TYPE_DOMAIN)
         tpf_write_signature(&tpf, &program->patch_constant_signature, TAG_PCSG);
-    write_sm4_rdef(ctx, &tpf.dxbc);
+    tpf_write_section(&tpf, TAG_RDEF, rdef);
     tpf_write_shdr(&tpf, entry_func);
     tpf_write_sfi0(&tpf);
     tpf_write_stat(&tpf);
