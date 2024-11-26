@@ -1755,7 +1755,7 @@ static void sm1_sort_externs(struct hlsl_ctx *ctx)
     list_move_tail(&ctx->extern_vars, &sorted);
 }
 
-void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
+static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
 {
     size_t ctab_offset, ctab_start, ctab_end, vars_offset, vars_start, size_offset, creator_offset, offset;
     unsigned int uniform_count = 0;
@@ -1912,6 +1912,21 @@ void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buff
 
     ctab_end = bytecode_align(buffer);
     set_u32(buffer, size_offset, vkd3d_make_u32(VKD3D_SM1_OP_COMMENT, (ctab_end - ctab_offset) / sizeof(uint32_t)));
+}
+
+void sm1_generate_ctab(struct hlsl_ctx *ctx, struct vkd3d_shader_code *ctab)
+{
+    struct vkd3d_bytecode_buffer buffer = {0};
+
+    write_sm1_uniforms(ctx, &buffer);
+    if (buffer.status)
+    {
+        vkd3d_free(buffer.data);
+        ctx->result = buffer.status;
+        return;
+    }
+    ctab->code = buffer.data;
+    ctab->size = buffer.size;
 }
 
 static uint32_t sm1_encode_register_type(enum vkd3d_shader_register_type type)

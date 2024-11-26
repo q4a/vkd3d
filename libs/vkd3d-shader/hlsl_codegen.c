@@ -8007,10 +8007,9 @@ static void sm1_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
 }
 
 static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
-        uint64_t config_flags, struct vsir_program *program, struct vkd3d_shader_code *ctab)
+        uint64_t config_flags, struct vsir_program *program)
 {
     struct vkd3d_shader_version version = {0};
-    struct vkd3d_bytecode_buffer buffer = {0};
     struct hlsl_block block;
 
     version.major = ctx->profile->major_version;
@@ -8021,16 +8020,6 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
         return;
     }
-
-    write_sm1_uniforms(ctx, &buffer);
-    if (buffer.status)
-    {
-        vkd3d_free(buffer.data);
-        ctx->result = buffer.status;
-        return;
-    }
-    ctab->code = buffer.data;
-    ctab->size = buffer.size;
 
     generate_vsir_signature(ctx, program, entry_func);
 
@@ -10569,7 +10558,11 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             struct vsir_program program;
             int result;
 
-            sm1_generate_vsir(ctx, entry_func, config_flags, &program, &ctab);
+            sm1_generate_ctab(ctx, &ctab);
+            if (ctx->result)
+                return ctx->result;
+
+            sm1_generate_vsir(ctx, entry_func, config_flags, &program);
             if (ctx->result)
             {
                 vsir_program_cleanup(&program);

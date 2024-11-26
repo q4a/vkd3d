@@ -1649,10 +1649,7 @@ bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, 
 D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type);
 D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type, bool is_combined_sampler);
 
-void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer);
-int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_compile_info *compile_info, const struct vkd3d_shader_code *ctab,
-        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
+void sm1_generate_ctab(struct hlsl_ctx *ctx, struct vkd3d_shader_code *ctab);
 
 struct extern_resource
 {
