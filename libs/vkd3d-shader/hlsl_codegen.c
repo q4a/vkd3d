@@ -10608,7 +10608,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
                 return ctx->result;
             }
 
-            result = tpf_compile(&program, config_flags, &rdef, out, ctx->message_context, ctx, entry_func);
+            result = tpf_compile(&program, config_flags, &rdef, out, ctx->message_context);
             vsir_program_cleanup(&program);
             vkd3d_shader_free_shader_code(&rdef);
             return result;

@@ -1396,8 +1396,6 @@ struct sm4_stat
 
 struct tpf_compiler
 {
-    /* OBJECTIVE: We want to get rid of this HLSL IR specific field. */
-    struct hlsl_ctx *ctx;
     struct vsir_program *program;
     struct vkd3d_sm4_lookup_tables lookup;
     struct sm4_stat *stat;
@@ -3195,18 +3193,17 @@ bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *s
     return true;
 }
 
-static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
-        uint32_t tag, struct vkd3d_bytecode_buffer *buffer)
+static void add_section(struct tpf_compiler *tpf, uint32_t tag, struct vkd3d_bytecode_buffer *buffer)
 {
     /* Native D3DDisassemble() expects at least the sizes of the ISGN and OSGN
      * sections to be aligned. Without this, the sections themselves will be
      * aligned, but their reported sizes won't. */
     size_t size = bytecode_align(buffer);
 
-    dxbc_writer_add_section(dxbc, tag, buffer->data, size);
+    dxbc_writer_add_section(&tpf->dxbc, tag, buffer->data, size);
 
     if (buffer->status < 0)
-        ctx->result = buffer->status;
+        tpf->result = buffer->status;
 }
 
 static int signature_element_pointer_compare(const void *x, const void *y)
@@ -3267,7 +3264,7 @@ static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_si
         set_u32(&buffer, (2 + i * 6) * sizeof(uint32_t), string_offset);
     }
 
-    add_section(tpf->ctx, &tpf->dxbc, tag, &buffer);
+    add_section(tpf, tag, &buffer);
     vkd3d_free(sorted_elements);
 }
 
@@ -4842,12 +4839,11 @@ static void tpf_write_program(struct tpf_compiler *tpf, const struct vsir_progra
         tpf_handle_instruction(tpf, &program->instructions.elements[i]);
 }
 
-static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_decl *entry_func)
+static void tpf_write_shdr(struct tpf_compiler *tpf)
 {
     const struct vsir_program *program = tpf->program;
     const struct vkd3d_shader_version *version;
     struct vkd3d_bytecode_buffer buffer = {0};
-    struct hlsl_ctx *ctx = tpf->ctx;
     size_t token_count_position;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
@@ -4892,7 +4888,7 @@ static void tpf_write_shdr(struct tpf_compiler *tpf, struct hlsl_ir_function_dec
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
-    add_section(ctx, &tpf->dxbc, TAG_SHDR, &buffer);
+    add_section(tpf, TAG_SHDR, &buffer);
     tpf->buffer = NULL;
 }
 
@@ -4918,7 +4914,6 @@ static void tpf_write_stat(struct tpf_compiler *tpf)
 {
     struct vkd3d_bytecode_buffer buffer = {0};
     const struct sm4_stat *stat = tpf->stat;
-    struct hlsl_ctx *ctx = tpf->ctx;
 
     put_u32(&buffer, stat->fields[VKD3D_STAT_INSTR_COUNT]);
     put_u32(&buffer, stat->fields[VKD3D_STAT_TEMPS]);
@@ -4950,7 +4945,7 @@ static void tpf_write_stat(struct tpf_compiler *tpf)
     put_u32(&buffer, stat->fields[VKD3D_STAT_LOD]);
     put_u32(&buffer, 0); /* Sample frequency */
 
-    if (hlsl_version_ge(ctx, 5, 0))
+    if (vkd3d_shader_ver_ge(&tpf->program->shader_version, 5, 0))
     {
         put_u32(&buffer, stat->fields[VKD3D_STAT_DCL_GS_INSTANCES]);
         put_u32(&buffer, stat->fields[VKD3D_STAT_TESS_CONTROL_POINT_COUNT]);
@@ -4962,7 +4957,7 @@ static void tpf_write_stat(struct tpf_compiler *tpf)
         put_u32(&buffer, stat->fields[VKD3D_STAT_STORE]);
     }
 
-    add_section(ctx, &tpf->dxbc, TAG_STAT, &buffer);
+    add_section(tpf, TAG_STAT, &buffer);
 }
 
 static void tpf_write_section(struct tpf_compiler *tpf, uint32_t tag, const struct vkd3d_shader_code *code)
@@ -4970,15 +4965,11 @@ static void tpf_write_section(struct tpf_compiler *tpf, uint32_t tag, const stru
     struct vkd3d_bytecode_buffer buffer = {0};
 
     bytecode_put_bytes(&buffer, code->code, code->size);
-    add_section(tpf->ctx, &tpf->dxbc, tag, &buffer);
+    add_section(tpf, tag, &buffer);
 }
 
-/* OBJECTIVE: Stop relying on ctx and entry_func on this function, receiving
- * data from the other parameters instead, so they can be removed from the
- * arguments and this function can be independent of HLSL structs.  */
 int tpf_compile(struct vsir_program *program, uint64_t config_flags, const struct vkd3d_shader_code *rdef,
-        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context,
-        struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     enum vkd3d_shader_type shader_type = program->shader_version.type;
     struct tpf_compiler tpf = {0};
@@ -4986,7 +4977,6 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags, const struc
     size_t i;
     int ret;
 
-    tpf.ctx = ctx;
     tpf.program = program;
     tpf.buffer = NULL;
     tpf.stat = &stat;
@@ -4998,13 +4988,11 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags, const struc
     if (shader_type == VKD3D_SHADER_TYPE_HULL || shader_type == VKD3D_SHADER_TYPE_DOMAIN)
         tpf_write_signature(&tpf, &program->patch_constant_signature, TAG_PCSG);
     tpf_write_section(&tpf, TAG_RDEF, rdef);
-    tpf_write_shdr(&tpf, entry_func);
+    tpf_write_shdr(&tpf);
     tpf_write_sfi0(&tpf);
     tpf_write_stat(&tpf);
 
     ret = VKD3D_OK;
-    if (ctx->result)
-        ret = ctx->result;
     if (tpf.result)
         ret = tpf.result;
 
