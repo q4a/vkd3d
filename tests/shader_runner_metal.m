@@ -70,6 +70,8 @@ static MTLPixelFormat get_metal_pixel_format(DXGI_FORMAT format)
             return MTLPixelFormatR32Float;
         case DXGI_FORMAT_R32_UINT:
             return MTLPixelFormatR32Uint;
+        case DXGI_FORMAT_D32_FLOAT:
+            return MTLPixelFormatDepth32Float;
         default:
             return MTLPixelFormatInvalid;
     }
@@ -95,6 +97,29 @@ static MTLPrimitiveType get_metal_primitive_type(D3D_PRIMITIVE_TOPOLOGY topology
 
         default:
             fatal_error("Unhandled topology %#x.\n", topology);
+    }
+}
+
+static MTLCompareFunction get_metal_compare_function(D3D12_COMPARISON_FUNC func)
+{
+    switch (func)
+    {
+        case VKD3D_SHADER_COMPARISON_FUNC_NEVER:
+            return MTLCompareFunctionNever;
+        case VKD3D_SHADER_COMPARISON_FUNC_LESS:
+            return MTLCompareFunctionLess;
+        case VKD3D_SHADER_COMPARISON_FUNC_EQUAL:
+            return MTLCompareFunctionEqual;
+        case VKD3D_SHADER_COMPARISON_FUNC_LESS_EQUAL:
+            return MTLCompareFunctionLessEqual;
+        case VKD3D_SHADER_COMPARISON_FUNC_GREATER:
+            return MTLCompareFunctionGreater;
+        case VKD3D_SHADER_COMPARISON_FUNC_NOT_EQUAL:
+            return MTLCompareFunctionNotEqual;
+        case VKD3D_SHADER_COMPARISON_FUNC_GREATER_EQUAL:
+            return MTLCompareFunctionGreaterEqual;
+        case VKD3D_SHADER_COMPARISON_FUNC_ALWAYS:
+            return MTLCompareFunctionAlways;
     }
 }
 
@@ -149,7 +174,7 @@ static void init_resource_texture(struct metal_runner *runner,
     id<MTLDevice> device = runner->device;
     MTLTextureDescriptor *desc;
 
-    if (params->desc.type != RESOURCE_TYPE_RENDER_TARGET)
+    if (params->desc.type != RESOURCE_TYPE_RENDER_TARGET && params->desc.type != RESOURCE_TYPE_DEPTH_STENCIL)
         return;
 
     if (params->desc.sample_count > 1)
@@ -305,10 +330,12 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
     struct metal_runner *runner = metal_runner(r);
     MTLRenderPipelineDescriptor *pipeline_desc;
     MTLVertexBufferLayoutDescriptor *binding;
+    id<MTLDepthStencilState> ds_state = nil;
     id<MTLDevice> device = runner->device;
     size_t attribute_offsets[32], stride;
     id<MTLRenderCommandEncoder> encoder;
     id<MTLCommandBuffer> command_buffer;
+    MTLDepthStencilDescriptor *ds_desc;
     MTLRenderPassDescriptor *pass_desc;
     id<MTLArgumentEncoder> descriptors;
     MTLVertexDescriptor *vertex_desc;
@@ -364,6 +391,22 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
                         fb_width = resource->r.desc.width;
                     if (resource->r.desc.height < fb_height)
                         fb_height = resource->r.desc.height;
+                    break;
+
+                case RESOURCE_TYPE_DEPTH_STENCIL:
+                    pipeline_desc.depthAttachmentPixelFormat = resource->texture.pixelFormat;
+                    pass_desc.depthAttachment.loadAction = MTLLoadActionLoad;
+                    pass_desc.depthAttachment.storeAction = MTLStoreActionStore;
+                    pass_desc.depthAttachment.texture = resource->texture;
+                    if (resource->r.desc.width < fb_width)
+                        fb_width = resource->r.desc.width;
+                    if (resource->r.desc.height < fb_height)
+                        fb_height = resource->r.desc.height;
+
+                    ds_desc = [[[MTLDepthStencilDescriptor alloc] init] autorelease];
+                    ds_desc.depthCompareFunction = get_metal_compare_function(runner->r.depth_func);
+                    ds_desc.depthWriteEnabled = true;
+                    ds_state = [[device newDepthStencilStateWithDescriptor:ds_desc] autorelease];
                     break;
 
                 case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -454,6 +497,9 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
             [encoder endEncoding];
             goto done;
         }
+
+        if (ds_state)
+            [encoder setDepthStencilState:ds_state];
 
         [encoder setRenderPipelineState:pso];
         [encoder setViewport:viewport];
