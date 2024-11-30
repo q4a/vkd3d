@@ -1502,6 +1502,20 @@ static HRESULT vkd3d_create_pipeline_layout(struct d3d12_device *device,
     return S_OK;
 }
 
+static HRESULT d3d12_descriptor_set_layout_init(struct d3d12_descriptor_set_layout *layout,
+        struct d3d12_device *device, const struct vk_binding_array *array)
+{
+    HRESULT hr;
+
+    if (FAILED(hr = vkd3d_create_descriptor_set_layout(device, array->flags, array->count,
+            array->unbounded_offset != UINT_MAX, array->bindings, &layout->vk_layout)))
+        return hr;
+    layout->unbounded_offset = array->unbounded_offset;
+    layout->table_index = array->table_index;
+
+    return S_OK;
+}
+
 static HRESULT d3d12_root_signature_create_descriptor_set_layouts(struct d3d12_root_signature *root_signature,
         struct vkd3d_descriptor_set_context *context)
 {
@@ -1513,16 +1527,13 @@ static HRESULT d3d12_root_signature_create_descriptor_set_layouts(struct d3d12_r
 
     for (i = 0; i < root_signature->vk_set_count; ++i)
     {
-        struct d3d12_descriptor_set_layout *layout = &root_signature->descriptor_set_layouts[i];
-        struct vk_binding_array *array = &context->vk_bindings[i];
+        const struct vk_binding_array *array = &context->vk_bindings[i];
 
         VKD3D_ASSERT(array->count);
 
-        if (FAILED(hr = vkd3d_create_descriptor_set_layout(root_signature->device, array->flags, array->count,
-                array->unbounded_offset != UINT_MAX, array->bindings, &layout->vk_layout)))
+        if (FAILED(hr = d3d12_descriptor_set_layout_init(&root_signature->descriptor_set_layouts[i],
+                root_signature->device, array)))
             return hr;
-        layout->unbounded_offset = array->unbounded_offset;
-        layout->table_index = array->table_index;
     }
 
     return S_OK;
