@@ -105,19 +105,12 @@ enum parse_state
     STATE_RESOURCE,
     STATE_SAMPLER,
     STATE_SHADER_COMPUTE,
-    STATE_SHADER_COMPUTE_TODO,
     STATE_SHADER_PIXEL,
-    STATE_SHADER_PIXEL_TODO,
     STATE_SHADER_VERTEX,
-    STATE_SHADER_VERTEX_TODO,
     STATE_SHADER_EFFECT,
-    STATE_SHADER_EFFECT_TODO,
     STATE_SHADER_HULL,
-    STATE_SHADER_HULL_TODO,
     STATE_SHADER_DOMAIN,
-    STATE_SHADER_DOMAIN_TODO,
     STATE_SHADER_GEOMETRY,
-    STATE_SHADER_GEOMETRY_TODO,
     STATE_TEST,
 };
 
@@ -1685,7 +1678,8 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
         hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
     }
     hr = map_special_hrs(hr);
-    ok(hr == expect, "Got unexpected hr %#x.\n", hr);
+    todo_if (runner->is_todo)
+        ok(hr == expect, "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)
     {
         ID3D10Blob_Release(blob);
@@ -1704,27 +1698,11 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     }
 }
 
-static enum parse_state get_parse_state_todo(enum parse_state state)
+static void read_shader_directive(struct shader_runner *runner,
+        const char *line, const char *src, HRESULT *expect_hr)
 {
-    if (state == STATE_SHADER_COMPUTE)
-        return STATE_SHADER_COMPUTE_TODO;
-    else if (state == STATE_SHADER_PIXEL)
-        return STATE_SHADER_PIXEL_TODO;
-    else if (state == STATE_SHADER_VERTEX)
-        return STATE_SHADER_VERTEX_TODO;
-    else if (state == STATE_SHADER_HULL)
-        return STATE_SHADER_HULL_TODO;
-    else if (state == STATE_SHADER_DOMAIN)
-        return STATE_SHADER_DOMAIN_TODO;
-    else if (state == STATE_SHADER_GEOMETRY)
-        return STATE_SHADER_GEOMETRY_TODO;
-    else
-        return STATE_SHADER_EFFECT_TODO;
-}
+    runner->is_todo = false;
 
-static enum parse_state read_shader_directive(struct shader_runner *runner, enum parse_state state, const char *line,
-        const char *src, HRESULT *expect_hr)
-{
     while (*src && *src != ']')
     {
         const char *src_start = src;
@@ -1734,7 +1712,7 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
             /* 'todo' is not meaningful when dxcompiler is in use. */
             if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
                 continue;
-            state = get_parse_state_todo(state);
+            runner->is_todo = true;
         }
         else if (match_directive_substring_with_args(runner, src, "fail", &src))
         {
@@ -1753,8 +1731,6 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
 
     if (strcmp(src, "]\n"))
         fatal_error("Malformed line '%s'.\n", line);
-
-    return state;
 }
 
 static bool check_capabilities(const struct shader_runner *runner, const struct shader_runner_caps *caps)
@@ -1997,12 +1973,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER_COMPUTE:
-                case STATE_SHADER_COMPUTE_TODO:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                    {
-                        todo_if (state == STATE_SHADER_COMPUTE_TODO)
                         compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_CS, expect_hr);
-                    }
                     free(runner->shader_source[SHADER_TYPE_CS]);
                     runner->shader_source[SHADER_TYPE_CS] = shader_source;
                     shader_source = NULL;
@@ -2011,12 +1983,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER_PIXEL:
-                case STATE_SHADER_PIXEL_TODO:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                    {
-                        todo_if (state == STATE_SHADER_PIXEL_TODO)
                         compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_PS, expect_hr);
-                    }
                     free(runner->shader_source[SHADER_TYPE_PS]);
                     runner->shader_source[SHADER_TYPE_PS] = shader_source;
                     shader_source = NULL;
@@ -2025,12 +1993,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER_VERTEX:
-                case STATE_SHADER_VERTEX_TODO:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                    {
-                        todo_if (state == STATE_SHADER_VERTEX_TODO)
                         compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_VS, expect_hr);
-                    }
                     free(runner->shader_source[SHADER_TYPE_VS]);
                     runner->shader_source[SHADER_TYPE_VS] = shader_source;
                     shader_source = NULL;
@@ -2039,12 +2003,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER_EFFECT:
-                case STATE_SHADER_EFFECT_TODO:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                    {
-                        todo_if (state == STATE_SHADER_EFFECT_TODO)
                         compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_FX, expect_hr);
-                    }
                     free(runner->shader_source[SHADER_TYPE_FX]);
                     runner->shader_source[SHADER_TYPE_FX] = shader_source;
                     shader_source = NULL;
@@ -2053,12 +2013,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER_HULL:
-                case STATE_SHADER_HULL_TODO:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                    {
-                        todo_if (state == STATE_SHADER_HULL_TODO)
                         compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_HS, expect_hr);
-                    }
                     free(runner->shader_source[SHADER_TYPE_HS]);
                     runner->shader_source[SHADER_TYPE_HS] = shader_source;
                     shader_source = NULL;
@@ -2067,12 +2023,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER_DOMAIN:
-                case STATE_SHADER_DOMAIN_TODO:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                    {
-                        todo_if (state == STATE_SHADER_DOMAIN_TODO)
                         compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_DS, expect_hr);
-                    }
                     free(runner->shader_source[SHADER_TYPE_DS]);
                     runner->shader_source[SHADER_TYPE_DS] = shader_source;
                     shader_source = NULL;
@@ -2081,12 +2033,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER_GEOMETRY:
-                case STATE_SHADER_GEOMETRY_TODO:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                    {
-                        todo_if (state == STATE_SHADER_GEOMETRY_TODO)
                         compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_GS, expect_hr);
-                    }
                     free(runner->shader_source[SHADER_TYPE_GS]);
                     runner->shader_source[SHADER_TYPE_GS] = shader_source;
                     shader_source = NULL;
@@ -2168,7 +2116,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             {
                 state = STATE_SHADER_COMPUTE;
                 expect_hr = S_OK;
-                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
             }
             else if (!strcmp(line, "[require]\n"))
             {
@@ -2184,7 +2132,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             {
                 state = STATE_SHADER_PIXEL;
                 expect_hr = S_OK;
-                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
             }
             else if (sscanf(line, "[sampler %u]\n", &index))
             {
@@ -2284,31 +2232,31 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             {
                 state = STATE_SHADER_VERTEX;
                 expect_hr = S_OK;
-                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
             }
             else if (match_directive_substring(line, "[effect", &line))
             {
                 state = STATE_SHADER_EFFECT;
                 expect_hr = S_OK;
-                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
             }
             else if (match_directive_substring(line, "[hull shader", &line))
             {
                 state = STATE_SHADER_HULL;
                 expect_hr = S_OK;
-                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
             }
             else if (match_directive_substring(line, "[domain shader", &line))
             {
                 state = STATE_SHADER_DOMAIN;
                 expect_hr = S_OK;
-                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
             }
             else if (match_directive_substring(line, "[geometry shader", &line))
             {
                 state = STATE_SHADER_GEOMETRY;
                 expect_hr = S_OK;
-                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
             }
             else if (!strcmp(line, "[input layout]\n"))
             {
@@ -2336,19 +2284,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 case STATE_PREPROC:
                 case STATE_PREPROC_INVALID:
                 case STATE_SHADER_COMPUTE:
-                case STATE_SHADER_COMPUTE_TODO:
                 case STATE_SHADER_PIXEL:
-                case STATE_SHADER_PIXEL_TODO:
                 case STATE_SHADER_VERTEX:
-                case STATE_SHADER_VERTEX_TODO:
                 case STATE_SHADER_EFFECT:
-                case STATE_SHADER_EFFECT_TODO:
                 case STATE_SHADER_HULL:
-                case STATE_SHADER_HULL_TODO:
                 case STATE_SHADER_DOMAIN:
-                case STATE_SHADER_DOMAIN_TODO:
                 case STATE_SHADER_GEOMETRY:
-                case STATE_SHADER_GEOMETRY_TODO:
                 {
                     size_t len = strlen(line);
 
