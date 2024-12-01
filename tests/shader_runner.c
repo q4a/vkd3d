@@ -104,13 +104,7 @@ enum parse_state
     STATE_REQUIRE,
     STATE_RESOURCE,
     STATE_SAMPLER,
-    STATE_SHADER_COMPUTE,
-    STATE_SHADER_PIXEL,
-    STATE_SHADER_VERTEX,
-    STATE_SHADER_EFFECT,
-    STATE_SHADER_HULL,
-    STATE_SHADER_DOMAIN,
-    STATE_SHADER_GEOMETRY,
+    STATE_SHADER,
     STATE_TEST,
 };
 
@@ -1701,6 +1695,7 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
 static void read_shader_directive(struct shader_runner *runner,
         const char *line, const char *src, HRESULT *expect_hr)
 {
+    *expect_hr = S_OK;
     runner->is_todo = false;
 
     while (*src && *src != ']')
@@ -1875,6 +1870,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
         const struct shader_runner_ops *ops, void *dxc_compiler)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
+    enum shader_type shader_type = SHADER_TYPE_CS;
     struct resource_params current_resource;
     struct sampler *current_sampler = NULL;
     enum parse_state state = STATE_NONE;
@@ -1972,71 +1968,11 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     free(current_resource.data);
                     break;
 
-                case STATE_SHADER_COMPUTE:
+                case STATE_SHADER:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_CS, expect_hr);
-                    free(runner->shader_source[SHADER_TYPE_CS]);
-                    runner->shader_source[SHADER_TYPE_CS] = shader_source;
-                    shader_source = NULL;
-                    shader_source_len = 0;
-                    shader_source_size = 0;
-                    break;
-
-                case STATE_SHADER_PIXEL:
-                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_PS, expect_hr);
-                    free(runner->shader_source[SHADER_TYPE_PS]);
-                    runner->shader_source[SHADER_TYPE_PS] = shader_source;
-                    shader_source = NULL;
-                    shader_source_len = 0;
-                    shader_source_size = 0;
-                    break;
-
-                case STATE_SHADER_VERTEX:
-                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_VS, expect_hr);
-                    free(runner->shader_source[SHADER_TYPE_VS]);
-                    runner->shader_source[SHADER_TYPE_VS] = shader_source;
-                    shader_source = NULL;
-                    shader_source_len = 0;
-                    shader_source_size = 0;
-                    break;
-
-                case STATE_SHADER_EFFECT:
-                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_FX, expect_hr);
-                    free(runner->shader_source[SHADER_TYPE_FX]);
-                    runner->shader_source[SHADER_TYPE_FX] = shader_source;
-                    shader_source = NULL;
-                    shader_source_len = 0;
-                    shader_source_size = 0;
-                    break;
-
-                case STATE_SHADER_HULL:
-                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_HS, expect_hr);
-                    free(runner->shader_source[SHADER_TYPE_HS]);
-                    runner->shader_source[SHADER_TYPE_HS] = shader_source;
-                    shader_source = NULL;
-                    shader_source_len = 0;
-                    shader_source_size = 0;
-                    break;
-
-                case STATE_SHADER_DOMAIN:
-                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_DS, expect_hr);
-                    free(runner->shader_source[SHADER_TYPE_DS]);
-                    runner->shader_source[SHADER_TYPE_DS] = shader_source;
-                    shader_source = NULL;
-                    shader_source_len = 0;
-                    shader_source_size = 0;
-                    break;
-
-                case STATE_SHADER_GEOMETRY:
-                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_GS, expect_hr);
-                    free(runner->shader_source[SHADER_TYPE_GS]);
-                    runner->shader_source[SHADER_TYPE_GS] = shader_source;
+                        compile_shader(runner, shader_source, shader_source_len, shader_type, expect_hr);
+                    free(runner->shader_source[shader_type]);
+                    runner->shader_source[shader_type] = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -2114,9 +2050,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
             if (match_directive_substring(line, "[compute shader", &line))
             {
-                state = STATE_SHADER_COMPUTE;
-                expect_hr = S_OK;
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                state = STATE_SHADER;
+                shader_type = SHADER_TYPE_CS;
             }
             else if (!strcmp(line, "[require]\n"))
             {
@@ -2130,9 +2065,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             }
             else if (match_directive_substring(line, "[pixel shader", &line))
             {
-                state = STATE_SHADER_PIXEL;
-                expect_hr = S_OK;
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                state = STATE_SHADER;
+                shader_type = SHADER_TYPE_PS;
             }
             else if (sscanf(line, "[sampler %u]\n", &index))
             {
@@ -2230,33 +2164,28 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             }
             else if (match_directive_substring(line, "[vertex shader", &line))
             {
-                state = STATE_SHADER_VERTEX;
-                expect_hr = S_OK;
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                state = STATE_SHADER;
+                shader_type = SHADER_TYPE_VS;
             }
             else if (match_directive_substring(line, "[effect", &line))
             {
-                state = STATE_SHADER_EFFECT;
-                expect_hr = S_OK;
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                state = STATE_SHADER;
+                shader_type = SHADER_TYPE_FX;
             }
             else if (match_directive_substring(line, "[hull shader", &line))
             {
-                state = STATE_SHADER_HULL;
-                expect_hr = S_OK;
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                state = STATE_SHADER;
+                shader_type = SHADER_TYPE_HS;
             }
             else if (match_directive_substring(line, "[domain shader", &line))
             {
-                state = STATE_SHADER_DOMAIN;
-                expect_hr = S_OK;
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                state = STATE_SHADER;
+                shader_type = SHADER_TYPE_DS;
             }
             else if (match_directive_substring(line, "[geometry shader", &line))
             {
-                state = STATE_SHADER_GEOMETRY;
-                expect_hr = S_OK;
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                state = STATE_SHADER;
+                shader_type = SHADER_TYPE_GS;
             }
             else if (!strcmp(line, "[input layout]\n"))
             {
@@ -2266,6 +2195,13 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     free(runner->input_elements[i].name);
                 runner->input_element_count = 0;
             }
+            else
+            {
+                fatal_error("Unknown directive '%s'.\n", line);
+            }
+
+            if (state == STATE_SHADER)
+                read_shader_directive(runner, line_buffer, line, &expect_hr);
         }
         else if (line[0] != '%' && line[0] != '\n')
         {
@@ -2283,13 +2219,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_PREPROC:
                 case STATE_PREPROC_INVALID:
-                case STATE_SHADER_COMPUTE:
-                case STATE_SHADER_PIXEL:
-                case STATE_SHADER_VERTEX:
-                case STATE_SHADER_EFFECT:
-                case STATE_SHADER_HULL:
-                case STATE_SHADER_DOMAIN:
-                case STATE_SHADER_GEOMETRY:
+                case STATE_SHADER:
                 {
                     size_t len = strlen(line);
 
