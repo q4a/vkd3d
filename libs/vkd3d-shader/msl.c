@@ -802,6 +802,16 @@ static void msl_generate_input_struct_declarations(struct msl_generator *gen)
 
         if (e->sysval_semantic)
         {
+            if (e->sysval_semantic == VKD3D_SHADER_SV_IS_FRONT_FACE)
+            {
+                if (type != VKD3D_SHADER_TYPE_PIXEL)
+                    msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                            "Internal compiler error: Unhandled SV_IS_FRONT_FACE in shader type #%x.", type);
+
+                msl_print_indent(gen->buffer, 1);
+                vkd3d_string_buffer_printf(buffer, "bool is_front_face [[front_facing]];\n");
+                continue;
+            }
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                     "Internal compiler error: Unhandled system value %#x.", e->sysval_semantic);
             continue;
@@ -1015,6 +1025,10 @@ static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
             msl_print_write_mask(buffer, e->mask);
             vkd3d_string_buffer_printf(buffer, " = input.shader_in_%u", i);
             msl_print_write_mask(buffer, e->mask);
+        }
+        else if (e->sysval_semantic == VKD3D_SHADER_SV_IS_FRONT_FACE)
+        {
+            vkd3d_string_buffer_printf(buffer, ".u = uint4(input.is_front_face ? 0xffffffffu : 0u, 0, 0, 0)");
         }
         else
         {
