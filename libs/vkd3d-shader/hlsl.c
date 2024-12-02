@@ -2700,10 +2700,8 @@ struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const cha
     return NULL;
 }
 
-struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const struct hlsl_type *type)
+static void hlsl_dump_type(struct vkd3d_string_buffer *buffer, const struct hlsl_type *type)
 {
-    struct vkd3d_string_buffer *string, *inner_string;
-
     static const char *const base_types[] =
     {
         [HLSL_TYPE_FLOAT] = "float",
@@ -2727,31 +2725,28 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
         [HLSL_SAMPLER_DIM_CUBEARRAY] = "CubeArray",
     };
 
-    if (!(string = hlsl_get_string_buffer(ctx)))
-        return NULL;
-
     if (type->name)
     {
-        vkd3d_string_buffer_printf(string, "%s", type->name);
-        return string;
+        vkd3d_string_buffer_printf(buffer, "%s", type->name);
+        return;
     }
 
     switch (type->class)
     {
         case HLSL_CLASS_SCALAR:
             VKD3D_ASSERT(type->e.numeric.type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(string, "%s", base_types[type->e.numeric.type]);
-            return string;
+            vkd3d_string_buffer_printf(buffer, "%s", base_types[type->e.numeric.type]);
+            return;
 
         case HLSL_CLASS_VECTOR:
             VKD3D_ASSERT(type->e.numeric.type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(string, "%s%u", base_types[type->e.numeric.type], type->dimx);
-            return string;
+            vkd3d_string_buffer_printf(buffer, "%s%u", base_types[type->e.numeric.type], type->dimx);
+            return;
 
         case HLSL_CLASS_MATRIX:
             VKD3D_ASSERT(type->e.numeric.type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(string, "%s%ux%u", base_types[type->e.numeric.type], type->dimy, type->dimx);
-            return string;
+            vkd3d_string_buffer_printf(buffer, "%s%ux%u", base_types[type->e.numeric.type], type->dimy, type->dimx);
+            return;
 
         case HLSL_CLASS_ARRAY:
         {
@@ -2760,102 +2755,85 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             for (t = type; t->class == HLSL_CLASS_ARRAY; t = t->e.array.type)
                 ;
 
-            if ((inner_string = hlsl_type_to_string(ctx, t)))
-            {
-                vkd3d_string_buffer_printf(string, "%s", inner_string->buffer);
-                hlsl_release_string_buffer(ctx, inner_string);
-            }
-
+            hlsl_dump_type(buffer, t);
             for (t = type; t->class == HLSL_CLASS_ARRAY; t = t->e.array.type)
             {
                 if (t->e.array.elements_count == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
-                    vkd3d_string_buffer_printf(string, "[]");
+                    vkd3d_string_buffer_printf(buffer, "[]");
                 else
-                    vkd3d_string_buffer_printf(string, "[%u]", t->e.array.elements_count);
+                    vkd3d_string_buffer_printf(buffer, "[%u]", t->e.array.elements_count);
             }
-            return string;
+            return;
         }
 
         case HLSL_CLASS_STRUCT:
-            vkd3d_string_buffer_printf(string, "<anonymous struct>");
-            return string;
+            vkd3d_string_buffer_printf(buffer, "<anonymous struct>");
+            return;
 
         case HLSL_CLASS_TEXTURE:
             if (type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
             {
-                vkd3d_string_buffer_printf(string, "ByteAddressBuffer");
-                return string;
+                vkd3d_string_buffer_printf(buffer, "ByteAddressBuffer");
+                return;
             }
 
             if (type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
             {
-                vkd3d_string_buffer_printf(string, "Texture");
-                return string;
+                vkd3d_string_buffer_printf(buffer, "Texture");
+                return;
             }
 
             VKD3D_ASSERT(hlsl_is_numeric_type(type->e.resource.format));
             VKD3D_ASSERT(type->e.resource.format->e.numeric.type < ARRAY_SIZE(base_types));
             if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
             {
-                vkd3d_string_buffer_printf(string, "Buffer");
+                vkd3d_string_buffer_printf(buffer, "Buffer<");
             }
             else
             {
                 VKD3D_ASSERT(type->sampler_dim < ARRAY_SIZE(dimensions));
-                vkd3d_string_buffer_printf(string, "Texture%s", dimensions[type->sampler_dim]);
+                vkd3d_string_buffer_printf(buffer, "Texture%s<", dimensions[type->sampler_dim]);
             }
-            if ((inner_string = hlsl_type_to_string(ctx, type->e.resource.format)))
-            {
-                vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
-                hlsl_release_string_buffer(ctx, inner_string);
-            }
-            return string;
+            hlsl_dump_type(buffer, type->e.resource.format);
+            vkd3d_string_buffer_printf(buffer, ">");
+            return;
 
         case HLSL_CLASS_UAV:
             if (type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
             {
-                vkd3d_string_buffer_printf(string, "RWByteAddressBuffer");
-                return string;
+                vkd3d_string_buffer_printf(buffer, "RWByteAddressBuffer");
+                return;
             }
             if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
-                vkd3d_string_buffer_printf(string, "RWBuffer");
+                vkd3d_string_buffer_printf(buffer, "RWBuffer<");
             else if (type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
-                vkd3d_string_buffer_printf(string, "RWStructuredBuffer");
+                vkd3d_string_buffer_printf(buffer, "RWStructuredBuffer<");
             else
-                vkd3d_string_buffer_printf(string, "RWTexture%s", dimensions[type->sampler_dim]);
-            if ((inner_string = hlsl_type_to_string(ctx, type->e.resource.format)))
-            {
-                vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
-                hlsl_release_string_buffer(ctx, inner_string);
-            }
-            return string;
+                vkd3d_string_buffer_printf(buffer, "RWTexture%s<", dimensions[type->sampler_dim]);
+            hlsl_dump_type(buffer, type->e.resource.format);
+            vkd3d_string_buffer_printf(buffer, ">");
+            return;
 
         case HLSL_CLASS_CONSTANT_BUFFER:
-            vkd3d_string_buffer_printf(string, "ConstantBuffer");
-            if ((inner_string = hlsl_type_to_string(ctx, type->e.resource.format)))
-            {
-                vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
-                hlsl_release_string_buffer(ctx, inner_string);
-            }
-            return string;
+            vkd3d_string_buffer_printf(buffer, "ConstantBuffer<");
+            hlsl_dump_type(buffer, type->e.resource.format);
+            vkd3d_string_buffer_printf(buffer, ">");
+            return;
 
         case HLSL_CLASS_ERROR:
-            vkd3d_string_buffer_printf(string, "<error type>");
-            return string;
+            vkd3d_string_buffer_printf(buffer, "<error type>");
+            return;
 
         case HLSL_CLASS_STREAM_OUTPUT:
             if (type->e.so.so_type == HLSL_STREAM_OUTPUT_POINT_STREAM)
-                vkd3d_string_buffer_printf(string, "PointStream");
+                vkd3d_string_buffer_printf(buffer, "PointStream<");
             else if (type->e.so.so_type == HLSL_STREAM_OUTPUT_LINE_STREAM)
-                vkd3d_string_buffer_printf(string, "LineStream");
+                vkd3d_string_buffer_printf(buffer, "LineStream<");
             else
-                vkd3d_string_buffer_printf(string, "TriangleStream");
-            if ((inner_string = hlsl_type_to_string(ctx, type->e.so.type)))
-            {
-                vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
-                hlsl_release_string_buffer(ctx, inner_string);
-            }
-            return string;
+                vkd3d_string_buffer_printf(buffer, "TriangleStream<");
+            hlsl_dump_type(buffer, type->e.so.type);
+            vkd3d_string_buffer_printf(buffer, ">");
+            return;
 
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
@@ -2878,8 +2856,17 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             break;
     }
 
-    vkd3d_string_buffer_printf(string, "<unexpected type>");
-    return string;
+    vkd3d_string_buffer_printf(buffer, "<unexpected type>");
+}
+
+struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const struct hlsl_type *type)
+{
+    struct vkd3d_string_buffer *buffer;
+
+    if (!(buffer = hlsl_get_string_buffer(ctx)))
+        return NULL;
+    hlsl_dump_type(buffer, type);
+    return buffer;
 }
 
 struct vkd3d_string_buffer *hlsl_component_to_string(struct hlsl_ctx *ctx, const struct hlsl_ir_var *var,
@@ -3042,7 +3029,8 @@ static void dump_ir_var(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer
             vkd3d_string_buffer_printf(buffer, "%s ", string->buffer);
         hlsl_release_string_buffer(ctx, string);
     }
-    vkd3d_string_buffer_printf(buffer, "%s %s", debug_hlsl_type(ctx, var->data_type), var->name);
+    hlsl_dump_type(buffer, var->data_type);
+    vkd3d_string_buffer_printf(buffer, " %s", var->name);
     if (var->semantic.name)
         vkd3d_string_buffer_printf(buffer, " : %s%u", var->semantic.name, var->semantic.index);
 }
@@ -3126,27 +3114,19 @@ const char *debug_hlsl_swizzle(uint32_t swizzle, unsigned int size)
 static void dump_ir_call(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_call *call)
 {
     const struct hlsl_ir_function_decl *decl = call->decl;
-    struct vkd3d_string_buffer *string;
     size_t i;
 
-    if (!(string = hlsl_type_to_string(ctx, decl->return_type)))
-        return;
-
-    vkd3d_string_buffer_printf(buffer, "call %s %s(", string->buffer, decl->func->name);
-    hlsl_release_string_buffer(ctx, string);
+    vkd3d_string_buffer_printf(buffer, "call ");
+    hlsl_dump_type(buffer, decl->return_type);
+    vkd3d_string_buffer_printf(buffer, " %s(", decl->func->name);
 
     for (i = 0; i < decl->parameters.count; ++i)
     {
         const struct hlsl_ir_var *param = decl->parameters.vars[i];
 
-        if (!(string = hlsl_type_to_string(ctx, param->data_type)))
-            return;
-
         if (i)
             vkd3d_string_buffer_printf(buffer, ", ");
-        vkd3d_string_buffer_printf(buffer, "%s", string->buffer);
-
-        hlsl_release_string_buffer(ctx, string);
+        hlsl_dump_type(buffer, param->data_type);
     }
     vkd3d_string_buffer_printf(buffer, ")");
 }
