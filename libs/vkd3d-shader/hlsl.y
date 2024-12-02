@@ -3012,9 +3012,16 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
         const char *name, const struct parse_initializer *args, bool is_compile,
         const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_function_decl *decl, *compatible_match = NULL;
+    struct hlsl_ir_function_decl *decl;
+    struct vkd3d_string_buffer *s;
     struct hlsl_ir_function *func;
     struct rb_entry *entry;
+    size_t i;
+    struct
+    {
+        struct hlsl_ir_function_decl **candidates;
+        size_t count, capacity;
+    } candidates = {0};
 
     if (!(entry = rb_get(&ctx->functions, name)))
         return NULL;
@@ -3022,18 +3029,41 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
 
     LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
     {
-        if (func_is_compatible_match(ctx, decl, is_compile, args))
+        if (!func_is_compatible_match(ctx, decl, is_compile, args))
+            continue;
+
+        if (!(hlsl_array_reserve(ctx, (void **)&candidates.candidates,
+                &candidates.capacity, candidates.count + 1, sizeof(decl))))
         {
-            if (compatible_match)
+            vkd3d_free(candidates.candidates);
+            return NULL;
+        }
+        candidates.candidates[candidates.count++] = decl;
+    }
+
+    if (!candidates.count)
+        return NULL;
+
+    if (candidates.count > 1)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_AMBIGUOUS_CALL, "Ambiguous function call.");
+        if ((s = hlsl_get_string_buffer(ctx)))
+        {
+            hlsl_note(ctx, loc, VKD3D_SHADER_LOG_ERROR, "Candidates are:");
+            for (i = 0; i < candidates.count; ++i)
             {
-                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_AMBIGUOUS_CALL, "Ambiguous function call.");
-                break;
+                hlsl_dump_ir_function_decl(ctx, s, candidates.candidates[i]);
+                hlsl_note(ctx, loc, VKD3D_SHADER_LOG_ERROR, "    %s;", s->buffer);
+                vkd3d_string_buffer_clear(s);
             }
-            compatible_match = decl;
+            hlsl_release_string_buffer(ctx, s);
         }
     }
 
-    return compatible_match;
+    decl = candidates.candidates[0];
+    vkd3d_free(candidates.candidates);
+
+    return decl;
 }
 
 static struct hlsl_ir_node *hlsl_new_void_expr(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)

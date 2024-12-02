@@ -3111,7 +3111,7 @@ const char *debug_hlsl_swizzle(uint32_t swizzle, unsigned int size)
     return vkd3d_dbg_sprintf(".%s", string);
 }
 
-static void hlsl_dump_ir_function_decl(struct hlsl_ctx *ctx,
+void hlsl_dump_ir_function_decl(struct hlsl_ctx *ctx,
         struct vkd3d_string_buffer *buffer, const struct hlsl_ir_function_decl *f)
 {
     size_t i;
