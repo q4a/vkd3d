@@ -552,6 +552,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_IEQ:
             msl_relop(gen, ins, "==");
             break;
+        case VKD3DSIH_EXP:
+            msl_intrinsic(gen, ins, "exp2");
+            break;
         case VKD3DSIH_FRC:
             msl_intrinsic(gen, ins, "fract");
             break;
