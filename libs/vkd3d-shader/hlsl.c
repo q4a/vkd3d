@@ -3111,24 +3111,26 @@ const char *debug_hlsl_swizzle(uint32_t swizzle, unsigned int size)
     return vkd3d_dbg_sprintf(".%s", string);
 }
 
-static void dump_ir_call(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_call *call)
+static void hlsl_dump_ir_function_decl(struct hlsl_ctx *ctx,
+        struct vkd3d_string_buffer *buffer, const struct hlsl_ir_function_decl *f)
 {
-    const struct hlsl_ir_function_decl *decl = call->decl;
     size_t i;
 
-    vkd3d_string_buffer_printf(buffer, "call ");
-    hlsl_dump_type(buffer, decl->return_type);
-    vkd3d_string_buffer_printf(buffer, " %s(", decl->func->name);
-
-    for (i = 0; i < decl->parameters.count; ++i)
+    hlsl_dump_type(buffer, f->return_type);
+    vkd3d_string_buffer_printf(buffer, " %s(", f->func->name);
+    for (i = 0; i < f->parameters.count; ++i)
     {
-        const struct hlsl_ir_var *param = decl->parameters.vars[i];
-
         if (i)
             vkd3d_string_buffer_printf(buffer, ", ");
-        hlsl_dump_type(buffer, param->data_type);
+        dump_ir_var(ctx, buffer, f->parameters.vars[i]);
     }
     vkd3d_string_buffer_printf(buffer, ")");
+}
+
+static void dump_ir_call(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_call *call)
+{
+    vkd3d_string_buffer_printf(buffer, "call ");
+    hlsl_dump_ir_function_decl(ctx, buffer, call->decl);
 }
 
 static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_constant *constant)
