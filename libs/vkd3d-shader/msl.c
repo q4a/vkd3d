@@ -649,6 +649,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             msl_binop(gen, ins, "<<");
             break;
         case VKD3DSIH_ISHR:
+        case VKD3DSIH_USHR:
             msl_binop(gen, ins, ">>");
             break;
         case VKD3DSIH_LTO:
