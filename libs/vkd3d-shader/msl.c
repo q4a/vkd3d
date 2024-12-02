@@ -511,6 +511,21 @@ static void msl_endif(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "}\n");
 }
 
+static void msl_unary_op(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *op)
+{
+    struct msl_src src;
+    struct msl_dst dst;
+    uint32_t mask;
+
+    mask = msl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    msl_src_init(&src, gen, &ins->src[0], mask);
+
+    msl_print_assignment(gen, &dst, "%s%s", op, src.str->buffer);
+
+    msl_src_cleanup(&src, &gen->string_buffers);
+    msl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
 static void msl_mov(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct msl_src src;
@@ -635,6 +650,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_MUL:
             msl_binop(gen, ins, "*");
+            break;
+        case VKD3DSIH_NOT:
+            msl_unary_op(gen, ins, "~");
             break;
         case VKD3DSIH_OR:
             msl_binop(gen, ins, "|");
