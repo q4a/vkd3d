@@ -648,6 +648,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_LTO:
             msl_relop(gen, ins, "<");
             break;
+        case VKD3DSIH_MAD:
+            msl_intrinsic(gen, ins, "fma");
+            break;
         case VKD3DSIH_MAX:
             msl_intrinsic(gen, ins, "max");
             break;
