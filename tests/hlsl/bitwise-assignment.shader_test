@@ -52,7 +52,7 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 uint4 3 0 0 0
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (280, 280, 0, 0)
 
 [pixel shader]
@@ -72,7 +72,7 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 uint4 2 0 0 0
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (20, -48, 20, -48)
 
 [pixel shader fail]
