@@ -486,6 +486,20 @@ static void msl_cast(struct msl_generator *gen, const struct vkd3d_shader_instru
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
+static void msl_end_block(struct msl_generator *gen)
+{
+    --gen->indent;
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "}\n");
+}
+
+static void msl_begin_block(struct msl_generator *gen)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "{\n");
+    ++gen->indent;
+}
+
 static void msl_if(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const char *condition;
@@ -499,16 +513,15 @@ static void msl_if(struct msl_generator *gen, const struct vkd3d_shader_instruct
 
     msl_src_cleanup(&src, &gen->string_buffers);
 
-    msl_print_indent(gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(gen->buffer, "{\n");
-    ++gen->indent;
+    msl_begin_block(gen);
 }
 
-static void msl_endif(struct msl_generator *gen)
+static void msl_else(struct msl_generator *gen)
 {
-    --gen->indent;
+    msl_end_block(gen);
     msl_print_indent(gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(gen->buffer, "}\n");
+    vkd3d_string_buffer_printf(gen->buffer, "else\n");
+    msl_begin_block(gen);
 }
 
 static void msl_unary_op(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *op)
@@ -598,8 +611,11 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_DP4:
             msl_dot(gen, ins, VKD3DSP_WRITEMASK_ALL);
             break;
+        case VKD3DSIH_ELSE:
+            msl_else(gen);
+            break;
         case VKD3DSIH_ENDIF:
-            msl_endif(gen);
+            msl_end_block(gen);
             break;
         case VKD3DSIH_IEQ:
             msl_relop(gen, ins, "==");
