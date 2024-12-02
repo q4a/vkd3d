@@ -609,6 +609,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_UTOF:
             msl_cast(gen, ins, "float");
             break;
+        case VKD3DSIH_LOG:
+            msl_intrinsic(gen, ins, "log2");
+            break;
         case VKD3DSIH_MOV:
             msl_mov(gen, ins);
             break;
