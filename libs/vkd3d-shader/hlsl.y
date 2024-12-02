@@ -3026,7 +3026,7 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
         {
             if (compatible_match)
             {
-                hlsl_fixme(ctx, loc, "Prioritize between multiple compatible function overloads.");
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_AMBIGUOUS_CALL, "Ambiguous function call.");
                 break;
             }
             compatible_match = decl;
