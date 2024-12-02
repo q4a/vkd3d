@@ -422,16 +422,25 @@ static void msl_dot(struct msl_generator *gen, const struct vkd3d_shader_instruc
 
 static void msl_intrinsic(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *op)
 {
+    struct vkd3d_string_buffer *args;
     struct msl_src src;
     struct msl_dst dst;
+    unsigned int i;
     uint32_t mask;
 
     mask = msl_dst_init(&dst, gen, ins, &ins->dst[0]);
-    msl_src_init(&src, gen, &ins->src[0], mask);
+    args = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    msl_print_assignment(gen, &dst, "%s(%s)", op, src.str->buffer);
+    for (i = 0; i < ins->src_count; ++i)
+    {
+        msl_src_init(&src, gen, &ins->src[i], mask);
+        vkd3d_string_buffer_printf(args, "%s%s", i ? ", " : "", src.str->buffer);
+        msl_src_cleanup(&src, &gen->string_buffers);
+    }
 
-    msl_src_cleanup(&src, &gen->string_buffers);
+    msl_print_assignment(gen, &dst, "%s(%s)", op, args->buffer);
+
+    vkd3d_string_buffer_release(&gen->string_buffers, args);
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
@@ -600,6 +609,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_LTO:
             msl_relop(gen, ins, "<");
+            break;
+        case VKD3DSIH_MAX:
+            msl_intrinsic(gen, ins, "max");
             break;
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:
