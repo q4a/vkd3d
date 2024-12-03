@@ -461,3 +461,239 @@ probe rtv 0 (1, 1) rgba (1.0, 0.0, 0.0, 1.0)
 probe uav 1 (1) rgba (0.5, 0.25, 1.0, 0.75)
 probe uav 1 (2) rgba (0.5, 0.25, 1.0, 0.75)
 probe uav 1 (3) rgba (0.5, 0.25, 1.0, 0.75)
+
+
+[require]
+shader model >= 6.0
+wave-ops
+float64
+format r32g32-float uav-load
+format r32g32b32a32-uint uav-load
+
+[uav 0]
+format r32g32-float
+size (buffer, 4)
+
+3.5 1.0
+3.5 1.0
+3.5 1.5
+3.5 1.0
+
+[uav 1]
+format r32g32b32a32-uint
+size (buffer, 16)
+
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<uint4> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id];
+    bool2 b = WaveActiveAllEqual(d);
+    u1[id] = uint4(b.x, b.y, 0, 0);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgbaui(1, 0, 0, 0)
+probe uav 1 (1) rgbaui(1, 0, 0, 0)
+probe uav 1 (2) rgbaui(1, 0, 0, 0)
+probe uav 1 (3) rgbaui(1, 0, 0, 0)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id] + u0[id ^ 1];
+    u1[id] = WaveReadLaneFirst(d);
+    u1[4 + id] = WaveReadLaneAt(d, 3);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(7.0, 2.0)
+probe uav 1 (1) rgd(7.0, 2.0)
+probe uav 1 (2) rgd(7.0, 2.0)
+probe uav 1 (3) rgd(7.0, 2.0)
+probe uav 1 (4) rgd(7.0, 2.5)
+probe uav 1 (5) rgd(7.0, 2.5)
+probe uav 1 (6) rgd(7.0, 2.5)
+probe uav 1 (7) rgd(7.0, 2.5)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id];
+    u1[id] = WaveActiveSum(d);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(14.0, 4.5)
+probe uav 1 (1) rgd(14.0, 4.5)
+probe uav 1 (2) rgd(14.0, 4.5)
+probe uav 1 (3) rgd(14.0, 4.5)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id];
+    u1[id] = WaveActiveProduct(d);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(150.0625, 1.5)
+probe uav 1 (1) rgd(150.0625, 1.5)
+probe uav 1 (2) rgd(150.0625, 1.5)
+probe uav 1 (3) rgd(150.0625, 1.5)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id];
+    u1[id] = WaveActiveMin(d);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(3.5, 1.0)
+probe uav 1 (1) rgd(3.5, 1.0)
+probe uav 1 (2) rgd(3.5, 1.0)
+probe uav 1 (3) rgd(3.5, 1.0)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id];
+    u1[id] = WaveActiveMax(d);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(3.5, 1.5)
+probe uav 1 (1) rgd(3.5, 1.5)
+probe uav 1 (2) rgd(3.5, 1.5)
+probe uav 1 (3) rgd(3.5, 1.5)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id];
+    u1[id] = WavePrefixSum(d);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(0.0, 0.0)
+probe uav 1 (1) rgd(3.5, 1.0)
+probe uav 1 (2) rgd(7.0, 2.0)
+probe uav 1 (3) rgd(10.5, 3.5)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    double2 d = u0[id];
+    u1[id] = WavePrefixProduct(d);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(1.0, 1.0)
+probe uav 1 (1) rgd(3.5, 1.0)
+probe uav 1 (2) rgd(12.25, 1.0)
+probe uav 1 (3) rgd(42.875, 1.5)
+
+
+[uav 0]
+format r32g32b32a32-float
+size (buffer, 4)
+
+0.25 0.50 0.75 1.00
+0.50 0.25 1.00 0.75
+0.75 1.00 0.50 0.25
+1.00 0.75 0.25 0.50
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    uint i = WaveGetLaneIndex() % 4;
+    double2 d = u0[i];
+    u1[i] = QuadReadAcrossX(d);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(0.5, 0.25)
+probe uav 1 (1) rgd(0.25, 0.5)
+probe uav 1 (2) rgd(1.0, 0.75)
+probe uav 1 (3) rgd(0.75, 1.0)
+
+
+[compute shader]
+RWBuffer<float2> u0;
+RWBuffer<double2> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    uint i = WaveGetLaneIndex() % 4;
+    double2 d = u0[i];
+    u1[i] = QuadReadLaneAt(d, 2);
+}
+
+[test]
+dispatch 4 1 1
+probe uav 1 (0) rgd(0.75, 1.0)
+probe uav 1 (1) rgd(0.75, 1.0)
+probe uav 1 (2) rgd(0.75, 1.0)
+probe uav 1 (3) rgd(0.75, 1.0)
