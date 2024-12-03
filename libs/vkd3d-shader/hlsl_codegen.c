@@ -2791,6 +2791,21 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
     return true;
 }
 
+static struct hlsl_type *clone_texture_array_as_combined_sampler_array(struct hlsl_ctx *ctx, struct hlsl_type *type)
+{
+    struct hlsl_type *sampler_type;
+
+    if (type->class == HLSL_CLASS_ARRAY)
+    {
+        if (!(sampler_type = clone_texture_array_as_combined_sampler_array(ctx, type->e.array.type)))
+            return NULL;
+
+        return hlsl_new_array_type(ctx, sampler_type, type->e.array.elements_count);
+    }
+
+    return ctx->builtin_types.sampler[type->sampler_dim];
+}
+
 /* Lower samples from separate texture and sampler variables to samples from
  * synthetized combined samplers. That is, translate SM4-style samples in the
  * source to SM1-style samples in the bytecode. */
@@ -2800,7 +2815,6 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     struct hlsl_ir_resource_load *load;
     struct vkd3d_string_buffer *name;
     struct hlsl_type *sampler_type;
-    unsigned int sampler_dim;
 
     if (instr->type != HLSL_IR_RESOURCE_LOAD)
         return false;
@@ -2826,11 +2840,6 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
                 "Lower separated samples with sampler arrays.");
         return false;
     }
-    if (resource->data_type->class == HLSL_CLASS_ARRAY)
-    {
-        hlsl_fixme(ctx, &instr->loc, "Lower separated samples with resource arrays.");
-        return false;
-    }
     if (!resource->is_uniform)
         return false;
     if(!sampler->is_uniform)
@@ -2839,13 +2848,16 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     if (!(name = hlsl_get_string_buffer(ctx)))
         return false;
     vkd3d_string_buffer_printf(name, "%s+%s", sampler->name, resource->name);
-    sampler_dim = hlsl_get_multiarray_element_type(resource->data_type)->sampler_dim;
 
     TRACE("Lowering to combined sampler %s.\n", debugstr_a(name->buffer));
 
     if (!(var = hlsl_get_var(ctx->globals, name->buffer)))
     {
-        sampler_type = ctx->builtin_types.sampler[sampler_dim];
+        if (!(sampler_type = clone_texture_array_as_combined_sampler_array(ctx, resource->data_type)))
+        {
+            hlsl_release_string_buffer(ctx, name);
+            return false;
+        }
 
         if (!(var = hlsl_new_synthetic_var_named(ctx, name->buffer, sampler_type, &instr->loc, false)))
         {
