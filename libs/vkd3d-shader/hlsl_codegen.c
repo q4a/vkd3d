@@ -2790,6 +2790,87 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
 
     return true;
 }
+
+/* Lower samples from separate texture and sampler variables to samples from
+ * synthetized combined samplers. That is, translate SM4-style samples in the
+ * source to SM1-style samples in the bytecode. */
+static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_var *var, *resource, *sampler;
+    struct hlsl_ir_resource_load *load;
+    struct vkd3d_string_buffer *name;
+    struct hlsl_type *sampler_type;
+    unsigned int sampler_dim;
+
+    if (instr->type != HLSL_IR_RESOURCE_LOAD)
+        return false;
+    load = hlsl_ir_resource_load(instr);
+
+    if (load->load_type != HLSL_RESOURCE_SAMPLE
+            && load->load_type != HLSL_RESOURCE_SAMPLE_LOD
+            && load->load_type != HLSL_RESOURCE_SAMPLE_LOD_BIAS)
+        return false;
+
+    if (!load->sampler.var)
+        return false;
+    resource = load->resource.var;
+    sampler = load->sampler.var;
+
+    VKD3D_ASSERT(hlsl_type_is_resource(resource->data_type));
+    VKD3D_ASSERT(hlsl_type_is_resource(sampler->data_type));
+    if (sampler->data_type->class == HLSL_CLASS_ARRAY)
+    {
+        /* Only supported by d3dcompiler if the sampler is the first component
+         * of the sampler array. */
+        hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED,
+                "Lower separated samples with sampler arrays.");
+        return false;
+    }
+    if (resource->data_type->class == HLSL_CLASS_ARRAY)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Lower separated samples with resource arrays.");
+        return false;
+    }
+    if (!resource->is_uniform)
+        return false;
+    if(!sampler->is_uniform)
+        return false;
+
+    if (!(name = hlsl_get_string_buffer(ctx)))
+        return false;
+    vkd3d_string_buffer_printf(name, "%s+%s", sampler->name, resource->name);
+    sampler_dim = hlsl_get_multiarray_element_type(resource->data_type)->sampler_dim;
+
+    TRACE("Lowering to combined sampler %s.\n", debugstr_a(name->buffer));
+
+    if (!(var = hlsl_get_var(ctx->globals, name->buffer)))
+    {
+        sampler_type = ctx->builtin_types.sampler[sampler_dim];
+
+        if (!(var = hlsl_new_synthetic_var_named(ctx, name->buffer, sampler_type, &instr->loc, false)))
+        {
+            hlsl_release_string_buffer(ctx, name);
+            return false;
+        }
+        var->storage_modifiers |= HLSL_STORAGE_UNIFORM;
+        var->is_combined_sampler = true;
+        var->is_uniform = 1;
+
+        list_remove(&var->scope_entry);
+        list_add_after(&sampler->scope_entry, &var->scope_entry);
+
+        list_add_after(&sampler->extern_entry, &var->extern_entry);
+    }
+    hlsl_release_string_buffer(ctx, name);
+
+    /* Only change the deref's var, keep the path. */
+    load->resource.var = var;
+    hlsl_cleanup_deref(&load->sampler);
+    load->sampler.var = NULL;
+
+    return true;
+}
+
 /* Lower combined samples and sampler variables to synthesized separated textures and samplers.
  * That is, translate SM1-style samples in the source to SM4-style samples in the bytecode. */
 static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -2899,6 +2980,27 @@ static void insert_ensuring_decreasing_bind_count(struct list *list, struct hlsl
     }
 
     list_add_tail(list, &to_add->extern_entry);
+}
+
+static bool sort_synthetic_combined_samplers_first(struct hlsl_ctx *ctx)
+{
+    struct list separated_resources;
+    struct hlsl_ir_var *var, *next;
+
+    list_init(&separated_resources);
+
+    LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_combined_sampler)
+        {
+            list_remove(&var->extern_entry);
+            insert_ensuring_decreasing_bind_count(&separated_resources, var, HLSL_REGSET_SAMPLERS);
+        }
+    }
+
+    list_move_head(&ctx->extern_vars, &separated_resources);
+
+    return false;
 }
 
 static bool sort_synthetic_separated_samplers_first(struct hlsl_ctx *ctx)
@@ -10260,9 +10362,13 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
 
+    if (hlsl_version_lt(ctx, 4, 0))
+        hlsl_transform_ir(ctx, lower_separate_samples, body, NULL);
+
     hlsl_transform_ir(ctx, validate_dereferences, body, NULL);
     hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
-    if (profile->major_version >= 4)
+
+    if (hlsl_version_ge(ctx, 4, 0))
         hlsl_transform_ir(ctx, lower_combined_samples, body, NULL);
 
     do
@@ -10270,7 +10376,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     while (hlsl_transform_ir(ctx, dce, body, NULL));
 
     hlsl_transform_ir(ctx, track_components_usage, body, NULL);
-    sort_synthetic_separated_samplers_first(ctx);
+    if (hlsl_version_lt(ctx, 4, 0))
+        sort_synthetic_combined_samplers_first(ctx);
+    else
+        sort_synthetic_separated_samplers_first(ctx);
 
     if (profile->major_version < 4)
     {

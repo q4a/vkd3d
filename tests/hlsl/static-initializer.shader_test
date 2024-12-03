@@ -136,7 +136,7 @@ float4 main(Texture2D tex2) : sv_target
 }
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 Texture2D real_tex;
 static Texture2D tex = real_tex;
 sampler sam;
@@ -147,11 +147,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<4 | msl) draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (1, 2, 3, 4)
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 Texture2D real_tex;
 static Texture2D tex;
 sampler sam;
@@ -163,7 +163,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<4 | msl) draw quad
+todo(msl) draw quad
 probe (0, 0) rgba (1, 2, 3, 4)
 
 

@@ -535,6 +535,10 @@ struct hlsl_ir_var
      * element of a struct, and thus needs to be aligned when packed in the signature. */
     bool force_align;
 
+    /* Whether this is a sampler that was created from the combination of a
+     * sampler and a texture for SM<4 backwards compatibility. */
+    bool is_combined_sampler;
+
     uint32_t is_input_semantic : 1;
     uint32_t is_output_semantic : 1;
     uint32_t is_uniform : 1;
@@ -1643,7 +1647,7 @@ bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, 
         struct hlsl_block *block, void *context);
 
 D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type);
-D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type);
+D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type, bool is_combined_sampler);
 
 void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer);
 int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,

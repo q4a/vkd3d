@@ -1570,9 +1570,14 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
     vkd3d_unreachable();
 }
 
-D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
+D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type, bool is_combined_sampler)
 {
-    switch (type->class)
+    enum hlsl_type_class class = type->class;
+
+    if (is_combined_sampler)
+        class = HLSL_CLASS_TEXTURE;
+
+    switch (class)
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
@@ -1639,7 +1644,7 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
             break;
 
         case HLSL_CLASS_ARRAY:
-            return hlsl_sm1_base_type(type->e.array.type);
+            return hlsl_sm1_base_type(type->e.array.type, is_combined_sampler);
 
         case HLSL_CLASS_STRUCT:
             return D3DXPT_VOID;
@@ -1677,7 +1682,8 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
     vkd3d_unreachable();
 }
 
-static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type, unsigned int ctab_start)
+static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer,
+        struct hlsl_type *type, bool is_combined_sampler, unsigned int ctab_start)
 {
     const struct hlsl_type *array_type = hlsl_get_multiarray_element_type(type);
     unsigned int array_size = hlsl_get_multiarray_size(type);
@@ -1697,7 +1703,7 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_typ
             struct hlsl_struct_field *field = &array_type->e.record.fields[i];
 
             field->name_bytecode_offset = put_string(buffer, field->name);
-            write_sm1_type(buffer, field->type, ctab_start);
+            write_sm1_type(buffer, field->type, false, ctab_start);
         }
 
         fields_offset = bytecode_align(buffer) - ctab_start;
@@ -1711,7 +1717,8 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_typ
         }
     }
 
-    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(hlsl_sm1_class(type), hlsl_sm1_base_type(array_type)));
+    type->bytecode_offset = put_u32(buffer,
+            vkd3d_make_u32(hlsl_sm1_class(type), hlsl_sm1_base_type(array_type, is_combined_sampler)));
     put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
     put_u32(buffer, vkd3d_make_u32(array_size, field_count));
     put_u32(buffer, fields_offset);
@@ -1836,7 +1843,7 @@ void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buff
             name_offset = put_string(buffer, var->name);
             set_u32(buffer, var_offset, name_offset - ctab_start);
 
-            write_sm1_type(buffer, var->data_type, ctab_start);
+            write_sm1_type(buffer, var->data_type, var->is_combined_sampler, ctab_start);
             set_u32(buffer, var_offset + 3 * sizeof(uint32_t), var->data_type->bytecode_offset - ctab_start);
 
             if (var->default_values)

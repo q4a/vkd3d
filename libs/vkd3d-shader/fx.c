@@ -1021,8 +1021,8 @@ static uint32_t get_fx_2_type_class(const struct hlsl_type *type)
     return hlsl_sm1_class(type);
 }
 
-static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *name, const struct hlsl_semantic *semantic,
-        struct fx_write_context *fx)
+static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *name,
+        const struct hlsl_semantic *semantic, bool is_combined_sampler, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     uint32_t semantic_offset, offset, elements_count = 0, name_offset;
@@ -1038,7 +1038,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
     name_offset = write_string(name, fx);
     semantic_offset = semantic->raw_name ? write_string(semantic->raw_name, fx) : 0;
 
-    offset = put_u32(buffer, hlsl_sm1_base_type(type));
+    offset = put_u32(buffer, hlsl_sm1_base_type(type, is_combined_sampler));
     put_u32(buffer, get_fx_2_type_class(type));
     put_u32(buffer, name_offset);
     put_u32(buffer, semantic_offset);
@@ -1074,7 +1074,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
 
             /* Validated in check_invalid_object_fields(). */
             VKD3D_ASSERT(hlsl_is_numeric_type(field->type));
-            write_fx_2_parameter(field->type, field->name, &field->semantic, fx);
+            write_fx_2_parameter(field->type, field->name, &field->semantic, false, fx);
         }
     }
 
@@ -1335,7 +1335,7 @@ static void write_fx_2_parameters(struct fx_write_context *fx)
         if (!is_type_supported_fx_2(ctx, var->data_type, &var->loc))
             continue;
 
-        desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
+        desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, var->is_combined_sampler, fx);
         value_offset = write_fx_2_initial_value(var, fx);
 
         flags = 0;
@@ -1358,7 +1358,7 @@ static void write_fx_2_annotation(struct hlsl_ir_var *var, struct fx_write_conte
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t desc_offset, value_offset;
 
-    desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
+    desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, var->is_combined_sampler, fx);
     value_offset = write_fx_2_initial_value(var, fx);
 
     put_u32(buffer, desc_offset);
