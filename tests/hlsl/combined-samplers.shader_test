@@ -15,6 +15,18 @@ address clamp clamp clamp
 filter linear linear linear
 address clamp clamp clamp
 
+[sampler 3]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 4]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 5]
+filter linear linear linear
+address clamp clamp clamp
+
 [srv 0]
 size (2d, 2, 2)
 0.0 0.0 0.0 1.0  0.0 1.0 0.0 1.0
@@ -35,6 +47,11 @@ size (2d, 1, 1)
 [srv 4]
 size (2d, 1, 1)
 4.0 4.0 4.0 1.0
+
+[srv 5]
+size (2d, 1, 1)
+5.0 5.0 5.0 1.0
+
 
 [pixel shader]
 sampler sam;
@@ -165,6 +182,48 @@ float4 main() : sv_target
 [test]
 todo(msl) draw quad
 probe (0, 0) rgba (1, 1, 1, 11)
+
+
+[pixel shader]
+sampler samA;
+sampler samB;
+sampler samC;
+texture2D tex;
+
+float4 main() : sv_target
+{
+    return 100000 * tex2D(samB, float2(0, 0))
+            + 10000 * tex2D(samC, float2(0, 0))
+            + 1000 * tex2D(samA, float2(0, 0))
+            + 100 * tex.Sample(samA, float2(0, 0))
+            + 10 * tex.Sample(samC, float2(0, 0))
+            + tex.Sample(samB, float2(0, 0));
+}
+
+[test]
+todo(msl) draw quad
+if(sm<4)  todo probe (0, 0) rgba(453021, 453021, 453021, 111111)
+if(sm>=4) probe (0, 0) rgba(12333, 12333, 12333, 111111)
+
+
+[pixel shader todo(sm<4)]
+Texture2D texA;
+sampler samA[2];
+Texture2D texB[2];
+sampler samB;
+
+float4 main() : sv_target
+{
+    return 1000 * texA.Sample(samA[0], float2(0, 0))
+            + 100 * tex2D(samA[1], float2(0, 0))
+            + 10 * tex2D(samB, float2(0, 0))
+            + texB[1].Sample(samB, float2(0, 0));
+}
+
+[test]
+todo(sm<4 | msl) draw quad
+if(sm<4)  probe (0, 0) rgba(4351, 4351, 4351, 1111)
+if(sm>=4) probe (0, 0) rgba(3125, 3125, 3125, 1111)
 
 
 [require]
