@@ -5210,7 +5210,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
     }
 }
 
-static void sort_uniform_by_numeric_bind_count(struct list *sorted, struct hlsl_ir_var *to_sort)
+static void sort_uniform_by_bind_count(struct list *sorted, struct hlsl_ir_var *to_sort, enum hlsl_regset regset)
 {
     struct hlsl_ir_var *var;
 
@@ -5218,8 +5218,8 @@ static void sort_uniform_by_numeric_bind_count(struct list *sorted, struct hlsl_
 
     LIST_FOR_EACH_ENTRY(var, sorted, struct hlsl_ir_var, extern_entry)
     {
-        uint32_t to_sort_size = to_sort->bind_count[HLSL_REGSET_NUMERIC];
-        uint32_t var_size = var->bind_count[HLSL_REGSET_NUMERIC];
+        uint32_t to_sort_size = to_sort->bind_count[regset];
+        uint32_t var_size = var->bind_count[regset];
 
         if (to_sort_size > var_size)
         {
@@ -5231,7 +5231,7 @@ static void sort_uniform_by_numeric_bind_count(struct list *sorted, struct hlsl_
     list_add_tail(sorted, &to_sort->extern_entry);
 }
 
-static void sort_uniforms_by_numeric_bind_count(struct hlsl_ctx *ctx)
+static void sort_uniforms_by_bind_count(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 {
     struct list sorted = LIST_INIT(sorted);
     struct hlsl_ir_var *var, *next;
@@ -5239,7 +5239,7 @@ static void sort_uniforms_by_numeric_bind_count(struct hlsl_ctx *ctx)
     LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_uniform)
-            sort_uniform_by_numeric_bind_count(&sorted, var);
+            sort_uniform_by_bind_count(&sorted, var, regset);
     }
     list_move_tail(&ctx->extern_vars, &sorted);
 }
@@ -5287,7 +5287,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     struct register_allocator allocator = {0};
     struct hlsl_ir_var *var;
 
-    sort_uniforms_by_numeric_bind_count(ctx);
+    sort_uniforms_by_bind_count(ctx, HLSL_REGSET_NUMERIC);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -10496,14 +10496,16 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         mark_indexable_vars(ctx, entry_func);
         allocate_temp_registers(ctx, entry_func);
         allocate_const_registers(ctx, entry_func);
+        sort_uniforms_by_bind_count(ctx, HLSL_REGSET_SAMPLERS);
+        allocate_objects(ctx, entry_func, HLSL_REGSET_SAMPLERS);
     }
     else
     {
         allocate_buffers(ctx);
         allocate_objects(ctx, entry_func, HLSL_REGSET_TEXTURES);
         allocate_objects(ctx, entry_func, HLSL_REGSET_UAVS);
+        allocate_objects(ctx, entry_func, HLSL_REGSET_SAMPLERS);
     }
-    allocate_objects(ctx, entry_func, HLSL_REGSET_SAMPLERS);
 
     if (TRACE_ON())
         rb_for_each_entry(&ctx->functions, dump_function, ctx);
