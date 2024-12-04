@@ -3541,6 +3541,51 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     return true;
 }
 
+static bool lower_resource_load_bias(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *swizzle, *store;
+    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_load *tmp_load;
+    struct hlsl_ir_var *tmp_var;
+    struct hlsl_deref deref;
+
+    if (instr->type != HLSL_IR_RESOURCE_LOAD)
+        return false;
+    load = hlsl_ir_resource_load(instr);
+    if (load->load_type != HLSL_RESOURCE_SAMPLE_LOD
+            && load->load_type != HLSL_RESOURCE_SAMPLE_LOD_BIAS)
+        return false;
+
+    if (!load->lod.node)
+        return false;
+
+    if (!(tmp_var = hlsl_new_synthetic_var(ctx, "coords-with-lod",
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), &instr->loc)))
+        return false;
+
+    if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), 4, load->lod.node, &load->lod.node->loc)))
+        return false;
+    list_add_before(&instr->entry, &swizzle->entry);
+
+    if (!(store = hlsl_new_simple_store(ctx, tmp_var, swizzle)))
+        return false;
+    list_add_before(&instr->entry, &store->entry);
+
+    hlsl_init_simple_deref_from_var(&deref, tmp_var);
+    if (!(store = hlsl_new_store_index(ctx, &deref, NULL, load->coords.node, 0, &instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &store->entry);
+
+    if (!(tmp_load = hlsl_new_var_load(ctx, tmp_var, &instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &tmp_load->node.entry);
+
+    hlsl_src_remove(&load->coords);
+    hlsl_src_from_node(&load->coords, &tmp_load->node);
+    hlsl_src_remove(&load->lod);
+    return true;
+}
+
 static bool lower_comparison_operators(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         struct hlsl_block *block)
 {
@@ -11059,13 +11104,14 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         append_output_var_copy(ctx, entry_func, entry_func->return_var);
     }
 
-    if (profile->major_version >= 4)
+    if (hlsl_version_ge(ctx, 4, 0))
     {
         hlsl_transform_ir(ctx, lower_discard_neg, body, NULL);
     }
     else
     {
         hlsl_transform_ir(ctx, lower_discard_nz, body, NULL);
+        hlsl_transform_ir(ctx, lower_resource_load_bias, body, NULL);
     }
 
     loop_unrolling_execute(ctx, body);
