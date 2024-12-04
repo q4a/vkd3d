@@ -2806,6 +2806,16 @@ static struct hlsl_type *clone_texture_array_as_combined_sampler_array(struct hl
     return ctx->builtin_types.sampler[type->sampler_dim];
 }
 
+static bool deref_offset_is_zero(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
+{
+    enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
+    unsigned int index;
+
+    if (!hlsl_regset_index_from_deref(ctx, deref, regset, &index))
+        return false;
+    return index == 0;
+}
+
 /* Lower samples from separate texture and sampler variables to samples from
  * synthetized combined samplers. That is, translate SM4-style samples in the
  * source to SM1-style samples in the bytecode. */
@@ -2832,10 +2842,9 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
 
     VKD3D_ASSERT(hlsl_type_is_resource(resource->data_type));
     VKD3D_ASSERT(hlsl_type_is_resource(sampler->data_type));
-    if (sampler->data_type->class == HLSL_CLASS_ARRAY)
+    if (sampler->data_type->class == HLSL_CLASS_ARRAY && !deref_offset_is_zero(ctx, &load->sampler))
     {
-        /* Only supported by d3dcompiler if the sampler is the first component
-         * of the sampler array. */
+        /* Not supported by d3dcompiler. */
         hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED,
                 "Lower separated samples with sampler arrays.");
         return false;
