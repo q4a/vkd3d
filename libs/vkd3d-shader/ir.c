@@ -7330,6 +7330,11 @@ static void vsir_validate_io_register(struct validation_context *ctx,
                     reg->idx_count, reg->type);
             return;
         }
+
+        if (is_array && !reg->idx[0].rel_addr && reg->idx[0].offset >= element->register_count)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                    "Array index %u exceeds the signature element register count %u in a register of type %#x.",
+                    reg->idx[0].offset, element->register_count, reg->type);
     }
 
     if (has_control_point && !reg->idx[control_point_index].rel_addr
