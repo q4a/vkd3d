@@ -703,7 +703,8 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
     return VKD3D_OK;
 }
 
-static enum vkd3d_result vsir_program_lower_tex(struct vsir_program *program, struct vkd3d_shader_instruction *tex)
+static enum vkd3d_result vsir_program_lower_tex(struct vsir_program *program,
+        struct vkd3d_shader_instruction *tex, struct vkd3d_shader_message_context *message_context)
 {
     unsigned int idx = tex->src[1].reg.idx[0].offset;
     struct vkd3d_shader_src_param *srcs;
@@ -711,16 +712,34 @@ static enum vkd3d_result vsir_program_lower_tex(struct vsir_program *program, st
     VKD3D_ASSERT(tex->src[1].reg.idx_count == 1);
     VKD3D_ASSERT(!tex->src[1].reg.idx[0].rel_addr);
 
-    if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 3)))
+    if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 4)))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     srcs[0] = tex->src[0];
     vsir_src_param_init_resource(&srcs[1], idx, idx);
     vsir_src_param_init_sampler(&srcs[2], idx, idx);
 
-    tex->opcode = VKD3DSIH_SAMPLE;
-    tex->src = srcs;
-    tex->src_count = 3;
+    if (!tex->flags)
+    {
+        tex->opcode = VKD3DSIH_SAMPLE;
+        tex->src = srcs;
+        tex->src_count = 3;
+    }
+    else if (tex->flags == VKD3DSI_TEXLD_BIAS)
+    {
+        tex->opcode = VKD3DSIH_SAMPLE_B;
+        tex->src = srcs;
+        tex->src_count = 4;
+
+        srcs[3] = tex->src[0];
+        srcs[3].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
+    }
+    else
+    {
+        vkd3d_shader_error(message_context, &tex->location,
+                VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED, "Unhandled tex flags %#x.", tex->flags);
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
 
     return VKD3D_OK;
 }
@@ -885,7 +904,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 break;
 
             case VKD3DSIH_TEX:
-                if ((ret = vsir_program_lower_tex(program, ins)) < 0)
+                if ((ret = vsir_program_lower_tex(program, ins, message_context)) < 0)
                     return ret;
                 break;
 

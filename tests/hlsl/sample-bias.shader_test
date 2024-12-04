@@ -37,11 +37,11 @@ probe (0, 0) rgba (10.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 7.5 0.0 0.0 0.0
 todo(msl) draw quad
-todo(sm<4) probe (0, 0) rgba(4.0, 0.0, 10.0, 0.0)
+probe (0, 0) rgba(4.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 8.5 0.0 0.0 0.0
 todo(msl) draw quad
-todo(sm<4) probe (0, 0) rgba(0.0, 0.0, 10.0, 0.0)
+probe (0, 0) rgba(0.0, 0.0, 10.0, 0.0)
 
 [require]
 shader model >= 3.0
@@ -65,8 +65,8 @@ probe (0, 0) rgba (10.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 7.5 0.0 0.0 0.0
 todo(msl) draw quad
-todo(sm<4) probe (0,0) rgba (4.0, 0.0, 10.0, 0.0)
+probe (0,0) rgba(4.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 8.5 0.0 0.0 0.0
 todo(msl) draw quad
-todo(sm<4) probe (0,0) rgba (0.0, 0.0, 10.0, 0.0)
+probe (0,0) rgba(0.0, 0.0, 10.0, 0.0)
