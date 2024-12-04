@@ -1632,16 +1632,18 @@ static void d3d12_command_allocator_reset_descriptor_pool_array(struct d3d12_com
     struct vkd3d_vk_descriptor_pool_array *array = &allocator->descriptor_pools[type];
     struct d3d12_device *device = allocator->device;
     const struct vkd3d_vk_device_procs *vk_procs;
+    const struct vkd3d_vk_descriptor_pool *pool;
     size_t i;
-
-    if (!vkd3d_vk_descriptor_pool_array_push_array(&allocator->free_descriptor_pools[type],
-            array->pools, array->count))
-        return;
 
     vk_procs = &device->vk_procs;
     for (i = 0; i < array->count; ++i)
     {
-        VK_CALL(vkResetDescriptorPool(device->vk_device, array->pools[i].vk_pool, 0));
+        pool = &array->pools[i];
+        if (pool->descriptor_count < allocator->vk_pool_sizes[type]
+                || !vkd3d_vk_descriptor_pool_array_push_array(&allocator->free_descriptor_pools[type], pool, 1))
+            VK_CALL(vkDestroyDescriptorPool(device->vk_device, pool->vk_pool, NULL));
+        else
+            VK_CALL(vkResetDescriptorPool(device->vk_device, pool->vk_pool, 0));
     }
     array->count = 0;
 }
