@@ -8593,8 +8593,13 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
     }
 
     /* Check again to have at most one intersection for each register, but this
-     * time using the effective write mask. This important for being able to
-     * merge all the signature elements in a single one without conflicts. */
+     * time using the effective write mask. Also check that we have stabilized,
+     * i.e., the effective write mask now contains all the signature element
+     * masks. This important for being able to merge all the signature elements
+     * in a single one without conflicts (there is no hard reason why we
+     * couldn't support an effective write mask that stabilizes after more
+     * iterations, but the code would be more complicated, and we avoid that if
+     * we can). */
     for (i = 0; i < range->register_count; ++i)
     {
         bool found = false;
@@ -8634,6 +8639,12 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
                         range->dst.write_mask);
 
             found = true;
+
+            if (~effective_write_mask & element->mask)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK,
+                        "Invalid write mask %#x on a signature element touched by a "
+                        "DCL_INDEX_RANGE instruction with effective write mask %#x.",
+                        element->mask, effective_write_mask);
         }
     }
 
