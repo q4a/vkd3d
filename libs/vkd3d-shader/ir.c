@@ -8501,8 +8501,8 @@ static void vsir_validate_dcl_hs_max_tessfactor(struct validation_context *ctx,
 static void vsir_validate_dcl_index_range(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
+    unsigned int i, j, base_register_idx, effective_write_mask = 0, control_point_count, first_component = UINT_MAX;
     const struct vkd3d_shader_index_range *range = &instruction->declaration.index_range;
-    unsigned int i, j, base_register_idx, effective_write_mask = 0, control_point_count;
     enum vkd3d_shader_sysval_semantic sysval = ~0u;
     const struct shader_signature *signature;
     bool has_control_point;
@@ -8588,6 +8588,12 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
 
             found = true;
 
+            if (first_component == UINT_MAX)
+                first_component = vsir_write_mask_get_component_idx(element->mask);
+            else if (first_component != vsir_write_mask_get_component_idx(element->mask))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK,
+                        "Signature masks are not left-aligned within a DCL_INDEX_RANGE.");
+
             effective_write_mask |= element->mask;
         }
     }
@@ -8645,6 +8651,10 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
                         "Invalid write mask %#x on a signature element touched by a "
                         "DCL_INDEX_RANGE instruction with effective write mask %#x.",
                         element->mask, effective_write_mask);
+
+            if (first_component != vsir_write_mask_get_component_idx(element->mask))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK,
+                        "Signature element masks are not left-aligned within a DCL_INDEX_RANGE.");
         }
     }
 
