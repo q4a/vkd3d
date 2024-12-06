@@ -8098,29 +8098,20 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
                 "element %u of %s signature: Non-contiguous mask %#x.",
                 idx, signature_type_name, element->mask);
 
-    /* Here we'd likely want to validate that the usage mask is a subset of the
-     * signature mask. Unfortunately the D3DBC parser sometimes violates this.
-     * For example I've seen a shader like this:
-     *   ps_3_0
-     *   [...]
-     *   dcl_texcoord0 v0
-     *   [...]
-     *   texld r2.xyzw, v0.xyzw, s1.xyzw
-     *   [...]
-     *
-     * The dcl_textcoord0 instruction secretly has a .xy mask, which is used to
-     * compute the signature mask, but the texld instruction apparently uses all
-     * the components. Of course the last two components are ignored, but
-     * formally they seem to be used. So we end up with a signature element with
-     * mask .xy and usage mask .xyzw.
-     *
-     * The correct fix would probably be to make the D3DBC parser aware of which
-     * components are really used for each instruction, but that would take some
-     * time. */
-    if (element->used_mask & ~0xf)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
-                "element %u of %s signature: Invalid usage mask %#x.",
-                idx, signature_type_name, element->used_mask);
+    if (ctx->program->normalisation_level >= VSIR_NORMALISED_SM4)
+    {
+        if ((element->used_mask & element->mask) != element->used_mask)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                    "element %u of %s signature: Invalid usage mask %#x with mask %#x.",
+                    idx, signature_type_name, element->used_mask, element->mask);
+    }
+    else
+    {
+        if (element->used_mask & ~0xf)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                    "element %u of %s signature: Invalid usage mask %#x.",
+                    idx, signature_type_name, element->used_mask);
+    }
 
     switch (element->sysval_semantic)
     {

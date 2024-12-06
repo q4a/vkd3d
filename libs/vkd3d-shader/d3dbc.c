@@ -633,7 +633,32 @@ static void add_signature_mask(struct vkd3d_shader_sm1_parser *sm1, bool output,
         return;
     }
 
+    /* Normally VSIR mandates that the register mask is a subset of the usage
+     * mask, and the usage mask is a subset of the signature mask. This is
+     * doesn't always happen with SM1-3 registers, because of the limited
+     * flexibility with expressing swizzles.
+     *
+     * For example it's easy to find shaders like this:
+     *   ps_3_0
+     *   [...]
+     *   dcl_texcoord0 v0
+     *   [...]
+     *   texld r2.xyzw, v0.xyzw, s1.xyzw
+     *   [...]
+     *
+     * The dcl_textcoord0 instruction secretly has a .xy mask, which is used to
+     * compute the signature mask, but the texld instruction apparently uses all
+     * the components. Of course the last two components are ignored, but
+     * formally they seem to be used. So we end up with a signature element with
+     * mask .xy and usage mask .xyzw.
+     *
+     * In order to avoid this problem, when generating VSIR code with SM4
+     * normalisation level we remove the unused components in the write mask. We
+     * don't do that when targetting the SM1 normalisation level (i.e., when
+     * disassembling) so as to generate the same disassembly code as native. */
     element->used_mask |= mask;
+    if (program->normalisation_level >= VSIR_NORMALISED_SM4)
+        element->used_mask &= element->mask;
 }
 
 static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *sm1,
@@ -1265,6 +1290,7 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1, st
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_location location = {.source_name = compile_info->source_name};
+    enum vsir_normalisation_level normalisation_level;
     const uint32_t *code = compile_info->source.code;
     size_t code_size = compile_info->source.size;
     struct vkd3d_shader_version version;
@@ -1315,9 +1341,13 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1, st
     sm1->start = &code[1];
     sm1->end = &code[token_count];
 
+    normalisation_level = VSIR_NORMALISED_SM1;
+    if (compile_info->target_type != VKD3D_SHADER_TARGET_D3D_ASM)
+        normalisation_level = VSIR_NORMALISED_SM4;
+
     /* Estimate instruction count to avoid reallocation in most shaders. */
     if (!vsir_program_init(program, compile_info, &version,
-            code_size != ~(size_t)0 ? token_count / 4u + 4 : 16, VSIR_CF_STRUCTURED, VSIR_NORMALISED_SM4))
+            code_size != ~(size_t)0 ? token_count / 4u + 4 : 16, VSIR_CF_STRUCTURED, normalisation_level))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     vkd3d_shader_parser_init(&sm1->p, program, message_context, compile_info->source_name);

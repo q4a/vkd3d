@@ -1411,6 +1411,7 @@ enum vsir_control_flow_type
 
 enum vsir_normalisation_level
 {
+    VSIR_NORMALISED_SM1,
     VSIR_NORMALISED_SM4,
     VSIR_NORMALISED_HULL_CONTROL_POINT_IO,
     VSIR_NORMALISED_SM6,
