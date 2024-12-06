@@ -6569,6 +6569,7 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
     {
         progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
         progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_identities, body, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_normalize_binary_exprs, body, NULL);
         progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
         progress |= hlsl_copy_propagation_execute(ctx, body);
         progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);

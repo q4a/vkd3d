@@ -52,3 +52,19 @@ float4 main() : SV_TARGET
 [test]
 draw quad
 probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
+
+
+% Test expression normalization and simplification.
+
+[pixel shader]
+uniform uint4 x;
+
+float4 main() : SV_TARGET
+{
+    return 6 + (2 * x * 3) - 5;
+}
+
+[test]
+uniform 0 uint4 0 1 2 3
+todo(msl) draw quad
+probe (0, 0) rgba (1.0, 7.0, 13.0, 19.0)
