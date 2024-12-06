@@ -8061,6 +8061,12 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid zero register count.", idx, signature_type_name);
 
+    if (element->register_index != UINT_MAX && (element->register_index >= MAX_REG_OUTPUT
+            || MAX_REG_OUTPUT - element->register_index < element->register_count))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid register index %u and count %u.",
+                idx, signature_type_name, element->register_index, element->register_count);
+
     if (element->mask == 0 || (element->mask & ~0xf))
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid mask %#x.", idx, signature_type_name, element->mask);
