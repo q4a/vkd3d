@@ -1125,6 +1125,12 @@ bool vsir_signature_find_sysval(const struct shader_signature *signature,
         enum vkd3d_shader_sysval_semantic sysval, unsigned int semantic_index, unsigned int *element_index);
 void shader_signature_cleanup(struct shader_signature *signature);
 
+struct vsir_features
+{
+    /* The shader requires rasteriser-ordered views. */
+    bool rovs;
+};
+
 struct dxbc_shader_desc
 {
     const uint32_t *byte_code;
@@ -1133,6 +1139,7 @@ struct dxbc_shader_desc
     struct shader_signature input_signature;
     struct shader_signature output_signature;
     struct shader_signature patch_constant_signature;
+    struct vsir_features features;
 };
 
 struct vkd3d_shader_register_semantic
@@ -1436,6 +1443,8 @@ struct vsir_program
     enum vsir_normalisation_level normalisation_level;
     enum vkd3d_tessellator_domain tess_domain;
     uint32_t io_dcls[VKD3D_BITMAP_SIZE(VKD3DSPR_COUNT)];
+
+    struct vsir_features features;
 
     const char **block_names;
     size_t block_name_count;
@@ -1946,6 +1955,21 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define VKD3D_DXBC_CHUNK_ALIGNMENT sizeof(uint32_t)
 
 #define DXBC_MAX_SECTION_COUNT 7
+
+#define DXBC_SFI0_REQUIRES_DOUBLES                              0x00000001u
+#define DXBC_SFI0_REQUIRES_EARLY_DEPTH_STENCIL                  0x00000002u
+#define DXBC_SFI0_REQUIRES_UAVS_AT_EVERY_STAGE                  0x00000004u
+#define DXBC_SFI0_REQUIRES_64_UAVS                              0x00000008u
+#define DXBC_SFI0_REQUIRES_MINIMUM_PRECISION                    0x00000010u
+#define DXBC_SFI0_REQUIRES_11_1_DOUBLE_EXTENSIONS               0x00000020u
+#define DXBC_SFI0_REQUIRES_11_1_SHADER_EXTENSIONS               0x00000040u
+#define DXBC_SFI0_REQUIRES_LEVEL_9_COMPARISON_FILTERING         0x00000080u
+#define DXBC_SFI0_REQUIRES_TILED_RESOURCES                      0x00000100u
+#define DXBC_SFI0_REQUIRES_STENCIL_REF                          0x00000200u
+#define DXBC_SFI0_REQUIRES_INNER_COVERAGE                       0x00000400u
+#define DXBC_SFI0_REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS    0x00000800u
+#define DXBC_SFI0_REQUIRES_ROVS                                 0x00001000u
+#define DXBC_SFI0_REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER 0x00002000u
 
 struct dxbc_writer
 {

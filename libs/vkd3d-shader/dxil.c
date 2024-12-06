@@ -10379,6 +10379,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, struct vsir_pro
     *input_signature = dxbc_desc->input_signature;
     *output_signature = dxbc_desc->output_signature;
     *patch_constant_signature = dxbc_desc->patch_constant_signature;
+    program->features = dxbc_desc->features;
     memset(dxbc_desc, 0, sizeof(*dxbc_desc));
 
     block = &sm6->root_block;
