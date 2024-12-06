@@ -7150,6 +7150,20 @@ struct validation_context
 
     unsigned int outer_tess_idxs[4];
     unsigned int inner_tess_idxs[2];
+
+    struct validation_context_signature_data
+    {
+        struct validation_context_signature_stream_data
+        {
+            struct validation_context_signature_register_data
+            {
+                struct validation_context_signature_component_data
+                {
+                    const struct signature_element *element;
+                } components[VKD3D_VEC4_SIZE];
+            } registers[MAX_REG_OUTPUT];
+        } streams[VKD3D_MAX_STREAM_COUNT];
+    } input_signature_data, output_signature_data, patch_constant_signature_data;
 };
 
 static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *ctx,
@@ -8048,14 +8062,14 @@ sysval_validation_data[] =
 };
 
 static void vsir_validate_signature_element(struct validation_context *ctx,
-        const struct shader_signature *signature, enum vsir_signature_type signature_type,
-        unsigned int idx)
+        const struct shader_signature *signature, struct validation_context_signature_data *signature_data,
+        enum vsir_signature_type signature_type, unsigned int idx)
 {
     enum vkd3d_tessellator_domain expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_INVALID;
     bool integer_type = false, is_outer = false, is_gs_output, require_index = true;
     const char *signature_type_name = signature_type_names[signature_type];
     const struct signature_element *element = &signature->elements[idx];
-    unsigned int semantic_index_max = 0;
+    unsigned int semantic_index_max = 0, i, j;
 
     if (element->register_count == 0)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
@@ -8284,6 +8298,31 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid interpolation mode %#x for integer component type.",
                 idx, signature_type_name, element->interpolation_mode);
+
+    if (element->stream_index >= VKD3D_MAX_STREAM_COUNT || !require_index)
+        return;
+
+    for (i = element->register_index; i < MAX_REG_OUTPUT
+            && i - element->register_index < element->register_count; ++i)
+    {
+        struct validation_context_signature_stream_data *stream_data = &signature_data->streams[element->stream_index];
+        struct validation_context_signature_register_data *register_data = &stream_data->registers[i];
+
+        for (j = 0; j < VKD3D_VEC4_SIZE; ++j)
+        {
+            struct validation_context_signature_component_data *component_data = &register_data->components[j];
+
+            if (!(element->mask & (1u << j)))
+                continue;
+
+            if (!component_data->element)
+                component_data->element = element;
+            else
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                        "element %u of %s signature: Conflict with element %zu.",
+                        idx, signature_type_name, component_data->element - signature->elements);
+        }
+    }
 }
 
 static const unsigned int allowed_signature_phases[] =
@@ -8293,8 +8332,8 @@ static const unsigned int allowed_signature_phases[] =
     [SIGNATURE_TYPE_PATCH_CONSTANT] = HS_BIT | DS_BIT,
 };
 
-static void vsir_validate_signature(struct validation_context *ctx,
-        const struct shader_signature *signature, enum vsir_signature_type signature_type)
+static void vsir_validate_signature(struct validation_context *ctx, const struct shader_signature *signature,
+        struct validation_context_signature_data *signature_data, enum vsir_signature_type signature_type)
 {
     unsigned int i;
 
@@ -8304,7 +8343,7 @@ static void vsir_validate_signature(struct validation_context *ctx,
                 "Unexpected %s signature.", signature_type_names[signature_type]);
 
     for (i = 0; i < signature->element_count; ++i)
-        vsir_validate_signature_element(ctx, signature, signature_type, i);
+        vsir_validate_signature_element(ctx, signature, signature_data, signature_type, i);
 
     if (signature_type == SIGNATURE_TYPE_PATCH_CONSTANT)
     {
@@ -9330,9 +9369,12 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
                         program->output_control_point_count);
     }
 
-    vsir_validate_signature(&ctx, &program->input_signature, SIGNATURE_TYPE_INPUT);
-    vsir_validate_signature(&ctx, &program->output_signature, SIGNATURE_TYPE_OUTPUT);
-    vsir_validate_signature(&ctx, &program->patch_constant_signature, SIGNATURE_TYPE_PATCH_CONSTANT);
+    vsir_validate_signature(&ctx, &program->input_signature,
+            &ctx.input_signature_data, SIGNATURE_TYPE_INPUT);
+    vsir_validate_signature(&ctx, &program->output_signature,
+            &ctx.output_signature_data, SIGNATURE_TYPE_OUTPUT);
+    vsir_validate_signature(&ctx, &program->patch_constant_signature,
+            &ctx.patch_constant_signature_data, SIGNATURE_TYPE_PATCH_CONSTANT);
 
     for (i = 0; i < sizeof(program->io_dcls) * CHAR_BIT; ++i)
     {
