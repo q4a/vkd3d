@@ -7210,6 +7210,7 @@ static const struct shader_signature *vsir_signature_from_register_type(struct v
         enum vkd3d_shader_register_type register_type, bool *has_control_point, unsigned int *control_point_count)
 {
     *has_control_point = false;
+    *control_point_count = 0;
 
     switch (register_type)
     {
