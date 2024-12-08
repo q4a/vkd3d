@@ -1496,7 +1496,7 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type);
 struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *condition, struct hlsl_ir_node *if_true, struct hlsl_ir_node *if_false);
 void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function_decl *decl);
-bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl);
+void hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl);
 
 void hlsl_block_cleanup(struct hlsl_block *block);
 bool hlsl_clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block, const struct hlsl_block *src_block);

@@ -1311,8 +1311,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
         free_parse_initializer(&param->initializer);
     }
 
-    if (!hlsl_add_var(ctx, var))
-        return false;
+    hlsl_add_var(ctx, var);
 
     if (!hlsl_array_reserve(ctx, (void **)&parameters->vars, &parameters->capacity,
             parameters->count + 1, sizeof(*parameters->vars)))
@@ -1321,7 +1320,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
     return true;
 }
 
-static bool add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *annotations,
+static void add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *annotations,
         struct hlsl_state_block *state_block, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
@@ -1329,7 +1328,7 @@ static bool add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *
 
     type = hlsl_get_type(ctx->globals, "pass", false, false);
     if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
-        return false;
+        return;
     var->annotations = annotations;
 
     var->state_blocks = hlsl_alloc(ctx, sizeof(*var->state_blocks));
@@ -1337,10 +1336,10 @@ static bool add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *
     var->state_block_count = 1;
     var->state_block_capacity = 1;
 
-    return hlsl_add_var(ctx, var);
+    hlsl_add_var(ctx, var);
 }
 
-static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
+static void add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
         struct hlsl_scope *annotations, const char *typename, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
@@ -1348,14 +1347,14 @@ static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_sc
 
     type = hlsl_get_type(ctx->globals, typename, false, false);
     if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
-        return false;
+        return;
     var->scope = scope;
     var->annotations = annotations;
 
-    return hlsl_add_var(ctx, var);
+    hlsl_add_var(ctx, var);
 }
 
-static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
+static void add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
         struct hlsl_scope *annotations, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
@@ -1363,11 +1362,11 @@ static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl
 
     type = hlsl_get_type(ctx->globals, "fxgroup", false, false);
     if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
-        return false;
+        return;
     var->scope = scope;
     var->annotations = annotations;
 
-    return hlsl_add_var(ctx, var);
+    hlsl_add_var(ctx, var);
 }
 
 static bool parse_reservation_index(struct hlsl_ctx *ctx, const char *string, unsigned int bracket_offset,
@@ -7247,8 +7246,7 @@ name_opt:
 pass:
       KW_PASS name_opt annotations_opt '{' state_block_start state_block '}'
         {
-            if (!add_pass(ctx, $2, $3, $6, &@1))
-                YYABORT;
+            add_pass(ctx, $2, $3, $6, &@1);
         }
 
 annotations_list:
@@ -7299,8 +7297,7 @@ technique9:
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
 
-            if (!add_technique(ctx, $2, scope, $3, "technique", &@1))
-                YYABORT;
+            add_technique(ctx, $2, scope, $3, "technique", &@1);
         }
 
 technique10:
@@ -7309,8 +7306,7 @@ technique10:
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
 
-            if (!add_technique(ctx, $2, scope, $3, "technique10", &@1))
-                YYABORT;
+            add_technique(ctx, $2, scope, $3, "technique10", &@1);
         }
 
 technique11:
@@ -7323,8 +7319,7 @@ technique11:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "The 'technique11' keyword is invalid for this profile.");
 
-            if (!add_technique(ctx, $2, scope, $3, "technique11", &@1))
-                YYABORT;
+            add_technique(ctx, $2, scope, $3, "technique11", &@1);
         }
 
 global_technique:
@@ -7345,8 +7340,7 @@ effect_group:
         {
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
-            if (!(add_effect_group(ctx, $2, scope, $3, &@2)))
-                YYABORT;
+            add_effect_group(ctx, $2, scope, $3, &@2);
         }
 
 buffer_declaration:

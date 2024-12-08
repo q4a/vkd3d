@@ -93,7 +93,7 @@ char *hlsl_sprintf_alloc(struct hlsl_ctx *ctx, const char *fmt, ...)
     return ret;
 }
 
-bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl)
+void hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl)
 {
     struct hlsl_scope *scope = ctx->cur_scope;
     struct hlsl_ir_var *var;
@@ -107,14 +107,12 @@ bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl)
                 hlsl_error(ctx, &decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                         "Identifier \"%s\" was already declared in this scope.", var->name);
                 hlsl_note(ctx, &var->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", var->name);
-                hlsl_free_var(decl);
-                return false;
+                break;
             }
         }
     }
 
     list_add_tail(&scope->vars, &decl->scope_entry);
-    return true;
 }
 
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
