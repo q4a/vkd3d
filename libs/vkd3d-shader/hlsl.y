@@ -1311,7 +1311,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
         free_parse_initializer(&param->initializer);
     }
 
-    if (!hlsl_add_var(ctx, var, false))
+    if (!hlsl_add_var(ctx, var))
     {
         hlsl_free_var(var);
         return false;
@@ -1340,7 +1340,7 @@ static bool add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *
     var->state_block_count = 1;
     var->state_block_capacity = 1;
 
-    if (!hlsl_add_var(ctx, var, false))
+    if (!hlsl_add_var(ctx, var))
     {
         struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
 
@@ -1366,7 +1366,7 @@ static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_sc
     var->scope = scope;
     var->annotations = annotations;
 
-    if (!hlsl_add_var(ctx, var, false))
+    if (!hlsl_add_var(ctx, var))
     {
         struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
 
@@ -1392,7 +1392,7 @@ static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl
     var->scope = scope;
     var->annotations = annotations;
 
-    if (!hlsl_add_var(ctx, var, false))
+    if (!hlsl_add_var(ctx, var))
     {
         struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
 
@@ -2590,7 +2590,6 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     bool constant_buffer = false;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
-    bool local = true;
     char *var_name;
     unsigned int i;
 
@@ -2726,8 +2725,6 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
 
     if (ctx->cur_scope == ctx->globals)
     {
-        local = false;
-
         if ((modifiers & HLSL_STORAGE_UNIFORM) && (modifiers & HLSL_STORAGE_STATIC))
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                     "Variable '%s' is declared as both \"uniform\" and \"static\".", var->name);
@@ -2790,7 +2787,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
                 "Static variables cannot have both numeric and resource components.");
     }
 
-    if (!hlsl_add_var(ctx, var, local))
+    if (!hlsl_add_var(ctx, var))
     {
         struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
 
@@ -7863,10 +7860,9 @@ compound_statement:
             if (!($$ = make_empty_block(ctx)))
                 YYABORT;
         }
-    | '{' scope_start statement_list '}'
+    | '{' statement_list '}'
         {
-            hlsl_pop_scope(ctx);
-            $$ = $3;
+            $$ = $2;
         }
 
 scope_start:
@@ -9126,7 +9122,11 @@ statement_list:
 statement:
       declaration_statement
     | expr_statement
-    | compound_statement
+    | scope_start compound_statement
+        {
+            hlsl_pop_scope(ctx);
+            $$ = $2;
+        }
     | jump_statement
     | selection_statement
     | loop_statement

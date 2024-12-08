@@ -93,7 +93,7 @@ char *hlsl_sprintf_alloc(struct hlsl_ctx *ctx, const char *fmt, ...)
     return ret;
 }
 
-bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var)
+bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl)
 {
     struct hlsl_scope *scope = ctx->cur_scope;
     struct hlsl_ir_var *var;
@@ -104,15 +104,6 @@ bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var
         {
             if (var->name && !strcmp(decl->name, var->name))
                 return false;
-        }
-        if (local_var && scope->upper->upper == ctx->globals)
-        {
-            /* Check whether the variable redefines a function parameter. */
-            LIST_FOR_EACH_ENTRY(var, &scope->upper->vars, struct hlsl_ir_var, scope_entry)
-            {
-                if (var->name && !strcmp(decl->name, var->name))
-                    return false;
-            }
         }
     }
 
