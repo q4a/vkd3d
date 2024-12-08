@@ -224,6 +224,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/sampler-state.shader_test \
 	tests/hlsl/sampler.shader_test \
 	tests/hlsl/saturate.shader_test \
+	tests/hlsl/scope.shader_test \
 	tests/hlsl/shade-mode.shader_test \
 	tests/hlsl/shader-interstage-interface.shader_test \
 	tests/hlsl/shader-point-size.shader_test \
