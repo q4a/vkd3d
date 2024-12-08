@@ -6889,6 +6889,38 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
     }
 }
 
+static bool add_switch(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct parse_attribute_list *attributes, struct list *cases, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *selector = node_from_block(block);
+    struct hlsl_ir_node *s;
+
+    if (!(selector = add_implicit_conversion(ctx, block, selector,
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &selector->loc)))
+    {
+        destroy_switch_cases(cases);
+        destroy_block(block);
+        cleanup_parse_attribute_list(attributes);
+        return false;
+    }
+
+    s = hlsl_new_switch(ctx, selector, cases, loc);
+
+    destroy_switch_cases(cases);
+
+    if (!s)
+    {
+        destroy_block(block);
+        cleanup_parse_attribute_list(attributes);
+        return false;
+    }
+
+    hlsl_block_add_instr(block, s);
+
+    cleanup_parse_attribute_list(attributes);
+    return true;
+}
+
 static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
         struct hlsl_type *format, const struct vkd3d_shader_location* loc)
 {
@@ -9237,33 +9269,10 @@ loop_statement:
 switch_statement:
       attribute_list_optional switch_scope_start KW_SWITCH '(' expr ')' '{' switch_cases '}'
         {
-            struct hlsl_ir_node *selector = node_from_block($5);
-            struct hlsl_ir_node *s;
-
-            if (!(selector = add_implicit_conversion(ctx, $5, selector, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &@5)))
-            {
-                destroy_switch_cases($8);
-                destroy_block($5);
-                cleanup_parse_attribute_list(&$1);
-                YYABORT;
-            }
-
-            s = hlsl_new_switch(ctx, selector, $8, &@3);
-
-            destroy_switch_cases($8);
-
-            if (!s)
-            {
-                destroy_block($5);
-                cleanup_parse_attribute_list(&$1);
-                YYABORT;
-            }
-
             $$ = $5;
-            hlsl_block_add_instr($$, s);
-
+            if (!add_switch(ctx, $$, &$1, $8, &@3))
+                YYABORT;
             hlsl_pop_scope(ctx);
-            cleanup_parse_attribute_list(&$1);
         }
 
 switch_case:
