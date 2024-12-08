@@ -1312,10 +1312,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
     }
 
     if (!hlsl_add_var(ctx, var))
-    {
-        hlsl_free_var(var);
         return false;
-    }
 
     if (!hlsl_array_reserve(ctx, (void **)&parameters->vars, &parameters->capacity,
             parameters->count + 1, sizeof(*parameters->vars)))
@@ -1340,18 +1337,7 @@ static bool add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *
     var->state_block_count = 1;
     var->state_block_capacity = 1;
 
-    if (!hlsl_add_var(ctx, var))
-    {
-        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
-
-        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                "Identifier \"%s\" was already declared in this scope.", var->name);
-        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
-        hlsl_free_var(var);
-        return false;
-    }
-
-    return true;
+    return hlsl_add_var(ctx, var);
 }
 
 static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
@@ -1366,18 +1352,7 @@ static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_sc
     var->scope = scope;
     var->annotations = annotations;
 
-    if (!hlsl_add_var(ctx, var))
-    {
-        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
-
-        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                "Identifier \"%s\" was already declared in this scope.", var->name);
-        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
-        hlsl_free_var(var);
-        return false;
-    }
-
-    return true;
+    return hlsl_add_var(ctx, var);
 }
 
 static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
@@ -1392,18 +1367,7 @@ static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl
     var->scope = scope;
     var->annotations = annotations;
 
-    if (!hlsl_add_var(ctx, var))
-    {
-        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
-
-        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                "Identifier \"%s\" was already declared in this scope.", var->name);
-        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
-        hlsl_free_var(var);
-        return false;
-    }
-
-    return true;
+    return hlsl_add_var(ctx, var);
 }
 
 static bool parse_reservation_index(struct hlsl_ctx *ctx, const char *string, unsigned int bracket_offset,
@@ -2787,16 +2751,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
                 "Static variables cannot have both numeric and resource components.");
     }
 
-    if (!hlsl_add_var(ctx, var))
-    {
-        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
-
-        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                "Variable \"%s\" was already declared in this scope.", var->name);
-        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
-        hlsl_free_var(var);
-        return;
-    }
+    hlsl_add_var(ctx, var);
 }
 
 static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var_list)
@@ -8108,11 +8063,7 @@ param_list:
         {
             $$ = $1;
             if (!add_func_parameter(ctx, &$$, &$3, &@3))
-            {
-                hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                        "Parameter \"%s\" is already declared.", $3.name);
                 YYABORT;
-            }
         }
 
 parameter:

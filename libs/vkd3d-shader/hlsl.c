@@ -103,7 +103,13 @@ bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl)
         LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
         {
             if (var->name && !strcmp(decl->name, var->name))
+            {
+                hlsl_error(ctx, &decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                        "Identifier \"%s\" was already declared in this scope.", var->name);
+                hlsl_note(ctx, &var->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", var->name);
+                hlsl_free_var(decl);
                 return false;
+            }
         }
     }
 
