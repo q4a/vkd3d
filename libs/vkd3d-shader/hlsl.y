@@ -6895,6 +6895,14 @@ static bool add_switch(struct hlsl_ctx *ctx, struct hlsl_block *block,
     struct hlsl_ir_node *selector = node_from_block(block);
     struct hlsl_ir_node *s;
 
+    if (selector->data_type->class == HLSL_CLASS_ERROR)
+    {
+        destroy_switch_cases(cases);
+        destroy_block(block);
+        cleanup_parse_attribute_list(attributes);
+        return true;
+    }
+
     if (!(selector = add_implicit_conversion(ctx, block, selector,
             hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &selector->loc)))
     {
