@@ -55,6 +55,11 @@
 #define VKD3D_SPIRV_GENERATOR_VERSION_SHIFT         0u
 #define VKD3D_SPIRV_GENERATOR_VERSION_MASK          (0xffffu << VKD3D_SPIRV_GENERATOR_VERSION_SHIFT)
 
+#define VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_SHIFT    16u
+#define VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_MASK     (0xffffu << VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_SHIFT)
+#define VKD3D_SPIRV_INSTRUCTION_OP_SHIFT            0u
+#define VKD3D_SPIRV_INSTRUCTION_OP_MASK             (0xffffu << VKD3D_SPIRV_INSTRUCTION_OP_SHIFT)
+
 #ifdef HAVE_SPIRV_TOOLS
 # include "spirv-tools/libspirv.h"
 
@@ -210,6 +215,7 @@ struct spirv_colours
 
 struct spirv_parser
 {
+    struct vkd3d_string_buffer_cache string_buffers;
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
     enum vkd3d_shader_compile_option_formatting_flags formatting;
@@ -351,19 +357,55 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
     return VKD3D_OK;
 }
 
+static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *parser)
+{
+    struct vkd3d_string_buffer *buffer;
+    uint16_t op, count;
+    unsigned int i;
+    uint32_t word;
+
+    word = spirv_parser_read_u32(parser);
+    count = (word & VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_MASK) >> VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_SHIFT;
+    op = (word & VKD3D_SPIRV_INSTRUCTION_OP_MASK) >> VKD3D_SPIRV_INSTRUCTION_OP_SHIFT;
+
+    if (!count)
+    {
+        spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
+                "Invalid word count %u.", count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    --count;
+    buffer = vkd3d_string_buffer_get(&parser->string_buffers);
+    for (i = 0; i < count; ++i)
+    {
+        word = spirv_parser_read_u32(parser);
+        vkd3d_string_buffer_printf(buffer, " 0x%08x", word);
+    }
+    spirv_parser_print_comment(parser, "<unrecognised instruction %#x>%s", op, buffer->buffer);
+    vkd3d_string_buffer_release(&parser->string_buffers, buffer);
+
+    spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+            "Unrecognised instruction %#x.", op);
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result spirv_parser_parse(struct spirv_parser *parser, struct vkd3d_shader_code *text)
 {
-    struct vkd3d_string_buffer buffer;
     enum vkd3d_result ret;
 
     if (text)
-    {
-        vkd3d_string_buffer_init(&buffer);
-        parser->text = &buffer;
-    }
+        parser->text = vkd3d_string_buffer_get(&parser->string_buffers);
 
     if ((ret = spirv_parser_read_header(parser)) < 0)
         goto fail;
+    while (parser->pos < parser->size)
+    {
+        ++parser->location.line;
+        if ((ret = spirv_parser_parse_instruction(parser)) < 0)
+            goto fail;
+    }
 
     if (parser->failed)
     {
@@ -371,21 +413,24 @@ static enum vkd3d_result spirv_parser_parse(struct spirv_parser *parser, struct 
         goto fail;
     }
 
-    ret = VKD3D_ERROR_NOT_IMPLEMENTED;
+    if (text)
+        vkd3d_shader_code_from_string_buffer(text, parser->text);
+
+    return VKD3D_OK;
 
 fail:
-    if (text)
+    if (parser->text)
     {
         if (TRACE_ON())
-            vkd3d_string_buffer_trace(&buffer);
-        vkd3d_string_buffer_cleanup(&buffer);
+            vkd3d_string_buffer_trace(parser->text);
+        vkd3d_string_buffer_release(&parser->string_buffers, parser->text);
     }
     return ret;
 }
 
 static void spirv_parser_cleanup(struct spirv_parser *parser)
 {
-    /* Nothing to do. */
+    vkd3d_string_buffer_cache_cleanup(&parser->string_buffers);
 }
 
 static enum vkd3d_result spirv_parser_init(struct spirv_parser *parser, const struct vkd3d_shader_code *source,
@@ -406,9 +451,11 @@ static enum vkd3d_result spirv_parser_init(struct spirv_parser *parser, const st
     memset(parser, 0, sizeof(*parser));
     parser->location.source_name = source_name;
     parser->message_context = message_context;
+    vkd3d_string_buffer_cache_init(&parser->string_buffers);
 
     if (source->size % 4)
     {
+        vkd3d_string_buffer_cache_cleanup(&parser->string_buffers);
         spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
                 "Shader size %zu is not a multiple of four.", source->size);
         return VKD3D_ERROR_INVALID_SHADER;
