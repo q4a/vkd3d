@@ -5699,6 +5699,16 @@ static struct hlsl_block *add_shader_compilation(struct hlsl_ctx *ctx, const cha
         return NULL;
     }
 
+    for (unsigned int i = 0; i < args->args_count; ++i)
+    {
+        if (args->args[i]->data_type->class == HLSL_CLASS_ERROR)
+        {
+            args->instrs->value = ctx->error_instr;
+            free(args->args);
+            return args->instrs;
+        }
+    }
+
     if (!(call_to_compile = add_user_call(ctx, decl, args, true, loc)))
     {
         free_parse_initializer(args);
