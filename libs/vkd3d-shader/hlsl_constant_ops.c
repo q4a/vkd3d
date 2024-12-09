@@ -1593,9 +1593,9 @@ static struct hlsl_ir_node *collect_exprs(struct hlsl_ctx *ctx, struct hlsl_bloc
 {
     enum hlsl_base_type type = instr->data_type->e.numeric.type;
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
-    struct hlsl_ir_node *ab, *res;
     struct hlsl_ir_expr *e1, *e2;
     enum hlsl_ir_expr_op opl;
+    struct hlsl_ir_node *res;
 
     if (!node1 || !node2 || node1->type != HLSL_IR_EXPR || node2->type != HLSL_IR_EXPR)
         return NULL;
@@ -1610,13 +1610,8 @@ static struct hlsl_ir_node *collect_exprs(struct hlsl_ctx *ctx, struct hlsl_bloc
     if (e1->operands[1].node->type != HLSL_IR_CONSTANT || e2->operands[1].node->type != HLSL_IR_CONSTANT)
         return NULL;
 
-    if (!(ab = hlsl_new_binary_expr(ctx, opr, e1->operands[1].node, e2->operands[1].node)))
-        return NULL;
-    hlsl_block_add_instr(block, ab);
-
     operands[0] = e1->operands[0].node;
-    operands[1] = ab;
-
+    operands[1] = hlsl_block_add_binary_expr(ctx, block, opr, e1->operands[1].node, e2->operands[1].node);
     if (!(res = hlsl_new_expr(ctx, opl, operands, instr->data_type, &instr->loc)))
         return NULL;
     hlsl_block_add_instr(block, res);
@@ -1677,26 +1672,14 @@ bool hlsl_normalize_binary_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
             if (arg2->type == HLSL_IR_CONSTANT)
             {
                 /* (x OP a) OP b -> x OP (a OP b) */
-                struct hlsl_ir_node *ab;
-
-                if (!(ab = hlsl_new_binary_expr(ctx, op, e1->operands[1].node, arg2)))
-                    goto fail;
-                hlsl_block_add_instr(&block, ab);
-
                 arg1 = e1->operands[0].node;
-                arg2 = ab;
+                arg2 = hlsl_block_add_binary_expr(ctx, &block, op, e1->operands[1].node, arg2);
                 progress = true;
             }
             else if (is_op_commutative(op))
             {
                 /* (x OP a) OP y -> (x OP y) OP a */
-                struct hlsl_ir_node *xy;
-
-                if (!(xy = hlsl_new_binary_expr(ctx, op, e1->operands[0].node, arg2)))
-                    goto fail;
-                hlsl_block_add_instr(&block, xy);
-
-                arg1 = xy;
+                arg1 = hlsl_block_add_binary_expr(ctx, &block, op, e1->operands[0].node, arg2);
                 arg2 = e1->operands[1].node;
                 progress = true;
             }
@@ -1706,13 +1689,7 @@ bool hlsl_normalize_binary_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
                 && e2->operands[0].node->type != HLSL_IR_CONSTANT && e2->operands[1].node->type == HLSL_IR_CONSTANT)
         {
             /* x OP (y OP a) -> (x OP y) OP a */
-            struct hlsl_ir_node *xy;
-
-            if (!(xy = hlsl_new_binary_expr(ctx, op, arg1, e2->operands[0].node)))
-                goto fail;
-            hlsl_block_add_instr(&block, xy);
-
-            arg1 = xy;
+            arg1 = hlsl_block_add_binary_expr(ctx, &block, op, arg1, e2->operands[0].node);
             arg2 = e2->operands[1].node;
             progress = true;
         }

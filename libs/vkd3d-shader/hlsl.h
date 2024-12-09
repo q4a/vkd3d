@@ -1505,6 +1505,8 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_bloc
 void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function_decl *decl);
 void hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl);
 
+struct hlsl_ir_node *hlsl_block_add_binary_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2);
 struct hlsl_ir_node *hlsl_block_add_cast(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *arg, struct hlsl_type *type, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_float_constant(struct hlsl_ctx *ctx, struct hlsl_block *block,

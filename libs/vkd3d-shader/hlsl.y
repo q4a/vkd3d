@@ -3433,9 +3433,7 @@ static bool add_combine_components(struct hlsl_ctx *ctx, const struct parse_init
         if (!(load = hlsl_add_load_component(ctx, params->instrs, arg, i, loc)))
             return false;
 
-        if (!(res = hlsl_new_binary_expr(ctx, op, res, load)))
-                return NULL;
-        hlsl_block_add_instr(params->instrs, res);
+        res = hlsl_block_add_binary_expr(ctx, params->instrs, op, res, load);
     }
 
     return true;
