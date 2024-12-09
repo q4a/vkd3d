@@ -2247,7 +2247,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
 
         for (i = 0; i < mat->data_type->e.numeric.dimx; ++i)
         {
-            struct hlsl_ir_node *cell, *load, *store, *c;
+            struct hlsl_ir_node *cell, *load, *c;
             struct hlsl_deref deref;
 
             if (!(writemask & (1 << i)))
@@ -2265,29 +2265,18 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
             if (!hlsl_init_deref_from_index_chain(ctx, &deref, cell))
                 return false;
 
-            if (!(store = hlsl_new_store_index(ctx, &deref, NULL, load, 0, &rhs->loc)))
-            {
-                hlsl_cleanup_deref(&deref);
-                return false;
-            }
-            hlsl_block_add_instr(block, store);
+            hlsl_block_add_store_index(ctx, block, &deref, NULL, load, 0, &rhs->loc);
             hlsl_cleanup_deref(&deref);
         }
     }
     else
     {
-        struct hlsl_ir_node *store;
         struct hlsl_deref deref;
 
         if (!hlsl_init_deref_from_index_chain(ctx, &deref, lhs))
             return false;
 
-        if (!(store = hlsl_new_store_index(ctx, &deref, NULL, rhs, writemask, &rhs->loc)))
-        {
-            hlsl_cleanup_deref(&deref);
-            return false;
-        }
-        hlsl_block_add_instr(block, store);
+        hlsl_block_add_store_index(ctx, block, &deref, NULL, rhs, writemask, &rhs->loc);
         hlsl_cleanup_deref(&deref);
     }
 

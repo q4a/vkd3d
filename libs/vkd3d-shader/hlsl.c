@@ -1534,6 +1534,13 @@ struct hlsl_ir_node *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hls
     return &store->node;
 }
 
+void hlsl_block_add_store_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct hlsl_deref *lhs, struct hlsl_ir_node *idx, struct hlsl_ir_node *rhs,
+        unsigned int writemask, const struct vkd3d_shader_location *loc)
+{
+    append_new_instr(ctx, block, hlsl_new_store_index(ctx, lhs, idx, rhs, writemask, loc));
+}
+
 bool hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *lhs, unsigned int comp, struct hlsl_ir_node *rhs)
 {

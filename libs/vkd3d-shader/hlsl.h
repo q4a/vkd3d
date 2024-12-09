@@ -1518,6 +1518,9 @@ struct hlsl_ir_node *hlsl_block_add_int_constant(struct hlsl_ctx *ctx, struct hl
         int32_t n, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *deref, unsigned int comp, const struct vkd3d_shader_location *loc);
+void hlsl_block_add_store_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct hlsl_deref *lhs, struct hlsl_ir_node *idx, struct hlsl_ir_node *rhs,
+        unsigned int writemask, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_uint_constant(struct hlsl_ctx *ctx, struct hlsl_block *block,
         unsigned int n, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_unary_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,

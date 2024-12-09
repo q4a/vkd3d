@@ -403,7 +403,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
-        struct hlsl_ir_node *store, *cast;
+        struct hlsl_ir_node *cast;
         struct hlsl_ir_var *input;
         struct hlsl_ir_load *load;
 
@@ -446,17 +446,13 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         {
             c = hlsl_block_add_uint_constant(ctx, block, i, &var->loc);
 
-            if (!(store = hlsl_new_store_index(ctx, &lhs->src, c, cast, 0, &var->loc)))
-                return;
-            hlsl_block_add_instr(block, store);
+            hlsl_block_add_store_index(ctx, block, &lhs->src, c, cast, 0, &var->loc);
         }
         else
         {
             VKD3D_ASSERT(i == 0);
 
-            if (!(store = hlsl_new_store_index(ctx, &lhs->src, NULL, cast, 0, &var->loc)))
-                return;
-            hlsl_block_add_instr(block, store);
+            hlsl_block_add_store_index(ctx, block, &lhs->src, NULL, cast, 0, &var->loc);
         }
     }
 }
@@ -1072,10 +1068,10 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     unsigned int dim_count = index->data_type->e.numeric.dimx;
-    struct hlsl_ir_node *store, *zero;
     struct hlsl_ir_load *coords_load;
     struct hlsl_deref coords_deref;
     struct hlsl_ir_var *coords;
+    struct hlsl_ir_node *zero;
 
     VKD3D_ASSERT(dim_count < 4);
 
@@ -1084,15 +1080,11 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
         return NULL;
 
     hlsl_init_simple_deref_from_var(&coords_deref, coords);
-    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, index, (1u << dim_count) - 1, loc)))
-        return NULL;
-    hlsl_block_add_instr(block, store);
+    hlsl_block_add_store_index(ctx, block, &coords_deref, NULL, index, (1u << dim_count) - 1, loc);
 
     zero = hlsl_block_add_uint_constant(ctx, block, 0, loc);
 
-    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, zero, 1u << dim_count, loc)))
-        return NULL;
-    hlsl_block_add_instr(block, store);
+    hlsl_block_add_store_index(ctx, block, &coords_deref, NULL, zero, 1u << dim_count, loc);
 
     if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
         return NULL;
@@ -1308,9 +1300,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
                 return false;
             hlsl_block_add_instr(block, &load->node);
 
-            if (!(store = hlsl_new_store_index(ctx, &row_deref, c, &load->node, 0, &instr->loc)))
-                return false;
-            hlsl_block_add_instr(block, store);
+            hlsl_block_add_store_index(ctx, block, &row_deref, c, &load->node, 0, &instr->loc);
         }
 
         if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
