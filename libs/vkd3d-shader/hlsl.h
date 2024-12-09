@@ -1525,6 +1525,9 @@ struct hlsl_ir_node *hlsl_block_add_load_component(struct hlsl_ctx *ctx, struct 
         const struct hlsl_deref *deref, unsigned int comp, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_load_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *deref, struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
+void hlsl_block_add_loop(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_block *iter, struct hlsl_block *body, enum hlsl_loop_unroll_type unroll_type,
+        unsigned int unroll_limit, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_simple_load(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_var *var, const struct vkd3d_shader_location *loc);
 void hlsl_block_add_simple_store(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -1646,9 +1649,6 @@ struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *v
 struct hlsl_ir_node *hlsl_new_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op op, struct hlsl_type *type,
         const struct hlsl_deref *dst, struct hlsl_ir_node *coords, struct hlsl_ir_node *cmp_value,
         struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc);
-struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx, struct hlsl_block *iter,
-        struct hlsl_block *block, enum hlsl_loop_unroll_type unroll_type,
-        unsigned int unroll_limit, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_matrix_swizzle(struct hlsl_ctx *ctx, struct hlsl_matrix_swizzle s,
         unsigned int width, struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,

@@ -655,7 +655,6 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum hlsl_loop_type 
 {
     enum hlsl_loop_unroll_type unroll_type = HLSL_LOOP_UNROLL;
     unsigned int i, unroll_limit = 0;
-    struct hlsl_ir_node *loop;
 
     check_attribute_list_for_duplicates(ctx, attributes);
     check_loop_attributes(ctx, attributes, loc);
@@ -714,9 +713,7 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum hlsl_loop_type 
     else
         list_move_head(&body->instrs, &cond->instrs);
 
-    if (!(loop = hlsl_new_loop(ctx, iter, body, unroll_type, unroll_limit, loc)))
-        goto oom;
-    hlsl_block_add_instr(init, loop);
+    hlsl_block_add_loop(ctx, init, iter, body, unroll_type, unroll_limit, loc);
 
     destroy_block(cond);
     destroy_block(body);

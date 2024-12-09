@@ -2253,7 +2253,7 @@ void hlsl_block_add_jump(struct hlsl_ctx *ctx, struct hlsl_block *block, enum hl
     append_new_instr(ctx, block, hlsl_new_jump(ctx, type, condition, loc));
 }
 
-struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx, struct hlsl_block *iter,
+static struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx, struct hlsl_block *iter,
         struct hlsl_block *block, enum hlsl_loop_unroll_type unroll_type,
         unsigned int unroll_limit, const struct vkd3d_shader_location *loc)
 {
@@ -2272,6 +2272,18 @@ struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx, struct hlsl_block *iter
     loop->unroll_type = unroll_type;
     loop->unroll_limit = unroll_limit;
     return &loop->node;
+}
+
+void hlsl_block_add_loop(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_block *iter, struct hlsl_block *body, enum hlsl_loop_unroll_type unroll_type,
+        unsigned int unroll_limit, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *instr = hlsl_new_loop(ctx, iter, body, unroll_type, unroll_limit, loc);
+
+    if (instr)
+        hlsl_block_add_instr(block, instr);
+    else
+        hlsl_block_cleanup(body);
 }
 
 struct clone_instr_map
