@@ -1971,7 +1971,7 @@ struct hlsl_ir_node *hlsl_block_add_load_component(struct hlsl_ctx *ctx, struct 
     return &load->node;
 }
 
-struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
+static struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_resource_load *load;
@@ -2008,6 +2008,12 @@ struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     if (load->sampling_dim == HLSL_SAMPLER_DIM_GENERIC)
         load->sampling_dim = hlsl_deref_get_type(ctx, &load->resource)->sampler_dim;
     return &load->node;
+}
+
+struct hlsl_ir_node *hlsl_block_add_resource_load(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc)
+{
+    return append_new_instr(ctx, block, hlsl_new_resource_load(ctx, params, loc));
 }
 
 static struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,

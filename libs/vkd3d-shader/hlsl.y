@@ -4768,7 +4768,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     unsigned int sampler_dim = hlsl_sampler_dim_count(dim);
     struct hlsl_resource_load_params load_params = { 0 };
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *coords, *sample;
+    struct hlsl_ir_node *coords;
 
     if (params->args_count != 2 && params->args_count != 4)
     {
@@ -4909,9 +4909,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
     load_params.sampling_dim = dim;
 
-    if (!(sample = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, sample);
+    hlsl_block_add_resource_load(ctx, params->instrs, &load_params, loc);
     return true;
 }
 
@@ -5736,7 +5734,6 @@ static bool add_raw_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bl
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
-    struct hlsl_ir_node *load;
     unsigned int value_dim;
 
     if (params->args_count != 1 && params->args_count != 2)
@@ -5774,10 +5771,7 @@ static bool add_raw_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bl
 
     load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, value_dim);
     load_params.resource = object;
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
@@ -5787,7 +5781,6 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
     const struct hlsl_type *object_type = object->data_type;
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
     unsigned int sampler_dim, offset_dim;
-    struct hlsl_ir_node *load;
     bool multisampled;
 
     if (object_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
@@ -5839,10 +5832,7 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
 
     load_params.format = object_type->e.resource.format;
     load_params.resource = object;
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
@@ -5853,7 +5843,6 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
     unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *load;
 
     sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
@@ -5897,11 +5886,7 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
-
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
@@ -5912,7 +5897,6 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     struct hlsl_resource_load_params load_params = { 0 };
     unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *load;
 
     sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
@@ -5966,11 +5950,7 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
-
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
@@ -5981,7 +5961,6 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     struct hlsl_resource_load_params load_params = {0};
     unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *load;
     unsigned int read_channel;
 
     sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
@@ -6066,10 +6045,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource.format->e.numeric.type, 4);
     load_params.resource = object;
     load_params.sampler = params->args[0];
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
@@ -6080,7 +6056,6 @@ static bool add_gather_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     struct hlsl_resource_load_params load_params = {0};
     unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *load;
 
     sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
@@ -6147,10 +6122,7 @@ static bool add_gather_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource.format->e.numeric.type, 4);
     load_params.resource = object;
     load_params.sampler = params->args[0];
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
@@ -6283,10 +6255,7 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
     load_params.resource = object;
     load_params.lod = args[ARG_MIP_LEVEL];
     load_params.format = hlsl_get_vector_type(ctx, uint_resinfo ? HLSL_TYPE_UINT : HLSL_TYPE_FLOAT, 4);
-
-    if (!(res_info = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, res_info);
+    res_info = hlsl_block_add_resource_load(ctx, block, &load_params, loc);
 
     if (!add_assignment_from_component(ctx, block, args[ARG_WIDTH], res_info, 0, loc))
         return false;
@@ -6309,9 +6278,7 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
         load_params.type = HLSL_RESOURCE_SAMPLE_INFO;
         load_params.resource = object;
         load_params.format = args[ARG_SAMPLE_COUNT]->data_type;
-        if (!(sample_info = hlsl_new_resource_load(ctx, &load_params, loc)))
-            return false;
-        hlsl_block_add_instr(block, sample_info);
+        sample_info = hlsl_block_add_resource_load(ctx, block, &load_params, loc);
 
         if (!add_assignment(ctx, block, args[ARG_SAMPLE_COUNT], ASSIGN_OP_ASSIGN, sample_info, false))
             return false;
@@ -6328,7 +6295,6 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     struct hlsl_resource_load_params load_params = { 0 };
     unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *load;
 
     sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
@@ -6379,10 +6345,7 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
@@ -6393,7 +6356,6 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
     struct hlsl_resource_load_params load_params = { 0 };
     unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *load;
 
     sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
@@ -6445,10 +6407,7 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
     load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
-
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-        return false;
-    hlsl_block_add_instr(block, load);
+    hlsl_block_add_resource_load(ctx, block, &load_params, loc);
     return true;
 }
 
