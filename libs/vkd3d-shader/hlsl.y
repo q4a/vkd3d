@@ -4120,7 +4120,7 @@ static bool intrinsic_exp(struct hlsl_ctx *ctx,
         return false;
     hlsl_block_add_instr(params->instrs, coeff);
 
-    if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, coeff, params->args[0], loc)))
+    if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, coeff, arg, loc)))
         return false;
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_EXP2, mul, loc);
