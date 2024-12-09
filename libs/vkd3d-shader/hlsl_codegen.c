@@ -1003,9 +1003,8 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
     else if (cf_instr)
     {
         struct list *tail = list_tail(&block->instrs);
-        struct hlsl_ir_node *not, *iff;
+        struct hlsl_ir_node *not, *iff, *load;
         struct hlsl_block then_block;
-        struct hlsl_ir_load *load;
 
         /* If we're in a loop, we should have used "break" instead. */
         VKD3D_ASSERT(!in_loop);
@@ -1017,11 +1016,8 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         list_move_slice_tail(&then_block.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
         lower_return(ctx, func, &then_block, in_loop);
 
-        if (!(load = hlsl_new_var_load(ctx, func->early_return_var, &cf_instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, &load->node);
-
-        not = hlsl_block_add_unary_expr(ctx, block, HLSL_OP1_LOGIC_NOT, &load->node, &cf_instr->loc);
+        load = hlsl_block_add_simple_load(ctx, block, func->early_return_var, &cf_instr->loc);
+        not = hlsl_block_add_unary_expr(ctx, block, HLSL_OP1_LOGIC_NOT, load, &cf_instr->loc);
 
         if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &cf_instr->loc)))
             return false;
@@ -1060,7 +1056,6 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     unsigned int dim_count = index->data_type->e.numeric.dimx;
-    struct hlsl_ir_load *coords_load;
     struct hlsl_deref coords_deref;
     struct hlsl_ir_var *coords;
     struct hlsl_ir_node *zero;
@@ -1075,14 +1070,9 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
     hlsl_block_add_store_index(ctx, block, &coords_deref, NULL, index, (1u << dim_count) - 1, loc);
 
     zero = hlsl_block_add_uint_constant(ctx, block, 0, loc);
-
     hlsl_block_add_store_index(ctx, block, &coords_deref, NULL, zero, 1u << dim_count, loc);
 
-    if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
-        return NULL;
-    hlsl_block_add_instr(block, &coords_load->node);
-
-    return &coords_load->node;
+    return hlsl_block_add_simple_load(ctx, block, coords, loc);
 }
 
 static bool lower_complex_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
@@ -1091,7 +1081,6 @@ static bool lower_complex_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     struct hlsl_type *src_type, *dst_type;
     struct hlsl_deref var_deref;
     bool broadcast, matrix_cast;
-    struct hlsl_ir_load *load;
     struct hlsl_ir_node *arg;
     struct hlsl_ir_var *var;
     unsigned int dst_idx;
@@ -1154,10 +1143,7 @@ static bool lower_complex_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         hlsl_block_add_store_component(ctx, block, &var_deref, dst_idx, cast);
     }
 
-    if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, &load->node);
-
+    hlsl_block_add_simple_load(ctx, block, var, &instr->loc);
     return true;
 }
 
@@ -1169,7 +1155,6 @@ static bool lower_complex_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 static bool lower_matrix_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_swizzle *swizzle;
-    struct hlsl_ir_load *var_load;
     struct hlsl_deref var_deref;
     struct hlsl_type *matrix_type;
     struct hlsl_ir_var *var;
@@ -1196,10 +1181,7 @@ static bool lower_matrix_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
         hlsl_block_add_store_component(ctx, block, &var_deref, i, load);
     }
 
-    if (!(var_load = hlsl_new_var_load(ctx, var, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, &var_load->node);
-
+    hlsl_block_add_simple_load(ctx, block, var, &instr->loc);
     return true;
 }
 
@@ -1282,9 +1264,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             hlsl_block_add_store_index(ctx, block, &row_deref, c, &load->node, 0, &instr->loc);
         }
 
-        if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, &load->node);
+        hlsl_block_add_simple_load(ctx, block, var, &instr->loc);
     }
     else
     {
@@ -2879,11 +2859,10 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
     element_count = hlsl_type_element_count(cut_type);
     for (i = 0; i < element_count; ++i)
     {
+        struct hlsl_ir_node *const_i, *equals, *ternary, *specific_load, *var_load;
         struct hlsl_type *btype = hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL);
-        struct hlsl_ir_node *const_i, *equals, *ternary, *specific_load;
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
         struct hlsl_deref deref_copy = {0};
-        struct hlsl_ir_load *var_load;
 
         const_i = hlsl_block_add_uint_constant(ctx, block, i, &cut_index->loc);
 
@@ -2896,9 +2875,7 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
             return false;
         hlsl_block_add_instr(block, equals);
 
-        if (!(var_load = hlsl_new_var_load(ctx, var, &cut_index->loc)))
-            return false;
-        hlsl_block_add_instr(block, &var_load->node);
+        var_load = hlsl_block_add_simple_load(ctx, block, var, &cut_index->loc);
 
         if (!hlsl_copy_deref(ctx, &deref_copy, deref))
             return false;
@@ -2909,16 +2886,13 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
 
         operands[0] = equals;
         operands[1] = specific_load;
-        operands[2] = &var_load->node;
+        operands[2] = var_load;
         ternary = hlsl_block_add_expr(ctx, block, HLSL_OP3_TERNARY, operands, instr->data_type, &cut_index->loc);
 
         hlsl_block_add_simple_store(ctx, block, var, ternary);
     }
 
-    if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, &load->node);
-
+    hlsl_block_add_simple_load(ctx, block, var, &instr->loc);
     return true;
 }
 
@@ -11378,17 +11352,13 @@ static bool loop_unrolling_remove_jumps_visit(struct hlsl_ctx *ctx, struct hlsl_
 static struct hlsl_ir_if *loop_unrolling_generate_var_check(struct hlsl_ctx *ctx,
         struct hlsl_block *dst, struct hlsl_ir_var *var, struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *cond, *iff;
+    struct hlsl_ir_node *cond, *load, *iff;
     struct hlsl_block then_block;
-    struct hlsl_ir_load *load;
 
     hlsl_block_init(&then_block);
 
-    if (!(load = hlsl_new_var_load(ctx, var, loc)))
-        return NULL;
-    hlsl_block_add_instr(dst, &load->node);
-
-    cond = hlsl_block_add_unary_expr(ctx, dst, HLSL_OP1_LOGIC_NOT, &load->node, loc);
+    load = hlsl_block_add_simple_load(ctx, dst, var, loc);
+    cond = hlsl_block_add_unary_expr(ctx, dst, HLSL_OP1_LOGIC_NOT, load, loc);
 
     if (!(iff = hlsl_new_if(ctx, cond, &then_block, NULL, loc)))
         return NULL;
@@ -11733,7 +11703,6 @@ static bool lower_f16tof32(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
     struct hlsl_ir_function_decl *func;
     struct hlsl_ir_node *call, *rhs;
     unsigned int component_count;
-    struct hlsl_ir_load *load;
     struct hlsl_ir_expr *expr;
     struct hlsl_ir_var *lhs;
     char *body;
@@ -11802,10 +11771,7 @@ static bool lower_f16tof32(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
         return false;
     hlsl_block_add_instr(block, call);
 
-    if (!(load = hlsl_new_var_load(ctx, func->return_var, &node->loc)))
-        return false;
-    hlsl_block_add_instr(block, &load->node);
-
+    hlsl_block_add_simple_load(ctx, block, func->return_var, &node->loc);
     return true;
 }
 
@@ -11814,7 +11780,6 @@ static bool lower_f32tof16(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
     struct hlsl_ir_function_decl *func;
     struct hlsl_ir_node *call, *rhs;
     unsigned int component_count;
-    struct hlsl_ir_load *load;
     struct hlsl_ir_expr *expr;
     struct hlsl_ir_var *lhs;
     char *body;
@@ -11871,10 +11836,7 @@ static bool lower_f32tof16(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
         return false;
     hlsl_block_add_instr(block, call);
 
-    if (!(load = hlsl_new_var_load(ctx, func->return_var, &node->loc)))
-        return false;
-    hlsl_block_add_instr(block, &load->node);
-
+    hlsl_block_add_simple_load(ctx, block, func->return_var, &node->loc);
     return true;
 }
 
@@ -11883,7 +11845,6 @@ static bool lower_isinf(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct 
     struct hlsl_ir_function_decl *func;
     struct hlsl_ir_node *call, *rhs;
     unsigned int component_count;
-    struct hlsl_ir_load *load;
     struct hlsl_ir_expr *expr;
     const char *template;
     char *body;
@@ -11955,10 +11916,7 @@ static bool lower_isinf(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct 
         return false;
     hlsl_block_add_instr(block, call);
 
-    if (!(load = hlsl_new_var_load(ctx, func->return_var, &node->loc)))
-        return false;
-    hlsl_block_add_instr(block, &load->node);
-
+    hlsl_block_add_simple_load(ctx, block, func->return_var, &node->loc);
     return true;
 }
 

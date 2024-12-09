@@ -1584,7 +1584,6 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
     if (type->class == HLSL_CLASS_MATRIX)
     {
         struct hlsl_type *scalar_type;
-        struct hlsl_ir_load *var_load;
         struct hlsl_deref var_deref;
         struct hlsl_ir_var *var;
 
@@ -1611,11 +1610,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
             hlsl_block_add_store_component(ctx, block, &var_deref, i, value);
         }
 
-        if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
-            return NULL;
-        hlsl_block_add_instr(block, &var_load->node);
-
-        return &var_load->node;
+        return hlsl_block_add_simple_load(ctx, block, var, loc);
     }
 
     return hlsl_block_add_expr(ctx, block, op, operands, type, loc);
@@ -3141,33 +3136,22 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
 
         if (param->storage_modifiers & HLSL_STORAGE_OUT)
         {
-            struct hlsl_ir_load *load;
+            struct hlsl_ir_node *load;
 
             if (arg->data_type->modifiers & HLSL_MODIFIER_CONST)
                 hlsl_error(ctx, &arg->loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                         "Output argument to \"%s\" is const.", func->func->name);
 
-            if (!(load = hlsl_new_var_load(ctx, param, &arg->loc)))
-                return NULL;
-            hlsl_block_add_instr(args->instrs, &load->node);
-
-            if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, &load->node, true))
+            load = hlsl_block_add_simple_load(ctx, args->instrs, param, &arg->loc);
+            if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, load, true))
                 return NULL;
         }
     }
 
     if (func->return_var)
-    {
-        struct hlsl_ir_load *load;
-
-        if (!(load = hlsl_new_var_load(ctx, func->return_var, loc)))
-            return false;
-        hlsl_block_add_instr(args->instrs, &load->node);
-    }
+        hlsl_block_add_simple_load(ctx, args->instrs, func->return_var, loc);
     else
-    {
         add_void_expr(ctx, args->instrs, loc);
-    }
 
     return call;
 }
@@ -4358,7 +4342,7 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
     struct hlsl_type *cast_type1 = arg1->data_type, *cast_type2 = arg2->data_type, *matrix_type, *ret_type;
     unsigned int i, j, k, vect_count = 0;
     struct hlsl_deref var_deref;
-    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *load;
     struct hlsl_ir_var *var;
 
     if (arg1->data_type->class == HLSL_CLASS_SCALAR || arg2->data_type->class == HLSL_CLASS_SCALAR)
@@ -4436,11 +4420,8 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
         }
     }
 
-    if (!(load = hlsl_new_var_load(ctx, var, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, &load->node);
-
-    return !!add_implicit_conversion(ctx, params->instrs, &load->node, ret_type, loc);
+    load = hlsl_block_add_simple_load(ctx, params->instrs, var, loc);
+    return !!add_implicit_conversion(ctx, params->instrs, load, ret_type, loc);
 }
 
 static bool intrinsic_normalize(struct hlsl_ctx *ctx,
@@ -4934,7 +4915,6 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
        is used for the second coordinate, while older ones appear to replicate first coordinate.*/
     if (dim == HLSL_SAMPLER_DIM_1D)
     {
-        struct hlsl_ir_load *load;
         struct hlsl_ir_var *var;
         unsigned int idx = 0;
 
@@ -4946,12 +4926,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
             coords = hlsl_block_add_float_constant(ctx, params->instrs, 0.5f, loc);
         initialize_var_components(ctx, params->instrs, var, &idx, coords, false);
 
-        if (!(load = hlsl_new_var_load(ctx, var, loc)))
-            return false;
-        hlsl_block_add_instr(params->instrs, &load->node);
-
-        coords = &load->node;
-
+        coords = hlsl_block_add_simple_load(ctx, params->instrs, var, loc);
         dim = HLSL_SAMPLER_DIM_2D;
     }
 
@@ -5049,7 +5024,6 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg = params->args[0];
     struct hlsl_type *arg_type = arg->data_type;
-    struct hlsl_ir_load *var_load;
     struct hlsl_deref var_deref;
     struct hlsl_type *mat_type;
     struct hlsl_ir_node *load;
@@ -5091,10 +5065,7 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
         }
     }
 
-    if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, &var_load->node);
-
+    hlsl_block_add_simple_load(ctx, params->instrs, var, loc);
     return true;
 }
 
@@ -5618,7 +5589,6 @@ static struct hlsl_block *add_compile_variant(struct hlsl_ctx *ctx, enum hlsl_co
 static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
         struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
 
     if (!hlsl_is_numeric_type(type))
@@ -5637,9 +5607,7 @@ static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type
 
     initialize_var(ctx, var, params, false);
 
-    if (!(load = hlsl_new_var_load(ctx, var, loc)))
-        return NULL;
-    hlsl_block_add_instr(params->instrs, &load->node);
+    hlsl_block_add_simple_load(ctx, params->instrs, var, loc);
 
     vkd3d_free(params->args);
     return params->instrs;
@@ -9308,17 +9276,15 @@ primary_expr:
         }
     | VAR_IDENTIFIER
         {
-            struct hlsl_ir_load *load;
             struct hlsl_ir_var *var;
 
             if ((var = hlsl_get_var(ctx->cur_scope, $1)))
             {
                 vkd3d_free($1);
 
-                if (!(load = hlsl_new_var_load(ctx, var, &@1)))
+                if (!($$ = make_empty_block(ctx)))
                     YYABORT;
-                if (!($$ = make_block(ctx, &load->node)))
-                    YYABORT;
+                hlsl_block_add_simple_load(ctx, $$, var, &@1);
             }
             else
             {
