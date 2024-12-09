@@ -1865,6 +1865,9 @@ struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned
     struct hlsl_ir_swizzle *swizzle;
     struct hlsl_type *type;
 
+    if (val->data_type->class == HLSL_CLASS_ERROR)
+        return val;
+
     VKD3D_ASSERT(val->data_type->class <= HLSL_CLASS_VECTOR);
 
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
