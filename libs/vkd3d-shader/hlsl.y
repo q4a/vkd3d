@@ -449,7 +449,7 @@ static uint32_t add_modifiers(struct hlsl_ctx *ctx, uint32_t modifiers, uint32_t
     return modifiers | mod;
 }
 
-static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *cond_block)
+static void append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *cond_block)
 {
     struct hlsl_ir_node *condition, *cast, *not;
     struct hlsl_block then_block;
@@ -457,7 +457,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
 
     /* E.g. "for (i = 0; ; ++i)". */
     if (list_empty(&cond_block->instrs))
-        return true;
+        return;
 
     condition = node_from_block(cond_block);
 
@@ -466,15 +466,12 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
     bool_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL);
     /* We already checked for a 1-component numeric type, so
      * add_implicit_conversion() is equivalent to add_cast() here. */
-    if (!(cast = add_cast(ctx, cond_block, condition, bool_type, &condition->loc)))
-        return false;
-
+    cast = add_cast(ctx, cond_block, condition, bool_type, &condition->loc);
     not = hlsl_block_add_unary_expr(ctx, cond_block, HLSL_OP1_LOGIC_NOT, cast, &condition->loc);
 
     hlsl_block_init(&then_block);
     hlsl_block_add_jump(ctx, &then_block, HLSL_IR_JUMP_BREAK, NULL, &condition->loc);
     hlsl_block_add_if(ctx, cond_block, not, &then_block, NULL, &condition->loc);
-    return true;
 }
 
 static void check_attribute_list_for_duplicates(struct hlsl_ctx *ctx, const struct parse_attribute_list *attrs)
@@ -518,11 +515,7 @@ static void resolve_loop_continue(struct hlsl_ctx *ctx, struct hlsl_block *block
             {
                 if (!hlsl_clone_block(ctx, &cond_block, cond))
                     return;
-                if (!append_conditional_break(ctx, &cond_block))
-                {
-                    hlsl_block_cleanup(&cond_block);
-                    return;
-                }
+                append_conditional_break(ctx, &cond_block);
                 list_move_before(&instr->entry, &cond_block.instrs);
             }
         }
@@ -705,8 +698,7 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum hlsl_loop_type 
     if (!init && !(init = make_empty_block(ctx)))
         goto oom;
 
-    if (!append_conditional_break(ctx, cond))
-        goto oom;
+    append_conditional_break(ctx, cond);
 
     if (type == HLSL_LOOP_DO_WHILE)
         list_move_tail(&body->instrs, &cond->instrs);
@@ -2108,8 +2100,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
     /* lhs casts could have resulted in a discrepancy between the
      * rhs->data_type and the type of the variable that will be ulimately
      * stored to. This is corrected. */
-    if (!(rhs = add_cast(ctx, block, rhs, lhs_type, &rhs->loc)))
-        return false;
+    rhs = add_cast(ctx, block, rhs, lhs_type, &rhs->loc);
 
     if (lhs->type == HLSL_IR_INDEX && hlsl_index_chain_has_resource_access(hlsl_ir_index(lhs)))
     {
@@ -2770,13 +2761,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             }
 
             zero = hlsl_block_add_uint_constant(ctx, &ctx->static_initializers, 0, &var->loc);
-
-            if (!(cast = add_cast(ctx, &ctx->static_initializers, zero, var->data_type, &var->loc)))
-            {
-                free_parse_variable_def(v);
-                continue;
-            }
-
+            cast = add_cast(ctx, &ctx->static_initializers, zero, var->data_type, &var->loc);
             hlsl_block_add_simple_store(ctx, &ctx->static_initializers, var, cast);
         }
         free_parse_variable_def(v);
@@ -3048,13 +3033,7 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
         if (param->storage_modifiers & HLSL_STORAGE_IN)
         {
             if (!hlsl_types_are_equal(arg->data_type, param->data_type))
-            {
-                struct hlsl_ir_node *cast;
-
-                if (!(cast = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc)))
-                    return NULL;
-                arg = cast;
-            }
+                arg = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc);
 
             hlsl_block_add_simple_store(ctx, args->instrs, param, arg);
         }
@@ -3333,9 +3312,7 @@ static bool intrinsic_all(struct hlsl_ctx *ctx,
     struct hlsl_type *bool_type;
 
     bool_type = convert_numeric_type(ctx, arg->data_type, HLSL_TYPE_BOOL);
-    if (!(cast = add_cast(ctx, params->instrs, arg, bool_type, loc)))
-        return false;
-
+    cast = add_cast(ctx, params->instrs, arg, bool_type, loc);
     add_combine_components(ctx, params, cast, HLSL_OP2_LOGIC_AND, loc);
     return true;
 }
@@ -3347,9 +3324,7 @@ static bool intrinsic_any(struct hlsl_ctx *ctx, const struct parse_initializer *
     struct hlsl_type *bool_type;
 
     bool_type = convert_numeric_type(ctx, arg->data_type, HLSL_TYPE_BOOL);
-    if (!(cast = add_cast(ctx, params->instrs, arg, bool_type, loc)))
-        return false;
-
+    cast = add_cast(ctx, params->instrs, arg, bool_type, loc);
     add_combine_components(ctx, params, cast, HLSL_OP2_LOGIC_OR, loc);
     return true;
 }
@@ -8972,14 +8947,7 @@ selection_statement:
 
             check_condition_type(ctx, condition);
 
-            if (!(condition = add_cast(ctx, $4, condition, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), &@4)))
-            {
-                destroy_block($6.then_block);
-                destroy_block($6.else_block);
-                cleanup_parse_attribute_list(&$1);
-                YYABORT;
-            }
-
+            condition = add_cast(ctx, $4, condition, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), &@4);
             hlsl_block_add_if(ctx, $4, condition, $6.then_block, $6.else_block, &@2);
 
             destroy_block($6.then_block);
