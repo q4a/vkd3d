@@ -1668,7 +1668,7 @@ struct hlsl_ir_node *hlsl_new_null_constant(struct hlsl_ctx *ctx, const struct v
     return hlsl_new_constant(ctx, ctx->builtin_types.null, &value, loc);
 }
 
-struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
+static struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *data_type, const struct vkd3d_shader_location *loc)
 {

@@ -3097,11 +3097,12 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
     return decl;
 }
 
-static struct hlsl_ir_node *hlsl_new_void_expr(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
+static void add_void_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
 
-    return hlsl_new_expr(ctx, HLSL_OP0_VOID, operands, ctx->builtin_types.Void, loc);
+    hlsl_block_add_expr(ctx, block, HLSL_OP0_VOID, operands, ctx->builtin_types.Void, loc);
 }
 
 static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
@@ -3221,11 +3222,7 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
     }
     else
     {
-        struct hlsl_ir_node *expr;
-
-        if (!(expr = hlsl_new_void_expr(ctx, loc)))
-            return false;
-        hlsl_block_add_instr(args->instrs, expr);
+        add_void_expr(ctx, args->instrs, loc);
     }
 
     return call;
@@ -5241,8 +5238,7 @@ static bool intrinsic_GetRenderTargetSampleCount(struct hlsl_ctx *ctx,
 static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op op,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc, const char *name)
 {
-    struct hlsl_ir_node *lhs, *coords, *val, *cmp_val = NULL, *orig_val = NULL;
-    struct hlsl_ir_node *interlocked, *void_ret;
+    struct hlsl_ir_node *interlocked, *lhs, *coords, *val, *cmp_val = NULL, *orig_val = NULL;
     struct hlsl_type *lhs_type, *val_type;
     struct vkd3d_string_buffer *string;
     struct hlsl_deref dst_deref;
@@ -5356,10 +5352,7 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
             return false;
     }
 
-    if (!(void_ret = hlsl_new_void_expr(ctx, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, void_ret);
-
+    add_void_expr(ctx, params->instrs, loc);
     return true;
 }
 
@@ -6313,7 +6306,6 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
     struct hlsl_resource_load_params load_params;
     struct hlsl_ir_node *sample_info, *res_info;
     struct hlsl_type *uint_type, *float_type;
-    struct hlsl_ir_node *void_ret;
     unsigned int i, j;
     enum func_argument
     {
@@ -6454,10 +6446,7 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
             return false;
     }
 
-    if (!(void_ret = hlsl_new_void_expr(ctx, loc)))
-        return false;
-    hlsl_block_add_instr(block, void_ret);
-
+    add_void_expr(ctx, block, loc);
     return true;
 }
 
