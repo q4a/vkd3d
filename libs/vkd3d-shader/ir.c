@@ -8054,7 +8054,7 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
     enum vkd3d_tessellator_domain expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_INVALID;
     const char *signature_type_name = signature_type_names[signature_type];
     const struct signature_element *element = &signature->elements[idx];
-    bool integer_type = false, is_outer = false;
+    bool integer_type = false, is_outer = false, is_gs_output;
     unsigned int semantic_index_max = 0;
 
     if (element->register_count == 0)
@@ -8066,6 +8066,13 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid register index %u and count %u.",
                 idx, signature_type_name, element->register_index, element->register_count);
+
+    is_gs_output = ctx->program->shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY
+            && signature_type == SIGNATURE_TYPE_OUTPUT;
+    if (element->stream_index >= VKD3D_MAX_STREAM_COUNT || (element->stream_index != 0 && !is_gs_output))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid stream index %u.",
+                idx, signature_type_name, element->stream_index);
 
     if (element->mask == 0 || (element->mask & ~0xf))
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
