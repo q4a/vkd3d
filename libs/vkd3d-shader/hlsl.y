@@ -372,7 +372,15 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     if (node->type == HLSL_IR_SAMPLER_STATE && dst_type->class == HLSL_CLASS_SAMPLER)
         return node;
 
-    if (!implicit_compatible_data_types(ctx, src_type, dst_type))
+    if (implicit_compatible_data_types(ctx, src_type, dst_type))
+    {
+        if (hlsl_is_numeric_type(dst_type) && hlsl_is_numeric_type(src_type)
+                && dst_type->e.numeric.dimx * dst_type->e.numeric.dimy < src_type->e.numeric.dimx * src_type->e.numeric.dimy
+                && ctx->warn_implicit_truncation)
+            hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION, "Implicit truncation of %s type.",
+                    src_type->class == HLSL_CLASS_VECTOR ? "vector" : "matrix");
+    }
+    else
     {
         struct vkd3d_string_buffer *src_string, *dst_string;
 
@@ -383,14 +391,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
                     "Can't implicitly convert from %s to %s.", src_string->buffer, dst_string->buffer);
         hlsl_release_string_buffer(ctx, src_string);
         hlsl_release_string_buffer(ctx, dst_string);
-        return NULL;
     }
-
-    if (hlsl_is_numeric_type(dst_type) && hlsl_is_numeric_type(src_type)
-            && dst_type->e.numeric.dimx * dst_type->e.numeric.dimy < src_type->e.numeric.dimx * src_type->e.numeric.dimy
-            && ctx->warn_implicit_truncation)
-        hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION, "Implicit truncation of %s type.",
-                src_type->class == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 
     return add_cast(ctx, block, node, dst_type, loc);
 }
@@ -590,11 +591,7 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
         return ret;
     hlsl_block_add_block(&expr, block);
 
-    if (!(node = add_implicit_conversion(ctx, &expr, node_from_block(&expr), dst_type, loc)))
-    {
-        hlsl_block_cleanup(&expr);
-        return ret;
-    }
+    node = add_implicit_conversion(ctx, &expr, node_from_block(&expr), dst_type, loc);
 
     /* Wrap the node into a src to allow the reference to survive the multiple const passes. */
     hlsl_src_from_node(&src, node);
@@ -841,9 +838,7 @@ static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
             if (return_value->data_type->class == HLSL_CLASS_ERROR)
                 return true;
 
-            if (!(return_value = add_implicit_conversion(ctx, block, return_value, return_type, loc)))
-                return false;
-
+            return_value = add_implicit_conversion(ctx, block, return_value, return_type, loc);
             hlsl_block_add_simple_store(ctx, block, ctx->cur_function->return_var, return_value);
         }
         else
@@ -922,10 +917,8 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct hlsl_block *block, str
             return false;
         }
 
-        if (!(index = add_implicit_conversion(ctx, block, index,
-                hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count), &index->loc)))
-            return false;
-
+        index = add_implicit_conversion(ctx, block, index,
+                hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count), &index->loc);
         hlsl_block_add_index(ctx, block, array, index, loc);
         return true;
     }
@@ -1248,9 +1241,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
 
         if (!param->initializer.braces)
         {
-            if (!(add_implicit_conversion(ctx, param->initializer.instrs, param->initializer.args[0], param->type, loc)))
-                return false;
-
+            add_implicit_conversion(ctx, param->initializer.instrs, param->initializer.args[0], param->type, loc);
             param->initializer.args[0] = node_from_block(param->initializer.instrs);
         }
 
@@ -1647,10 +1638,7 @@ static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct 
 
     bool_type = hlsl_get_numeric_type(ctx, arg->data_type->class, HLSL_TYPE_BOOL,
             arg->data_type->e.numeric.dimx, arg->data_type->e.numeric.dimy);
-
-    if (!(args[0] = add_implicit_conversion(ctx, block, arg, bool_type, loc)))
-        return NULL;
-
+    args[0] = add_implicit_conversion(ctx, block, arg, bool_type, loc);
     return add_expr(ctx, block, op, args, bool_type, loc);
 }
 
@@ -1680,12 +1668,8 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
         return block->value;
     }
 
-    if (!(args[0] = add_implicit_conversion(ctx, block, arg1, common_type, loc)))
-        return NULL;
-
-    if (!(args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc)))
-        return NULL;
-
+    args[0] = add_implicit_conversion(ctx, block, arg1, common_type, loc);
+    args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc);
     return add_expr(ctx, block, op, args, common_type, loc);
 }
 
@@ -1716,12 +1700,8 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
     common_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
     return_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
 
-    if (!(args[0] = add_implicit_conversion(ctx, block, arg1, common_type, loc)))
-        return NULL;
-
-    if (!(args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc)))
-        return NULL;
-
+    args[0] = add_implicit_conversion(ctx, block, arg1, common_type, loc);
+    args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc);
     return add_expr(ctx, block, op, args, return_type, loc);
 }
 
@@ -1739,12 +1719,8 @@ static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct
 
     common_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
 
-    if (!(args[0] = add_implicit_conversion(ctx, block, arg1, common_type, loc)))
-        return NULL;
-
-    if (!(args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc)))
-        return NULL;
-
+    args[0] = add_implicit_conversion(ctx, block, arg1, common_type, loc);
+    args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc);
     return add_expr(ctx, block, op, args, common_type, loc);
 }
 
@@ -1770,12 +1746,8 @@ static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct h
     return_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
     integer_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_INT, dimx, dimy);
 
-    if (!(args[0] = add_implicit_conversion(ctx, block, arg1, return_type, loc)))
-        return NULL;
-
-    if (!(args[1] = add_implicit_conversion(ctx, block, arg2, integer_type, loc)))
-        return NULL;
-
+    args[0] = add_implicit_conversion(ctx, block, arg1, return_type, loc);
+    args[1] = add_implicit_conversion(ctx, block, arg2, integer_type, loc);
     return add_expr(ctx, block, op, args, return_type, loc);
 }
 
@@ -1823,12 +1795,8 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct hls
     common_type = hlsl_get_vector_type(ctx, base, dim);
     ret_type = hlsl_get_scalar_type(ctx, base);
 
-    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc)))
-        return NULL;
-
-    if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
-        return NULL;
-
+    args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc);
+    args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc);
     return add_expr(ctx, instrs, op, args, ret_type, loc);
 }
 
@@ -2024,8 +1992,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         width = size;
     }
 
-    if (!(rhs = add_implicit_conversion(ctx, block, rhs, lhs_type, &rhs->loc)))
-        return false;
+    rhs = add_implicit_conversion(ctx, block, rhs, lhs_type, &rhs->loc);
 
     while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_INDEX)
     {
@@ -2321,9 +2288,7 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
             }
             else
             {
-                if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
-                    return;
-
+                conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc);
                 hlsl_block_add_store_component(ctx, instrs, &dst_deref, *store_index, conv);
             }
         }
@@ -2718,15 +2683,8 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             }
 
             if (!v->initializer.braces)
-            {
-                if (!(add_implicit_conversion(ctx, v->initializer.instrs, v->initializer.args[0], type, &v->loc)))
-                {
-                    free_parse_variable_def(v);
-                    continue;
-                }
-
-                v->initializer.args[0] = node_from_block(v->initializer.instrs);
-            }
+                v->initializer.args[0] = add_implicit_conversion(ctx,
+                        v->initializer.instrs, v->initializer.args[0], type, &v->loc);
 
             if (var->data_type->class != HLSL_CLASS_ERROR)
                 initialize_var(ctx, var, &v->initializer, is_default_values_initializer);
@@ -3118,21 +3076,13 @@ static struct hlsl_ir_node *intrinsic_float_convert_arg(struct hlsl_ctx *ctx,
     return add_implicit_conversion(ctx, params->instrs, arg, type, loc);
 }
 
-static bool convert_args(struct hlsl_ctx *ctx, const struct parse_initializer *params,
+static void convert_args(struct hlsl_ctx *ctx, const struct parse_initializer *params,
         struct hlsl_type *type, const struct vkd3d_shader_location *loc)
 {
     unsigned int i;
 
     for (i = 0; i < params->args_count; ++i)
-    {
-        struct hlsl_ir_node *new_arg;
-
-        if (!(new_arg = add_implicit_conversion(ctx, params->instrs, params->args[i], type, loc)))
-            return false;
-        params->args[i] = new_arg;
-    }
-
-    return true;
+        params->args[i] = add_implicit_conversion(ctx, params->instrs, params->args[i], type, loc);
 }
 
 static struct hlsl_type *elementwise_intrinsic_get_common_type(struct hlsl_ctx *ctx,
@@ -3193,7 +3143,8 @@ static bool elementwise_intrinsic_convert_args(struct hlsl_ctx *ctx,
     if (!(common_type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
         return false;
 
-    return convert_args(ctx, params, common_type, loc);
+    convert_args(ctx, params, common_type, loc);
+    return true;
 }
 
 static bool elementwise_intrinsic_float_convert_args(struct hlsl_ctx *ctx,
@@ -3206,7 +3157,8 @@ static bool elementwise_intrinsic_float_convert_args(struct hlsl_ctx *ctx,
     if (hlsl_type_is_integer(type))
         type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->e.numeric.dimx, type->e.numeric.dimy);
 
-    return convert_args(ctx, params, type, loc);
+    convert_args(ctx, params, type, loc);
+    return true;
 }
 
 static bool elementwise_intrinsic_uint_convert_args(struct hlsl_ctx *ctx,
@@ -3219,7 +3171,8 @@ static bool elementwise_intrinsic_uint_convert_args(struct hlsl_ctx *ctx,
 
     type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_UINT, type->e.numeric.dimx, type->e.numeric.dimy);
 
-    return convert_args(ctx, params, type, loc);
+    convert_args(ctx, params, type, loc);
+    return true;
 }
 
 static bool intrinsic_abs(struct hlsl_ctx *ctx,
@@ -3624,12 +3577,8 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
 
     cast_type = hlsl_get_vector_type(ctx, base, 3);
 
-    if (!(arg1_cast = add_implicit_conversion(ctx, params->instrs, arg1, cast_type, loc)))
-        return false;
-
-    if (!(arg2_cast = add_implicit_conversion(ctx, params->instrs, arg2, cast_type, loc)))
-        return false;
-
+    arg1_cast = add_implicit_conversion(ctx, params->instrs, arg1, cast_type, loc);
+    arg2_cast = add_implicit_conversion(ctx, params->instrs, arg2, cast_type, loc);
     arg1_swzl1 = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg1_cast, loc);
     arg2_swzl1 = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg2_cast, loc);
 
@@ -4309,11 +4258,8 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
         ret_type = hlsl_get_scalar_type(ctx, base);
     }
 
-    if (!(cast1 = add_implicit_conversion(ctx, params->instrs, arg1, cast_type1, loc)))
-        return false;
-
-    if (!(cast2 = add_implicit_conversion(ctx, params->instrs, arg2, cast_type2, loc)))
-        return false;
+    cast1 = add_implicit_conversion(ctx, params->instrs, arg1, cast_type1, loc);
+    cast2 = add_implicit_conversion(ctx, params->instrs, arg2, cast_type2, loc);
 
     if (!(var = hlsl_new_synthetic_var(ctx, "mul", matrix_type, loc)))
         return false;
@@ -4354,7 +4300,8 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
     }
 
     load = hlsl_block_add_simple_load(ctx, params->instrs, var, loc);
-    return !!add_implicit_conversion(ctx, params->instrs, load, ret_type, loc);
+    add_implicit_conversion(ctx, params->instrs, load, ret_type, loc);
+    return true;
 }
 
 static bool intrinsic_normalize(struct hlsl_ctx *ctx,
@@ -4452,7 +4399,6 @@ static bool intrinsic_refract(struct hlsl_ctx *ctx,
 {
     struct hlsl_type *type, *scalar_type;
     struct hlsl_ir_function_decl *func;
-    struct hlsl_ir_node *index;
     char *body;
 
     static const char template[] =
@@ -4482,9 +4428,7 @@ static bool intrinsic_refract(struct hlsl_ctx *ctx,
      * which we will only use the first component of. */
 
     scalar_type = hlsl_get_scalar_type(ctx, params->args[2]->data_type->e.numeric.type);
-    if (!(index = add_implicit_conversion(ctx, params->instrs, params->args[2], scalar_type, loc)))
-        return false;
-    params->args[2] = index;
+    params->args[2] = add_implicit_conversion(ctx, params->instrs, params->args[2], scalar_type, loc);
 
     if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
@@ -4553,16 +4497,14 @@ static bool intrinsic_sign(struct hlsl_ctx *ctx,
     if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, zero, arg, loc)))
         return false;
 
-    if (!(op1 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc)))
-        return false;
+    op1 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc);
 
     /* Check if arg < 0, cast bool to int and invert (meaning true is -1) */
 
     if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, arg, zero, loc)))
         return false;
 
-    if (!(op2 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc)))
-        return false;
+    op2 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc);
 
     if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, op2, loc)))
         return false;
@@ -4671,7 +4613,8 @@ static bool intrinsic_step(struct hlsl_ctx *ctx,
             params->args[1], params->args[0], loc)))
         return false;
 
-    return !!add_implicit_conversion(ctx, params->instrs, ge, type, loc);
+    add_implicit_conversion(ctx, params->instrs, ge, type, loc);
+    return true;
 }
 
 static bool intrinsic_tan(struct hlsl_ctx *ctx,
@@ -4760,30 +4703,19 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
             load_params.type = HLSL_RESOURCE_SAMPLE_LOD_BIAS;
 
         c = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(X, Y, Z, W), sampler_dim, params->args[1], loc);
-
-        if (!(coords = add_implicit_conversion(ctx, params->instrs, c,
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        {
-            return false;
-        }
+        coords = add_implicit_conversion(ctx, params->instrs, c,
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
 
         lod = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(W, W, W, W), 1, params->args[1], loc);
-
-        if (!(load_params.lod = add_implicit_conversion(ctx, params->instrs, lod,
-                hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
-        {
-            return false;
-        }
+        load_params.lod = add_implicit_conversion(ctx, params->instrs, lod,
+                hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc);
     }
     else if (!strcmp(name, "tex2Dproj")
             || !strcmp(name, "tex3Dproj")
             || !strcmp(name, "texCUBEproj"))
     {
-        if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), loc)))
-        {
-            return false;
-        }
+        coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), loc);
 
         if (hlsl_version_ge(ctx, 4, 0))
         {
@@ -4804,35 +4736,19 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     }
     else if (params->args_count == 4) /* Gradient sampling. */
     {
-        if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        {
-            return false;
-        }
-
-        if (!(load_params.ddx = add_implicit_conversion(ctx, params->instrs, params->args[2],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        {
-            return false;
-        }
-
-        if (!(load_params.ddy = add_implicit_conversion(ctx, params->instrs, params->args[3],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        {
-            return false;
-        }
-
+        coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
+        load_params.ddx = add_implicit_conversion(ctx, params->instrs, params->args[2],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
+        load_params.ddy = add_implicit_conversion(ctx, params->instrs, params->args[3],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
         load_params.type = HLSL_RESOURCE_SAMPLE_GRAD;
     }
     else
     {
         load_params.type = HLSL_RESOURCE_SAMPLE;
-
-        if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        {
-            return false;
-        }
+        coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
     }
 
     /* tex1D() functions never produce 1D resource declarations. For newer profiles half offset
@@ -5565,8 +5481,7 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
         {
             cond_type = hlsl_get_numeric_type(ctx, common_type->class,
                     HLSL_TYPE_BOOL, common_type->e.numeric.dimx, common_type->e.numeric.dimy);
-            if (!(cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc)))
-                return false;
+            cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc);
         }
         else
         {
@@ -5595,15 +5510,11 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
 
             cond_type = hlsl_get_numeric_type(ctx, common_type->class, HLSL_TYPE_BOOL,
                     common_type->e.numeric.dimx, common_type->e.numeric.dimy);
-            if (!(cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc)))
-                return false;
+            cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc);
         }
 
-        if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
-            return false;
-
-        if (!(second = add_implicit_conversion(ctx, block, second, common_type, &second->loc)))
-            return false;
+        first = add_implicit_conversion(ctx, block, first, common_type, &first->loc);
+        second = add_implicit_conversion(ctx, block, second, common_type, &second->loc);
     }
     else
     {
@@ -5623,9 +5534,7 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
 
         cond_type = hlsl_get_numeric_type(ctx, cond_type->class, HLSL_TYPE_BOOL,
                 cond_type->e.numeric.dimx, cond_type->e.numeric.dimy);
-        if (!(cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc)))
-            return false;
-
+        cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc);
         common_type = first->data_type;
     }
 
@@ -5709,10 +5618,8 @@ static bool add_raw_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bl
     else
         value_dim = 4;
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[0],
-            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
-        return false;
-
+    load_params.coords = add_implicit_conversion(ctx, block, params->args[0],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
     load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, value_dim);
     load_params.resource = object;
     hlsl_block_add_resource_load(ctx, block, &load_params, loc);
@@ -5751,18 +5658,12 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
     }
 
     if (multisampled)
-    {
-        if (!(load_params.sample_index = add_implicit_conversion(ctx, block, params->args[1],
-                hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc)))
-            return false;
-    }
+        load_params.sample_index = add_implicit_conversion(ctx, block, params->args[1],
+                hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc);
 
     if (!!offset_dim && params->args_count > 1 + multisampled)
-    {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[1 + multisampled],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-            return false;
-    }
+        load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[1 + multisampled],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc);
 
     if (params->args_count > 1 + multisampled + !!offset_dim)
     {
@@ -5770,10 +5671,8 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
     }
 
     /* +1 for the mipmap level for non-multisampled textures */
-    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[0],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + !multisampled), loc)))
-        return false;
-
+    load_params.coords = add_implicit_conversion(ctx, block, params->args[0],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + !multisampled), loc);
     load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     hlsl_block_add_resource_load(ctx, block, &load_params, loc);
@@ -5811,16 +5710,12 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        return false;
+    load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
 
     if (offset_dim && params->args_count > 2)
-    {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[2],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-            return false;
-    }
+        load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[2],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc);
 
     if (params->args_count > 2 + !!offset_dim)
         hlsl_fixme(ctx, loc, "Sample() clamp parameter.");
@@ -5871,20 +5766,14 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        return false;
-
-    if (!(load_params.cmp = add_implicit_conversion(ctx, block, params->args[2],
-            hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
-        load_params.cmp = params->args[2];
+    load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
+    load_params.cmp = add_implicit_conversion(ctx, block, params->args[2],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc);
 
     if (offset_dim && params->args_count > 3)
-    {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[2],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-            return false;
-    }
+        load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[2],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc);
 
     if (params->args_count > 3 + !!offset_dim)
         hlsl_fixme(ctx, loc, "%s() clamp parameter.", name);
@@ -5958,9 +5847,8 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     }
     else if (offset_dim && params->args_count > 2)
     {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[2],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-            return false;
+        load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[2],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc);
     }
 
     sampler_type = params->args[0]->data_type;
@@ -5982,10 +5870,8 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        return false;
-
+    load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
     load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource.format->e.numeric.type, 4);
     load_params.resource = object;
     load_params.sampler = params->args[0];
@@ -6155,12 +6041,8 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
                 /* Input parameter. */
                 if (iter->args[j] == ARG_MIP_LEVEL)
                 {
-                    if (!(args[ARG_MIP_LEVEL] = add_implicit_conversion(ctx, block, args[ARG_MIP_LEVEL],
-                            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
-                    {
-                        return false;
-                    }
-
+                    args[ARG_MIP_LEVEL] = add_implicit_conversion(ctx, block, args[ARG_MIP_LEVEL],
+                            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
                     continue;
                 }
 
@@ -6268,20 +6150,14 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        load_params.coords = params->args[1];
-
-    if (!(load_params.lod = add_implicit_conversion(ctx, block, params->args[2],
-            hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
-        load_params.lod = params->args[2];
+    load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
+    load_params.lod = add_implicit_conversion(ctx, block, params->args[2],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc);
 
     if (offset_dim && params->args_count > 3)
-    {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[3],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-            return false;
-    }
+        load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[3],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc);
 
     if (params->args_count > 3 + !!offset_dim)
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
@@ -6326,24 +6202,16 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        load_params.coords = params->args[1];
-
-    if (!(load_params.ddx = add_implicit_conversion(ctx, block, params->args[2],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        load_params.ddx = params->args[2];
-
-    if (!(load_params.ddy = add_implicit_conversion(ctx, block, params->args[3],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-        load_params.ddy = params->args[3];
+    load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
+    load_params.ddx = add_implicit_conversion(ctx, block, params->args[2],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
+    load_params.ddy = add_implicit_conversion(ctx, block, params->args[3],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc);
 
     if (offset_dim && params->args_count > 4)
-    {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[4],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-            return false;
-    }
+        load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[4],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc);
 
     if (params->args_count > 4 + !!offset_dim)
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
@@ -6378,13 +6246,10 @@ static bool add_store_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block
     else
         value_dim = 4;
 
-    if (!(offset = add_implicit_conversion(ctx, block, params->args[0],
-            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
-        return false;
-
-    if (!(rhs = add_implicit_conversion(ctx, block, params->args[1],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, value_dim), loc)))
-        return false;
+    offset = add_implicit_conversion(ctx, block, params->args[0],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
+    rhs = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, value_dim), loc);
 
     if (!hlsl_init_deref_from_index_chain(ctx, &resource_deref, object))
         return false;
@@ -6590,15 +6455,8 @@ static bool add_switch(struct hlsl_ctx *ctx, struct hlsl_block *block,
         return true;
     }
 
-    if (!(selector = add_implicit_conversion(ctx, block, selector,
-            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &selector->loc)))
-    {
-        destroy_switch_cases(cases);
-        destroy_block(block);
-        cleanup_parse_attribute_list(attributes);
-        return false;
-    }
-
+    selector = add_implicit_conversion(ctx, block, selector,
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &selector->loc);
     s = hlsl_new_switch(ctx, selector, cases, loc);
 
     destroy_switch_cases(cases);
