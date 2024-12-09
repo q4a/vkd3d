@@ -2328,9 +2328,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool d
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                 "Argument to %s%screment operator is const.", post ? "post" : "pre", decrement ? "de" : "in");
 
-    if (!(one = hlsl_new_int_constant(ctx, 1, loc)))
-        return false;
-    hlsl_block_add_instr(block, one);
+    one = hlsl_block_add_int_constant(ctx, block, 1, loc);
 
     if (!add_assignment(ctx, block, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one, false))
         return false;
@@ -9376,12 +9374,9 @@ primary_expr:
         }
     | C_INTEGER
         {
-            struct hlsl_ir_node *c;
-
-            if (!(c = hlsl_new_int_constant(ctx, $1, &@1)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
-            if (!($$ = make_block(ctx, c)))
-                YYABORT;
+            hlsl_block_add_int_constant(ctx, $$, $1, &@1);
         }
     | C_UNSIGNED
         {
