@@ -1595,7 +1595,6 @@ static struct hlsl_ir_node *collect_exprs(struct hlsl_ctx *ctx, struct hlsl_bloc
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_ir_expr *e1, *e2;
     enum hlsl_ir_expr_op opl;
-    struct hlsl_ir_node *res;
 
     if (!node1 || !node2 || node1->type != HLSL_IR_EXPR || node2->type != HLSL_IR_EXPR)
         return NULL;
@@ -1612,10 +1611,7 @@ static struct hlsl_ir_node *collect_exprs(struct hlsl_ctx *ctx, struct hlsl_bloc
 
     operands[0] = e1->operands[0].node;
     operands[1] = hlsl_block_add_binary_expr(ctx, block, opr, e1->operands[1].node, e2->operands[1].node);
-    if (!(res = hlsl_new_expr(ctx, opl, operands, instr->data_type, &instr->loc)))
-        return NULL;
-    hlsl_block_add_instr(block, res);
-    return res;
+    return hlsl_block_add_expr(ctx, block, opl, operands, instr->data_type, &instr->loc);
 }
 
 bool hlsl_normalize_binary_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -1734,19 +1730,13 @@ bool hlsl_normalize_binary_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg1, arg2};
         struct hlsl_ir_node *res;
 
-        if (!(res = hlsl_new_expr(ctx, op, operands, instr->data_type, &instr->loc)))
-            goto fail;
-        hlsl_block_add_instr(&block, res);
+        res = hlsl_block_add_expr(ctx, &block, op, operands, instr->data_type, &instr->loc);
 
         list_move_before(&instr->entry, &block.instrs);
         hlsl_replace_node(instr, res);
     }
 
     return progress;
-
-fail:
-    hlsl_block_cleanup(&block);
-    return false;
 }
 
 bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)

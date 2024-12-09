@@ -1588,7 +1588,6 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *type, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *expr;
     unsigned int i;
 
     if (type->class == HLSL_CLASS_MATRIX)
@@ -1637,11 +1636,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
         return &var_load->node;
     }
 
-    if (!(expr = hlsl_new_expr(ctx, op, operands, type, loc)))
-        return NULL;
-    hlsl_block_add_instr(block, expr);
-
-    return expr;
+    return hlsl_block_add_expr(ctx, block, op, operands, type, loc);
 }
 
 static bool type_is_integer(enum hlsl_base_type type)
@@ -5233,17 +5228,13 @@ static bool intrinsic_GetRenderTargetSampleCount(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
-    struct hlsl_ir_node *expr;
 
     if (ctx->profile->type != VKD3D_SHADER_TYPE_PIXEL || hlsl_version_lt(ctx, 4, 1))
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                 "GetRenderTargetSampleCount() can only be used from a pixel shader using version 4.1 or higher.");
 
-    if (!(expr = hlsl_new_expr(ctx, HLSL_OP0_RASTERIZER_SAMPLE_COUNT,
-            operands, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, expr);
-
+    hlsl_block_add_expr(ctx, params->instrs, HLSL_OP0_RASTERIZER_SAMPLE_COUNT,
+            operands, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
     return true;
 }
 

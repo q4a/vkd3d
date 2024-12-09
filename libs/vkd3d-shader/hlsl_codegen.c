@@ -2777,7 +2777,7 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
 
     if (type->class == HLSL_CLASS_VECTOR && idx->type != HLSL_IR_CONSTANT)
     {
-        struct hlsl_ir_node *eq, *swizzle, *dot, *c, *operands[HLSL_MAX_OPERANDS] = {0};
+        struct hlsl_ir_node *eq, *swizzle, *c, *operands[HLSL_MAX_OPERANDS] = {0};
         unsigned int width = type->e.numeric.dimx;
         struct hlsl_constant_value value;
         struct hlsl_ir_load *vector_load;
@@ -2801,11 +2801,8 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
 
         operands[0] = swizzle;
         operands[1] = c;
-        if (!(eq = hlsl_new_expr(ctx, HLSL_OP2_EQUAL, operands,
-                hlsl_get_vector_type(ctx, HLSL_TYPE_BOOL, width), &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, eq);
-
+        eq = hlsl_block_add_expr(ctx, block, HLSL_OP2_EQUAL, operands,
+                hlsl_get_vector_type(ctx, HLSL_TYPE_BOOL, width), &instr->loc);
         eq = hlsl_block_add_cast(ctx, block, eq, type, &instr->loc);
 
         op = HLSL_OP2_DOT;
@@ -2816,10 +2813,7 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
          * LOGIC_OR + LOGIC_AND. */
         operands[0] = &vector_load->node;
         operands[1] = eq;
-        if (!(dot = hlsl_new_expr(ctx, op, operands, instr->data_type, &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, dot);
-
+        hlsl_block_add_expr(ctx, block, op, operands, instr->data_type, &instr->loc);
         return true;
     }
 
@@ -2930,9 +2924,7 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
 
         operands[0] = cut_index;
         operands[1] = const_i;
-        if (!(equals = hlsl_new_expr(ctx, HLSL_OP2_EQUAL, operands, btype, &cut_index->loc)))
-            return false;
-        hlsl_block_add_instr(block, equals);
+        equals = hlsl_block_add_expr(ctx, block, HLSL_OP2_EQUAL, operands, btype, &cut_index->loc);
 
         if (!(equals = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X),
                 var->data_type->e.numeric.dimx, equals, &cut_index->loc)))
@@ -2960,9 +2952,7 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
         operands[0] = equals;
         operands[1] = &specific_load->node;
         operands[2] = &var_load->node;
-        if (!(ternary = hlsl_new_expr(ctx, HLSL_OP3_TERNARY, operands, instr->data_type, &cut_index->loc)))
-            return false;
-        hlsl_block_add_instr(block, ternary);
+        ternary = hlsl_block_add_expr(ctx, block, HLSL_OP3_TERNARY, operands, instr->data_type, &cut_index->loc);
 
         if (!(var_store = hlsl_new_simple_store(ctx, var, ternary)))
             return false;
@@ -3325,10 +3315,7 @@ static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
 
     memset(operands, 0, sizeof(operands));
     operands[0] = res;
-    if (!(res = hlsl_new_expr(ctx, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, res);
-
+    hlsl_block_add_expr(ctx, block, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc);
     return true;
 }
 
@@ -3385,7 +3372,7 @@ static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
 /* Lower DP2 to MUL + ADD */
 static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
-    struct hlsl_ir_node *arg1, *arg2, *mul, *replacement, *add_x, *add_y;
+    struct hlsl_ir_node *arg1, *arg2, *mul, *add_x, *add_y;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -3406,9 +3393,7 @@ static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct h
         operands[1] = arg2;
         operands[2] = hlsl_block_add_float_constant(ctx, block, 0.0f, &expr->node.loc);
 
-        if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_DP2ADD, operands, instr->data_type, &expr->node.loc)))
-            return false;
-        hlsl_block_add_instr(block, replacement);
+        hlsl_block_add_expr(ctx, block, HLSL_OP3_DP2ADD, operands, instr->data_type, &expr->node.loc);
     }
     else
     {
@@ -3617,8 +3602,8 @@ static bool lower_trig(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
 
 static bool lower_logic_not(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
+    struct hlsl_ir_node *arg, *arg_cast, *neg, *one, *sub;
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS];
-    struct hlsl_ir_node *arg, *arg_cast, *neg, *one, *sub, *res;
     struct hlsl_constant_value one_value;
     struct hlsl_type *float_type;
     struct hlsl_ir_expr *expr;
@@ -3651,18 +3636,15 @@ static bool lower_logic_not(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, st
 
     memset(operands, 0, sizeof(operands));
     operands[0] = sub;
-    if (!(res = hlsl_new_expr(ctx, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, res);
-
+    hlsl_block_add_expr(ctx, block, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc);
     return true;
 }
 
 /* Lower TERNARY to CMP for SM1. */
 static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
-    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 }, *replacement;
     struct hlsl_ir_node *cond, *first, *second, *float_cond, *neg;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_ir_expr *expr;
     struct hlsl_type *type;
 
@@ -3694,10 +3676,7 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     operands[0] = neg;
     operands[1] = second;
     operands[2] = first;
-    if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_CMP, operands, first->data_type, &instr->loc)))
-        return false;
-
-    hlsl_block_add_instr(block, replacement);
+    hlsl_block_add_expr(ctx, block, HLSL_OP3_CMP, operands, first->data_type, &instr->loc);
     return true;
 }
 
@@ -3749,7 +3728,7 @@ static bool lower_resource_load_bias(struct hlsl_ctx *ctx, struct hlsl_ir_node *
 static bool lower_comparison_operators(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         struct hlsl_block *block)
 {
-    struct hlsl_ir_node *arg1, *arg1_cast, *arg2, *arg2_cast, *slt, *res, *ret;
+    struct hlsl_ir_node *arg1, *arg1_cast, *arg2, *arg2_cast, *slt, *res;
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS];
     struct hlsl_type *float_type;
     struct hlsl_ir_expr *expr;
@@ -3832,10 +3811,7 @@ static bool lower_comparison_operators(struct hlsl_ctx *ctx, struct hlsl_ir_node
      * and casts to BOOL have already been lowered to "!= 0". */
     memset(operands, 0, sizeof(operands));
     operands[0] = res;
-    if (!(ret = hlsl_new_expr(ctx, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, ret);
-
+    hlsl_block_add_expr(ctx, block, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc);
     return true;
 }
 
@@ -3978,7 +3954,6 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_bloc
 {
     struct hlsl_type *cond_type = condition->data_type;
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS];
-    struct hlsl_ir_node *cond;
 
     VKD3D_ASSERT(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
 
@@ -3992,11 +3967,7 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_bloc
     operands[0] = condition;
     operands[1] = if_true;
     operands[2] = if_false;
-    if (!(cond = hlsl_new_expr(ctx, HLSL_OP3_TERNARY, operands, if_true->data_type, &condition->loc)))
-        return false;
-    hlsl_block_add_instr(instrs, cond);
-
-    return cond;
+    return hlsl_block_add_expr(ctx, instrs, HLSL_OP3_TERNARY, operands, if_true->data_type, &condition->loc);
 }
 
 static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
@@ -4174,9 +4145,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     ge->data_type = btype;
 
     neg2 = hlsl_block_add_unary_expr(ctx, block, HLSL_OP1_NEG, arg2, &instr->loc);
-
-    if (!(cond = hlsl_add_conditional(ctx, block, ge, arg2, neg2)))
-        return false;
+    cond = hlsl_add_conditional(ctx, block, ge, arg2, neg2);
 
     for (i = 0; i < type->e.numeric.dimx; ++i)
         one_value.u[i].f = 1.0f;
@@ -4218,9 +4187,7 @@ static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     operands[1] = zero;
     cmp_type = hlsl_get_numeric_type(ctx, arg_type->class, HLSL_TYPE_BOOL,
             arg_type->e.numeric.dimx, arg_type->e.numeric.dimy);
-    if (!(cmp = hlsl_new_expr(ctx, HLSL_OP2_LESS, operands, cmp_type, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(&block, cmp);
+    cmp = hlsl_block_add_expr(ctx, &block, HLSL_OP2_LESS, operands, cmp_type, &instr->loc);
 
     if (!(bool_false = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), &zero_value, &instr->loc)))
         return false;
