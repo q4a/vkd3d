@@ -451,7 +451,7 @@ static uint32_t add_modifiers(struct hlsl_ctx *ctx, uint32_t modifiers, uint32_t
 
 static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *cond_block)
 {
-    struct hlsl_ir_node *condition, *cast, *not, *iff;
+    struct hlsl_ir_node *condition, *cast, *not;
     struct hlsl_block then_block;
     struct hlsl_type *bool_type;
 
@@ -473,10 +473,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
 
     hlsl_block_init(&then_block);
     hlsl_block_add_jump(ctx, &then_block, HLSL_IR_JUMP_BREAK, NULL, &condition->loc);
-
-    if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &condition->loc)))
-        return false;
-    hlsl_block_add_instr(cond_block, iff);
+    hlsl_block_add_if(ctx, cond_block, not, &then_block, NULL, &condition->loc);
     return true;
 }
 
@@ -8990,7 +8987,6 @@ selection_statement:
         {
             struct hlsl_ir_node *condition = node_from_block($4);
             const struct parse_attribute_list *attributes = &$1;
-            struct hlsl_ir_node *instr;
             unsigned int i;
 
             check_attribute_list_for_duplicates(ctx, attributes);
@@ -9020,19 +9016,13 @@ selection_statement:
                 YYABORT;
             }
 
-            if (!(instr = hlsl_new_if(ctx, condition, $6.then_block, $6.else_block, &@2)))
-            {
-                destroy_block($6.then_block);
-                destroy_block($6.else_block);
-                cleanup_parse_attribute_list(&$1);
-                YYABORT;
-            }
+            hlsl_block_add_if(ctx, $4, condition, $6.then_block, $6.else_block, &@2);
+
             destroy_block($6.then_block);
             destroy_block($6.else_block);
             cleanup_parse_attribute_list(&$1);
 
             $$ = $4;
-            hlsl_block_add_instr($$, instr);
         }
 
 if_body:

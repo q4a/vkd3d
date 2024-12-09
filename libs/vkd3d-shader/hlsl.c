@@ -1789,6 +1789,23 @@ struct hlsl_ir_node *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *cond
     return &iff->node;
 }
 
+void hlsl_block_add_if(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *condition,
+        struct hlsl_block *then_block, struct hlsl_block *else_block, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *instr = hlsl_new_if(ctx, condition, then_block, else_block, loc);
+
+    if (instr)
+    {
+        hlsl_block_add_instr(block, instr);
+    }
+    else
+    {
+        hlsl_block_cleanup(then_block);
+        if (else_block)
+            hlsl_block_cleanup(else_block);
+    }
+}
+
 struct hlsl_ir_switch_case *hlsl_new_switch_case(struct hlsl_ctx *ctx, unsigned int value,
         bool is_default, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
 {

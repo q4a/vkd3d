@@ -1011,7 +1011,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
     else if (cf_instr)
     {
         struct list *tail = list_tail(&block->instrs);
-        struct hlsl_ir_node *not, *iff, *load;
+        struct hlsl_ir_node *not, *load;
         struct hlsl_block then_block;
 
         /* If we're in a loop, we should have used "break" instead. */
@@ -1026,10 +1026,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
 
         load = hlsl_block_add_simple_load(ctx, block, func->early_return_var, &cf_instr->loc);
         not = hlsl_block_add_unary_expr(ctx, block, HLSL_OP1_LOGIC_NOT, load, &cf_instr->loc);
-
-        if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &cf_instr->loc)))
-            return false;
-        list_add_tail(&block->instrs, &iff->entry);
+        hlsl_block_add_if(ctx, block, not, &then_block, NULL, &cf_instr->loc);
     }
 
     return has_early_return;
