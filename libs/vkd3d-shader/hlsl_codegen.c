@@ -569,7 +569,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
         struct hlsl_ir_var *output;
-        struct hlsl_ir_load *load;
+        struct hlsl_ir_node *load;
 
         if (!(output = add_semantic_var(ctx, func, var, vector_type,
                 modifiers, semantic, semantic_index + i, true, force_align, loc)))
@@ -578,21 +578,16 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         if (type->class == HLSL_CLASS_MATRIX)
         {
             c = hlsl_block_add_uint_constant(ctx, &func->body, i, &var->loc);
-
-            if (!(load = hlsl_new_load_index(ctx, &rhs->src, c, &var->loc)))
-                return;
-            hlsl_block_add_instr(&func->body, &load->node);
+            load = hlsl_block_add_load_index(ctx, &func->body, &rhs->src, c, &var->loc);
         }
         else
         {
             VKD3D_ASSERT(i == 0);
 
-            if (!(load = hlsl_new_load_index(ctx, &rhs->src, NULL, &var->loc)))
-                return;
-            hlsl_block_add_instr(&func->body, &load->node);
+            load = hlsl_block_add_load_index(ctx, &func->body, &rhs->src, NULL, &var->loc);
         }
 
-        hlsl_block_add_simple_store(ctx, &func->body, output, &load->node);
+        hlsl_block_add_simple_store(ctx, &func->body, output, load);
     }
 }
 
@@ -1293,9 +1288,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     }
     else
     {
-        if (!(load = hlsl_new_load_index(ctx, &var_deref, index->idx.node, &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, &load->node);
+        hlsl_block_add_load_index(ctx, block, &var_deref, index->idx.node, &instr->loc);
     }
     return true;
 }
@@ -2887,10 +2880,10 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
     for (i = 0; i < element_count; ++i)
     {
         struct hlsl_type *btype = hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL);
+        struct hlsl_ir_node *const_i, *equals, *ternary, *specific_load;
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
-        struct hlsl_ir_node *const_i, *equals, *ternary;
-        struct hlsl_ir_load *var_load, *specific_load;
         struct hlsl_deref deref_copy = {0};
+        struct hlsl_ir_load *var_load;
 
         const_i = hlsl_block_add_uint_constant(ctx, block, i, &cut_index->loc);
 
@@ -2911,18 +2904,11 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
             return false;
         hlsl_src_remove(&deref_copy.path[i_cut]);
         hlsl_src_from_node(&deref_copy.path[i_cut], const_i);
-
-        if (!(specific_load = hlsl_new_load_index(ctx, &deref_copy, NULL, &cut_index->loc)))
-        {
-            hlsl_cleanup_deref(&deref_copy);
-            return false;
-        }
-        hlsl_block_add_instr(block, &specific_load->node);
-
+        specific_load = hlsl_block_add_load_index(ctx, block, &deref_copy, NULL, &cut_index->loc);
         hlsl_cleanup_deref(&deref_copy);
 
         operands[0] = equals;
-        operands[1] = &specific_load->node;
+        operands[1] = specific_load;
         operands[2] = &var_load->node;
         ternary = hlsl_block_add_expr(ctx, block, HLSL_OP3_TERNARY, operands, instr->data_type, &cut_index->loc);
 
@@ -3536,7 +3522,6 @@ static bool lower_trig(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
         struct hlsl_ir_node *comps[4] = {0};
         struct hlsl_ir_var *var;
         struct hlsl_deref var_deref;
-        struct hlsl_ir_load *var_load;
 
         for (i = 0; i < type->e.numeric.dimx; ++i)
         {
@@ -3557,9 +3542,7 @@ static bool lower_trig(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
             hlsl_block_add_store_component(ctx, block, &var_deref, i, sincos);
         }
 
-        if (!(var_load = hlsl_new_load_index(ctx, &var_deref, NULL, &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, &var_load->node);
+        hlsl_block_add_load_index(ctx, block, &var_deref, NULL, &instr->loc);
     }
 
     return true;
