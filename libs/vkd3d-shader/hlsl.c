@@ -1696,6 +1696,12 @@ struct hlsl_ir_node *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
     return cast;
 }
 
+struct hlsl_ir_node *hlsl_block_add_cast(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_ir_node *arg, struct hlsl_type *type, const struct vkd3d_shader_location *loc)
+{
+    return append_new_instr(ctx, block, hlsl_new_cast(ctx, arg, type, loc));
+}
+
 static struct hlsl_ir_node *hlsl_new_error_expr(struct hlsl_ctx *ctx)
 {
     static const struct vkd3d_shader_location loc = {.source_name = "<error>"};

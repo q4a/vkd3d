@@ -351,7 +351,6 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct hlsl_block *bl
         struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *src_type = node->data_type;
-    struct hlsl_ir_node *cast;
 
     if (hlsl_types_are_equal(src_type, dst_type))
         return node;
@@ -359,11 +358,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct hlsl_block *bl
     if (src_type->class == HLSL_CLASS_NULL)
         return node;
 
-    if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
-        return NULL;
-    hlsl_block_add_instr(block, cast);
-
-    return cast;
+    return hlsl_block_add_cast(ctx, block, node, dst_type, loc);
 }
 
 static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -940,7 +935,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct hlsl_block *block, str
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
-    struct hlsl_ir_node *return_index, *cast;
+    struct hlsl_ir_node *return_index;
 
     if (array->data_type->class == HLSL_CLASS_ERROR || index->data_type->class == HLSL_CLASS_ERROR)
     {
@@ -981,10 +976,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct hlsl_block *block, str
         return false;
     }
 
-    if (!(cast = hlsl_new_cast(ctx, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &index->loc)))
-        return false;
-    hlsl_block_add_instr(block, cast);
-    index = cast;
+    index = hlsl_block_add_cast(ctx, block, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &index->loc);
 
     if (expr_type->class != HLSL_CLASS_ARRAY && expr_type->class != HLSL_CLASS_VECTOR && expr_type->class != HLSL_CLASS_MATRIX)
     {
