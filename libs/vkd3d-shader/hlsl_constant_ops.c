@@ -220,7 +220,9 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
                 break;
 
             case HLSL_TYPE_BOOL:
-                /* Casts to bool should have already been lowered. */
+                dst->u[k].u = u ? ~0u : 0u;
+                break;
+
             default:
                 vkd3d_unreachable();
         }
