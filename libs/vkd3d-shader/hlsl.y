@@ -451,7 +451,7 @@ static uint32_t add_modifiers(struct hlsl_ctx *ctx, uint32_t modifiers, uint32_t
 
 static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *cond_block)
 {
-    struct hlsl_ir_node *condition, *cast, *not, *iff, *jump;
+    struct hlsl_ir_node *condition, *cast, *not, *iff;
     struct hlsl_block then_block;
     struct hlsl_type *bool_type;
 
@@ -472,10 +472,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
     not = hlsl_block_add_unary_expr(ctx, cond_block, HLSL_OP1_LOGIC_NOT, cast, &condition->loc);
 
     hlsl_block_init(&then_block);
-
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &condition->loc)))
-        return false;
-    hlsl_block_add_instr(&then_block, jump);
+    hlsl_block_add_jump(ctx, &then_block, HLSL_IR_JUMP_BREAK, NULL, &condition->loc);
 
     if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &condition->loc)))
         return false;
@@ -851,7 +848,6 @@ static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *return_value, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *return_type = ctx->cur_function->return_type;
-    struct hlsl_ir_node *jump;
 
     if (ctx->cur_function->return_var)
     {
@@ -877,10 +873,7 @@ static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Void functions cannot return a value.");
     }
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, NULL, loc)))
-        return false;
-    hlsl_block_add_instr(block, jump);
-
+    hlsl_block_add_jump(ctx, block, HLSL_IR_JUMP_RETURN, NULL, loc);
     return true;
 }
 
@@ -3578,7 +3571,7 @@ static bool intrinsic_clamp(struct hlsl_ctx *ctx,
 static bool intrinsic_clip(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *condition, *jump;
+    struct hlsl_ir_node *condition;
 
     if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
@@ -3596,10 +3589,7 @@ static bool intrinsic_clip(struct hlsl_ctx *ctx,
         return false;
     }
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD_NEG, condition, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, jump);
-
+    hlsl_block_add_jump(ctx, params->instrs, HLSL_IR_JUMP_DISCARD_NEG, condition, loc);
     return true;
 }
 
@@ -8954,8 +8944,6 @@ statement:
 jump_statement:
       KW_BREAK ';'
         {
-            struct hlsl_ir_node *jump;
-
             if (!is_break_allowed(ctx->cur_scope))
             {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
@@ -8964,22 +8952,15 @@ jump_statement:
 
             if (!($$ = make_empty_block(ctx)))
                 YYABORT;
-            if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &@1)))
-                YYABORT;
-            hlsl_block_add_instr($$, jump);
+            hlsl_block_add_jump(ctx, $$, HLSL_IR_JUMP_BREAK, NULL, &@1);
         }
     | KW_CONTINUE ';'
         {
-            struct hlsl_ir_node *jump;
-
             check_continue(ctx, ctx->cur_scope, &@1);
 
             if (!($$ = make_empty_block(ctx)))
                 YYABORT;
-
-            if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_UNRESOLVED_CONTINUE, NULL, &@1)))
-                YYABORT;
-            hlsl_block_add_instr($$, jump);
+            hlsl_block_add_jump(ctx, $$, HLSL_IR_JUMP_UNRESOLVED_CONTINUE, NULL, &@1);
         }
     | KW_RETURN expr ';'
         {
@@ -8996,16 +8977,12 @@ jump_statement:
         }
     | KW_DISCARD ';'
         {
-            struct hlsl_ir_node *discard, *c;
+            struct hlsl_ir_node *c;
 
             if (!($$ = make_empty_block(ctx)))
                 YYABORT;
-
             c = hlsl_block_add_uint_constant(ctx, $$, ~0u, &@1);
-
-            if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD_NZ, c, &@1)))
-                return false;
-            hlsl_block_add_instr($$, discard);
+            hlsl_block_add_jump(ctx, $$, HLSL_IR_JUMP_DISCARD_NZ, c, &@1);
         }
 
 selection_statement:

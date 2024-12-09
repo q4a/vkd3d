@@ -829,9 +829,9 @@ static bool find_recursive_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
 static void insert_early_return_break(struct hlsl_ctx *ctx,
         struct hlsl_ir_function_decl *func, struct hlsl_ir_node *cf_instr)
 {
-    struct hlsl_ir_node *iff, *jump;
     struct hlsl_block then_block;
     struct hlsl_ir_load *load;
+    struct hlsl_ir_node *iff;
 
     hlsl_block_init(&then_block);
 
@@ -839,9 +839,7 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
         return;
     list_add_after(&cf_instr->entry, &load->node.entry);
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &cf_instr->loc)))
-        return;
-    hlsl_block_add_instr(&then_block, jump);
+    hlsl_block_add_jump(ctx, &then_block, HLSL_IR_JUMP_BREAK, NULL, &cf_instr->loc);
 
     if (!(iff = hlsl_new_if(ctx, &load->node, &then_block, NULL, &cf_instr->loc)))
         return;
@@ -2694,16 +2692,9 @@ static bool normalize_switch_cases(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     }
     else
     {
-        struct hlsl_ir_node *jump;
-
         if (!(def = hlsl_new_switch_case(ctx, 0, true, NULL, &s->node.loc)))
             return true;
-        if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &s->node.loc)))
-        {
-            hlsl_free_ir_switch_case(def);
-            return true;
-        }
-        hlsl_block_add_instr(&def->body, jump);
+        hlsl_block_add_jump(ctx, &def->body, HLSL_IR_JUMP_BREAK, NULL, &s->node.loc);
     }
     list_add_tail(&s->cases, &def->entry);
 
