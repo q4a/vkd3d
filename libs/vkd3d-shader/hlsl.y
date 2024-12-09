@@ -474,9 +474,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
     if (!(cast = add_cast(ctx, cond_block, condition, bool_type, &condition->loc)))
         return false;
 
-    if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, cast, &condition->loc)))
-        return false;
-    hlsl_block_add_instr(cond_block, not);
+    not = hlsl_block_add_unary_expr(ctx, cond_block, HLSL_OP1_LOGIC_NOT, cast, &condition->loc);
 
     hlsl_block_init(&then_block);
 
@@ -3793,9 +3791,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
     if (!(mul1 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg1_swzl1, arg2_swzl1, loc)))
         return false;
 
-    if (!(mul1_neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, mul1_neg);
+    mul1_neg = hlsl_block_add_unary_expr(ctx, params->instrs, HLSL_OP1_NEG, mul1, loc);
 
     if (!(arg1_swzl2 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg1_cast, loc)))
         return false;

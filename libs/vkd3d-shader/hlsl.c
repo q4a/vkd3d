@@ -1330,17 +1330,6 @@ static struct hlsl_ir_node *append_new_instr(struct hlsl_ctx *ctx, struct hlsl_b
     return instr;
 }
 
-struct hlsl_ir_node *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
-        const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *cast;
-
-    cast = hlsl_new_unary_expr(ctx, HLSL_OP1_CAST, node, loc);
-    if (cast)
-        cast->data_type = type;
-    return cast;
-}
-
 struct hlsl_ir_node *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *node)
 {
     /* Use a cast to the same type as a makeshift identity expression. */
@@ -1666,12 +1655,18 @@ struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op
     return &expr->node;
 }
 
-struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
+static struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
         struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg};
 
     return hlsl_new_expr(ctx, op, operands, arg->data_type, loc);
+}
+
+struct hlsl_ir_node *hlsl_block_add_unary_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
+{
+    return append_new_instr(ctx, block, hlsl_new_unary_expr(ctx, op, arg, loc));
 }
 
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
@@ -1688,6 +1683,17 @@ struct hlsl_ir_node *hlsl_new_ternary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_ex
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg1, arg2, arg3};
 
     return hlsl_new_expr(ctx, op, operands, arg1->data_type, &arg1->loc);
+}
+
+struct hlsl_ir_node *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *cast;
+
+    cast = hlsl_new_unary_expr(ctx, HLSL_OP1_CAST, node, loc);
+    if (cast)
+        cast->data_type = type;
+    return cast;
 }
 
 static struct hlsl_ir_node *hlsl_new_error_expr(struct hlsl_ctx *ctx)
