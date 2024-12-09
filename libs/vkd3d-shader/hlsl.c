@@ -1857,17 +1857,18 @@ struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     return hlsl_new_load_index(ctx, &var_deref, NULL, loc);
 }
 
-struct hlsl_ir_node *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
+struct hlsl_ir_node *hlsl_block_add_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *deref, unsigned int comp, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *type, *comp_type;
     struct hlsl_block comp_path_block;
     struct hlsl_ir_load *load;
 
-    hlsl_block_init(block);
-
     if (!(load = hlsl_alloc(ctx, sizeof(*load))))
-        return NULL;
+    {
+        block->value = ctx->error_instr;
+        return ctx->error_instr;
+    }
 
     type = hlsl_deref_get_type(ctx, deref);
     comp_type = hlsl_type_get_component_type(ctx, type, comp);
@@ -1876,7 +1877,8 @@ struct hlsl_ir_node *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
     if (!init_deref_from_component_index(ctx, &comp_path_block, &load->src, deref, comp, loc))
     {
         vkd3d_free(load);
-        return NULL;
+        block->value = ctx->error_instr;
+        return ctx->error_instr;
     }
     hlsl_block_add_block(block, &comp_path_block);
 

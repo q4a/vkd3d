@@ -891,8 +891,7 @@ static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
 struct hlsl_ir_node *hlsl_add_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *var_instr, unsigned int comp, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *load, *store;
-    struct hlsl_block load_block;
+    struct hlsl_ir_node *store;
     struct hlsl_ir_var *var;
     struct hlsl_deref src;
 
@@ -904,11 +903,7 @@ struct hlsl_ir_node *hlsl_add_load_component(struct hlsl_ctx *ctx, struct hlsl_b
     hlsl_block_add_instr(block, store);
 
     hlsl_init_simple_deref_from_var(&src, var);
-    if (!(load = hlsl_new_load_component(ctx, &load_block, &src, comp, loc)))
-        return NULL;
-    hlsl_block_add_block(block, &load_block);
-
-    return load;
+    return hlsl_block_add_load_component(ctx, block, &src, comp, loc);
 }
 
 static bool add_record_access(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *record,

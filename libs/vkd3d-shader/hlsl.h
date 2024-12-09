@@ -1516,6 +1516,8 @@ struct hlsl_ir_node *hlsl_block_add_float_constant(struct hlsl_ctx *ctx, struct 
         float f, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_int_constant(struct hlsl_ctx *ctx, struct hlsl_block *block,
         int32_t n, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_block_add_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct hlsl_deref *deref, unsigned int comp, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_uint_constant(struct hlsl_ctx *ctx, struct hlsl_block *block,
         unsigned int n, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_unary_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -1611,8 +1613,6 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_load *hlsl_new_load_parent(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         const struct vkd3d_shader_location *loc);
-struct hlsl_ir_node *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
-        const struct hlsl_deref *deref, unsigned int comp, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_add_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *var_instr, unsigned int comp, const struct vkd3d_shader_location *loc);
 
