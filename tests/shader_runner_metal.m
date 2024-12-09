@@ -319,6 +319,51 @@ static id<MTLFunction> compile_stage(struct metal_runner *runner, enum shader_ty
     return [function autorelease];
 }
 
+static void encode_argument_buffer(struct metal_runner *runner,
+        id<MTLRenderCommandEncoder> command_encoder)
+{
+    NSMutableArray<MTLArgumentDescriptor *> *argument_descriptors;
+    id<MTLDevice> device = runner->device;
+    MTLArgumentDescriptor *arg_desc;
+    id<MTLArgumentEncoder> encoder;
+    id<MTLBuffer> argument_buffer;
+
+    argument_descriptors = [[[NSMutableArray alloc] init] autorelease];
+
+    if (runner->r.uniform_count)
+    {
+        arg_desc = [MTLArgumentDescriptor argumentDescriptor];
+        arg_desc.dataType = MTLDataTypePointer;
+        arg_desc.index = 0;
+        arg_desc.access = MTLBindingAccessReadOnly;
+        [argument_descriptors addObject:arg_desc];
+    }
+
+    if (![argument_descriptors count])
+        return;
+
+    encoder = [[device newArgumentEncoderWithArguments:argument_descriptors] autorelease];
+    argument_buffer = [[device newBufferWithLength:encoder.encodedLength
+            options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
+    [encoder setArgumentBuffer:argument_buffer offset:0];
+
+    if (runner->r.uniform_count)
+    {
+        id<MTLBuffer> cb;
+
+        cb = [[device newBufferWithBytes:runner->r.uniforms
+                length:runner->r.uniform_count * sizeof(*runner->r.uniforms)
+                options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
+        [encoder setBuffer:cb offset:0 atIndex:0];
+        [command_encoder useResource:cb
+                usage:MTLResourceUsageRead
+                stages:MTLRenderStageVertex | MTLRenderStageFragment];
+    }
+
+    [command_encoder setVertexBuffer:argument_buffer offset:0 atIndex:0];
+    [command_encoder setFragmentBuffer:argument_buffer offset:0 atIndex:0];
+}
+
 static bool metal_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
 {
     return false;
@@ -380,13 +425,9 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
     id<MTLCommandBuffer> command_buffer;
     MTLDepthStencilDescriptor *ds_desc;
     MTLRenderPassDescriptor *pass_desc;
-    id<MTLArgumentEncoder> descriptors;
     MTLVertexDescriptor *vertex_desc;
     struct metal_resource *resource;
-    MTLArgumentDescriptor *cbv_desc;
     id<MTLRenderPipelineState> pso;
-    id<MTLBuffer> argument_buffer;
-    id<MTLBuffer> cb;
     bool ret = false;
     NSError *err;
 
@@ -482,27 +523,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
         command_buffer = [runner->queue commandBuffer];
         encoder = [command_buffer renderCommandEncoderWithDescriptor:pass_desc];
 
-        if (r->uniform_count)
-        {
-            cb = [[device newBufferWithBytes:r->uniforms
-                    length:runner->r.uniform_count * sizeof(*runner->r.uniforms)
-                    options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
-
-            cbv_desc = [MTLArgumentDescriptor argumentDescriptor];
-            cbv_desc.dataType = MTLDataTypePointer;
-            cbv_desc.index = 0;
-            cbv_desc.access = MTLBindingAccessReadOnly;
-
-            descriptors = [[device newArgumentEncoderWithArguments:@[cbv_desc]] autorelease];
-            argument_buffer = [[device newBufferWithLength:descriptors.encodedLength
-                    options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
-            [descriptors setArgumentBuffer:argument_buffer offset:0];
-            [descriptors setBuffer:cb offset:0 atIndex:0];
-
-            [encoder setVertexBuffer:argument_buffer offset:0 atIndex:0];
-            [encoder setFragmentBuffer:argument_buffer offset:0 atIndex:0];
-            [encoder useResource:cb usage:MTLResourceUsageRead stages:MTLRenderStageVertex | MTLRenderStageFragment];
-        }
+        encode_argument_buffer(runner, encoder);
 
         if (runner->r.input_element_count > 32)
             fatal_error("Unsupported input element count %zu.\n", runner->r.input_element_count);
