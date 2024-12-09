@@ -1153,10 +1153,7 @@ static bool lower_complex_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         }
 
         dst_comp_type = hlsl_type_get_component_type(ctx, dst_type, dst_idx);
-
-        if (!(component_load = hlsl_add_load_component(ctx, block, arg, src_idx, &arg->loc)))
-            return false;
-
+        component_load = hlsl_add_load_component(ctx, block, arg, src_idx, &arg->loc);
         cast = hlsl_block_add_cast(ctx, block, component_load, dst_comp_type, &arg->loc);
 
         hlsl_block_add_store_component(ctx, block, &var_deref, dst_idx, cast);
@@ -1200,9 +1197,7 @@ static bool lower_matrix_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
 
         k = swizzle->u.matrix.components[i].y * matrix_type->e.numeric.dimx + swizzle->u.matrix.components[i].x;
 
-        if (!(load = hlsl_add_load_component(ctx, block, swizzle->val.node, k, &instr->loc)))
-            return false;
-
+        load = hlsl_add_load_component(ctx, block, swizzle->val.node, k, &instr->loc);
         hlsl_block_add_store_component(ctx, block, &var_deref, i, load);
     }
 
@@ -4168,9 +4163,7 @@ static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     count = hlsl_type_component_count(cmp_type);
     for (i = 0; i < count; ++i)
     {
-        if (!(load = hlsl_add_load_component(ctx, &block, cmp, i, &instr->loc)))
-            return false;
-
+        load = hlsl_add_load_component(ctx, &block, cmp, i, &instr->loc);
         or = hlsl_block_add_binary_expr(ctx, &block, HLSL_OP2_LOGIC_OR, or, load);
     }
 
