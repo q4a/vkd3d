@@ -3209,8 +3209,7 @@ static bool write_acos_or_asin(struct hlsl_ctx *ctx,
 
     const char *fn_name = asin_mode ? fn_name_asin : fn_name_acos;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
     type = arg->data_type;
 
     if (!(body = hlsl_sprintf_alloc(ctx, template,
@@ -3464,10 +3463,7 @@ static bool intrinsic_asuint(struct hlsl_ctx *ctx,
 static bool intrinsic_ceil(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg;
-
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    struct hlsl_ir_node *arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_CEIL, arg, loc);
 }
@@ -3514,10 +3510,7 @@ static bool intrinsic_clip(struct hlsl_ctx *ctx,
 static bool intrinsic_cos(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg;
-
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    struct hlsl_ir_node *arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_COS, arg, loc);
 }
@@ -3538,8 +3531,7 @@ static bool write_cosh_or_sinh(struct hlsl_ctx *ctx,
     static const char fn_name_sinh[] = "sinh";
     static const char fn_name_cosh[] = "cosh";
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     type_name = arg->data_type->name;
     fn_name = sinh_mode ? fn_name_sinh : fn_name_cosh;
@@ -3601,8 +3593,7 @@ static bool intrinsic_ddx(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSX, arg, loc);
 }
@@ -3612,8 +3603,7 @@ static bool intrinsic_ddx_coarse(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSX_COARSE, arg, loc);
 }
@@ -3623,8 +3613,7 @@ static bool intrinsic_ddx_fine(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSX_FINE, arg, loc);
 }
@@ -3634,8 +3623,7 @@ static bool intrinsic_ddy(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSY, arg, loc);
 }
@@ -3645,8 +3633,7 @@ static bool intrinsic_ddy_coarse(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSY_COARSE, arg, loc);
 }
@@ -3656,8 +3643,7 @@ static bool intrinsic_degrees(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg, *deg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     /* 1 rad = 180/pi degree = 57.2957795 degree */
     deg = hlsl_block_add_float_constant(ctx, params->instrs, 57.2957795f, loc);
@@ -3669,8 +3655,7 @@ static bool intrinsic_ddy_fine(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSY_FINE, arg, loc);
 }
@@ -3724,8 +3709,7 @@ static bool intrinsic_determinant(struct hlsl_ctx *ctx,
         return false;
     }
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, arg, loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, arg, loc);
 
     dim = min(type->e.numeric.dimx, type->e.numeric.dimy);
     if (dim == 1)
@@ -3767,11 +3751,8 @@ static bool intrinsic_distance(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg1, *arg2, *neg, *add, *dot;
 
-    if (!(arg1 = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
-
-    if (!(arg2 = intrinsic_float_convert_arg(ctx, params, params->args[1], loc)))
-        return false;
+    arg1 = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
+    arg2 = intrinsic_float_convert_arg(ctx, params, params->args[1], loc);
 
     if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, arg2, loc)))
         return false;
@@ -3840,8 +3821,7 @@ static bool intrinsic_exp(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg, *mul, *coeff;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     /* 1/ln(2) */
     coeff = hlsl_block_add_float_constant(ctx, params->instrs, 1.442695f, loc);
@@ -3857,8 +3837,7 @@ static bool intrinsic_exp2(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_EXP2, arg, loc);
 }
@@ -3926,8 +3905,7 @@ static bool intrinsic_floor(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_FLOOR, arg, loc);
 }
@@ -3939,11 +3917,8 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
     static const struct hlsl_constant_value zero_value;
 
-    if (!(x = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
-
-    if (!(y = intrinsic_float_convert_arg(ctx, params, params->args[1], loc)))
-        return false;
+    x = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
+    y = intrinsic_float_convert_arg(ctx, params, params->args[1], loc);
 
     if (!(div = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, x, y, loc)))
         return false;
@@ -3978,8 +3953,7 @@ static bool intrinsic_frac(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_FRACT, arg, loc);
 }
@@ -4054,8 +4028,7 @@ static bool intrinsic_length(struct hlsl_ctx *ctx,
         hlsl_release_string_buffer(ctx, string);
     }
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     if (!(dot = add_binary_dot_expr(ctx, params->instrs, arg, arg, loc)))
         return false;
@@ -4117,8 +4090,7 @@ static bool intrinsic_log(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *log, *arg, *coeff;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     if (!(log = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_LOG2, arg, loc)))
         return false;
@@ -4133,8 +4105,7 @@ static bool intrinsic_log10(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *log, *arg, *coeff;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     if (!(log = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_LOG2, arg, loc)))
         return false;
@@ -4149,8 +4120,7 @@ static bool intrinsic_log2(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_LOG2, arg, loc);
 }
@@ -4320,8 +4290,7 @@ static bool intrinsic_normalize(struct hlsl_ctx *ctx,
         hlsl_release_string_buffer(ctx, string);
     }
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     if (!(dot = add_binary_dot_expr(ctx, params->instrs, arg, arg, loc)))
         return false;
@@ -4354,8 +4323,7 @@ static bool intrinsic_radians(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg, *rad;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     /* 1 degree = pi/180 rad = 0.0174532925f rad */
     rad = hlsl_block_add_float_constant(ctx, params->instrs, 0.0174532925f, loc);
@@ -4367,8 +4335,7 @@ static bool intrinsic_rcp(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_RCP, arg, loc);
 }
@@ -4451,8 +4418,7 @@ static bool intrinsic_round(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ROUND, arg, loc);
 }
@@ -4462,8 +4428,7 @@ static bool intrinsic_rsqrt(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_RSQ, arg, loc);
 }
@@ -4473,8 +4438,7 @@ static bool intrinsic_saturate(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, arg, loc);
 }
@@ -4518,8 +4482,7 @@ static bool intrinsic_sin(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SIN, arg, loc);
 }
@@ -4593,8 +4556,7 @@ static bool intrinsic_sqrt(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SQRT, arg, loc);
 }
@@ -4648,8 +4610,7 @@ static bool intrinsic_tanh(struct hlsl_ctx *ctx,
             "    return (exp_pos - exp_neg) / (exp_pos + exp_neg);\n"
             "}\n";
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
     type = arg->data_type;
 
     if (!(body = hlsl_sprintf_alloc(ctx, template,
@@ -4910,10 +4871,7 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
 static bool intrinsic_trunc(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg;
-
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
+    struct hlsl_ir_node *arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc);
 
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_TRUNC, arg, loc);
 }
@@ -4938,9 +4896,7 @@ static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
         return false;
     }
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, arg, loc)))
-        return false;
-
+    arg = intrinsic_float_convert_arg(ctx, params, arg, loc);
     c = hlsl_block_add_float_constant(ctx, params->instrs, 255.0f + (0.5f / 256.0f), loc);
 
     if (arg_type->class == HLSL_CLASS_VECTOR)
