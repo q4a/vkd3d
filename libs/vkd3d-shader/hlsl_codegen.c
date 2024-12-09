@@ -717,6 +717,9 @@ bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, 
     struct hlsl_ir_node *instr, *next;
     bool progress = false;
 
+    if (ctx->result)
+        return false;
+
     LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
     {
         if (instr->type == HLSL_IR_IF)
@@ -2221,6 +2224,9 @@ bool hlsl_copy_propagation_execute(struct hlsl_ctx *ctx, struct hlsl_block *bloc
 {
     struct copy_propagation_state state;
     bool progress;
+
+    if (ctx->result)
+        return false;
 
     index_instructions(block, 1);
 
@@ -4957,6 +4963,9 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 {
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
+
+    if (ctx->result)
+        return;
 
     index_instructions(&entry_func->body, 1);
 
