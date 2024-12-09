@@ -2110,7 +2110,6 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         struct hlsl_ir_node *coords = hlsl_ir_index(lhs)->idx.node;
         struct hlsl_deref resource_deref;
         struct hlsl_type *resource_type;
-        struct hlsl_ir_node *store;
         unsigned int dim_count;
 
         if (!hlsl_index_is_resource_access(hlsl_ir_index(lhs)))
@@ -2139,12 +2138,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         VKD3D_ASSERT(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
         VKD3D_ASSERT(coords->data_type->e.numeric.dimx == dim_count);
 
-        if (!(store = hlsl_new_resource_store(ctx, &resource_deref, coords, rhs, &lhs->loc)))
-        {
-            hlsl_cleanup_deref(&resource_deref);
-            return false;
-        }
-        hlsl_block_add_instr(block, store);
+        hlsl_block_add_resource_store(ctx, block, &resource_deref, coords, rhs, &lhs->loc);
         hlsl_cleanup_deref(&resource_deref);
     }
     else if (matrix_writemask)
@@ -6441,7 +6435,7 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
 static bool add_store_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *offset, *rhs, *store;
+    struct hlsl_ir_node *offset, *rhs;
     struct hlsl_deref resource_deref;
     unsigned int value_dim;
 
@@ -6472,13 +6466,7 @@ static bool add_store_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block
     if (!hlsl_init_deref_from_index_chain(ctx, &resource_deref, object))
         return false;
 
-    if (!(store = hlsl_new_resource_store(ctx, &resource_deref, offset, rhs, loc)))
-    {
-        hlsl_cleanup_deref(&resource_deref);
-        return false;
-    }
-
-    hlsl_block_add_instr(block, store);
+    hlsl_block_add_resource_store(ctx, block, &resource_deref, offset, rhs, loc);
     hlsl_cleanup_deref(&resource_deref);
 
     return true;
