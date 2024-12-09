@@ -395,7 +395,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     return add_cast(ctx, block, node, dst_type, loc);
 }
 
-static bool add_explicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *block,
+static void add_explicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_type *dst_type, const struct parse_array_sizes *arrays, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *instr = node_from_block(block);
@@ -414,7 +414,7 @@ static bool add_explicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *blo
     }
 
     if (instr->data_type->class == HLSL_CLASS_ERROR)
-        return true;
+        return;
 
     if (!explicit_compatible_data_types(ctx, src_type, dst_type))
     {
@@ -427,10 +427,9 @@ static bool add_explicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *blo
                     src_string->buffer, dst_string->buffer);
         hlsl_release_string_buffer(ctx, src_string);
         hlsl_release_string_buffer(ctx, dst_string);
-        return false;
     }
 
-    return add_cast(ctx, block, instr, dst_type, loc);
+    add_cast(ctx, block, instr, dst_type, loc);
 }
 
 static uint32_t add_modifiers(struct hlsl_ctx *ctx, uint32_t modifiers, uint32_t mod,
@@ -9408,12 +9407,7 @@ unary_expr:
                 hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers are not allowed on casts.");
 
-            if (!add_explicit_conversion(ctx, $6, $3, &$4, &@3))
-            {
-                destroy_block($6);
-                vkd3d_free($4.sizes);
-                YYABORT;
-            }
+            add_explicit_conversion(ctx, $6, $3, &$4, &@3);
             vkd3d_free($4.sizes);
             $$ = $6;
         }
