@@ -1550,13 +1550,11 @@ void hlsl_block_add_simple_store(struct hlsl_ctx *ctx, struct hlsl_block *block,
     hlsl_block_add_store_index(ctx, block, &lhs_deref, NULL, rhs, 0, &rhs->loc);
 }
 
-bool hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
+bool hlsl_block_add_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *lhs, unsigned int comp, struct hlsl_ir_node *rhs)
 {
     struct hlsl_block comp_path_block;
     struct hlsl_ir_store *store;
-
-    hlsl_block_init(block);
 
     if (!(store = hlsl_alloc(ctx, sizeof(*store))))
         return false;

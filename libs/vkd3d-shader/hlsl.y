@@ -1595,7 +1595,6 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
         for (i = 0; i < type->e.numeric.dimy * type->e.numeric.dimx; ++i)
         {
             struct hlsl_ir_node *value, *cell_operands[HLSL_MAX_OPERANDS] = { NULL };
-            struct hlsl_block store_block;
             unsigned int j;
 
             for (j = 0; j < HLSL_MAX_OPERANDS; j++)
@@ -1612,9 +1611,8 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
             if (!(value = add_expr(ctx, block, op, cell_operands, scalar_type, loc)))
                 return NULL;
 
-            if (!hlsl_new_store_component(ctx, &store_block, &var_deref, i, value))
+            if (!hlsl_block_add_store_component(ctx, block, &var_deref, i, value))
                 return NULL;
-            hlsl_block_add_block(block, &store_block);
         }
 
         if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
@@ -2206,7 +2204,6 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
             for (j = 0; j < lhs->data_type->e.numeric.dimx; ++j)
             {
                 struct hlsl_ir_node *load;
-                struct hlsl_block store_block;
                 const unsigned int idx = i * 4 + j;
                 const unsigned int component = i * lhs->data_type->e.numeric.dimx + j;
 
@@ -2219,12 +2216,11 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
                     return false;
                 }
 
-                if (!hlsl_new_store_component(ctx, &store_block, &deref, component, load))
+                if (!hlsl_block_add_store_component(ctx, block, &deref, component, load))
                 {
                     hlsl_cleanup_deref(&deref);
                     return false;
                 }
-                hlsl_block_add_block(block, &store_block);
             }
         }
 
@@ -2397,9 +2393,8 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
                 if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
                     return;
 
-                if (!hlsl_new_store_component(ctx, &block, &dst_deref, *store_index, conv))
+                if (!hlsl_block_add_store_component(ctx, instrs, &dst_deref, *store_index, conv))
                     return;
-                hlsl_block_add_block(instrs, &block);
             }
         }
 
@@ -3135,7 +3130,6 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
             struct hlsl_type *type = hlsl_type_get_component_type(ctx, param->data_type, j);
             struct hlsl_constant_value value;
             struct hlsl_ir_node *comp;
-            struct hlsl_block store_block;
 
             if (!param->default_values[j].string)
             {
@@ -3144,9 +3138,8 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
                     return NULL;
                 hlsl_block_add_instr(args->instrs, comp);
 
-                if (!hlsl_new_store_component(ctx, &store_block, &param_deref, j, comp))
+                if (!hlsl_block_add_store_component(ctx, args->instrs, &param_deref, j, comp))
                     return NULL;
-                hlsl_block_add_block(args->instrs, &store_block);
             }
         }
     }
@@ -4434,7 +4427,6 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
         for (j = 0; j < matrix_type->e.numeric.dimy; ++j)
         {
             struct hlsl_ir_node *instr = NULL;
-            struct hlsl_block block;
 
             for (k = 0; k < cast_type1->e.numeric.dimx && k < cast_type2->e.numeric.dimy; ++k)
             {
@@ -4462,9 +4454,9 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
                 }
             }
 
-            if (!hlsl_new_store_component(ctx, &block, &var_deref, j * matrix_type->e.numeric.dimx + i, instr))
+            if (!hlsl_block_add_store_component(ctx, params->instrs, &var_deref,
+                    j * matrix_type->e.numeric.dimx + i, instr))
                 return false;
-            hlsl_block_add_block(params->instrs, &block);
         }
     }
 
@@ -5116,15 +5108,13 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
     {
         for (j = 0; j < arg_type->e.numeric.dimy; ++j)
         {
-            struct hlsl_block block;
-
             if (!(load = hlsl_add_load_component(ctx, params->instrs, arg,
                     j * arg->data_type->e.numeric.dimx + i, loc)))
                 return false;
 
-            if (!hlsl_new_store_component(ctx, &block, &var_deref, i * var->data_type->e.numeric.dimx + j, load))
+            if (!hlsl_block_add_store_component(ctx, params->instrs, &var_deref,
+                    i * var->data_type->e.numeric.dimx + j, load))
                 return false;
-            hlsl_block_add_block(params->instrs, &block);
         }
     }
 
