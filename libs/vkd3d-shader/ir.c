@@ -8052,9 +8052,9 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         unsigned int idx)
 {
     enum vkd3d_tessellator_domain expected_tess_domain = VKD3D_TESSELLATOR_DOMAIN_INVALID;
+    bool integer_type = false, is_outer = false, is_gs_output, require_index = true;
     const char *signature_type_name = signature_type_names[signature_type];
     const struct signature_element *element = &signature->elements[idx];
-    bool integer_type = false, is_outer = false, is_gs_output;
     unsigned int semantic_index_max = 0;
 
     if (element->register_count == 0)
@@ -8110,6 +8110,9 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
     switch (element->sysval_semantic)
     {
         case VKD3D_SHADER_SV_NONE:
+        case VKD3D_SHADER_SV_TARGET:
+            break;
+
         case VKD3D_SHADER_SV_POSITION:
         case VKD3D_SHADER_SV_CLIP_DISTANCE:
         case VKD3D_SHADER_SV_CULL_DISTANCE:
@@ -8120,12 +8123,12 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         case VKD3D_SHADER_SV_INSTANCE_ID:
         case VKD3D_SHADER_SV_IS_FRONT_FACE:
         case VKD3D_SHADER_SV_SAMPLE_INDEX:
-        case VKD3D_SHADER_SV_TARGET:
         case VKD3D_SHADER_SV_DEPTH:
         case VKD3D_SHADER_SV_COVERAGE:
         case VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL:
         case VKD3D_SHADER_SV_DEPTH_LESS_EQUAL:
         case VKD3D_SHADER_SV_STENCIL_REF:
+            require_index = false;
             break;
 
         case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
@@ -8165,6 +8168,11 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
                     idx, signature_type_name, element->sysval_semantic);
             break;
     }
+
+    if (require_index && element->register_index == UINT_MAX)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: System value semantic %#x requires a register index.",
+                idx, signature_type_name, element->sysval_semantic);
 
     if (expected_tess_domain != VKD3D_TESSELLATOR_DOMAIN_INVALID)
     {
