@@ -2064,7 +2064,6 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
             struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs);
-            struct hlsl_ir_node *new_swizzle;
             uint32_t s;
 
             VKD3D_ASSERT(!matrix_writemask);
@@ -2095,13 +2094,9 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
                 }
             }
 
-            if (!(new_swizzle = hlsl_new_swizzle(ctx, s, width, rhs, &swizzle->node.loc)))
-                return false;
-            hlsl_block_add_instr(block, new_swizzle);
-
+            rhs = hlsl_block_add_swizzle(ctx, block, s, width, rhs, &swizzle->node.loc);
             lhs = swizzle->val.node;
             lhs_type = hlsl_get_vector_type(ctx, lhs_type->e.numeric.type, width);
-            rhs = new_swizzle;
         }
         else
         {
@@ -3661,26 +3656,16 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
     if (!(arg2_cast = add_implicit_conversion(ctx, params->instrs, arg2, cast_type, loc)))
         return false;
 
-    if (!(arg1_swzl1 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg1_cast, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, arg1_swzl1);
-
-    if (!(arg2_swzl1 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg2_cast, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, arg2_swzl1);
+    arg1_swzl1 = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg1_cast, loc);
+    arg2_swzl1 = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg2_cast, loc);
 
     if (!(mul1 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg1_swzl1, arg2_swzl1, loc)))
         return false;
 
     mul1_neg = hlsl_block_add_unary_expr(ctx, params->instrs, HLSL_OP1_NEG, mul1, loc);
 
-    if (!(arg1_swzl2 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg1_cast, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, arg1_swzl2);
-
-    if (!(arg2_swzl2 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg2_cast, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, arg2_swzl2);
+    arg1_swzl2 = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg1_cast, loc);
+    arg2_swzl2 = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg2_cast, loc);
 
     if (!(mul2 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg1_swzl2, arg2_swzl2, loc)))
         return false;
@@ -4800,9 +4785,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
         else
             load_params.type = HLSL_RESOURCE_SAMPLE_LOD_BIAS;
 
-        if (!(c = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), sampler_dim, params->args[1], loc)))
-            return false;
-        hlsl_block_add_instr(params->instrs, c);
+        c = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(X, Y, Z, W), sampler_dim, params->args[1], loc);
 
         if (!(coords = add_implicit_conversion(ctx, params->instrs, c,
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
@@ -4810,9 +4793,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
             return false;
         }
 
-        if (!(lod = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(W, W, W, W), 1, params->args[1], loc)))
-            return false;
-        hlsl_block_add_instr(params->instrs, lod);
+        lod = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(W, W, W, W), 1, params->args[1], loc);
 
         if (!(load_params.lod = add_implicit_conversion(ctx, params->instrs, lod,
                 hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
@@ -4834,13 +4815,8 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
         {
             struct hlsl_ir_node *divisor;
 
-            if (!(divisor = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(W, W, W, W), sampler_dim, coords, loc)))
-                return false;
-            hlsl_block_add_instr(params->instrs, divisor);
-
-            if (!(coords = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), sampler_dim, coords, loc)))
-                return false;
-            hlsl_block_add_instr(params->instrs, coords);
+            divisor = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(W, W, W, W), sampler_dim, coords, loc);
+            coords = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(X, Y, Z, W), sampler_dim, coords, loc);
 
             if (!(coords = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, coords, divisor, loc)))
                 return false;
@@ -5055,7 +5031,7 @@ static bool intrinsic_trunc(struct hlsl_ctx *ctx,
 static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg = params->args[0], *ret, *c, *swizzle;
+    struct hlsl_ir_node *arg = params->args[0], *ret, *c;
     struct hlsl_type *arg_type = arg->data_type;
 
     if (arg_type->class != HLSL_CLASS_SCALAR && !(arg_type->class == HLSL_CLASS_VECTOR
@@ -5078,13 +5054,7 @@ static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
     c = hlsl_block_add_float_constant(ctx, params->instrs, 255.0f + (0.5f / 256.0f), loc);
 
     if (arg_type->class == HLSL_CLASS_VECTOR)
-    {
-        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, Y, X, W), 4, arg, loc)))
-            return false;
-        hlsl_block_add_instr(params->instrs, swizzle);
-
-        arg = swizzle;
-    }
+        arg = hlsl_block_add_swizzle(ctx, params->instrs, HLSL_SWIZZLE(Z, Y, X, W), 4, arg, loc);
 
     if (!(ret = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, c, loc)))
         return false;

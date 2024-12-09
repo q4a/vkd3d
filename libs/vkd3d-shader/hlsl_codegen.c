@@ -1291,7 +1291,7 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, s
 
     if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR && src_type->e.numeric.dimx == 1)
     {
-        struct hlsl_ir_node *new_cast, *swizzle;
+        struct hlsl_ir_node *new_cast;
 
         dst_scalar_type = hlsl_get_scalar_type(ctx, dst_type->e.numeric.type);
         /* We need to preserve the cast since it might be doing more than just
@@ -1299,12 +1299,8 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, s
         new_cast = hlsl_block_add_cast(ctx, block, cast->operands[0].node, dst_scalar_type, &cast->node.loc);
 
         if (dst_type->e.numeric.dimx != 1)
-        {
-            if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X),
-                    dst_type->e.numeric.dimx, new_cast, &cast->node.loc)))
-                return false;
-            hlsl_block_add_instr(block, swizzle);
-        }
+            hlsl_block_add_swizzle(ctx, block, HLSL_SWIZZLE(X, X, X, X),
+                    dst_type->e.numeric.dimx, new_cast, &cast->node.loc);
 
         return true;
     }
@@ -2039,14 +2035,7 @@ static bool copy_propagation_replace_with_deref(struct hlsl_ctx *ctx,
     hlsl_block_add_instr(&block, new_instr);
 
     if (new_instr->data_type->class == HLSL_CLASS_SCALAR || new_instr->data_type->class == HLSL_CLASS_VECTOR)
-    {
-        struct hlsl_ir_node *swizzle_node;
-
-        if (!(swizzle_node = hlsl_new_swizzle(ctx, ret_swizzle, instr_component_count, new_instr, &instr->loc)))
-            goto done;
-        hlsl_block_add_instr(&block, swizzle_node);
-        new_instr = swizzle_node;
-    }
+        new_instr = hlsl_block_add_swizzle(ctx, &block, ret_swizzle, instr_component_count, new_instr, &instr->loc);
 
     if (TRACE_ON())
     {
@@ -2841,18 +2830,14 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR
             && dst_type->e.numeric.dimx < src_type->e.numeric.dimx)
     {
-        struct hlsl_ir_node *new_cast, *swizzle;
+        struct hlsl_ir_node *new_cast;
 
         dst_vector_type = hlsl_get_vector_type(ctx, dst_type->e.numeric.type, src_type->e.numeric.dimx);
         /* We need to preserve the cast since it might be doing more than just
          * narrowing the vector. */
         new_cast = hlsl_block_add_cast(ctx, block, cast->operands[0].node, dst_vector_type, &cast->node.loc);
-
-        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W),
-                dst_type->e.numeric.dimx, new_cast, &cast->node.loc)))
-            return false;
-        hlsl_block_add_instr(block, swizzle);
-
+        hlsl_block_add_swizzle(ctx, block, HLSL_SWIZZLE(X, Y, Z, W),
+                dst_type->e.numeric.dimx, new_cast, &cast->node.loc);
         return true;
     }
 
@@ -3066,9 +3051,7 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
             return false;
         hlsl_block_add_instr(block, &vector_load->node);
 
-        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), width, idx, &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, swizzle);
+        swizzle = hlsl_block_add_swizzle(ctx, block, HLSL_SWIZZLE(X, X, X, X), width, idx, &instr->loc);
 
         value.u[0].u = 0;
         value.u[1].u = 1;
@@ -3201,11 +3184,8 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
         operands[0] = cut_index;
         operands[1] = const_i;
         equals = hlsl_block_add_expr(ctx, block, HLSL_OP2_EQUAL, operands, btype, &cut_index->loc);
-
-        if (!(equals = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X),
-                var->data_type->e.numeric.dimx, equals, &cut_index->loc)))
-            return false;
-        hlsl_block_add_instr(block, equals);
+        equals = hlsl_block_add_swizzle(ctx, block, HLSL_SWIZZLE(X, X, X, X),
+                var->data_type->e.numeric.dimx, equals, &cut_index->loc);
 
         var_load = hlsl_block_add_simple_load(ctx, block, var, &cut_index->loc);
 
@@ -3678,16 +3658,10 @@ static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct h
     {
         mul = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_MUL, expr->operands[0].node, expr->operands[1].node);
 
-        if (!(add_x = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X),
-                instr->data_type->e.numeric.dimx, mul, &expr->node.loc)))
-            return false;
-        hlsl_block_add_instr(block, add_x);
-
-        if (!(add_y = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Y, Y, Y),
-                instr->data_type->e.numeric.dimx, mul, &expr->node.loc)))
-            return false;
-        hlsl_block_add_instr(block, add_y);
-
+        add_x = hlsl_block_add_swizzle(ctx, block, HLSL_SWIZZLE(X, X, X, X),
+                instr->data_type->e.numeric.dimx, mul, &expr->node.loc);
+        add_y = hlsl_block_add_swizzle(ctx, block, HLSL_SWIZZLE(Y, Y, Y, Y),
+                instr->data_type->e.numeric.dimx, mul, &expr->node.loc);
         hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_ADD, add_x, add_y);
     }
 
@@ -3850,9 +3824,7 @@ static bool lower_trig(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
         {
             uint32_t s = hlsl_swizzle_from_writemask(1 << i);
 
-            if (!(comps[i] = hlsl_new_swizzle(ctx, s, 1, reduced, &instr->loc)))
-                return false;
-            hlsl_block_add_instr(block, comps[i]);
+            comps[i] = hlsl_block_add_swizzle(ctx, block, s, 1, reduced, &instr->loc);
         }
 
         if (!(var = hlsl_new_synthetic_var(ctx, "sincos", type, &instr->loc)))
@@ -4372,9 +4344,7 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
         {
             uint32_t s = hlsl_swizzle_from_writemask(1 << i);
 
-            if (!(comps[i] = hlsl_new_swizzle(ctx, s, 1, mult, &instr->loc)))
-                return false;
-            hlsl_block_add_instr(block, comps[i]);
+            comps[i] = hlsl_block_add_swizzle(ctx, block, s, 1, mult, &instr->loc);
         }
 
         res = comps[0];
