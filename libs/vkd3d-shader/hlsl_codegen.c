@@ -1159,8 +1159,7 @@ static bool lower_complex_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 
         cast = hlsl_block_add_cast(ctx, block, component_load, dst_comp_type, &arg->loc);
 
-        if (!hlsl_block_add_store_component(ctx, block, &var_deref, dst_idx, cast))
-            return false;
+        hlsl_block_add_store_component(ctx, block, &var_deref, dst_idx, cast);
     }
 
     if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
@@ -1204,8 +1203,7 @@ static bool lower_matrix_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
         if (!(load = hlsl_add_load_component(ctx, block, swizzle->val.node, k, &instr->loc)))
             return false;
 
-        if (!hlsl_block_add_store_component(ctx, block, &var_deref, i, load))
-            return false;
+        hlsl_block_add_store_component(ctx, block, &var_deref, i, load);
     }
 
     if (!(var_load = hlsl_new_var_load(ctx, var, &instr->loc)))
@@ -3561,9 +3559,7 @@ static bool lower_trig(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
         for (i = 0; i < type->e.numeric.dimx; ++i)
         {
             sincos = hlsl_block_add_unary_expr(ctx, block, op, comps[i], &instr->loc);
-
-            if (!hlsl_block_add_store_component(ctx, block, &var_deref, i, sincos))
-                return false;
+            hlsl_block_add_store_component(ctx, block, &var_deref, i, sincos);
         }
 
         if (!(var_load = hlsl_new_load_index(ctx, &var_deref, NULL, &instr->loc)))

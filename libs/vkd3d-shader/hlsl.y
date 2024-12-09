@@ -1611,8 +1611,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
             if (!(value = add_expr(ctx, block, op, cell_operands, scalar_type, loc)))
                 return NULL;
 
-            if (!hlsl_block_add_store_component(ctx, block, &var_deref, i, value))
-                return NULL;
+            hlsl_block_add_store_component(ctx, block, &var_deref, i, value);
         }
 
         if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
@@ -2216,11 +2215,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
                     return false;
                 }
 
-                if (!hlsl_block_add_store_component(ctx, block, &deref, component, load))
-                {
-                    hlsl_cleanup_deref(&deref);
-                    return false;
-                }
+                hlsl_block_add_store_component(ctx, block, &deref, component, load);
             }
         }
 
@@ -2393,8 +2388,7 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
                 if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
                     return;
 
-                if (!hlsl_block_add_store_component(ctx, instrs, &dst_deref, *store_index, conv))
-                    return;
+                hlsl_block_add_store_component(ctx, instrs, &dst_deref, *store_index, conv);
             }
         }
 
@@ -3138,8 +3132,7 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
                     return NULL;
                 hlsl_block_add_instr(args->instrs, comp);
 
-                if (!hlsl_block_add_store_component(ctx, args->instrs, &param_deref, j, comp))
-                    return NULL;
+                hlsl_block_add_store_component(ctx, args->instrs, &param_deref, j, comp);
             }
         }
     }
@@ -4454,9 +4447,8 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
                 }
             }
 
-            if (!hlsl_block_add_store_component(ctx, params->instrs, &var_deref,
-                    j * matrix_type->e.numeric.dimx + i, instr))
-                return false;
+            hlsl_block_add_store_component(ctx, params->instrs, &var_deref,
+                    j * matrix_type->e.numeric.dimx + i, instr);
         }
     }
 
@@ -5112,9 +5104,8 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
                     j * arg->data_type->e.numeric.dimx + i, loc)))
                 return false;
 
-            if (!hlsl_block_add_store_component(ctx, params->instrs, &var_deref,
-                    i * var->data_type->e.numeric.dimx + j, load))
-                return false;
+            hlsl_block_add_store_component(ctx, params->instrs, &var_deref,
+                    i * var->data_type->e.numeric.dimx + j, load);
         }
     }
 
