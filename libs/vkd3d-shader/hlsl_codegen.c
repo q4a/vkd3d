@@ -3435,7 +3435,7 @@ static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
 /* Lower DP2 to MUL + ADD */
 static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
-    struct hlsl_ir_node *arg1, *arg2, *mul, *replacement, *zero, *add_x, *add_y;
+    struct hlsl_ir_node *arg1, *arg2, *mul, *replacement, *add_x, *add_y;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -3452,13 +3452,9 @@ static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct h
     {
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
 
-        if (!(zero = hlsl_new_float_constant(ctx, 0.0f, &expr->node.loc)))
-            return false;
-        hlsl_block_add_instr(block, zero);
-
         operands[0] = arg1;
         operands[1] = arg2;
-        operands[2] = zero;
+        operands[2] = hlsl_block_add_float_constant(ctx, block, 0.0f, &expr->node.loc);
 
         if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_DP2ADD, operands, instr->data_type, &expr->node.loc)))
             return false;

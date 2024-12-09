@@ -3875,10 +3875,7 @@ static bool intrinsic_degrees(struct hlsl_ctx *ctx,
         return false;
 
     /* 1 rad = 180/pi degree = 57.2957795 degree */
-    if (!(deg = hlsl_new_float_constant(ctx, 57.2957795f, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, deg);
-
+    deg = hlsl_block_add_float_constant(ctx, params->instrs, 57.2957795f, loc);
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, deg, loc);
 }
 
@@ -4062,9 +4059,7 @@ static bool intrinsic_exp(struct hlsl_ctx *ctx,
         return false;
 
     /* 1/ln(2) */
-    if (!(coeff = hlsl_new_float_constant(ctx, 1.442695f, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, coeff);
+    coeff = hlsl_block_add_float_constant(ctx, params->instrs, 1.442695f, loc);
 
     if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, coeff, arg, loc)))
         return false;
@@ -4344,10 +4339,7 @@ static bool intrinsic_log(struct hlsl_ctx *ctx,
         return false;
 
     /* ln(2) */
-    if (!(coeff = hlsl_new_float_constant(ctx, 0.69314718055f, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, coeff);
-
+    coeff = hlsl_block_add_float_constant(ctx, params->instrs, 0.69314718055f, loc);
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, log, coeff, loc);
 }
 
@@ -4363,10 +4355,7 @@ static bool intrinsic_log10(struct hlsl_ctx *ctx,
         return false;
 
     /* 1 / log2(10) */
-    if (!(coeff = hlsl_new_float_constant(ctx, 0.301029996f, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, coeff);
-
+    coeff = hlsl_block_add_float_constant(ctx, params->instrs, 0.301029996f, loc);
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, log, coeff, loc);
 }
 
@@ -4594,10 +4583,7 @@ static bool intrinsic_radians(struct hlsl_ctx *ctx,
         return false;
 
     /* 1 degree = pi/180 rad = 0.0174532925f rad */
-    if (!(rad = hlsl_new_float_constant(ctx, 0.0174532925f, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, rad);
-
+    rad = hlsl_block_add_float_constant(ctx, params->instrs, 0.0174532925f, loc);
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, rad, loc);
 }
 
@@ -5035,7 +5021,6 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     if (dim == HLSL_SAMPLER_DIM_1D)
     {
         struct hlsl_ir_load *load;
-        struct hlsl_ir_node *half;
         struct hlsl_ir_var *var;
         unsigned int idx = 0;
 
@@ -5044,15 +5029,8 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
 
         initialize_var_components(ctx, params->instrs, var, &idx, coords, false);
         if (hlsl_version_ge(ctx, 4, 0))
-        {
-            if (!(half = hlsl_new_float_constant(ctx, 0.5f, loc)))
-                return false;
-            hlsl_block_add_instr(params->instrs, half);
-
-            initialize_var_components(ctx, params->instrs, var, &idx, half, false);
-        }
-        else
-            initialize_var_components(ctx, params->instrs, var, &idx, coords, false);
+            coords = hlsl_block_add_float_constant(ctx, params->instrs, 0.5f, loc);
+        initialize_var_components(ctx, params->instrs, var, &idx, coords, false);
 
         if (!(load = hlsl_new_var_load(ctx, var, loc)))
             return false;
@@ -5245,9 +5223,7 @@ static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
     if (!(arg = intrinsic_float_convert_arg(ctx, params, arg, loc)))
         return false;
 
-    if (!(c = hlsl_new_float_constant(ctx, 255.0f + (0.5f / 256.0f), loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, c);
+    c = hlsl_block_add_float_constant(ctx, params->instrs, 255.0f + (0.5f / 256.0f), loc);
 
     if (arg_type->class == HLSL_CLASS_VECTOR)
     {
@@ -9358,12 +9334,9 @@ func_arguments:
 primary_expr:
       C_FLOAT
         {
-            struct hlsl_ir_node *c;
-
-            if (!(c = hlsl_new_float_constant(ctx, $1, &@1)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
-            if (!($$ = make_block(ctx, c)))
-                YYABORT;
+            hlsl_block_add_float_constant(ctx, $$, $1, &@1);
         }
     | C_INTEGER
         {
