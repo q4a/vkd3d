@@ -925,9 +925,7 @@ static bool add_record_access(struct hlsl_ctx *ctx, struct hlsl_block *block, st
 
     VKD3D_ASSERT(idx < record->data_type->e.record.field_count);
 
-    if (!(c = hlsl_new_uint_constant(ctx, idx, loc)))
-        return false;
-    hlsl_block_add_instr(block, c);
+    c = hlsl_block_add_uint_constant(ctx, block, idx, loc);
 
     if (!(index = hlsl_new_index(ctx, record, c, loc)))
         return false;
@@ -2275,9 +2273,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
             if (!(writemask & (1 << i)))
                 continue;
 
-            if (!(c = hlsl_new_uint_constant(ctx, i, &lhs->loc)))
-                return false;
-            hlsl_block_add_instr(block, c);
+            c = hlsl_block_add_uint_constant(ctx, block, i, &lhs->loc);
 
             if (!(cell = hlsl_new_index(ctx, &row->node, c, &lhs->loc)))
                 return false;
@@ -2869,12 +2865,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
                 continue;
             }
 
-            if (!(zero = hlsl_new_uint_constant(ctx, 0, &var->loc)))
-            {
-                free_parse_variable_def(v);
-                continue;
-            }
-            hlsl_block_add_instr(&ctx->static_initializers, zero);
+            zero = hlsl_block_add_uint_constant(ctx, &ctx->static_initializers, 0, &var->loc);
 
             if (!(cast = add_cast(ctx, &ctx->static_initializers, zero, var->data_type, &var->loc)))
             {
@@ -6377,8 +6368,8 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
     bool uint_resinfo, has_uint_arg, has_float_arg;
     struct hlsl_resource_load_params load_params;
     struct hlsl_ir_node *sample_info, *res_info;
-    struct hlsl_ir_node *zero = NULL, *void_ret;
     struct hlsl_type *uint_type, *float_type;
+    struct hlsl_ir_node *void_ret;
     unsigned int i, j;
     enum func_argument
     {
@@ -6478,12 +6469,7 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
     }
 
     if (!args[ARG_MIP_LEVEL])
-    {
-        if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
-            return false;
-        hlsl_block_add_instr(block, zero);
-        args[ARG_MIP_LEVEL] = zero;
-    }
+        args[ARG_MIP_LEVEL] = hlsl_block_add_uint_constant(ctx, block, 0, loc);
 
     memset(&load_params, 0, sizeof(load_params));
     load_params.type = HLSL_RESOURCE_RESINFO;
@@ -9177,9 +9163,7 @@ jump_statement:
             if (!($$ = make_empty_block(ctx)))
                 YYABORT;
 
-            if (!(c = hlsl_new_uint_constant(ctx, ~0u, &@1)))
-                return false;
-            hlsl_block_add_instr($$, c);
+            c = hlsl_block_add_uint_constant(ctx, $$, ~0u, &@1);
 
             if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD_NZ, c, &@1)))
                 return false;
@@ -9401,12 +9385,9 @@ primary_expr:
         }
     | C_UNSIGNED
         {
-            struct hlsl_ir_node *c;
-
-            if (!(c = hlsl_new_uint_constant(ctx, $1, &@1)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
-            if (!($$ = make_block(ctx, c)))
-                YYABORT;
+            hlsl_block_add_uint_constant(ctx, $$, $1, &@1);
         }
     | boolean
         {

@@ -62,9 +62,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
                 size /= 4;
             }
 
-            if (!(c = hlsl_new_uint_constant(ctx, size, loc)))
-                return NULL;
-            hlsl_block_add_instr(block, c);
+            c = hlsl_block_add_uint_constant(ctx, block, size, loc);
 
             if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, c, idx)))
                 return NULL;
@@ -86,12 +84,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
                 field_offset /= 4;
             }
 
-            if (!(c = hlsl_new_uint_constant(ctx, field_offset, loc)))
-                return NULL;
-            hlsl_block_add_instr(block, c);
-
-            idx_offset = c;
-
+            idx_offset = hlsl_block_add_uint_constant(ctx, block, field_offset, loc);
             break;
         }
 
@@ -122,9 +115,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
 
     hlsl_block_init(block);
 
-    if (!(offset = hlsl_new_uint_constant(ctx, 0, loc)))
-        return NULL;
-    hlsl_block_add_instr(block, offset);
+    offset = hlsl_block_add_uint_constant(ctx, block, 0, loc);
 
     VKD3D_ASSERT(deref->var);
     type = deref->var->data_type;
@@ -448,9 +439,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
                 return;
             hlsl_init_simple_deref_from_var(&patch_deref, input);
 
-            if (!(idx = hlsl_new_uint_constant(ctx, patch_index, &var->loc)))
-                return;
-            hlsl_block_add_instr(block, idx);
+            idx = hlsl_block_add_uint_constant(ctx, block, patch_index, &var->loc);
 
             if (!(load = hlsl_new_load_index(ctx, &patch_deref, idx, loc)))
                 return;
@@ -473,9 +462,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
 
         if (type->class == HLSL_CLASS_MATRIX)
         {
-            if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
-                return;
-            hlsl_block_add_instr(block, c);
+            c = hlsl_block_add_uint_constant(ctx, block, i, &var->loc);
 
             if (!(store = hlsl_new_store_index(ctx, &lhs->src, c, cast, 0, &var->loc)))
                 return;
@@ -538,9 +525,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 force_align = (i == 0);
             }
 
-            if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
-                return;
-            hlsl_block_add_instr(block, c);
+            c = hlsl_block_add_uint_constant(ctx, block, i, &var->loc);
 
             /* This redundant load is expected to be deleted later by DCE. */
             if (!(element_load = hlsl_new_load_index(ctx, &lhs->src, c, loc)))
@@ -615,9 +600,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
 
         if (type->class == HLSL_CLASS_MATRIX)
         {
-            if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
-                return;
-            hlsl_block_add_instr(&func->body, c);
+            c = hlsl_block_add_uint_constant(ctx, &func->body, i, &var->loc);
 
             if (!(load = hlsl_new_load_index(ctx, &rhs->src, c, &var->loc)))
                 return;
@@ -678,9 +661,7 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx,
                 force_align = (i == 0);
             }
 
-            if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
-                return;
-            hlsl_block_add_instr(&func->body, c);
+            c = hlsl_block_add_uint_constant(ctx, &func->body, i, &var->loc);
 
             if (!(element_load = hlsl_new_load_index(ctx, &rhs->src, c, loc)))
                 return;
@@ -1127,9 +1108,7 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
         return NULL;
     hlsl_block_add_instr(block, store);
 
-    if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
-        return NULL;
-    hlsl_block_add_instr(block, zero);
+    zero = hlsl_block_add_uint_constant(ctx, block, 0, loc);
 
     if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, zero, 1u << dim_count, loc)))
         return NULL;
@@ -1341,9 +1320,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         {
             struct hlsl_ir_node *c;
 
-            if (!(c = hlsl_new_uint_constant(ctx, i, &instr->loc)))
-                return false;
-            hlsl_block_add_instr(block, c);
+            c = hlsl_block_add_uint_constant(ctx, block, i, &instr->loc);
 
             if (!(load = hlsl_new_load_index(ctx, &var_deref, c, &instr->loc)))
                 return false;
@@ -2977,9 +2954,7 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
         struct hlsl_ir_load *var_load, *specific_load;
         struct hlsl_deref deref_copy = {0};
 
-        if (!(const_i = hlsl_new_uint_constant(ctx, i, &cut_index->loc)))
-            return false;
-        hlsl_block_add_instr(block, const_i);
+        const_i = hlsl_block_add_uint_constant(ctx, block, i, &cut_index->loc);
 
         operands[0] = cut_index;
         operands[1] = const_i;

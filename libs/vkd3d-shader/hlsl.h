@@ -1505,6 +1505,8 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_bloc
 void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function_decl *decl);
 void hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl);
 
+struct hlsl_ir_node *hlsl_block_add_uint_constant(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        unsigned int n, const struct vkd3d_shader_location *loc);
 void hlsl_block_cleanup(struct hlsl_block *block);
 bool hlsl_clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block, const struct hlsl_block *src_block);
 
