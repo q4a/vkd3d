@@ -857,17 +857,13 @@ static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
     {
         if (return_value)
         {
-            struct hlsl_ir_node *store;
-
             if (return_value->data_type->class == HLSL_CLASS_ERROR)
                 return true;
 
             if (!(return_value = add_implicit_conversion(ctx, block, return_value, return_type, loc)))
                 return false;
 
-            if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
-                return false;
-            list_add_after(&return_value->entry, &store->entry);
+            hlsl_block_add_simple_store(ctx, block, ctx->cur_function->return_var, return_value);
         }
         else
         {
@@ -891,16 +887,13 @@ static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
 struct hlsl_ir_node *hlsl_add_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *var_instr, unsigned int comp, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *store;
     struct hlsl_ir_var *var;
     struct hlsl_deref src;
 
     if (!(var = hlsl_new_synthetic_var(ctx, "deref", var_instr->data_type, &var_instr->loc)))
         return NULL;
 
-    if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
-        return NULL;
-    hlsl_block_add_instr(block, store);
+    hlsl_block_add_simple_store(ctx, block, var, var_instr);
 
     hlsl_init_simple_deref_from_var(&src, var);
     return hlsl_block_add_load_component(ctx, block, &src, comp, loc);
@@ -2822,7 +2815,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
         }
         else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
         {
-            struct hlsl_ir_node *cast, *store, *zero;
+            struct hlsl_ir_node *cast, *zero;
 
             /* Initialize statics to zero by default. */
 
@@ -2840,12 +2833,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
                 continue;
             }
 
-            if (!(store = hlsl_new_simple_store(ctx, var, cast)))
-            {
-                free_parse_variable_def(v);
-                continue;
-            }
-            hlsl_block_add_instr(&ctx->static_initializers, store);
+            hlsl_block_add_simple_store(ctx, &ctx->static_initializers, var, cast);
         }
         free_parse_variable_def(v);
     }
@@ -3113,8 +3101,6 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
 
         if (param->storage_modifiers & HLSL_STORAGE_IN)
         {
-            struct hlsl_ir_node *store;
-
             if (!hlsl_types_are_equal(arg->data_type, param->data_type))
             {
                 struct hlsl_ir_node *cast;
@@ -3124,9 +3110,7 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
                 arg = cast;
             }
 
-            if (!(store = hlsl_new_simple_store(ctx, param, arg)))
-                return NULL;
-            hlsl_block_add_instr(args->instrs, store);
+            hlsl_block_add_simple_store(ctx, args->instrs, param, arg);
         }
 
         ++k;
