@@ -703,6 +703,54 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_texldp(struct vsir_program *program,
+        struct vkd3d_shader_instruction *tex, unsigned int *tmp_idx)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct vkd3d_shader_location *location = &tex->location;
+    struct vkd3d_shader_instruction *div_ins, *tex_ins;
+    size_t pos = tex - instructions->elements;
+    unsigned int w_comp;
+
+    w_comp = vsir_swizzle_get_component(tex->src[0].swizzle, 3);
+
+    if (!shader_instruction_array_insert_at(instructions, pos + 1, 2))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    if (*tmp_idx == ~0u)
+        *tmp_idx = program->temp_count++;
+
+    div_ins = &instructions->elements[pos + 1];
+    tex_ins = &instructions->elements[pos + 2];
+
+    if (!vsir_instruction_init_with_params(program, div_ins, location, VKD3DSIH_DIV, 1, 2))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    vsir_dst_param_init(&div_ins->dst[0], VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    div_ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    div_ins->dst[0].reg.idx[0].offset = *tmp_idx;
+    div_ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL;
+
+    div_ins->src[0] = tex->src[0];
+
+    div_ins->src[1] = tex->src[0];
+    div_ins->src[1].swizzle = vkd3d_shader_create_swizzle(w_comp, w_comp, w_comp, w_comp);
+
+    if (!vsir_instruction_init_with_params(program, tex_ins, location, VKD3DSIH_TEX, 1, 2))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    tex_ins->dst[0] = tex->dst[0];
+
+    tex_ins->src[0].reg = div_ins->dst[0].reg;
+    tex_ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
+
+    tex_ins->src[1] = tex->src[1];
+
+    vkd3d_shader_instruction_make_nop(tex);
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_tex(struct vsir_program *program,
         struct vkd3d_shader_instruction *tex, struct vkd3d_shader_message_context *message_context)
 {
@@ -904,8 +952,16 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 break;
 
             case VKD3DSIH_TEX:
-                if ((ret = vsir_program_lower_tex(program, ins, message_context)) < 0)
-                    return ret;
+                if (ins->flags == VKD3DSI_TEXLD_PROJECT)
+                {
+                    if ((ret = vsir_program_lower_texldp(program, ins, &tmp_idx)) < 0)
+                        return ret;
+                }
+                else
+                {
+                    if ((ret = vsir_program_lower_tex(program, ins, message_context)) < 0)
+                        return ret;
+                }
                 break;
 
             case VKD3DSIH_TEXLDD:
