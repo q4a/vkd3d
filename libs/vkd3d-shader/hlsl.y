@@ -3018,6 +3018,26 @@ static enum hlsl_base_type hlsl_base_type_class(enum hlsl_base_type t)
     return 0;
 }
 
+static unsigned int hlsl_base_type_width(enum hlsl_base_type t)
+{
+    switch (t)
+    {
+        case HLSL_TYPE_HALF:
+            return 16;
+
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+        case HLSL_TYPE_BOOL:
+            return 32;
+
+        case HLSL_TYPE_DOUBLE:
+            return 64;
+    }
+
+    return 0;
+}
+
 static int function_parameter_compare(const struct hlsl_ir_var *candidate,
         const struct hlsl_ir_var *ref, const struct hlsl_ir_node *arg)
 {
@@ -3025,7 +3045,7 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
     {
         enum hlsl_base_type type;
         enum hlsl_base_type class;
-        unsigned int count;
+        unsigned int count, width;
     } c, r, a;
     int ret;
 
@@ -3036,14 +3056,17 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
     c.type = candidate->data_type->e.numeric.type;
     c.class = hlsl_base_type_class(c.type);
     c.count = hlsl_type_component_count(candidate->data_type);
+    c.width = hlsl_base_type_width(c.type);
 
     r.type = ref->data_type->e.numeric.type;
     r.class = hlsl_base_type_class(r.type);
     r.count = hlsl_type_component_count(ref->data_type);
+    r.width = hlsl_base_type_width(r.type);
 
     a.type = arg->data_type->e.numeric.type;
     a.class = hlsl_base_type_class(a.type);
     a.count = hlsl_type_component_count(arg->data_type);
+    a.width = hlsl_base_type_width(a.type);
 
     /* Prefer candidates without component count narrowing. E.g., given an
      * float4 argument, half4 is a better match than float2. */
@@ -3058,6 +3081,11 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
     /* Prefer candidates with matching component types. E.g., given an int
      * argument, int4 is a better match than uint4. */
     if ((ret = (a.type == c.type) - (a.type == r.type)))
+        return ret;
+
+    /* Prefer candidates without component type narrowing. E.g., given a float
+     * argument, double is a better match than half. */
+    if ((ret = (a.width > r.width) - (a.width > c.width)))
         return ret;
 
     return 0;
