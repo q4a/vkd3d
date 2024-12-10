@@ -137,6 +137,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/function.shader_test \
 	tests/hlsl/fwidth.shader_test \
 	tests/hlsl/fxgroup-syntax.shader_test \
+	tests/hlsl/gather-cmp.shader_test \
 	tests/hlsl/gather-offset.shader_test \
 	tests/hlsl/gather.shader_test \
 	tests/hlsl/geometry.shader_test \
