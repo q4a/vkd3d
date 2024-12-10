@@ -8293,6 +8293,11 @@ static void vsir_validate_signature_element(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
                 "element %u of %s signature: Invalid zero register count.", idx, signature_type_name);
 
+    if (ctx->program->normalisation_level < VSIR_NORMALISED_SM6 && element->register_count != 1)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "element %u of %s signature: Invalid register count %u.", idx, signature_type_name,
+                element->register_count);
+
     if (element->register_index != UINT_MAX && (element->register_index >= MAX_REG_OUTPUT
             || MAX_REG_OUTPUT - element->register_index < element->register_count))
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
