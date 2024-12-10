@@ -3023,6 +3023,7 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
 {
     struct
     {
+        enum hlsl_base_type type;
         enum hlsl_base_type class;
         unsigned int count;
     } c, r, a;
@@ -3032,13 +3033,16 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
     if (!hlsl_is_numeric_type(arg->data_type))
         return 0;
 
-    c.class = hlsl_base_type_class(candidate->data_type->e.numeric.type);
+    c.type = candidate->data_type->e.numeric.type;
+    c.class = hlsl_base_type_class(c.type);
     c.count = hlsl_type_component_count(candidate->data_type);
 
-    r.class = hlsl_base_type_class(ref->data_type->e.numeric.type);
+    r.type = ref->data_type->e.numeric.type;
+    r.class = hlsl_base_type_class(r.type);
     r.count = hlsl_type_component_count(ref->data_type);
 
-    a.class = hlsl_base_type_class(arg->data_type->e.numeric.type);
+    a.type = arg->data_type->e.numeric.type;
+    a.class = hlsl_base_type_class(a.type);
     a.count = hlsl_type_component_count(arg->data_type);
 
     /* Prefer candidates without component count narrowing. E.g., given an
@@ -3049,6 +3053,11 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
     /* Prefer candidates with matching component type classes. E.g., given a
      * float argument, double is a better match than int. */
     if ((ret = (a.class == c.class) - (a.class == r.class)))
+        return ret;
+
+    /* Prefer candidates with matching component types. E.g., given an int
+     * argument, int4 is a better match than uint4. */
+    if ((ret = (a.type == c.type) - (a.type == r.type)))
         return ret;
 
     return 0;
