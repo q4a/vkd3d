@@ -3088,7 +3088,9 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
     if ((ret = (a.width > r.width) - (a.width > c.width)))
         return ret;
 
-    return 0;
+    /* Prefer candidates without component count widening. E.g. given a float
+     * argument, float is a better match than float2. */
+    return (a.count < r.count) - (a.count < c.count);
 }
 
 static int function_compare(const struct hlsl_ir_function_decl *candidate,

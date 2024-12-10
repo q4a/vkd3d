@@ -184,7 +184,7 @@ float4 main() : sv_target
 }
 
 % An exact match is preferred over widening.
-[pixel shader todo]
+[pixel shader]
 float f(float x) { return 1.0; }
 float f(float2 x) { return 2.0; }
 
@@ -194,7 +194,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+draw quad
 probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
 
 % Component type narrowing is preferred over component count narrowing.
