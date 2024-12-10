@@ -2998,6 +2998,52 @@ static bool func_is_compatible_match(struct hlsl_ctx *ctx, const struct hlsl_ir_
     return true;
 }
 
+static int function_parameter_compare(const struct hlsl_ir_var *candidate,
+        const struct hlsl_ir_var *ref, const struct hlsl_ir_node *arg)
+{
+    struct
+    {
+        unsigned int count;
+    } c, r, a;
+    int ret;
+
+    /* TODO: Non-numeric types. */
+    if (!hlsl_is_numeric_type(arg->data_type))
+        return 0;
+
+    c.count = hlsl_type_component_count(candidate->data_type);
+    r.count = hlsl_type_component_count(ref->data_type);
+    a.count = hlsl_type_component_count(arg->data_type);
+
+    /* Prefer candidates without component count narrowing. E.g., given an
+     * float4 argument, half4 is a better match than float2. */
+    if ((ret = (a.count > r.count) - (a.count > c.count)))
+        return ret;
+
+    return 0;
+}
+
+static int function_compare(const struct hlsl_ir_function_decl *candidate,
+        const struct hlsl_ir_function_decl *ref, const struct parse_initializer *args)
+{
+    bool any_worse = false, any_better = false;
+    unsigned int i;
+    int ret;
+
+    for (i = 0; i < args->args_count; ++i)
+    {
+        ret = function_parameter_compare(candidate->parameters.vars[i], ref->parameters.vars[i], args->args[i]);
+        if (ret < 0)
+            any_worse = true;
+        else if (ret > 0)
+            any_better = true;
+    }
+
+    /* We consider a candidate better if at least one parameter is a better
+     * match, and none are a worse match. */
+    return any_better - any_worse;
+}
+
 static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
         const char *name, const struct parse_initializer *args, bool is_compile,
         const struct vkd3d_shader_location *loc)
@@ -3006,6 +3052,7 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
     struct vkd3d_string_buffer *s;
     struct hlsl_ir_function *func;
     struct rb_entry *entry;
+    int compare;
     size_t i;
     struct
     {
@@ -3021,6 +3068,23 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
     {
         if (!func_is_compatible_match(ctx, decl, is_compile, args))
             continue;
+
+        if (candidates.count)
+        {
+            compare = function_compare(decl, candidates.candidates[0], args);
+
+            /* The candidate is worse; skip it. */
+            if (compare < 0)
+                continue;
+
+            /* The candidate is better; replace the current candidates. */
+            if (compare > 0)
+            {
+                candidates.candidates[0] = decl;
+                candidates.count = 1;
+                continue;
+            }
+        }
 
         if (!(hlsl_array_reserve(ctx, (void **)&candidates.candidates,
                 &candidates.capacity, candidates.count + 1, sizeof(decl))))

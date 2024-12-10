@@ -198,7 +198,7 @@ todo(sm<6) draw quad
 probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
 
 % Component type narrowing is preferred over component count narrowing.
-[pixel shader todo]
+[pixel shader]
 float f(half4 x) { return 1.0; }
 float f(float2 x) { return 2.0; }
 
@@ -208,7 +208,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+draw quad
 probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
 
 % Let C be the common type that would be produced in an arithmetic expression
@@ -218,7 +218,7 @@ probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
 % (same as the parameter) and "int2" for the second function (same base type as
 % the argument, but narrower), so the first function is preferred.
 
-[pixel shader todo]
+[pixel shader]
 
 float4 func(float4 x)
 {
@@ -236,8 +236,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
-todo(sm<6) probe (0, 0) rgba(0.0, 0.0, 0.0, 0.0)
+draw quad
+probe (0, 0) rgba(0.0, 0.0, 0.0, 0.0)
 
 % Let C be the common type that would be produced in an arithmetic expression
 % between the parameter and argument types. If C is the same as the argument,
