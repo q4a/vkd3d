@@ -659,11 +659,11 @@ struct hlsl_ir_if
     struct hlsl_block else_block;
 };
 
-enum hlsl_ir_loop_unroll_type
+enum hlsl_loop_unroll_type
 {
-    HLSL_IR_LOOP_UNROLL,
-    HLSL_IR_LOOP_FORCE_UNROLL,
-    HLSL_IR_LOOP_FORCE_LOOP
+    HLSL_LOOP_UNROLL,
+    HLSL_LOOP_FORCE_UNROLL,
+    HLSL_LOOP_FORCE_LOOP
 };
 
 enum hlsl_loop_type
@@ -682,7 +682,7 @@ struct hlsl_ir_loop
     enum hlsl_loop_type type;
     unsigned int next_index; /* liveness index of the end of the loop */
     unsigned int unroll_limit;
-    enum hlsl_ir_loop_unroll_type unroll_type;
+    enum hlsl_loop_unroll_type unroll_type;
 };
 
 struct hlsl_ir_switch_case
@@ -1560,7 +1560,7 @@ struct hlsl_ir_node *hlsl_new_compile(struct hlsl_ctx *ctx, enum hlsl_compile_ty
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx, struct hlsl_block *iter,
-        struct hlsl_block *block, enum hlsl_ir_loop_unroll_type unroll_type,
+        struct hlsl_block *block, enum hlsl_loop_unroll_type unroll_type,
         unsigned int unroll_limit, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);

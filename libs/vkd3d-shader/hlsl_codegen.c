@@ -10123,7 +10123,7 @@ static unsigned int loop_unrolling_get_max_iterations(struct hlsl_ctx *ctx, stru
         return loop->unroll_limit;
 
     /* All SMs will default to 1024 if [unroll] has been specified without an explicit limit. */
-    if (loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
+    if (loop->unroll_type == HLSL_LOOP_FORCE_UNROLL)
         return 1024;
 
     /* SM4 limits implicit unrolling to 254 iterations. */
@@ -10253,7 +10253,7 @@ static bool loop_unrolling_unroll_loop(struct hlsl_ctx *ctx, struct hlsl_block *
      * i.e [unroll(4)] for (i = 0; i < 8; ++i)) */
     if (!loop->unroll_limit && i == max_iterations)
     {
-        if (loop->unroll_type == HLSL_IR_LOOP_FORCE_UNROLL)
+        if (loop->unroll_type == HLSL_LOOP_FORCE_UNROLL)
             hlsl_error(ctx, &loop->node.loc, VKD3D_SHADER_ERROR_HLSL_FAILED_FORCED_UNROLL,
                 "Unable to unroll loop, maximum iterations reached (%u).", max_iterations);
         goto fail;
@@ -10287,11 +10287,11 @@ static bool unroll_loops(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, void *
 
     loop = hlsl_ir_loop(node);
 
-    if (loop->unroll_type != HLSL_IR_LOOP_UNROLL && loop->unroll_type != HLSL_IR_LOOP_FORCE_UNROLL)
+    if (loop->unroll_type != HLSL_LOOP_UNROLL && loop->unroll_type != HLSL_LOOP_FORCE_UNROLL)
         return true;
 
     if (!loop_unrolling_unroll_loop(ctx, program, loop))
-        loop->unroll_type = HLSL_IR_LOOP_FORCE_LOOP;
+        loop->unroll_type = HLSL_LOOP_FORCE_LOOP;
 
     return true;
 }
