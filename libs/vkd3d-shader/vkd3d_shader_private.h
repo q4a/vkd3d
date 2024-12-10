@@ -1411,9 +1411,9 @@ enum vsir_control_flow_type
 
 enum vsir_normalisation_level
 {
-    VSIR_NOT_NORMALISED,
+    VSIR_NORMALISED_SM4,
     VSIR_NORMALISED_HULL_CONTROL_POINT_IO,
-    VSIR_FULLY_NORMALISED_IO,
+    VSIR_NORMALISED_SM6,
 };
 
 struct vsir_program

@@ -1582,7 +1582,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
     enum vkd3d_result ret;
     unsigned int i, j;
 
-    VKD3D_ASSERT(program->normalisation_level == VSIR_NOT_NORMALISED);
+    VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_SM4);
 
     if (program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
     {
@@ -2340,7 +2340,7 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
 
     program->instructions = normaliser.instructions;
     program->use_vocp = normaliser.use_vocp;
-    program->normalisation_level = VSIR_FULLY_NORMALISED_IO;
+    program->normalisation_level = VSIR_NORMALISED_SM6;
     return VKD3D_OK;
 }
 
@@ -7234,7 +7234,7 @@ static const struct shader_signature *vsir_signature_from_register_type(struct v
             {
                 case VKD3D_SHADER_TYPE_HULL:
                     if (ctx->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE
-                            || ctx->program->normalisation_level >= VSIR_FULLY_NORMALISED_IO)
+                            || ctx->program->normalisation_level >= VSIR_NORMALISED_SM6)
                     {
                         *has_control_point = ctx->program->normalisation_level >= VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
                         *control_point_count = ctx->program->output_control_point_count;
@@ -7276,7 +7276,7 @@ static void vsir_validate_io_register(struct validation_context *ctx, const stru
     signature = vsir_signature_from_register_type(ctx, reg->type, &has_control_point, &control_point_count);
     VKD3D_ASSERT(signature);
 
-    if (ctx->program->normalisation_level < VSIR_FULLY_NORMALISED_IO)
+    if (ctx->program->normalisation_level < VSIR_NORMALISED_SM6)
     {
         /* Indices are [register] or [control point, register]. Both are
          * allowed to have a relative address. */
@@ -8374,7 +8374,7 @@ static void vsir_validate_signature(struct validation_context *ctx, const struct
         }
 
         /* After I/O normalisation tessellation factors are merged in a single array. */
-        if (ctx->program->normalisation_level >= VSIR_FULLY_NORMALISED_IO)
+        if (ctx->program->normalisation_level >= VSIR_NORMALISED_SM6)
         {
             expected_outer_count = min(1, expected_outer_count);
             expected_inner_count = min(1, expected_inner_count);
@@ -8568,7 +8568,7 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
     const struct shader_signature *signature;
     bool has_control_point;
 
-    if (ctx->program->normalisation_level >= VSIR_FULLY_NORMALISED_IO)
+    if (ctx->program->normalisation_level >= VSIR_NORMALISED_SM6)
     {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
                 "DCL_INDEX_RANGE is not allowed with fully normalised input/output.");
