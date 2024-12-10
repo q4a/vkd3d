@@ -2998,11 +2998,32 @@ static bool func_is_compatible_match(struct hlsl_ctx *ctx, const struct hlsl_ir_
     return true;
 }
 
+static enum hlsl_base_type hlsl_base_type_class(enum hlsl_base_type t)
+{
+    switch (t)
+    {
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_DOUBLE:
+            return HLSL_TYPE_FLOAT;
+
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            return HLSL_TYPE_INT;
+
+        case HLSL_TYPE_BOOL:
+            return HLSL_TYPE_BOOL;
+    }
+
+    return 0;
+}
+
 static int function_parameter_compare(const struct hlsl_ir_var *candidate,
         const struct hlsl_ir_var *ref, const struct hlsl_ir_node *arg)
 {
     struct
     {
+        enum hlsl_base_type class;
         unsigned int count;
     } c, r, a;
     int ret;
@@ -3011,13 +3032,23 @@ static int function_parameter_compare(const struct hlsl_ir_var *candidate,
     if (!hlsl_is_numeric_type(arg->data_type))
         return 0;
 
+    c.class = hlsl_base_type_class(candidate->data_type->e.numeric.type);
     c.count = hlsl_type_component_count(candidate->data_type);
+
+    r.class = hlsl_base_type_class(ref->data_type->e.numeric.type);
     r.count = hlsl_type_component_count(ref->data_type);
+
+    a.class = hlsl_base_type_class(arg->data_type->e.numeric.type);
     a.count = hlsl_type_component_count(arg->data_type);
 
     /* Prefer candidates without component count narrowing. E.g., given an
      * float4 argument, half4 is a better match than float2. */
     if ((ret = (a.count > r.count) - (a.count > c.count)))
+        return ret;
+
+    /* Prefer candidates with matching component type classes. E.g., given a
+     * float argument, double is a better match than int. */
+    if ((ret = (a.class == c.class) - (a.class == r.class)))
         return ret;
 
     return 0;
