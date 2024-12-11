@@ -108,6 +108,27 @@ enum parse_state
     STATE_TEST,
 };
 
+static enum shader_model match_shader_model_string(const char *string, const char **rest)
+{
+    for (enum shader_model i = 0; i < ARRAY_SIZE(model_strings); ++i)
+    {
+        if (!strncmp(string, model_strings[i], strlen(model_strings[i])))
+        {
+            *rest = string + strlen(model_strings[i]);
+            return i;
+        }
+        /* Allow e.g. "4" as a shorthand for "4.0". */
+        if (string[0] == model_strings[i][0] && !strcmp(&model_strings[i][1], ".0")
+                && string[1] != '.' && !isdigit(string[1]))
+        {
+            *rest = string + 1;
+            return i;
+        }
+    }
+
+    fatal_error("Unrecognized shader model '%s'.\n", string);
+}
+
 static bool match_tag(struct shader_runner *runner, const char *tag)
 {
     for (size_t i = 0; i < runner->caps->tag_count; ++i)
@@ -119,54 +140,55 @@ static bool match_tag(struct shader_runner *runner, const char *tag)
     return false;
 }
 
-static bool check_qualifier_args_conjunction(struct shader_runner *runner, const char *line, const char **const rest)
+static bool check_qualifier_args_conjunction(struct shader_runner *runner,
+        const char *line, const char **const rest, uint32_t *model_mask)
 {
+    static const char *const valid_tags[] = {"d3d12", "glsl", "msl", "mvk", "vulkan"};
     bool holds = true;
-    unsigned int i;
 
-    static const struct
-    {
-        const char *text;
-        enum shader_model sm_min, sm_max;
-        bool tag;
-    }
-    valid_args[] =
-    {
-        {"sm>=4", SHADER_MODEL_4_0, SHADER_MODEL_6_0},
-        {"sm>=6", SHADER_MODEL_6_0, SHADER_MODEL_6_0},
-        {"sm<4",  SHADER_MODEL_2_0, SHADER_MODEL_4_0 - 1},
-        {"sm<6",  SHADER_MODEL_2_0, SHADER_MODEL_6_0 - 1},
-        {"d3d12", 0, 0, true},
-        {"glsl", 0, 0, true},
-        {"msl", 0, 0, true},
-        {"mvk", 0, 0, true},
-        {"vulkan", 0, 0, true},
-    };
+    *model_mask = ~0u;
 
     while (*line != ')' && *line != '|')
     {
+        enum shader_model model;
         bool match = false;
 
         while (isspace(*line))
             ++line;
 
-        for (i = 0; i < ARRAY_SIZE(valid_args); ++i)
+        if (!strncmp(line, "sm>=", 4))
         {
-            const char *option_text = valid_args[i].text;
-            size_t option_len = strlen(option_text);
-
-            if (strncmp(line, option_text, option_len))
-                continue;
-
             match = true;
-            line += option_len;
-            if (valid_args[i].tag)
-                holds &= match_tag(runner, option_text);
-            else if (runner->minimum_shader_model < valid_args[i].sm_min
-                    || runner->minimum_shader_model > valid_args[i].sm_max)
+            line += 4;
+            model = match_shader_model_string(line, &line);
+            *model_mask &= ~((1u << model) - 1);
+            if (runner->minimum_shader_model < model)
                 holds = false;
+        }
+        else if (!strncmp(line, "sm<", 3))
+        {
+            match = true;
+            line += 3;
+            model = match_shader_model_string(line, &line);
+            *model_mask &= ((1u << model) - 1);
+            if (runner->minimum_shader_model >= model)
+                holds = false;
+        }
+        else
+        {
+            for (unsigned int i = 0; i < ARRAY_SIZE(valid_tags); ++i)
+            {
+                const char *option_text = valid_tags[i];
+                size_t option_len = strlen(option_text);
 
-            break;
+                if (strncmp(line, option_text, option_len))
+                    continue;
+
+                match = true;
+                line += option_len;
+                holds &= match_tag(runner, option_text);
+                break;
+            }
         }
 
         while (isspace(*line))
@@ -189,21 +211,31 @@ static bool check_qualifier_args_conjunction(struct shader_runner *runner, const
     return holds;
 }
 
-static bool check_qualifier_args(struct shader_runner *runner, const char *line, const char **const rest)
+static bool check_qualifier_args(struct shader_runner *runner,
+        const char *line, const char **const rest, uint32_t *model_mask)
 {
     bool first = true;
     bool holds = false;
 
-    assert(*line == '(');
+    if (*line != '(')
+    {
+        *model_mask = ~0u;
+        return true;
+    }
     ++line;
+
+    *model_mask = 0;
 
     while (*line != ')')
     {
+        uint32_t sub_mask;
+
         if (!first && *line == '|')
             ++line;
         first = false;
 
-        holds = check_qualifier_args_conjunction(runner, line, &line) || holds;
+        holds = check_qualifier_args_conjunction(runner, line, &line, &sub_mask) || holds;
+        *model_mask |= sub_mask;
     }
 
     assert(*line == ')');
@@ -217,6 +249,7 @@ static bool match_string_generic(struct shader_runner *runner, const char *line,
         const char *token, const char **const rest, bool allow_qualifier_args)
 {
     size_t len = strlen(token);
+    uint32_t model_mask;
     bool holds = true;
 
     while (isspace(*line))
@@ -226,8 +259,8 @@ static bool match_string_generic(struct shader_runner *runner, const char *line,
         return false;
     line += len;
 
-    if (allow_qualifier_args && *line == '(')
-        holds = check_qualifier_args(runner, line, &line);
+    if (allow_qualifier_args)
+        holds = check_qualifier_args(runner, line, &line, &model_mask);
 
     if (rest)
     {
@@ -1619,8 +1652,7 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
     return blob;
 }
 
-static void compile_shader(struct shader_runner *runner, const char *source, size_t len,
-        enum shader_type type, HRESULT expect)
+static void compile_shader(struct shader_runner *runner, const char *source, size_t len, enum shader_type type)
 {
     bool use_dxcompiler = runner->minimum_shader_model >= SHADER_MODEL_6_0;
     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -1660,8 +1692,8 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
         hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
     }
     hr = map_special_hrs(hr);
-    todo_if (runner->is_todo)
-        ok(hr == expect, "Got unexpected hr %#x.\n", hr);
+    todo_if (runner->hlsl_todo[runner->minimum_shader_model])
+        ok(hr == runner->hlsl_hrs[runner->minimum_shader_model], "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)
     {
         ID3D10Blob_Release(blob);
@@ -1680,33 +1712,47 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     }
 }
 
-static void read_shader_directive(struct shader_runner *runner,
-        const char *line, const char *src, HRESULT *expect_hr)
+static void read_shader_directive(struct shader_runner *runner, const char *line, const char *src)
 {
-    *expect_hr = S_OK;
-    runner->is_todo = false;
+    for (unsigned int i = SHADER_MODEL_MIN; i <= SHADER_MODEL_MAX; ++i)
+    {
+        runner->hlsl_hrs[i] = S_OK;
+        runner->hlsl_todo[i] = false;
+    }
 
     while (*src && *src != ']')
     {
-        const char *src_start = src;
+        uint32_t model_mask;
 
-        if (match_string_with_args(runner, src, "todo", &src))
+        if (match_string(src, "todo", &src))
         {
-            /* 'todo' is not meaningful when dxcompiler is in use. */
-            if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
-                continue;
-            runner->is_todo = true;
+            check_qualifier_args(runner, src, &src, &model_mask);
+            for (unsigned int i = SHADER_MODEL_MIN; i <= SHADER_MODEL_MAX; ++i)
+            {
+                /* 'todo' is not meaningful when dxcompiler is in use. */
+                if (i < SHADER_MODEL_6_0 && (model_mask & (1u << i)))
+                    runner->hlsl_todo[i] = true;
+            }
         }
-        else if (match_string_with_args(runner, src, "fail", &src))
+        else if (match_string(src, "fail", &src))
         {
-            *expect_hr = E_FAIL;
+            check_qualifier_args(runner, src, &src, &model_mask);
+            for (unsigned int i = SHADER_MODEL_MIN; i <= SHADER_MODEL_MAX; ++i)
+            {
+                if (model_mask & (1u << i))
+                    runner->hlsl_hrs[i] = E_FAIL;
+            }
         }
-        else if (match_string_with_args(runner, src, "notimpl", &src))
+        else if (match_string(src, "notimpl", &src))
         {
-            *expect_hr = E_NOTIMPL;
+            check_qualifier_args(runner, src, &src, &model_mask);
+            for (unsigned int i = SHADER_MODEL_MIN; i <= SHADER_MODEL_MAX; ++i)
+            {
+                if (model_mask & (1u << i))
+                    runner->hlsl_hrs[i] = E_NOTIMPL;
+            }
         }
-
-        if (src == src_start)
+        else
         {
             fatal_error("Malformed line '%s'.\n", line);
         }
@@ -1865,7 +1911,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     unsigned int i, line_number = 0, block_start_line_number = 0;
     enum test_action test_action = TEST_ACTION_RUN;
     char *shader_source = NULL;
-    HRESULT expect_hr = S_OK;
     char line_buffer[256];
     const char *testname;
     FILE *f;
@@ -1958,7 +2003,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
                 case STATE_SHADER:
                     if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, shader_type, expect_hr);
+                        compile_shader(runner, shader_source, shader_source_len, shader_type);
                     free(runner->shader_source[shader_type]);
                     runner->shader_source[shader_type] = shader_source;
                     shader_source = NULL;
@@ -2189,7 +2234,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             }
 
             if (state == STATE_SHADER)
-                read_shader_directive(runner, line_buffer, line, &expect_hr);
+                read_shader_directive(runner, line_buffer, line);
         }
         else if (line[0] != '%' && line[0] != '\n')
         {
@@ -2232,7 +2277,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 case STATE_TEST:
                     /* Compilation which fails with dxcompiler is not 'todo', therefore the tests are
                      * not 'todo' either. They cannot run, so skip them entirely. */
-                    if (!runner->failed_resource_count && test_action == TEST_ACTION_RUN && SUCCEEDED(expect_hr))
+                    if (!runner->failed_resource_count && test_action == TEST_ACTION_RUN
+                            && SUCCEEDED(runner->hlsl_hrs[runner->minimum_shader_model]))
                         parse_test_directive(runner, line);
                     break;
             }

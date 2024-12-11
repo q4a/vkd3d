@@ -32,12 +32,14 @@
 enum shader_model
 {
     SHADER_MODEL_2_0,
+    SHADER_MODEL_MIN = SHADER_MODEL_2_0,
     SHADER_MODEL_3_0,
     SHADER_MODEL_4_0,
     SHADER_MODEL_4_1,
     SHADER_MODEL_5_0,
     SHADER_MODEL_5_1,
     SHADER_MODEL_6_0,
+    SHADER_MODEL_MAX = SHADER_MODEL_6_0,
 };
 
 enum shader_type
@@ -190,6 +192,8 @@ struct shader_runner
 
     bool is_todo;
     bool is_bug;
+    bool hlsl_todo[SHADER_MODEL_MAX + 1];
+    HRESULT hlsl_hrs[SHADER_MODEL_MAX + 1];
 
     char *shader_source[SHADER_TYPE_COUNT];
     enum shader_model minimum_shader_model;
