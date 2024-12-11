@@ -1652,9 +1652,10 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
     return blob;
 }
 
-static void compile_shader(struct shader_runner *runner, const char *source, size_t len, enum shader_type type)
+static void compile_shader(struct shader_runner *runner, const char *source,
+        size_t len, enum shader_type type, enum shader_model model)
 {
-    bool use_dxcompiler = runner->minimum_shader_model >= SHADER_MODEL_6_0;
+    bool use_dxcompiler = (model >= SHADER_MODEL_6_0);
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
     HRESULT hr;
@@ -1686,14 +1687,14 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     else
     {
         if (type == SHADER_TYPE_FX)
-            sprintf(profile, "%s_%s", shader_type_string(type), effect_models[runner->minimum_shader_model]);
+            sprintf(profile, "%s_%s", shader_type_string(type), effect_models[model]);
         else
-            sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
+            sprintf(profile, "%s_%s", shader_type_string(type), shader_models[model]);
         hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
     }
     hr = map_special_hrs(hr);
-    todo_if (runner->hlsl_todo[runner->minimum_shader_model])
-        ok(hr == runner->hlsl_hrs[runner->minimum_shader_model], "Got unexpected hr %#x.\n", hr);
+    todo_if (runner->hlsl_todo[model])
+        ok(hr == runner->hlsl_hrs[model], "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)
     {
         ID3D10Blob_Release(blob);
@@ -1895,21 +1896,21 @@ static void update_line_number_context(const char *testname, unsigned int line_n
 
 enum test_action
 {
+    TEST_ACTION_COMPILE,
     TEST_ACTION_RUN,
-    TEST_ACTION_SKIP_COMPILATION,
     TEST_ACTION_SKIP_EXECUTION,
 };
 
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
         const struct shader_runner_ops *ops, void *dxc_compiler)
 {
+    enum test_action test_action = ops ? TEST_ACTION_RUN : TEST_ACTION_COMPILE;
     size_t shader_source_size = 0, shader_source_len = 0;
     enum shader_type shader_type = SHADER_TYPE_CS;
     struct resource_params current_resource;
     struct sampler *current_sampler = NULL;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0, block_start_line_number = 0;
-    enum test_action test_action = TEST_ACTION_RUN;
     char *shader_source = NULL;
     char line_buffer[256];
     const char *testname;
@@ -1980,9 +1981,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_REQUIRE:
-                    if (runner->maximum_shader_model < runner->minimum_shader_model)
-                        test_action = TEST_ACTION_SKIP_COMPILATION;
-                    else if (!check_capabilities(runner, caps))
+                    if (runner->maximum_shader_model < runner->minimum_shader_model
+                            || !check_capabilities(runner, caps))
                         test_action = TEST_ACTION_SKIP_EXECUTION;
                     break;
 
@@ -2002,8 +2002,34 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_SHADER:
-                    if (test_action != TEST_ACTION_SKIP_COMPILATION)
-                        compile_shader(runner, shader_source, shader_source_len, shader_type);
+                    if (test_action == TEST_ACTION_COMPILE)
+                    {
+                        /* Most versions have relatively minor differences
+                         * between them, so don't waste time testing every
+                         * version possible.
+                         * SM1-3, SM4-5, and SM6 are completely different
+                         * formats, often with different HLSL semantics, so
+                         * where possible try to test one version from each set. */
+
+                        uint32_t model_mask = 0;
+
+                        if (runner->minimum_shader_model <= SHADER_MODEL_3_0)
+                            bitmap_set(&model_mask, runner->minimum_shader_model);
+                        if (runner->minimum_shader_model <= SHADER_MODEL_5_1
+                                && runner->maximum_shader_model >= SHADER_MODEL_4_0)
+                            bitmap_set(&model_mask, max(runner->minimum_shader_model, SHADER_MODEL_4_0));
+                        if (runner->maximum_shader_model >= SHADER_MODEL_6_0)
+                            bitmap_set(&model_mask, max(runner->minimum_shader_model, SHADER_MODEL_6_0));
+
+                        for (enum shader_model model = SHADER_MODEL_MIN; model <= SHADER_MODEL_MAX; ++model)
+                        {
+                            if (!bitmap_is_set(&model_mask, model))
+                                continue;
+                            vkd3d_test_push_context("Model %s", model_strings[model]);
+                            compile_shader(runner, shader_source, shader_source_len, shader_type, model);
+                            vkd3d_test_pop_context();
+                        }
+                    }
                     free(runner->shader_source[shader_type]);
                     runner->shader_source[shader_type] = shader_source;
                     shader_source = NULL;
@@ -2016,7 +2042,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     ID3D10Blob *blob = NULL, *errors = NULL;
                     HRESULT hr;
 
-                    if (test_action != TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_COMPILE)
                         break;
 
                     hr = D3DPreprocess(shader_source, strlen(shader_source), NULL, NULL, NULL, &blob, &errors);
@@ -2042,7 +2068,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     HRESULT hr;
                     char *text;
 
-                    if (test_action != TEST_ACTION_RUN)
+                    if (test_action != TEST_ACTION_COMPILE)
                         break;
 
                     hr = D3DPreprocess(shader_source, strlen(shader_source), NULL, NULL, NULL, &blob, &errors);
@@ -2094,7 +2120,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 memset(runner->require_shader_caps, 0, sizeof(runner->require_shader_caps));
                 memset(runner->require_format_caps, 0, sizeof(runner->require_format_caps));
                 runner->compile_options = 0;
-                test_action = TEST_ACTION_RUN;
+                test_action = ops ? TEST_ACTION_RUN : TEST_ACTION_COMPILE;
             }
             else if (match_string(line, "[pixel shader", &line))
             {
@@ -2358,6 +2384,22 @@ out:
 }
 #endif
 
+static void run_compile_tests(void *dxc_compiler)
+{
+    struct shader_runner_caps caps = {0};
+    struct shader_runner runner = {0};
+
+    caps.runner = "hlsl";
+    caps.minimum_shader_model = SHADER_MODEL_MIN;
+    caps.maximum_shader_model = dxc_compiler ? SHADER_MODEL_MAX : SHADER_MODEL_5_1;
+    for (unsigned int i = 0; i < SHADER_CAP_COUNT; ++i)
+        caps.shader_caps[i] = true;
+    for (unsigned int i = 0; i < DXGI_FORMAT_COUNT; ++i)
+        caps.format_caps[i] = ~0u;
+
+    run_shader_tests(&runner, &caps, NULL, dxc_compiler);
+}
+
 START_TEST(shader_runner)
 {
     IDxcCompiler3 *dxc;
@@ -2365,6 +2407,9 @@ START_TEST(shader_runner)
     parse_args(argc, argv);
 
     dxc = dxcompiler_create();
+
+    trace("Running HLSL compile tests.\n");
+    run_compile_tests(dxc);
 
 #if defined(VKD3D_CROSSTEST)
     trace("Running tests from a Windows cross build\n");
