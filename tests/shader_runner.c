@@ -213,17 +213,16 @@ static bool check_qualifier_args(struct shader_runner *runner, const char *line,
     return holds;
 }
 
-static bool match_string_generic(struct shader_runner *runner, const char *line, const char *token,
-        const char **const rest, bool exclude_bracket, bool allow_qualifier_args)
+static bool match_string_generic(struct shader_runner *runner, const char *line,
+        const char *token, const char **const rest, bool allow_qualifier_args)
 {
     size_t len = strlen(token);
     bool holds = true;
 
-    while (isspace(*line) || (exclude_bracket && *line == ']'))
+    while (isspace(*line))
         ++line;
 
-    if (strncmp(line, token, len) || !(isspace(line[len]) || line[len] == '('
-            || (exclude_bracket && line[len] == ']')))
+    if (strncmp(line, token, len) || !(isspace(line[len]) || line[len] == '(' || line[len] == ']'))
         return false;
     line += len;
 
@@ -242,23 +241,12 @@ static bool match_string_generic(struct shader_runner *runner, const char *line,
 static bool match_string_with_args(struct shader_runner *runner,
         const char *line, const char *token, const char **const rest)
 {
-    return match_string_generic(runner, line, token, rest, false, true);
+    return match_string_generic(runner, line, token, rest, true);
 }
 
 static bool match_string(const char *line, const char *token, const char **const rest)
 {
-    return match_string_generic(NULL, line, token, rest, false, false);
-}
-
-static bool match_directive_substring_with_args(struct shader_runner *runner,
-        const char *line, const char *token, const char **const rest)
-{
-    return match_string_generic(runner, line, token, rest, true, true);
-}
-
-static bool match_directive_substring(const char *line, const char *token, const char **const rest)
-{
-    return match_string_generic(NULL, line, token, rest, true, false);
+    return match_string_generic(NULL, line, token, rest, false);
 }
 
 static const char *close_parentheses(const char *line)
@@ -1702,18 +1690,18 @@ static void read_shader_directive(struct shader_runner *runner,
     {
         const char *src_start = src;
 
-        if (match_directive_substring_with_args(runner, src, "todo", &src))
+        if (match_string_with_args(runner, src, "todo", &src))
         {
             /* 'todo' is not meaningful when dxcompiler is in use. */
             if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
                 continue;
             runner->is_todo = true;
         }
-        else if (match_directive_substring_with_args(runner, src, "fail", &src))
+        else if (match_string_with_args(runner, src, "fail", &src))
         {
             *expect_hr = E_FAIL;
         }
-        else if (match_directive_substring_with_args(runner, src, "notimpl", &src))
+        else if (match_string_with_args(runner, src, "notimpl", &src))
         {
             *expect_hr = E_NOTIMPL;
         }
@@ -2048,7 +2036,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             block_start_line_number = line_number;
             update_line_number_context(testname, line_number);
 
-            if (match_directive_substring(line, "[compute shader", &line))
+            if (match_string(line, "[compute shader", &line))
             {
                 state = STATE_SHADER;
                 shader_type = SHADER_TYPE_CS;
@@ -2063,7 +2051,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 runner->compile_options = 0;
                 test_action = TEST_ACTION_RUN;
             }
-            else if (match_directive_substring(line, "[pixel shader", &line))
+            else if (match_string(line, "[pixel shader", &line))
             {
                 state = STATE_SHADER;
                 shader_type = SHADER_TYPE_PS;
@@ -2162,27 +2150,27 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             {
                 state = STATE_PREPROC_INVALID;
             }
-            else if (match_directive_substring(line, "[vertex shader", &line))
+            else if (match_string(line, "[vertex shader", &line))
             {
                 state = STATE_SHADER;
                 shader_type = SHADER_TYPE_VS;
             }
-            else if (match_directive_substring(line, "[effect", &line))
+            else if (match_string(line, "[effect", &line))
             {
                 state = STATE_SHADER;
                 shader_type = SHADER_TYPE_FX;
             }
-            else if (match_directive_substring(line, "[hull shader", &line))
+            else if (match_string(line, "[hull shader", &line))
             {
                 state = STATE_SHADER;
                 shader_type = SHADER_TYPE_HS;
             }
-            else if (match_directive_substring(line, "[domain shader", &line))
+            else if (match_string(line, "[domain shader", &line))
             {
                 state = STATE_SHADER;
                 shader_type = SHADER_TYPE_DS;
             }
-            else if (match_directive_substring(line, "[geometry shader", &line))
+            else if (match_string(line, "[geometry shader", &line))
             {
                 state = STATE_SHADER;
                 shader_type = SHADER_TYPE_GS;
