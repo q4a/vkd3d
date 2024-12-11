@@ -68,3 +68,23 @@ float4 main() : SV_TARGET
 uniform 0 uint4 0 1 2 3
 todo(msl) draw quad
 probe (0, 0) rgba (1.0, 7.0, 13.0, 19.0)
+
+% Test collecting terms with constant coefficients.
+
+[pixel shader]
+uniform uint x;
+
+float4 main() : SV_TARGET
+{
+    uint4 res;
+    res.x = x * 2 + (3 + 3 * x);
+    res.y = (x & 4) | (x & 1);
+    res.z = max(min(2, x), min(x, 10));
+    res.w = 0;
+    return res;
+}
+
+[test]
+uniform 0 uint 7
+todo(msl) draw quad
+probe (0, 0) rgba(38.0, 5.0, 7.0, 0.0)

@@ -1589,9 +1589,71 @@ static bool is_op_commutative(enum hlsl_ir_expr_op op)
     }
 }
 
+/* Returns true iff x OPL (y OPR z) = (x OPL y) OPR (x OPL z). */
+static bool is_op_left_distributive(enum hlsl_ir_expr_op opl, enum hlsl_ir_expr_op opr, enum hlsl_base_type type)
+{
+    switch (opl)
+    {
+        case HLSL_OP2_BIT_AND:
+            return opr == HLSL_OP2_BIT_OR || opr == HLSL_OP2_BIT_XOR;
+
+        case HLSL_OP2_BIT_OR:
+            return opr == HLSL_OP2_BIT_AND;
+
+        case HLSL_OP2_DOT:
+        case HLSL_OP2_MUL:
+            return opr == HLSL_OP2_ADD && (type == HLSL_TYPE_INT || type == HLSL_TYPE_UINT);
+
+        case HLSL_OP2_MAX:
+            return opr == HLSL_OP2_MIN;
+
+        case HLSL_OP2_MIN:
+            return opr == HLSL_OP2_MAX;
+
+        default:
+            return false;
+    }
+}
+
+/* Attempt to collect together the expression (x OPL a) OPR (x OPL b) -> x OPL (a OPR b). */
+static struct hlsl_ir_node *collect_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
+        enum hlsl_ir_expr_op opr, struct hlsl_ir_node *node1, struct hlsl_ir_node *node2)
+{
+    enum hlsl_base_type type = instr->data_type->e.numeric.type;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_ir_node *ab, *res;
+    struct hlsl_ir_expr *e1, *e2;
+    enum hlsl_ir_expr_op opl;
+
+    if (!node1 || !node2 || node1->type != HLSL_IR_EXPR || node2->type != HLSL_IR_EXPR)
+        return NULL;
+    e1 = hlsl_ir_expr(node1);
+    e2 = hlsl_ir_expr(node2);
+    opl = e1->op;
+
+    if (e2->op != opl || !is_op_left_distributive(opl, opr, type))
+        return NULL;
+    if (e1->operands[0].node != e2->operands[0].node)
+        return NULL;
+    if (e1->operands[1].node->type != HLSL_IR_CONSTANT || e2->operands[1].node->type != HLSL_IR_CONSTANT)
+        return NULL;
+
+    if (!(ab = hlsl_new_binary_expr(ctx, opr, e1->operands[1].node, e2->operands[1].node)))
+        return NULL;
+    list_add_before(&instr->entry, &ab->entry);
+
+    operands[0] = e1->operands[0].node;
+    operands[1] = ab;
+
+    if (!(res = hlsl_new_expr(ctx, opl, operands, instr->data_type, &instr->loc)))
+        return NULL;
+    list_add_before(&instr->entry, &res->entry);
+    return res;
+}
+
 bool hlsl_normalize_binary_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    struct hlsl_ir_node *arg1 , *arg2;
+    struct hlsl_ir_node *arg1, *arg2, *tmp;
     struct hlsl_ir_expr *expr;
     enum hlsl_base_type type;
     enum hlsl_ir_expr_op op;
@@ -1612,11 +1674,17 @@ bool hlsl_normalize_binary_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     if (!arg1 || !arg2)
         return false;
 
+    if ((tmp = collect_exprs(ctx, instr, op, arg1, arg2)))
+    {
+        /* (x OPL a) OPR (x OPL b) -> x OPL (a OPR b) */
+        hlsl_replace_node(instr, tmp);
+        return true;
+    }
+
     if (is_op_commutative(op) && arg1->type == HLSL_IR_CONSTANT && arg2->type != HLSL_IR_CONSTANT)
     {
         /* a OP x -> x OP a */
-        struct hlsl_ir_node *tmp = arg1;
-
+        tmp = arg1;
         arg1 = arg2;
         arg2 = tmp;
         progress = true;
@@ -1673,6 +1741,39 @@ bool hlsl_normalize_binary_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
             progress = true;
         }
 
+        if (!progress && e1 && (tmp = collect_exprs(ctx, instr, op, e1->operands[1].node, arg2)))
+        {
+            /* (y OPR (x OPL a)) OPR (x OPL b) -> y OPR (x OPL (a OPR b)) */
+            arg1 = e1->operands[0].node;
+            arg2 = tmp;
+            progress = true;
+        }
+
+        if (!progress && is_op_commutative(op) && e1
+                && (tmp = collect_exprs(ctx, instr, op, e1->operands[0].node, arg2)))
+        {
+            /* ((x OPL a) OPR y) OPR (x OPL b) -> (x OPL (a OPR b)) OPR y */
+            arg1 = tmp;
+            arg2 = e1->operands[1].node;
+            progress = true;
+        }
+
+        if (!progress && e2 && (tmp = collect_exprs(ctx, instr, op, arg1, e2->operands[0].node)))
+        {
+            /* (x OPL a) OPR ((x OPL b) OPR y) -> (x OPL (a OPR b)) OPR y */
+            arg1 = tmp;
+            arg2 = e2->operands[1].node;
+            progress = true;
+        }
+
+        if (!progress && is_op_commutative(op) && e2
+                && (tmp = collect_exprs(ctx, instr, op, arg1, e2->operands[1].node)))
+        {
+            /* (x OPL a) OPR (y OPR (x OPL b)) -> (x OPL (a OPR b)) OPR y */
+            arg1 = tmp;
+            arg2 = e2->operands[0].node;
+            progress = true;
+        }
     }
 
     if (progress)
