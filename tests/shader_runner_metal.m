@@ -65,8 +65,13 @@ static MTLPixelFormat get_metal_pixel_format(DXGI_FORMAT format)
             return MTLPixelFormatRGBA32Uint;
         case DXGI_FORMAT_R32G32B32A32_SINT:
             return MTLPixelFormatRGBA32Sint;
+        case DXGI_FORMAT_R32G32_UINT:
+            return MTLPixelFormatRG32Uint;
         case DXGI_FORMAT_R32_FLOAT:
             return MTLPixelFormatR32Float;
+        case DXGI_FORMAT_R32_SINT:
+            return MTLPixelFormatR32Sint;
+        case DXGI_FORMAT_R32_TYPELESS:
         case DXGI_FORMAT_R32_UINT:
             return MTLPixelFormatR32Uint;
         case DXGI_FORMAT_D32_FLOAT:
@@ -194,8 +199,17 @@ static void init_resource_texture(struct metal_runner *runner,
     id<MTLDevice> device = runner->device;
     MTLTextureDescriptor *desc;
 
-    if (params->desc.type != RESOURCE_TYPE_RENDER_TARGET && params->desc.type != RESOURCE_TYPE_DEPTH_STENCIL)
-        return;
+    switch (params->desc.type)
+    {
+        case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+        case RESOURCE_TYPE_TEXTURE:
+            break;
+
+        case RESOURCE_TYPE_UAV:
+        case RESOURCE_TYPE_VERTEX_BUFFER:
+            return;
+    }
 
     if (params->desc.sample_count > 1)
     {
@@ -209,9 +223,6 @@ static void init_resource_texture(struct metal_runner *runner,
             return;
         }
     }
-
-    if (params->data)
-        fatal_error("Initial texture resource data not implemented.\n");
 
     desc = [[MTLTextureDescriptor alloc] init];
     if (params->desc.sample_count > 1)
@@ -227,10 +238,64 @@ static void init_resource_texture(struct metal_runner *runner,
     desc.mipmapLevelCount = params->desc.level_count;
     desc.sampleCount = max(params->desc.sample_count, 1);
     desc.storageMode = MTLStorageModePrivate;
-    desc.usage = MTLTextureUsageRenderTarget;
+
+    switch (params->desc.type)
+    {
+        case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            desc.usage = MTLTextureUsageRenderTarget;
+            break;
+
+        case RESOURCE_TYPE_TEXTURE:
+            desc.usage = MTLTextureUsageShaderRead;
+            break;
+
+        case RESOURCE_TYPE_UAV:
+        case RESOURCE_TYPE_VERTEX_BUFFER:
+            break;
+    }
 
     resource->texture = [device newTextureWithDescriptor:desc];
     ok(resource->texture, "Failed to create texture.\n");
+
+    if (params->data)
+    {
+        unsigned int buffer_offset = 0, level, level_width, level_height;
+        id<MTLCommandBuffer> command_buffer;
+        id<MTLBlitCommandEncoder> blit;
+        id<MTLTexture> upload_texture;
+
+        if (params->desc.sample_count > 1)
+            fatal_error("Cannot upload data to a multisampled texture.\n");
+        if (params->desc.depth > 1)
+            fatal_error("Uploading data to a texture array is not supported.\n");
+
+        desc.storageMode = MTLStorageModeManaged;
+        upload_texture = [[device newTextureWithDescriptor:desc] autorelease];
+
+        for (level = 0; level < params->desc.level_count; ++level)
+        {
+            level_width  = get_level_dimension(params->desc.width, level);
+            level_height = get_level_dimension(params->desc.height, level);
+            [upload_texture replaceRegion:MTLRegionMake2D(0, 0, level_width, level_height)
+                    mipmapLevel:level
+                    slice:0
+                    withBytes:&params->data[buffer_offset]
+                    bytesPerRow:level_width * params->desc.texel_size
+                    bytesPerImage:level_height * level_width * params->desc.texel_size];
+            buffer_offset += level_height * level_width * params->desc.texel_size;
+        }
+
+        command_buffer = [runner->queue commandBuffer];
+
+        blit = [command_buffer blitCommandEncoder];
+        [blit copyFromTexture:upload_texture toTexture:resource->texture];
+        [blit endEncoding];
+
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+    }
+
     [desc release];
 }
 
@@ -263,9 +328,9 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
 {
     struct vkd3d_shader_interface_info interface_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO};
     struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
-    struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
+    struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS + 1 /* CBV */];
     struct vkd3d_shader_resource_binding *binding;
-    unsigned int descriptor_binding = 0;
+    unsigned int i;
     char *messages;
     int ret;
 
@@ -289,15 +354,47 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
 
     if (runner->r.uniform_count)
     {
-        binding = &bindings[interface_info.binding_count++];
+        binding = &bindings[interface_info.binding_count];
         binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_CBV;
         binding->register_space = 0;
         binding->register_index = 0;
         binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
         binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
         binding->binding.set = 0;
-        binding->binding.binding = descriptor_binding++;
+        binding->binding.binding = interface_info.binding_count;
         binding->binding.count = 1;
+        ++interface_info.binding_count;
+    }
+
+    for (i = 0; i < runner->r.resource_count; ++i)
+    {
+        const struct metal_resource *resource = metal_resource(runner->r.resources[i]);
+
+        switch (resource->r.desc.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                binding = &bindings[interface_info.binding_count];
+                binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
+                binding->register_space = 0;
+                binding->register_index = resource->r.desc.slot;
+                binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
+                    binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
+                else
+                    binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
+                binding->binding.set = 0;
+                binding->binding.binding = interface_info.binding_count;
+                binding->binding.count = 1;
+                ++interface_info.binding_count;
+                break;
+
+            case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+            case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                break;
+
+        }
     }
 
     interface_info.bindings = bindings;
@@ -335,7 +432,7 @@ static id<MTLFunction> compile_stage(struct metal_runner *runner, enum shader_ty
     return [function autorelease];
 }
 
-static void encode_argument_buffer(struct metal_runner *runner,
+static bool encode_argument_buffer(struct metal_runner *runner,
         id<MTLRenderCommandEncoder> command_encoder)
 {
     NSMutableArray<MTLArgumentDescriptor *> *argument_descriptors;
@@ -343,6 +440,7 @@ static void encode_argument_buffer(struct metal_runner *runner,
     MTLArgumentDescriptor *arg_desc;
     id<MTLArgumentEncoder> encoder;
     id<MTLBuffer> argument_buffer;
+    unsigned int i, index = 0;
 
     argument_descriptors = [[[NSMutableArray alloc] init] autorelease];
 
@@ -355,8 +453,31 @@ static void encode_argument_buffer(struct metal_runner *runner,
         [argument_descriptors addObject:arg_desc];
     }
 
+    for (i = 0; i < runner->r.resource_count; ++i)
+    {
+        struct metal_resource *resource = metal_resource(runner->r.resources[i]);
+
+        switch (resource->r.desc.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                arg_desc = [MTLArgumentDescriptor argumentDescriptor];
+                arg_desc.dataType = MTLDataTypeTexture;
+                arg_desc.index = [argument_descriptors count];
+                arg_desc.access = MTLBindingAccessReadOnly;
+                arg_desc.textureType = [resource->texture textureType];
+                [argument_descriptors addObject:arg_desc];
+                break;
+
+            case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+            case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                break;
+        }
+    }
+
     if (![argument_descriptors count])
-        return;
+        return true;
 
     encoder = [[device newArgumentEncoderWithArguments:argument_descriptors] autorelease];
     argument_buffer = [[device newBufferWithLength:encoder.encodedLength
@@ -370,16 +491,44 @@ static void encode_argument_buffer(struct metal_runner *runner,
         cb = [[device newBufferWithBytes:runner->r.uniforms
                 length:runner->r.uniform_count * sizeof(*runner->r.uniforms)
                 options:DEFAULT_BUFFER_RESOURCE_OPTIONS | MTLResourceStorageModeManaged] autorelease];
-        [encoder setBuffer:cb offset:0 atIndex:0];
+        [encoder setBuffer:cb offset:0 atIndex:index++];
         [command_encoder useResource:cb
                 usage:MTLResourceUsageRead
                 stages:MTLRenderStageVertex | MTLRenderStageFragment];
+    }
+
+    for (i = 0; i < runner->r.resource_count; ++i)
+    {
+        struct metal_resource *resource = metal_resource(runner->r.resources[i]);
+
+        switch (resource->r.desc.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                [encoder setTexture:resource->texture atIndex:index++];
+                if (!resource->texture)
+                {
+                    trace("Unsupported buffer texture\n");
+                    return false;
+                }
+                [command_encoder useResource:resource->texture
+                        usage:MTLResourceUsageRead
+                        stages:MTLRenderStageVertex | MTLRenderStageFragment];
+                break;
+
+            case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+            case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                break;
+        }
     }
 
     [argument_buffer didModifyRange:NSMakeRange(0, encoder.encodedLength)];
 
     [command_encoder setVertexBuffer:argument_buffer offset:0 atIndex:0];
     [command_encoder setFragmentBuffer:argument_buffer offset:0 atIndex:0];
+
+    return true;
 }
 
 static bool metal_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
@@ -541,7 +690,12 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
         command_buffer = [runner->queue commandBuffer];
         encoder = [command_buffer renderCommandEncoderWithDescriptor:pass_desc];
 
-        encode_argument_buffer(runner, encoder);
+        if (!encode_argument_buffer(runner, encoder))
+        {
+            [encoder endEncoding];
+            ret = false;
+            goto done;
+        }
 
         if (runner->r.input_element_count > 32)
             fatal_error("Unsupported input element count %zu.\n", runner->r.input_element_count);
