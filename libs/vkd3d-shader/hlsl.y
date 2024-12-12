@@ -667,6 +667,7 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
             case HLSL_IR_RESOURCE_LOAD:
             case HLSL_IR_RESOURCE_STORE:
             case HLSL_IR_SWITCH:
+            case HLSL_IR_INTERLOCKED:
             case HLSL_IR_STATEBLOCK_CONSTANT:
                 hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "Expected literal expression.");
@@ -5374,6 +5375,109 @@ static bool intrinsic_GetRenderTargetSampleCount(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op op,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc, const char *name)
+{
+    struct hlsl_ir_node *lhs, *coords, *val, *orig_val = NULL;
+    struct hlsl_ir_node *interlocked, *void_ret;
+    struct hlsl_type *lhs_type, *val_type;
+    struct vkd3d_string_buffer *string;
+    struct hlsl_deref dst_deref;
+
+    if (hlsl_version_lt(ctx, 5, 0))
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "Interlocked functions can only be used in shader model 5.0 or higher.");
+
+    if (params->args_count != 2 && params->args_count != 3)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Unexpected number of arguments to function '%s': expected 2 or 3, but got %u.",
+                        name, params->args_count);
+        return false;
+    }
+
+    lhs = params->args[0];
+    lhs_type = lhs->data_type;
+
+    if (lhs_type->class != HLSL_CLASS_SCALAR || (lhs_type->e.numeric.type != HLSL_TYPE_UINT
+            && lhs_type->e.numeric.type != HLSL_TYPE_INT))
+    {
+        if ((string = hlsl_type_to_string(ctx, lhs_type)))
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Unexpected type for argument 0 of '%s': expected 'uint' or 'int', but got '%s'.",
+                    name, string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+        }
+        return false;
+    }
+
+    /* Interlocked*() functions always take uint for the value parameters,
+     * except for InterlockedMax()/InterlockedMin(). */
+    val_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT);
+    if (!(val = add_implicit_conversion(ctx, params->instrs, params->args[1], val_type, loc)))
+        return false;
+
+    if (params->args_count == 3)
+        orig_val = params->args[2];
+
+    /* TODO: groupshared variables */
+    if (lhs->type == HLSL_IR_INDEX && hlsl_index_chain_has_resource_access(hlsl_ir_index(lhs)))
+    {
+        if (!hlsl_index_is_resource_access(hlsl_ir_index(lhs)))
+        {
+            hlsl_fixme(ctx, &lhs->loc, "Non-direct structured resource interlocked targets.");
+            return false;
+        }
+
+        if (!hlsl_init_deref_from_index_chain(ctx, &dst_deref, hlsl_ir_index(lhs)->val.node))
+            return false;
+        coords = hlsl_ir_index(lhs)->idx.node;
+
+        VKD3D_ASSERT(coords->data_type->class == HLSL_CLASS_VECTOR);
+        VKD3D_ASSERT(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
+
+        if (hlsl_deref_get_type(ctx, &dst_deref)->class != HLSL_CLASS_UAV)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Interlocked targets must be UAV elements.");
+            return false;
+        }
+    }
+    else
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Interlocked targets must be UAV elements.");
+        return false;
+    }
+
+    interlocked = hlsl_new_interlocked(ctx, op, orig_val ? lhs_type : NULL, &dst_deref, coords, NULL, val, loc);
+    hlsl_cleanup_deref(&dst_deref);
+    if (!interlocked)
+        return false;
+    hlsl_block_add_instr(params->instrs, interlocked);
+
+    if (orig_val)
+    {
+        if (orig_val->data_type->modifiers & HLSL_MODIFIER_CONST)
+            hlsl_error(ctx, &orig_val->loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
+                    "Output argument to '%s' is const.", name);
+
+        if (!add_assignment(ctx, params->instrs, orig_val, ASSIGN_OP_ASSIGN, interlocked))
+            return false;
+    }
+
+    if (!(void_ret = hlsl_new_void_expr(ctx, loc)))
+        return false;
+    hlsl_block_add_instr(params->instrs, void_ret);
+
+    return true;
+}
+
+static bool intrinsic_InterlockedAdd(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_ADD, params, loc, "InterlockedAdd");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5387,6 +5491,7 @@ intrinsic_functions[] =
     /* Note: these entries should be kept in alphabetical order. */
     {"D3DCOLORtoUBYTE4",                    1, true,  intrinsic_d3dcolor_to_ubyte4},
     {"GetRenderTargetSampleCount",          0, true,  intrinsic_GetRenderTargetSampleCount},
+    {"InterlockedAdd",                     -1, true,  intrinsic_InterlockedAdd},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},
