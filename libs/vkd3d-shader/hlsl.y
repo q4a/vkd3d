@@ -5403,7 +5403,8 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
     {
         cmp_val = params->args[1];
         val = params->args[2];
-        orig_val = params->args[3];
+        if (params->args_count == 4)
+            orig_val = params->args[3];
     }
     else
     {
@@ -5502,6 +5503,12 @@ static bool intrinsic_InterlockedCompareExchange(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_CMP_EXCH, params, loc, "InterlockedCompareExchange");
 }
 
+static bool intrinsic_InterlockedCompareStore(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_CMP_EXCH, params, loc, "InterlockedCompareStore");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5518,6 +5525,7 @@ intrinsic_functions[] =
     {"InterlockedAdd",                     -1, true,  intrinsic_InterlockedAdd},
     {"InterlockedAnd",                     -1, true,  intrinsic_InterlockedAnd},
     {"InterlockedCompareExchange",          4, true,  intrinsic_InterlockedCompareExchange},
+    {"InterlockedCompareStore",             3, true,  intrinsic_InterlockedCompareStore},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},
