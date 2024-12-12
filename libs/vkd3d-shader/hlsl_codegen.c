@@ -10001,11 +10001,13 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
     static const enum vkd3d_shader_opcode opcodes[] =
     {
         [HLSL_INTERLOCKED_ADD] = VKD3DSIH_ATOMIC_IADD,
+        [HLSL_INTERLOCKED_AND] = VKD3DSIH_ATOMIC_AND,
     };
 
     static const enum vkd3d_shader_opcode imm_opcodes[] =
     {
         [HLSL_INTERLOCKED_ADD] = VKD3DSIH_IMM_ATOMIC_IADD,
+        [HLSL_INTERLOCKED_AND] = VKD3DSIH_IMM_ATOMIC_AND,
     };
 
     struct hlsl_ir_node *coords = interlocked->coords.node, *value = interlocked->value.node;

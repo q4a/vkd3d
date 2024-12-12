@@ -3507,6 +3507,7 @@ static void dump_ir_interlocked(struct vkd3d_string_buffer *buffer, const struct
     static const char *const op_names[] =
     {
         [HLSL_INTERLOCKED_ADD] = "add",
+        [HLSL_INTERLOCKED_AND] = "and",
     };
 
     VKD3D_ASSERT(interlocked->op < ARRAY_SIZE(op_names));

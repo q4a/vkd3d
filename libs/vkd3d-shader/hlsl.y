@@ -5478,6 +5478,12 @@ static bool intrinsic_InterlockedAdd(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_ADD, params, loc, "InterlockedAdd");
 }
 
+static bool intrinsic_InterlockedAnd(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_AND, params, loc, "InterlockedAnd");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5492,6 +5498,7 @@ intrinsic_functions[] =
     {"D3DCOLORtoUBYTE4",                    1, true,  intrinsic_d3dcolor_to_ubyte4},
     {"GetRenderTargetSampleCount",          0, true,  intrinsic_GetRenderTargetSampleCount},
     {"InterlockedAdd",                     -1, true,  intrinsic_InterlockedAdd},
+    {"InterlockedAnd",                     -1, true,  intrinsic_InterlockedAnd},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},

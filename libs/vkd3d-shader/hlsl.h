@@ -954,6 +954,7 @@ struct hlsl_ir_stateblock_constant
 enum hlsl_interlocked_op
 {
     HLSL_INTERLOCKED_ADD,
+    HLSL_INTERLOCKED_AND,
 };
 
 /* Represents an interlocked operation.
