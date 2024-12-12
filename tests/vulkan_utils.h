@@ -49,6 +49,8 @@ struct vulkan_test_context
 #include "vulkan_procs.h"
 };
 
+#undef DECLARE_VK_PFN
+
 #define VK_CALL(f) (context->f)
 
 static inline void begin_command_buffer(const struct vulkan_test_context *context)
@@ -265,7 +267,7 @@ static inline bool vulkan_test_context_init_instance(struct vulkan_test_context 
 {
     VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     struct vulkan_extension_list enabled_extensions;
-    DECLARE_VK_PFN(vkGetInstanceProcAddr)
+    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
     void *libvulkan;
     uint32_t count;
     VkResult vr;
@@ -415,6 +417,46 @@ static inline void vulkan_test_context_destroy(const struct vulkan_test_context 
     if (context->device)
         vulkan_test_context_destroy_device(context);
     VK_CALL(vkDestroyInstance(context->instance, NULL));
+}
+
+/* This doesn't work for NVIDIA, because they use a different bit pattern. */
+static inline bool is_vulkan_driver_version_ge(const VkPhysicalDeviceProperties *device_properties,
+        const VkPhysicalDeviceDriverPropertiesKHR *driver_properties,
+        uint32_t major, uint32_t minor, uint32_t patch)
+{
+    uint32_t version = device_properties->driverVersion;
+
+    if (version == 1)
+    {
+        uint32_t driver_major, driver_minor, driver_patch;
+
+        /* llvmpipe doesn't provide a valid driverVersion value, so we resort to
+         * parsing the driverInfo string. */
+        if (sscanf(driver_properties->driverInfo, "Mesa %u.%u.%u",
+                &driver_major, &driver_minor, &driver_patch) == 3)
+            version = VK_MAKE_API_VERSION(0, driver_major, driver_minor, driver_patch);
+    }
+
+    return version >= VK_MAKE_API_VERSION(0, major, minor, patch);
+}
+
+static inline bool is_mesa_vulkan_driver(const VkPhysicalDeviceDriverPropertiesKHR *properties)
+{
+    switch (properties->driverID)
+    {
+        case VK_DRIVER_ID_MESA_RADV_KHR:
+        case VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA:
+        case VK_DRIVER_ID_MESA_LLVMPIPE:
+        case VK_DRIVER_ID_MESA_TURNIP:
+        case VK_DRIVER_ID_MESA_V3DV:
+        case VK_DRIVER_ID_MESA_PANVK:
+        case VK_DRIVER_ID_MESA_VENUS:
+        case VK_DRIVER_ID_MESA_DOZEN:
+            return true;
+
+        default:
+            return false;
+    }
 }
 
 #endif /* __VKD3D_VULKAN_UTILS_H */

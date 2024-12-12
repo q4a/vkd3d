@@ -480,6 +480,11 @@ static inline bool is_mesa_device(ID3D12Device *device)
     return false;
 }
 
+static inline bool is_mesa_device_lt(ID3D12Device *device, uint32_t major, uint32_t minor, uint32_t patch)
+{
+    return false;
+}
+
 static inline bool is_mesa_intel_device(ID3D12Device *device)
 {
     return false;
@@ -531,10 +536,12 @@ static inline bool is_depth_clip_enable_supported(ID3D12Device *device)
 
 #define VKD3D_AGILITY_SDK_EXPORTS
 
+#include "vulkan_utils.h"
 #define DECLARE_VK_PFN(name) static PFN_##name name;
 DECLARE_VK_PFN(vkGetInstanceProcAddr)
 #define VK_INSTANCE_PFN   DECLARE_VK_PFN
 #include "vulkan_procs.h"
+#undef DECLARE_VK_PFN
 
 static bool check_device_extension(VkPhysicalDevice vk_physical_device, const char *name)
 {
@@ -750,9 +757,17 @@ static inline bool is_mesa_device(ID3D12Device *device)
     VkPhysicalDeviceDriverPropertiesKHR properties;
 
     get_driver_properties(device, NULL, &properties);
-    return properties.driverID == VK_DRIVER_ID_MESA_RADV_KHR
-            || properties.driverID == VK_DRIVER_ID_MESA_LLVMPIPE
-            || properties.driverID == VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA_KHR;
+    return is_mesa_vulkan_driver(&properties);
+}
+
+static inline bool is_mesa_device_lt(ID3D12Device *device, uint32_t major, uint32_t minor, uint32_t patch)
+{
+    VkPhysicalDeviceDriverPropertiesKHR driver_properties;
+    VkPhysicalDeviceProperties device_properties;
+
+    get_driver_properties(device, &device_properties, &driver_properties);
+    return is_mesa_vulkan_driver(&driver_properties)
+            && !is_vulkan_driver_version_ge(&device_properties, &driver_properties, major, minor, patch);
 }
 
 static inline bool is_mesa_intel_device(ID3D12Device *device)
@@ -778,24 +793,8 @@ static inline bool is_llvmpipe_device_gte(ID3D12Device *device,
     VkPhysicalDeviceProperties device_properties;
 
     get_driver_properties(device, &device_properties, &driver_properties);
-    if (driver_properties.driverID != VK_DRIVER_ID_MESA_LLVMPIPE)
-        return false;
-
-    if (device_properties.driverVersion == 1)
-    {
-        uint32_t driver_major, driver_minor, driver_patch;
-
-        /* llvmpipe doesn't provide a valid driverVersion value, so we resort to parsing the
-         * driverInfo string. */
-        if (sscanf(driver_properties.driverInfo, "Mesa %u.%u.%u",
-                &driver_major, &driver_minor, &driver_patch) == 3)
-        {
-            device_properties.driverVersion = VK_MAKE_API_VERSION(0,
-                    driver_major, driver_minor, driver_patch);
-        }
-    }
-
-    return device_properties.driverVersion >= VK_MAKE_API_VERSION(0, major, minor, patch);
+    return driver_properties.driverID == VK_DRIVER_ID_MESA_LLVMPIPE
+            && is_vulkan_driver_version_ge(&device_properties, &driver_properties, major, minor, patch);
 }
 
 static inline bool is_nvidia_device(ID3D12Device *device)
