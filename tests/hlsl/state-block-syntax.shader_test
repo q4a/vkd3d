@@ -237,7 +237,7 @@ float4 main() : sv_target { return 0; }
 
 
 % The number of state blocks in the state block list must match the number of components.
-[pixel shader fail(sm<6)]
+[pixel shader fail(sm<5.1) todo(sm>=5.1)]
 sampler sams[2]
 {
     {
@@ -246,7 +246,7 @@ sampler sams[2]
 
 float4 main() : sv_target { return 0; }
 
-[pixel shader fail(sm<6)]
+[pixel shader fail(sm<6) todo(sm>=5.1)]
 sampler sams[2][2]
 {
     {

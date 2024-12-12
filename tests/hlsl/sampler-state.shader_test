@@ -2,7 +2,7 @@
 options: backcompat
 
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler2D sam = sampler_state
 {
     texture = NULL;
@@ -54,7 +54,7 @@ float4 main(): sv_target
 }
 
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler sam[2] =
 {
     sampler_state
@@ -106,7 +106,7 @@ float4 main(): sv_target
 }
 
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler sam = sampler_state
 {
     texture = NULL;
@@ -121,7 +121,7 @@ float4 main(): sv_target
 }
 
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler sam = sampler_state
 {
     foo = BAR;
@@ -135,7 +135,7 @@ float4 main(): sv_target
 }
 
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 // default value initializers make it more permissive but if types don't match
 // then the whole initializer is discarded.
 float4 f = {
@@ -208,7 +208,7 @@ float4 main(): sv_target
 shader model >= 5.0
 options: backcompat
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 // Default values and sample_state work.
 // Requires sm5.
 

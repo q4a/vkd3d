@@ -797,7 +797,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 cbuffer buffer
 {
     float4 foo : packoffset(c0);

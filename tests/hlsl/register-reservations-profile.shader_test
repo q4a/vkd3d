@@ -154,7 +154,7 @@ probe (0, 0) rgba (2, 2, 2, 99)
 % reservation is given, but if two different reservations are given it instead
 % just picks the last one, without regard to version.
 
-[pixel shader todo]
+[pixel shader fail(sm>=5.0 & sm<5.1) todo]
 Texture2D tex1 : register(ps, t1) : register(ps_5_0, t2);
 
 float4 main() : sv_target
@@ -168,7 +168,7 @@ if(sm>=6) probe (0,0) rgba (2, 2, 2, 99)
 if(sm<6)  probe (0,0) rgba (1, 1, 1, 99)
 
 
-[pixel shader fail(sm<6) todo]
+[pixel shader fail(sm<4.1) todo]
 Texture2D tex1 : register(ps, t1) : register(ps_4_0, t2);
 
 float4 main() : sv_target
@@ -181,7 +181,7 @@ draw quad
 probe (0, 0) rgba (2, 2, 2, 99)
 
 
-[pixel shader fail(sm<6) todo]
+[pixel shader fail(sm<4.1) todo]
 Texture2D tex1 : register(ps_4_0, t1) : register(ps, t2);
 
 float4 main() : sv_target
@@ -207,7 +207,7 @@ draw quad
 probe (0, 0) rgba (2, 2, 2, 99)
 
 
-[pixel shader fail todo]
+[pixel shader fail(sm<4.1 | sm>=6) todo]
 Texture2D tex1 : register(ps_4_0, t1) : register(t2);
 
 float4 main() : sv_target

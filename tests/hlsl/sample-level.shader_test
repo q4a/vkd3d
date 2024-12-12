@@ -39,7 +39,7 @@ probe (0, 0) rgba (0.0, 0.0, 1.0, 0.0)
 shader model >= 3.0
 options: backcompat
 
-[pixel shader todo(sm<4) fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm<4 | sm>=5.1)]
 sampler s;
 float level;
 

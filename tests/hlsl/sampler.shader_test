@@ -53,7 +53,7 @@ float4 main() : sv_target
 [require]
 options: backcompat
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 samplerCUBE s;
 
 float4 main() : sv_target
@@ -61,7 +61,7 @@ float4 main() : sv_target
     return texCUBE(s, float3(0.0, 0.0, 0.0));
 }
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler1D s;
 
 float4 main() : sv_target
@@ -119,7 +119,7 @@ size (2d, 1, 1)
 5.0 5.0 5.0 1.0
 
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler samA;
 sampler samB[2];
 sampler samC[3];

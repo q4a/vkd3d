@@ -99,7 +99,7 @@ shader model >= 4.0
 
 
 % Register reservation with incorrect register type.
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler2D unused : register(t0);
 Texture2D tex;
 

@@ -123,7 +123,10 @@ todo draw quad
 todo probe (0,0) rgba (416.0, 416.0, 416.0, 111.0)
 
 
-[pixel shader todo fail(sm>=6)]
+% Fails in sm6 because it uses a uniform parameter.
+% Fails in sm5.1 apparently because of a compiler bug:
+%   error X4609: Overflow of resource binding range
+[pixel shader fail(sm>=5.1) todo]
 Texture2D tex;
 
 struct apple
@@ -167,7 +170,11 @@ filter point point point
 address clamp clamp clamp
 
 
-[pixel shader todo fail(sm>=6)]
+% Fails in sm6 because it uses a uniform parameter.
+% Fails in sm5.1 apparently because of a compiler bug (different from the above!):
+%   error X8000: D3D11 Internal Compiler Error: Invalid Bytecode: Sampler s3 already declared.  Opcode #5 (count is 1-based).
+%   error X8000: D3D11 Internal Compiler Error: Invalid Bytecode: Can't continue validation - aborting.
+[pixel shader fail(sm>=5.1) todo]
 Texture2D tex;
 sampler sam0; // must reserve s3
 

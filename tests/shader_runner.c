@@ -1679,6 +1679,13 @@ static void compile_shader(struct shader_runner *runner, const char *source,
         [SHADER_MODEL_5_0] = "5_0",
     };
 
+    /* We can let this go through D3DCompile() with the invalid shader model
+     * string, but it returns a unique error code. Just skip it. */
+    if (model < SHADER_MODEL_4_0 && type != SHADER_TYPE_VS && type != SHADER_TYPE_PS && type != SHADER_TYPE_FX)
+        return;
+    if (model < SHADER_MODEL_5_0 && (type == SHADER_TYPE_HS || type == SHADER_TYPE_DS))
+        return;
+
     if (use_dxcompiler)
     {
         assert(runner->dxc_compiler);
@@ -2011,17 +2018,34 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                          * formats, often with different HLSL semantics, so
                          * where possible try to test one version from each set. */
 
+                        static const uint32_t sm1_mask = (1u << SHADER_MODEL_4_0) - 1;
+                        static const uint32_t sm4_mask = ((1u << SHADER_MODEL_6_0) - 1) & ~sm1_mask;
+
                         uint32_t model_mask = 0;
 
-                        if (runner->minimum_shader_model <= SHADER_MODEL_3_0)
+                        if (runner->hlsl_hrs[runner->minimum_shader_model] == S_OK)
                             bitmap_set(&model_mask, runner->minimum_shader_model);
-                        if (runner->minimum_shader_model <= SHADER_MODEL_5_1
+                        for (unsigned int j = SHADER_MODEL_MIN + 1; j <= SHADER_MODEL_MAX; ++j)
+                        {
+                            if (runner->hlsl_hrs[j - 1] != runner->hlsl_hrs[j])
+                            {
+                                /* Behaviour changes here; test both versions. */
+                                bitmap_set(&model_mask, j - 1);
+                                bitmap_set(&model_mask, j);
+                            }
+                        }
+
+                        if (!(model_mask & sm1_mask) && runner->minimum_shader_model <= SHADER_MODEL_3_0)
+                            bitmap_set(&model_mask, runner->minimum_shader_model);
+                        if (!(model_mask & sm4_mask)
+                                && runner->minimum_shader_model <= SHADER_MODEL_5_1
                                 && runner->maximum_shader_model >= SHADER_MODEL_4_0)
                             bitmap_set(&model_mask, max(runner->minimum_shader_model, SHADER_MODEL_4_0));
                         if (runner->maximum_shader_model >= SHADER_MODEL_6_0)
                             bitmap_set(&model_mask, max(runner->minimum_shader_model, SHADER_MODEL_6_0));
 
-                        for (enum shader_model model = SHADER_MODEL_MIN; model <= SHADER_MODEL_MAX; ++model)
+                        for (enum shader_model model = runner->minimum_shader_model;
+                                model <= runner->maximum_shader_model; ++model)
                         {
                             if (!bitmap_is_set(&model_mask, model))
                                 continue;
