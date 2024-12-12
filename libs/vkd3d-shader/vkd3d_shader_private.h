@@ -262,6 +262,7 @@ enum vkd3d_shader_error
 
     VKD3D_SHADER_ERROR_MSL_INTERNAL                     = 10000,
     VKD3D_SHADER_ERROR_MSL_BINDING_NOT_FOUND            = 10001,
+    VKD3D_SHADER_ERROR_MSL_UNSUPPORTED                  = 10002,
 
     VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED               = 11000,
     VKD3D_SHADER_ERROR_FX_INVALID_VERSION               = 11001,
