@@ -8076,9 +8076,7 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
             break;
 
         case VKD3DSPR_PATCHCONST:
-            if (ctx->program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                        "PATCHCONST register used as destination parameters are only allowed in Hull Shaders.");
+            vsir_validate_io_dst_param(ctx, dst);
             break;
 
         default:
