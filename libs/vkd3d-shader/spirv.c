@@ -7301,7 +7301,6 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VKD3DSIH_DDIV,       SpvOpFDiv},
         {VKD3DSIH_DIV,        SpvOpFDiv},
         {VKD3DSIH_DMUL,       SpvOpFMul},
-        {VKD3DSIH_DTOF,       SpvOpFConvert},
         {VKD3DSIH_DTOI,       SpvOpConvertFToS},
         {VKD3DSIH_DTOU,       SpvOpConvertFToU},
         {VKD3DSIH_FREM,       SpvOpFRem},
@@ -8025,6 +8024,29 @@ static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
 
     val_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpConvertFToU, dst_type_id, val_id);
     val_id = vkd3d_spirv_build_op_select(builder, dst_type_id, condition_id, uint_max_id, val_id);
+
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
+}
+
+static void spirv_compiler_emit_dtof(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t type_id, val_id, src_id;
+    unsigned int component_count;
+    uint32_t write_mask;
+
+    component_count = vsir_write_mask_component_count(dst->write_mask);
+    write_mask = vkd3d_write_mask_from_component_count(component_count);
+
+    src_id = spirv_compiler_emit_load_src(compiler, src, write_mask);
+
+    type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, component_count);
+    val_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpFConvert, type_id, src_id);
+    if (instruction->flags & VKD3DSI_PRECISE_XYZW)
+        vkd3d_spirv_build_op_decorate(builder, val_id, SpvDecorationNoContraction, NULL, 0);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
@@ -10419,7 +10441,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DDIV:
         case VKD3DSIH_DIV:
         case VKD3DSIH_DMUL:
-        case VKD3DSIH_DTOF:
         case VKD3DSIH_FREM:
         case VKD3DSIH_FTOD:
         case VKD3DSIH_IADD:
@@ -10506,6 +10527,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DTOU:
         case VKD3DSIH_FTOU:
             spirv_compiler_emit_ftou(compiler, instruction);
+            break;
+        case VKD3DSIH_DTOF:
+            spirv_compiler_emit_dtof(compiler, instruction);
             break;
         case VKD3DSIH_DEQO:
         case VKD3DSIH_DGEO:
