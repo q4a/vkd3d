@@ -5542,6 +5542,12 @@ static bool intrinsic_InterlockedMin(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_MIN, params, loc, "InterlockedMin");
 }
 
+static bool intrinsic_InterlockedOr(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_OR, params, loc, "InterlockedOr");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5562,6 +5568,7 @@ intrinsic_functions[] =
     {"InterlockedExchange",                 3, true,  intrinsic_InterlockedExchange},
     {"InterlockedMax",                     -1, true,  intrinsic_InterlockedMax},
     {"InterlockedMin",                     -1, true,  intrinsic_InterlockedMin},
+    {"InterlockedOr",                      -1, true,  intrinsic_InterlockedOr},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},

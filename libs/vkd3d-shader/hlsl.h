@@ -959,6 +959,7 @@ enum hlsl_interlocked_op
     HLSL_INTERLOCKED_EXCH,
     HLSL_INTERLOCKED_MAX,
     HLSL_INTERLOCKED_MIN,
+    HLSL_INTERLOCKED_OR,
 };
 
 /* Represents an interlocked operation.
