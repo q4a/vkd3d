@@ -8186,6 +8186,10 @@ static void vsir_validate_src_param(struct validation_context *ctx,
                     "Invalid NULL register used as source parameter.");
             break;
 
+        case VKD3DSPR_INPUT:
+            vsir_validate_io_src_param(ctx, src);
+            break;
+
         case VKD3DSPR_OUTPUT:
             vsir_validate_io_src_param(ctx, src);
             break;
