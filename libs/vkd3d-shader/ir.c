@@ -8191,10 +8191,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
             break;
 
         case VKD3DSPR_PATCHCONST:
-            if (ctx->program->shader_version.type != VKD3D_SHADER_TYPE_DOMAIN
-                    && ctx->program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                        "PATCHCONST register used as source parameters are only allowed in Hull and Domain Shaders.");
+            vsir_validate_io_src_param(ctx, src);
             break;
 
         default:
