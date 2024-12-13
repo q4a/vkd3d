@@ -8141,6 +8141,16 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
     }
 }
 
+static void vsir_validate_io_src_param(struct validation_context *ctx,
+        const struct vkd3d_shader_src_param *src)
+{
+    struct vsir_io_register_data io_reg_data;
+
+    if (!vsir_get_io_register_data(ctx, src->reg.type, &io_reg_data) || !(io_reg_data.flags & INPUT_BIT))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                "Invalid register type %#x used as source parameter.", src->reg.type);
+}
+
 static void vsir_validate_src_param(struct validation_context *ctx,
         const struct vkd3d_shader_src_param *src)
 {
@@ -8177,10 +8187,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
             break;
 
         case VKD3DSPR_OUTPUT:
-            if (ctx->program->shader_version.type != VKD3D_SHADER_TYPE_HULL
-                    || (ctx->phase != VKD3DSIH_HS_FORK_PHASE && ctx->phase != VKD3DSIH_HS_JOIN_PHASE))
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
-                        "Invalid OUTPUT register used as source parameter.");
+            vsir_validate_io_src_param(ctx, src);
             break;
 
         case VKD3DSPR_PATCHCONST:
