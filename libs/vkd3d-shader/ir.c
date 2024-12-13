@@ -8079,6 +8079,10 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
             vsir_validate_io_dst_param(ctx, dst);
             break;
 
+        case VKD3DSPR_INCONTROLPOINT:
+            vsir_validate_io_dst_param(ctx, dst);
+            break;
+
         case VKD3DSPR_PATCHCONST:
             vsir_validate_io_dst_param(ctx, dst);
             break;
