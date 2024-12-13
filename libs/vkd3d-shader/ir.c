@@ -7206,64 +7206,210 @@ static void vsir_validate_register_without_indices(struct validation_context *ct
                 reg->idx_count, reg->type);
 }
 
-static const struct shader_signature *vsir_signature_from_register_type(struct validation_context *ctx,
-        enum vkd3d_shader_register_type register_type, bool *has_control_point, unsigned int *control_point_count)
+enum vsir_signature_type
 {
-    *has_control_point = false;
-    *control_point_count = 0;
+    SIGNATURE_TYPE_INPUT,
+    SIGNATURE_TYPE_OUTPUT,
+    SIGNATURE_TYPE_PATCH_CONSTANT,
+};
+
+enum vsir_io_reg_type
+{
+    REG_V,
+    REG_O,
+    REG_VPC,
+    REG_VICP,
+    REG_VOCP,
+    REG_COUNT,
+};
+
+enum vsir_phase
+{
+    PHASE_NONE,
+    PHASE_CONTROL_POINT,
+    PHASE_FORK,
+    PHASE_JOIN,
+    PHASE_COUNT,
+};
+
+struct vsir_io_register_data
+{
+    unsigned int flags;
+    enum vsir_signature_type signature_type;
+    const struct shader_signature *signature;
+    unsigned int control_point_count;
+};
+
+enum
+{
+    ACCESS_BIT = (1u << 0),
+    CONTROL_POINT_BIT = (1u << 1),
+};
+
+static const struct vsir_io_register_data vsir_sm4_io_register_data
+        [VKD3D_SHADER_TYPE_GRAPHICS_COUNT][PHASE_COUNT][REG_COUNT] =
+{
+    [VKD3D_SHADER_TYPE_PIXEL][PHASE_NONE] =
+    {
+        [REG_V] = {ACCESS_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_VERTEX][PHASE_NONE] =
+    {
+        [REG_V] = {ACCESS_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_GEOMETRY][PHASE_NONE] =
+    {
+        [REG_V] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_HULL][PHASE_CONTROL_POINT] =
+    {
+        [REG_V] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_HULL][PHASE_FORK] =
+    {
+        [REG_VICP] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_VOCP] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_OUTPUT},
+        /* According to MSDN, vpc is not allowed in fork phases. However we
+         * don't really distinguish between fork and join phases, so we
+         * allow it. */
+        [REG_VPC] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+    },
+    [VKD3D_SHADER_TYPE_HULL][PHASE_JOIN] =
+    {
+        [REG_VICP] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_VOCP] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_OUTPUT},
+        [REG_VPC] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+    },
+    [VKD3D_SHADER_TYPE_DOMAIN][PHASE_NONE] =
+    {
+        [REG_VICP] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_VPC] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+};
+
+static const struct vsir_io_register_data vsir_sm6_io_register_data
+        [VKD3D_SHADER_TYPE_GRAPHICS_COUNT][PHASE_COUNT][REG_COUNT] =
+{
+    [VKD3D_SHADER_TYPE_PIXEL][PHASE_NONE] =
+    {
+        [REG_V] = {ACCESS_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_VERTEX][PHASE_NONE] =
+    {
+        [REG_V] = {ACCESS_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_GEOMETRY][PHASE_NONE] =
+    {
+        [REG_V] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_HULL][PHASE_CONTROL_POINT] =
+    {
+        [REG_V] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+    [VKD3D_SHADER_TYPE_HULL][PHASE_FORK] =
+    {
+        [REG_V] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_OUTPUT},
+        [REG_VPC] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+    },
+    [VKD3D_SHADER_TYPE_HULL][PHASE_JOIN] =
+    {
+        [REG_V] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_O] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_OUTPUT},
+        [REG_VPC] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+    },
+    [VKD3D_SHADER_TYPE_DOMAIN][PHASE_NONE] =
+    {
+        [REG_V] = {ACCESS_BIT | CONTROL_POINT_BIT, SIGNATURE_TYPE_INPUT},
+        [REG_VPC] = {ACCESS_BIT, SIGNATURE_TYPE_PATCH_CONSTANT},
+        [REG_O] = {ACCESS_BIT, SIGNATURE_TYPE_OUTPUT},
+    },
+};
+
+static const bool vsir_get_io_register_data(struct validation_context *ctx,
+        enum vkd3d_shader_register_type register_type, struct vsir_io_register_data *data)
+{
+    const struct vsir_io_register_data (*signature_register_data)
+            [VKD3D_SHADER_TYPE_GRAPHICS_COUNT][PHASE_COUNT][REG_COUNT];
+    enum vsir_io_reg_type io_reg_type;
+    enum vsir_phase phase;
+
+    if (ctx->program->shader_version.type >= ARRAY_SIZE(*signature_register_data))
+        return NULL;
+
+    if (ctx->program->normalisation_level >= VSIR_NORMALISED_SM6)
+        signature_register_data = &vsir_sm6_io_register_data;
+    else
+        signature_register_data = &vsir_sm4_io_register_data;
 
     switch (register_type)
     {
-        case VKD3DSPR_INPUT:
-            switch (ctx->program->shader_version.type)
-            {
-                case VKD3D_SHADER_TYPE_GEOMETRY:
-                case VKD3D_SHADER_TYPE_HULL:
-                case VKD3D_SHADER_TYPE_DOMAIN:
-                    *has_control_point = true;
-                    *control_point_count = ctx->program->input_control_point_count;
-                    break;
-
-                default:
-                    break;
-            }
-            return &ctx->program->input_signature;
-
-        case VKD3DSPR_OUTPUT:
-            switch (ctx->program->shader_version.type)
-            {
-                case VKD3D_SHADER_TYPE_HULL:
-                    if (ctx->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE
-                            || ctx->program->normalisation_level >= VSIR_NORMALISED_SM6)
-                    {
-                        *has_control_point = ctx->program->normalisation_level >= VSIR_NORMALISED_HULL_CONTROL_POINT_IO;
-                        *control_point_count = ctx->program->output_control_point_count;
-                        return &ctx->program->output_signature;
-                    }
-                    else
-                    {
-                        return &ctx->program->patch_constant_signature;
-                    }
-
-                default:
-                    return &ctx->program->output_signature;
-            }
-
-        case VKD3DSPR_INCONTROLPOINT:
-            *has_control_point = true;
-            *control_point_count = ctx->program->input_control_point_count;
-            return &ctx->program->input_signature;
-
-        case VKD3DSPR_OUTCONTROLPOINT:
-            *has_control_point = true;
-            *control_point_count = ctx->program->output_control_point_count;
-            return &ctx->program->output_signature;
-
-        case VKD3DSPR_PATCHCONST:
-            return &ctx->program->patch_constant_signature;
+        case VKD3DSPR_INPUT:           io_reg_type = REG_V; break;
+        case VKD3DSPR_OUTPUT:          io_reg_type = REG_O; break;
+        case VKD3DSPR_INCONTROLPOINT:  io_reg_type = REG_VICP; break;
+        case VKD3DSPR_OUTCONTROLPOINT: io_reg_type = REG_VOCP; break;
+        case VKD3DSPR_PATCHCONST:      io_reg_type = REG_VPC; break;
 
         default:
             return NULL;
+    }
+
+    switch (ctx->phase)
+    {
+        case VKD3DSIH_HS_CONTROL_POINT_PHASE: phase = PHASE_CONTROL_POINT; break;
+        case VKD3DSIH_HS_FORK_PHASE:          phase = PHASE_FORK; break;
+        case VKD3DSIH_HS_JOIN_PHASE:          phase = PHASE_JOIN; break;
+        case VKD3DSIH_INVALID:                phase = PHASE_NONE; break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    *data = (*signature_register_data)[ctx->program->shader_version.type][phase][io_reg_type];
+
+    if (!(data->flags & ACCESS_BIT))
+        return false;
+
+    /* VSIR_NORMALISED_HULL_CONTROL_POINT_IO differs from VSIR_NORMALISED_SM4
+     * for just a single flag. So we don't keep a whole copy of it, but just
+     * patch SM4 when needed. */
+    if (ctx->program->normalisation_level == VSIR_NORMALISED_HULL_CONTROL_POINT_IO
+            && ctx->program->shader_version.type == VKD3D_SHADER_TYPE_HULL
+            && phase == PHASE_CONTROL_POINT && io_reg_type == REG_O)
+    {
+        VKD3D_ASSERT(!(data->flags & CONTROL_POINT_BIT));
+        data->flags |= CONTROL_POINT_BIT;
+    }
+
+    switch (data->signature_type)
+    {
+        case SIGNATURE_TYPE_INPUT:
+            data->signature = &ctx->program->input_signature;
+            data->control_point_count = ctx->program->input_control_point_count;
+            return true;
+
+        case SIGNATURE_TYPE_OUTPUT:
+            data->signature = &ctx->program->output_signature;
+            data->control_point_count = ctx->program->output_control_point_count;
+            return true;
+
+        case SIGNATURE_TYPE_PATCH_CONSTANT:
+            data->signature = &ctx->program->patch_constant_signature;
+            return true;
+
+        default:
+            vkd3d_unreachable();
     }
 }
 
@@ -7271,10 +7417,19 @@ static void vsir_validate_io_register(struct validation_context *ctx, const stru
 {
     unsigned int control_point_index, control_point_count;
     const struct shader_signature *signature;
+    struct vsir_io_register_data io_reg_data;
     bool has_control_point;
 
-    signature = vsir_signature_from_register_type(ctx, reg->type, &has_control_point, &control_point_count);
-    VKD3D_ASSERT(signature);
+    if (!vsir_get_io_register_data(ctx, reg->type, &io_reg_data))
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                "Invalid usage of register type %#x.", reg->type);
+        return;
+    }
+
+    signature = io_reg_data.signature;
+    has_control_point = io_reg_data.flags & CONTROL_POINT_BIT;
+    control_point_count = io_reg_data.control_point_count;
 
     if (ctx->program->normalisation_level < VSIR_NORMALISED_SM6)
     {
@@ -8017,13 +8172,6 @@ static bool vsir_validate_src_max_count(struct validation_context *ctx,
     return true;
 }
 
-enum vsir_signature_type
-{
-    SIGNATURE_TYPE_INPUT,
-    SIGNATURE_TYPE_OUTPUT,
-    SIGNATURE_TYPE_PATCH_CONSTANT,
-};
-
 static const char * const signature_type_names[] =
 {
     [SIGNATURE_TYPE_INPUT] = "input",
@@ -8557,6 +8705,7 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
     const struct vkd3d_shader_index_range *range = &instruction->declaration.index_range;
     enum vkd3d_shader_sysval_semantic sysval = ~0u;
     const struct shader_signature *signature;
+    struct vsir_io_register_data io_reg_data;
     bool has_control_point;
 
     if (ctx->program->normalisation_level >= VSIR_NORMALISED_SM6)
@@ -8574,14 +8723,17 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT,
                 "Invalid shift %u on a DCL_INDEX_RANGE destination parameter.", range->dst.shift);
 
-    signature = vsir_signature_from_register_type(ctx, range->dst.reg.type, &has_control_point, &control_point_count);
-    if (!signature)
+    if (!vsir_get_io_register_data(ctx, range->dst.reg.type, &io_reg_data))
     {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
                 "Invalid register type %#x in DCL_INDEX_RANGE instruction.",
                 range->dst.reg.type);
         return;
     }
+
+    signature = io_reg_data.signature;
+    has_control_point = io_reg_data.flags & CONTROL_POINT_BIT;
+    control_point_count = io_reg_data.control_point_count;
 
     if (range->dst.reg.idx_count != 1 + !!has_control_point)
     {
