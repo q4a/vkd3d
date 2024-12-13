@@ -8194,6 +8194,10 @@ static void vsir_validate_src_param(struct validation_context *ctx,
             vsir_validate_io_src_param(ctx, src);
             break;
 
+        case VKD3DSPR_INCONTROLPOINT:
+            vsir_validate_io_src_param(ctx, src);
+            break;
+
         case VKD3DSPR_PATCHCONST:
             vsir_validate_io_src_param(ctx, src);
             break;
