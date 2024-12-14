@@ -6124,6 +6124,87 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     return true;
 }
 
+static bool add_gather_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    struct hlsl_resource_load_params load_params = {0};
+    unsigned int sampler_dim, offset_dim;
+    const struct hlsl_type *sampler_type;
+    struct hlsl_ir_node *load;
+
+    sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+
+    if (!strcmp(name, "GatherCmpGreen"))
+        load_params.type = HLSL_RESOURCE_GATHER_CMP_GREEN;
+    else if (!strcmp(name, "GatherCmpBlue"))
+        load_params.type = HLSL_RESOURCE_GATHER_CMP_BLUE;
+    else if (!strcmp(name, "GatherCmpAlpha"))
+        load_params.type = HLSL_RESOURCE_GATHER_CMP_ALPHA;
+    else
+        load_params.type = HLSL_RESOURCE_GATHER_CMP_RED;
+
+    if (!strcmp(name, "GatherCmp") || !offset_dim)
+    {
+        if (params->args_count < 3 || params->args_count > 4 + !!offset_dim)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Wrong number of arguments to method '%s': expected from 3 to %u, but got %u.",
+                    name, 4 + !!offset_dim, params->args_count);
+            return false;
+        }
+    }
+    else if (params->args_count < 3 || params->args_count == 6 || params->args_count > 8)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method '%s': expected 3, 4, 5, 7, or 8, but got %u.",
+                name, params->args_count);
+        return false;
+    }
+
+    if (params->args_count == 5 || params->args_count == 8)
+    {
+        hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+    }
+    else if (offset_dim && params->args_count > 3)
+    {
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[3],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
+            return false;
+    }
+
+    sampler_type = params->args[0]->data_type;
+    if (sampler_type->class != HLSL_CLASS_SAMPLER || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_COMPARISON)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, sampler_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong type for argument 0 of %s(): expected 'SamplerComparisonState', but got '%s'.",
+                    name, string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
+
+    if (!(load_params.coords = add_implicit_conversion(ctx, block, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
+        return false;
+
+    if (!(load_params.cmp = add_implicit_conversion(ctx, block, params->args[2],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
+        return false;
+
+    load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource.format->e.numeric.type, 4);
+    load_params.resource = object;
+    load_params.sampler = params->args[0];
+
+    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    hlsl_block_add_instr(block, load);
+    return true;
+}
+
 static bool add_assignment_from_component(struct hlsl_ctx *ctx, struct hlsl_block *instrs, struct hlsl_ir_node *dest,
         struct hlsl_ir_node *src, unsigned int component, const struct vkd3d_shader_location *loc)
 {
@@ -6491,6 +6572,11 @@ texture_methods[] =
     { "Gather",             add_gather_method_call,        "00010101001000" },
     { "GatherAlpha",        add_gather_method_call,        "00010101001000" },
     { "GatherBlue",         add_gather_method_call,        "00010101001000" },
+    { "GatherCmp",          add_gather_cmp_method_call,    "00010101001000" },
+    { "GatherCmpAlpha",     add_gather_cmp_method_call,    "00010101001000" },
+    { "GatherCmpBlue",      add_gather_cmp_method_call,    "00010101001000" },
+    { "GatherCmpGreen",     add_gather_cmp_method_call,    "00010101001000" },
+    { "GatherCmpRed",       add_gather_cmp_method_call,    "00010101001000" },
     { "GatherGreen",        add_gather_method_call,        "00010101001000" },
     { "GatherRed",          add_gather_method_call,        "00010101001000" },
 

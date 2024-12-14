@@ -4758,6 +4758,8 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_FTOU:
         case VKD3DSIH_GATHER4:
         case VKD3DSIH_GATHER4_PO:
+        case VKD3DSIH_GATHER4_C:
+        case VKD3DSIH_GATHER4_PO_C:
         case VKD3DSIH_GEO:
         case VKD3DSIH_HS_CONTROL_POINT_PHASE:
         case VKD3DSIH_HS_FORK_PHASE:

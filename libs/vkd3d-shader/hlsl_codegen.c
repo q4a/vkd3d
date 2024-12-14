@@ -2949,6 +2949,10 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         case HLSL_RESOURCE_GATHER_GREEN:
         case HLSL_RESOURCE_GATHER_BLUE:
         case HLSL_RESOURCE_GATHER_ALPHA:
+        case HLSL_RESOURCE_GATHER_CMP_RED:
+        case HLSL_RESOURCE_GATHER_CMP_GREEN:
+        case HLSL_RESOURCE_GATHER_CMP_BLUE:
+        case HLSL_RESOURCE_GATHER_CMP_ALPHA:
         case HLSL_RESOURCE_RESINFO:
         case HLSL_RESOURCE_SAMPLE_CMP:
         case HLSL_RESOURCE_SAMPLE_CMP_LZ:
@@ -9596,18 +9600,18 @@ static bool sm4_generate_vsir_instr_sample(struct hlsl_ctx *ctx,
 }
 
 static bool sm4_generate_vsir_instr_gather(struct hlsl_ctx *ctx, struct vsir_program *program,
-        const struct hlsl_ir_resource_load *load, uint32_t swizzle)
+        const struct hlsl_ir_resource_load *load, uint32_t swizzle, bool compare)
 {
     const struct vkd3d_shader_version *version = &program->shader_version;
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
     const struct hlsl_deref *resource = &load->resource;
+    enum vkd3d_shader_opcode opcode = VKD3DSIH_GATHER4;
     const struct hlsl_deref *sampler = &load->sampler;
     const struct hlsl_ir_node *instr = &load->node;
+    unsigned int src_count = 3, current_arg = 0;
     struct vkd3d_shader_instruction *ins;
-    enum vkd3d_shader_opcode opcode;
 
-    opcode = VKD3DSIH_GATHER4;
     if (texel_offset && !sm4_generate_vsir_validate_texel_offset_aoffimmi(texel_offset))
     {
         if (!vkd3d_shader_ver_ge(version, 5, 0))
@@ -9617,50 +9621,40 @@ static bool sm4_generate_vsir_instr_gather(struct hlsl_ctx *ctx, struct vsir_pro
             return false;
         }
         opcode = VKD3DSIH_GATHER4_PO;
+        ++src_count;
     }
 
-    if (opcode == VKD3DSIH_GATHER4)
+    if (compare)
     {
-        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode, 1, 3)))
-            return false;
+        opcode = opcode == VKD3DSIH_GATHER4 ? VKD3DSIH_GATHER4_C : VKD3DSIH_GATHER4_PO_C;
+        ++src_count;
+    }
 
-        vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
-        vsir_src_from_hlsl_node(&ins->src[0], ctx, coords, VKD3DSP_WRITEMASK_ALL);
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode, 1, src_count)))
+        return false;
+
+    vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
+    vsir_src_from_hlsl_node(&ins->src[current_arg++], ctx, coords, VKD3DSP_WRITEMASK_ALL);
+
+    if (opcode == VKD3DSIH_GATHER4_PO || opcode == VKD3DSIH_GATHER4_PO_C)
+        vsir_src_from_hlsl_node(&ins->src[current_arg++], ctx, texel_offset, VKD3DSP_WRITEMASK_ALL);
+    else
         sm4_generate_vsir_encode_texel_offset_as_aoffimmi(ins, texel_offset);
 
-        if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
-                &ins->src[1], resource, ins->dst[0].write_mask, &instr->loc))
-            return false;
+    if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
+            &ins->src[current_arg++], resource, ins->dst[0].write_mask, &instr->loc))
+        return false;
 
-        if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
-                &ins->src[2], sampler, VKD3DSP_WRITEMASK_ALL, &instr->loc))
-            return false;
-        ins->src[2].reg.dimension = VSIR_DIMENSION_VEC4;
-        ins->src[2].swizzle = swizzle;
-    }
-    else if (opcode == VKD3DSIH_GATHER4_PO)
-    {
-        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode, 1, 4)))
-            return false;
+    if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
+            &ins->src[current_arg], sampler, VKD3DSP_WRITEMASK_ALL, &instr->loc))
+        return false;
+    ins->src[current_arg].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->src[current_arg].swizzle = swizzle;
+    current_arg++;
 
-        vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
-        vsir_src_from_hlsl_node(&ins->src[0], ctx, coords, VKD3DSP_WRITEMASK_ALL);
-        vsir_src_from_hlsl_node(&ins->src[1], ctx, texel_offset, VKD3DSP_WRITEMASK_ALL);
+    if (compare)
+        vsir_src_from_hlsl_node(&ins->src[current_arg++], ctx, load->cmp.node, VKD3DSP_WRITEMASK_0);
 
-        if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
-                &ins->src[2], resource, ins->dst[0].write_mask, &instr->loc))
-            return false;
-
-        if (!sm4_generate_vsir_init_src_param_from_deref(ctx, program,
-                &ins->src[3], sampler, VKD3DSP_WRITEMASK_ALL, &instr->loc))
-            return false;
-        ins->src[3].reg.dimension = VSIR_DIMENSION_VEC4;
-        ins->src[3].swizzle = swizzle;
-    }
-    else
-    {
-        vkd3d_unreachable();
-    }
     return true;
 }
 
@@ -9723,6 +9717,32 @@ static bool sm4_generate_vsir_instr_resinfo(struct hlsl_ctx *ctx,
     return true;
 }
 
+static uint32_t get_gather_swizzle(enum hlsl_resource_load_type type)
+{
+    switch (type)
+    {
+        case HLSL_RESOURCE_GATHER_RED:
+        case HLSL_RESOURCE_GATHER_CMP_RED:
+            return VKD3D_SHADER_SWIZZLE(X, X, X, X);
+
+        case HLSL_RESOURCE_GATHER_GREEN:
+        case HLSL_RESOURCE_GATHER_CMP_GREEN:
+            return VKD3D_SHADER_SWIZZLE(Y, Y, Y, Y);
+
+        case HLSL_RESOURCE_GATHER_BLUE:
+        case HLSL_RESOURCE_GATHER_CMP_BLUE:
+            return VKD3D_SHADER_SWIZZLE(Z, Z, Z, Z);
+
+        case HLSL_RESOURCE_GATHER_ALPHA:
+        case HLSL_RESOURCE_GATHER_CMP_ALPHA:
+            return VKD3D_SHADER_SWIZZLE(W, W, W, W);
+        default:
+            return 0;
+    }
+
+    return 0;
+}
+
 static bool sm4_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
         struct vsir_program *program, const struct hlsl_ir_resource_load *load)
 {
@@ -9754,16 +9774,16 @@ static bool sm4_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
             return sm4_generate_vsir_instr_sample(ctx, program, load);
 
         case HLSL_RESOURCE_GATHER_RED:
-            return sm4_generate_vsir_instr_gather(ctx, program, load, VKD3D_SHADER_SWIZZLE(X, X, X, X));
-
         case HLSL_RESOURCE_GATHER_GREEN:
-            return sm4_generate_vsir_instr_gather(ctx, program, load, VKD3D_SHADER_SWIZZLE(Y, Y, Y, Y));
-
         case HLSL_RESOURCE_GATHER_BLUE:
-            return sm4_generate_vsir_instr_gather(ctx, program, load, VKD3D_SHADER_SWIZZLE(Z, Z, Z, Z));
-
         case HLSL_RESOURCE_GATHER_ALPHA:
-            return sm4_generate_vsir_instr_gather(ctx, program, load, VKD3D_SHADER_SWIZZLE(W, W, W, W));
+            return sm4_generate_vsir_instr_gather(ctx, program, load, get_gather_swizzle(load->load_type), false);
+
+        case HLSL_RESOURCE_GATHER_CMP_RED:
+        case HLSL_RESOURCE_GATHER_CMP_GREEN:
+        case HLSL_RESOURCE_GATHER_CMP_BLUE:
+        case HLSL_RESOURCE_GATHER_CMP_ALPHA:
+            return sm4_generate_vsir_instr_gather(ctx, program, load, get_gather_swizzle(load->load_type), true);
 
         case HLSL_RESOURCE_SAMPLE_INFO:
             return sm4_generate_vsir_instr_sample_info(ctx, program, load);
