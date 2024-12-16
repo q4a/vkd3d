@@ -1685,11 +1685,6 @@ static bool io_normaliser_is_in_fork_or_join_phase(const struct io_normaliser *n
     return normaliser->phase == VKD3DSIH_HS_FORK_PHASE || normaliser->phase == VKD3DSIH_HS_JOIN_PHASE;
 }
 
-static bool io_normaliser_is_in_control_point_phase(const struct io_normaliser *normaliser)
-{
-    return normaliser->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE;
-}
-
 static bool shader_signature_find_element_for_reg(const struct shader_signature *signature,
         unsigned int reg_idx, unsigned int write_mask, unsigned int *element_idx)
 {
@@ -2161,13 +2156,6 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
     if (!shader_signature_find_element_for_reg(signature, reg_idx, write_mask, &element_idx))
         vkd3d_unreachable();
     e = &signature->elements[element_idx];
-
-    if (io_normaliser_is_in_control_point_phase(normaliser) && reg->type == VKD3DSPR_OUTPUT)
-    {
-        /* The control point id param. */
-        VKD3D_ASSERT(reg->idx[0].rel_addr);
-        id_idx = 1;
-    }
 
     if ((e->register_count > 1 || vsir_sysval_semantic_is_tess_factor(e->sysval_semantic)))
         id_idx = shader_register_normalise_arrayed_addressing(reg, id_idx, e->register_index);
