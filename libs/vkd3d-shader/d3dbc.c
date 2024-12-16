@@ -1787,7 +1787,7 @@ static void sm1_sort_externs(struct hlsl_ctx *ctx)
 
 static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
 {
-    size_t ctab_offset, ctab_start, ctab_end, vars_offset, vars_start, size_offset, creator_offset, offset;
+    size_t ctab_start, vars_offset, vars_start, creator_offset, offset;
     unsigned int uniform_count = 0;
     struct hlsl_ir_var *var;
 
@@ -1815,9 +1815,6 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
     }
 
     sm1_sort_externs(ctx);
-
-    size_offset = put_u32(buffer, 0);
-    ctab_offset = put_u32(buffer, VKD3D_MAKE_TAG('C','T','A','B'));
 
     ctab_start = put_u32(buffer, 7 * sizeof(uint32_t)); /* CTAB header size. */
     creator_offset = put_u32(buffer, 0);
@@ -1939,9 +1936,6 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
     offset = put_string(buffer, vkd3d_shader_get_version(NULL, NULL));
     set_u32(buffer, creator_offset, offset - ctab_start);
-
-    ctab_end = bytecode_align(buffer);
-    set_u32(buffer, size_offset, vkd3d_make_u32(VKD3D_SM1_OP_COMMENT, (ctab_end - ctab_offset) / sizeof(uint32_t)));
 }
 
 void sm1_generate_ctab(struct hlsl_ctx *ctx, struct vkd3d_shader_code *ctab)
@@ -2011,6 +2005,21 @@ static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info_from_vsir_
     }
 
     return info;
+}
+
+static void d3dbc_write_comment(struct d3dbc_compiler *d3dbc,
+        uint32_t tag, const struct vkd3d_shader_code *comment)
+{
+    struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
+    size_t offset, start, end;
+
+    offset = put_u32(buffer, 0);
+
+    start = put_u32(buffer, tag);
+    bytecode_put_bytes(buffer, comment->code, comment->size);
+    end = bytecode_align(buffer);
+
+    set_u32(buffer, offset, vkd3d_make_u32(VKD3D_SM1_OP_COMMENT, (end - start) / sizeof(uint32_t)));
 }
 
 static uint32_t sm1_encode_register_type(enum vkd3d_shader_register_type type)
@@ -2376,9 +2385,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     }
 
     put_u32(buffer, sm1_version(version->type, version->major, version->minor));
-
-    bytecode_put_bytes(buffer, ctab->code, ctab->size);
-
+    d3dbc_write_comment(&d3dbc, VKD3D_MAKE_TAG('C','T','A','B'), ctab);
     d3dbc_write_semantic_dcls(&d3dbc);
     d3dbc_write_program_instructions(&d3dbc);
 
