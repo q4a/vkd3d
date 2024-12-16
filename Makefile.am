@@ -245,6 +245,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/sqrt.shader_test \
 	tests/hlsl/srv-buffers.shader_test \
 	tests/hlsl/srv-byteaddressbuffer.shader_test \
+	tests/hlsl/srv-structuredbuffer.shader_test \
 	tests/hlsl/state-block-function-syntax.shader_test \
 	tests/hlsl/state-block-syntax.shader_test \
 	tests/hlsl/static-initializer.shader_test \
