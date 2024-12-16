@@ -8067,6 +8067,403 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     sm1_generate_vsir_block(ctx, &entry_func->body, program);
 }
 
+D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
+{
+    switch (type->class)
+    {
+        case HLSL_CLASS_ARRAY:
+            return hlsl_sm1_class(type->e.array.type);
+        case HLSL_CLASS_MATRIX:
+            VKD3D_ASSERT(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
+            if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
+                return D3DXPC_MATRIX_COLUMNS;
+            else
+                return D3DXPC_MATRIX_ROWS;
+        case HLSL_CLASS_SCALAR:
+            return D3DXPC_SCALAR;
+        case HLSL_CLASS_STRUCT:
+            return D3DXPC_STRUCT;
+        case HLSL_CLASS_VECTOR:
+            return D3DXPC_VECTOR;
+        case HLSL_CLASS_PIXEL_SHADER:
+        case HLSL_CLASS_SAMPLER:
+        case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_VERTEX_SHADER:
+            return D3DXPC_OBJECT;
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
+        case HLSL_CLASS_EFFECT_GROUP:
+        case HLSL_CLASS_ERROR:
+        case HLSL_CLASS_PASS:
+        case HLSL_CLASS_RASTERIZER_STATE:
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
+        case HLSL_CLASS_TECHNIQUE:
+        case HLSL_CLASS_UAV:
+        case HLSL_CLASS_VOID:
+        case HLSL_CLASS_CONSTANT_BUFFER:
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+        case HLSL_CLASS_HULL_SHADER:
+        case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
+        case HLSL_CLASS_STREAM_OUTPUT:
+        case HLSL_CLASS_NULL:
+            break;
+    }
+
+    vkd3d_unreachable();
+}
+
+D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type, bool is_combined_sampler)
+{
+    enum hlsl_type_class class = type->class;
+
+    if (is_combined_sampler)
+        class = HLSL_CLASS_TEXTURE;
+
+    switch (class)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            switch (type->e.numeric.type)
+            {
+                case HLSL_TYPE_BOOL:
+                    return D3DXPT_BOOL;
+                /* Actually double behaves differently depending on DLL version:
+                 * For <= 36, it maps to D3DXPT_FLOAT.
+                 * For 37-40, it maps to zero (D3DXPT_VOID).
+                 * For >= 41, it maps to 39, which is D3D_SVT_DOUBLE (note D3D_SVT_*
+                 * values are mostly compatible with D3DXPT_*).
+                 * However, the latter two cases look like bugs, and a reasonable
+                 * application certainly wouldn't know what to do with them.
+                 * For fx_2_0 it's always D3DXPT_FLOAT regardless of DLL version. */
+                case HLSL_TYPE_DOUBLE:
+                case HLSL_TYPE_FLOAT:
+                case HLSL_TYPE_HALF:
+                    return D3DXPT_FLOAT;
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                    return D3DXPT_INT;
+                default:
+                    vkd3d_unreachable();
+            }
+
+        case HLSL_CLASS_SAMPLER:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3DXPT_SAMPLER1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3DXPT_SAMPLER2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3DXPT_SAMPLER3D;
+                case HLSL_SAMPLER_DIM_CUBE:
+                    return D3DXPT_SAMPLERCUBE;
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return D3DXPT_SAMPLER;
+                default:
+                    ERR("Invalid dimension %#x.\n", type->sampler_dim);
+                    vkd3d_unreachable();
+            }
+            break;
+
+        case HLSL_CLASS_TEXTURE:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3DXPT_TEXTURE1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3DXPT_TEXTURE2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3DXPT_TEXTURE3D;
+                case HLSL_SAMPLER_DIM_CUBE:
+                    return D3DXPT_TEXTURECUBE;
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return D3DXPT_TEXTURE;
+                default:
+                    ERR("Invalid dimension %#x.\n", type->sampler_dim);
+                    vkd3d_unreachable();
+            }
+            break;
+
+        case HLSL_CLASS_ARRAY:
+            return hlsl_sm1_base_type(type->e.array.type, is_combined_sampler);
+
+        case HLSL_CLASS_STRUCT:
+            return D3DXPT_VOID;
+
+        case HLSL_CLASS_STRING:
+            return D3DXPT_STRING;
+
+        case HLSL_CLASS_PIXEL_SHADER:
+            return D3DXPT_PIXELSHADER;
+
+        case HLSL_CLASS_VERTEX_SHADER:
+            return D3DXPT_VERTEXSHADER;
+
+        case HLSL_CLASS_DEPTH_STENCIL_STATE:
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
+        case HLSL_CLASS_EFFECT_GROUP:
+        case HLSL_CLASS_ERROR:
+        case HLSL_CLASS_PASS:
+        case HLSL_CLASS_RASTERIZER_STATE:
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
+        case HLSL_CLASS_TECHNIQUE:
+        case HLSL_CLASS_UAV:
+        case HLSL_CLASS_VOID:
+        case HLSL_CLASS_CONSTANT_BUFFER:
+        case HLSL_CLASS_COMPUTE_SHADER:
+        case HLSL_CLASS_DOMAIN_SHADER:
+        case HLSL_CLASS_HULL_SHADER:
+        case HLSL_CLASS_GEOMETRY_SHADER:
+        case HLSL_CLASS_BLEND_STATE:
+        case HLSL_CLASS_STREAM_OUTPUT:
+        case HLSL_CLASS_NULL:
+            break;
+    }
+
+    vkd3d_unreachable();
+}
+
+static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer,
+        struct hlsl_type *type, bool is_combined_sampler, unsigned int ctab_start)
+{
+    const struct hlsl_type *array_type = hlsl_get_multiarray_element_type(type);
+    unsigned int array_size = hlsl_get_multiarray_size(type);
+    struct hlsl_struct_field *field;
+    unsigned int field_count = 0;
+    size_t fields_offset = 0;
+    size_t i;
+
+    if (type->bytecode_offset)
+        return;
+
+    if (array_type->class == HLSL_CLASS_STRUCT)
+    {
+        field_count = array_type->e.record.field_count;
+
+        for (i = 0; i < field_count; ++i)
+        {
+            field = &array_type->e.record.fields[i];
+            field->name_bytecode_offset = put_string(buffer, field->name);
+            write_sm1_type(buffer, field->type, false, ctab_start);
+        }
+
+        fields_offset = bytecode_align(buffer) - ctab_start;
+
+        for (i = 0; i < field_count; ++i)
+        {
+            field = &array_type->e.record.fields[i];
+            put_u32(buffer, field->name_bytecode_offset - ctab_start);
+            put_u32(buffer, field->type->bytecode_offset - ctab_start);
+        }
+    }
+
+    type->bytecode_offset = put_u32(buffer,
+            vkd3d_make_u32(hlsl_sm1_class(type), hlsl_sm1_base_type(array_type, is_combined_sampler)));
+    put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
+    put_u32(buffer, vkd3d_make_u32(array_size, field_count));
+    put_u32(buffer, fields_offset);
+}
+
+static void sm1_sort_extern(struct list *sorted, struct hlsl_ir_var *to_sort)
+{
+    struct hlsl_ir_var *var;
+
+    list_remove(&to_sort->extern_entry);
+
+    LIST_FOR_EACH_ENTRY(var, sorted, struct hlsl_ir_var, extern_entry)
+    {
+        if (strcmp(to_sort->name, var->name) < 0)
+        {
+            list_add_before(&var->extern_entry, &to_sort->extern_entry);
+            return;
+        }
+    }
+
+    list_add_tail(sorted, &to_sort->extern_entry);
+}
+
+static void sm1_sort_externs(struct hlsl_ctx *ctx)
+{
+    struct list sorted = LIST_INIT(sorted);
+    struct hlsl_ir_var *var, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_uniform)
+            sm1_sort_extern(&sorted, var);
+    }
+    list_move_tail(&ctx->extern_vars, &sorted);
+}
+
+static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
+{
+    size_t ctab_start, vars_offset, vars_start, creator_offset, offset;
+    unsigned int uniform_count = 0, r;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        for (r = 0; r <= HLSL_REGSET_LAST; ++r)
+        {
+            if (var->semantic.name || !var->regs[r].allocated || !var->last_read)
+                continue;
+
+            ++uniform_count;
+
+            if (var->is_param && var->is_uniform)
+            {
+                char *new_name;
+
+                if (!(new_name = hlsl_sprintf_alloc(ctx, "$%s", var->name)))
+                    return;
+                vkd3d_free((char *)var->name);
+                var->name = new_name;
+            }
+        }
+    }
+
+    sm1_sort_externs(ctx);
+
+    ctab_start = put_u32(buffer, 7 * sizeof(uint32_t)); /* CTAB header size. */
+    creator_offset = put_u32(buffer, 0);
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
+        put_u32(buffer, D3DVS_VERSION(ctx->profile->major_version, ctx->profile->minor_version));
+    else
+        put_u32(buffer, D3DPS_VERSION(ctx->profile->major_version, ctx->profile->minor_version));
+    put_u32(buffer, uniform_count);
+    vars_offset = put_u32(buffer, 0);
+    put_u32(buffer, 0); /* FIXME: flags */
+    put_u32(buffer, 0); /* FIXME: target string */
+
+    vars_start = bytecode_align(buffer);
+    set_u32(buffer, vars_offset, vars_start - ctab_start);
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        for (r = 0; r <= HLSL_REGSET_LAST; ++r)
+        {
+            if (var->semantic.name || !var->regs[r].allocated || !var->last_read)
+                continue;
+
+            put_u32(buffer, 0); /* name */
+            if (r == HLSL_REGSET_NUMERIC)
+            {
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->regs[r].id));
+                put_u32(buffer, var->bind_count[r]);
+            }
+            else
+            {
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->regs[r].index));
+                put_u32(buffer, var->bind_count[r]);
+            }
+            put_u32(buffer, 0); /* type */
+            put_u32(buffer, 0); /* default value */
+        }
+    }
+
+    uniform_count = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        for (r = 0; r <= HLSL_REGSET_LAST; ++r)
+        {
+            size_t var_offset, name_offset;
+
+            if (var->semantic.name || !var->regs[r].allocated || !var->last_read)
+                continue;
+
+            var_offset = vars_start + (uniform_count * 5 * sizeof(uint32_t));
+
+            name_offset = put_string(buffer, var->name);
+            set_u32(buffer, var_offset, name_offset - ctab_start);
+
+            write_sm1_type(buffer, var->data_type, var->is_combined_sampler, ctab_start);
+            set_u32(buffer, var_offset + 3 * sizeof(uint32_t), var->data_type->bytecode_offset - ctab_start);
+
+            if (var->default_values)
+            {
+                unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+                unsigned int comp_count = hlsl_type_component_count(var->data_type);
+                unsigned int default_value_offset;
+                unsigned int k;
+
+                default_value_offset = bytecode_reserve_bytes(buffer, reg_size * sizeof(uint32_t));
+                set_u32(buffer, var_offset + 4 * sizeof(uint32_t), default_value_offset - ctab_start);
+
+                for (k = 0; k < comp_count; ++k)
+                {
+                    struct hlsl_type *comp_type = hlsl_type_get_component_type(ctx, var->data_type, k);
+                    unsigned int comp_offset;
+                    enum hlsl_regset regset;
+
+                    comp_offset = hlsl_type_get_component_offset(ctx, var->data_type, k, &regset);
+                    if (regset == HLSL_REGSET_NUMERIC)
+                    {
+                        union
+                        {
+                            uint32_t u;
+                            float f;
+                        } uni;
+
+                        switch (comp_type->e.numeric.type)
+                        {
+                            case HLSL_TYPE_DOUBLE:
+                                if (ctx->double_as_float_alias)
+                                    uni.u = var->default_values[k].number.u;
+                                else
+                                    uni.u = 0;
+                                break;
+
+                            case HLSL_TYPE_INT:
+                                uni.f = var->default_values[k].number.i;
+                                break;
+
+                            case HLSL_TYPE_UINT:
+                            case HLSL_TYPE_BOOL:
+                                uni.f = var->default_values[k].number.u;
+                                break;
+
+                            case HLSL_TYPE_HALF:
+                            case HLSL_TYPE_FLOAT:
+                                uni.u = var->default_values[k].number.u;
+                                break;
+
+                            default:
+                                vkd3d_unreachable();
+                        }
+
+                        set_u32(buffer, default_value_offset + comp_offset * sizeof(uint32_t), uni.u);
+                    }
+                }
+            }
+
+            ++uniform_count;
+        }
+    }
+
+    offset = put_string(buffer, vkd3d_shader_get_version(NULL, NULL));
+    set_u32(buffer, creator_offset, offset - ctab_start);
+}
+
+static void sm1_generate_ctab(struct hlsl_ctx *ctx, struct vkd3d_shader_code *ctab)
+{
+    struct vkd3d_bytecode_buffer buffer = {0};
+
+    write_sm1_uniforms(ctx, &buffer);
+    if (buffer.status)
+    {
+        vkd3d_free(buffer.data);
+        ctx->result = buffer.status;
+        return;
+    }
+    ctab->code = buffer.data;
+    ctab->size = buffer.size;
+}
+
 static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vsir_program *program,
         const struct hlsl_ir_var *var, bool is_patch_constant_func, struct hlsl_block *block,
         const struct vkd3d_shader_location *loc)

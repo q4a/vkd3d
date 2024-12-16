@@ -1658,8 +1658,6 @@ bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, 
 D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type);
 D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type, bool is_combined_sampler);
 
-void sm1_generate_ctab(struct hlsl_ctx *ctx, struct vkd3d_shader_code *ctab);
-
 struct extern_resource
 {
     /* "var" is only not NULL if this resource is a whole variable, so it may
