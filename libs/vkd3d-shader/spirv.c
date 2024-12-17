@@ -7994,6 +7994,7 @@ static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
     const struct vkd3d_shader_src_param *src = instruction->src;
     uint32_t src_type_id, dst_type_id, condition_type_id;
     unsigned int component_count;
+    uint32_t write_mask;
 
     VKD3D_ASSERT(instruction->dst_count == 1);
     VKD3D_ASSERT(instruction->src_count == 1);
@@ -8003,21 +8004,23 @@ static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
      * and for NaN to yield zero. */
 
     component_count = vsir_write_mask_component_count(dst->write_mask);
-    src_type_id = spirv_compiler_get_type_id_for_reg(compiler, &src->reg, dst->write_mask);
-    dst_type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
-    src_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
 
     if (src->reg.data_type == VKD3D_DATA_DOUBLE)
     {
+        write_mask = vkd3d_write_mask_from_component_count(component_count);
         zero_id = spirv_compiler_get_constant_double_vector(compiler, 0.0, component_count);
         float_max_id = spirv_compiler_get_constant_double_vector(compiler, 4294967296.0, component_count);
     }
     else
     {
+        write_mask = dst->write_mask;
         zero_id = spirv_compiler_get_constant_float_vector(compiler, 0.0f, component_count);
         float_max_id = spirv_compiler_get_constant_float_vector(compiler, 4294967296.0f, component_count);
     }
 
+    src_type_id = spirv_compiler_get_type_id_for_reg(compiler, &src->reg, write_mask);
+    dst_type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
+    src_id = spirv_compiler_emit_load_src(compiler, src, write_mask);
     val_id = vkd3d_spirv_build_op_glsl_std450_max(builder, src_type_id, src_id, zero_id);
 
     uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, UINT_MAX, component_count);
