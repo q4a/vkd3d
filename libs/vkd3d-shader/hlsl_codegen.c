@@ -10084,6 +10084,196 @@ static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
     generate_vsir_add_program_instruction(ctx, program, &func->loc, VKD3DSIH_RET, 0, 0);
 }
 
+static int sm4_compare_extern_resources(const void *a, const void *b)
+{
+    const struct extern_resource *aa = a;
+    const struct extern_resource *bb = b;
+    int r;
+
+    if ((r = vkd3d_u32_compare(aa->regset, bb->regset)))
+        return r;
+
+    if ((r = vkd3d_u32_compare(aa->space, bb->space)))
+        return r;
+
+    return vkd3d_u32_compare(aa->index, bb->index);
+}
+
+static const char *string_skip_tag(const char *string)
+{
+    if (!strncmp(string, "<resource>", strlen("<resource>")))
+        return string + strlen("<resource>");
+    return string;
+}
+
+struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
+{
+    bool separate_components = ctx->profile->major_version == 5 && ctx->profile->minor_version == 0;
+    struct extern_resource *extern_resources = NULL;
+    const struct hlsl_ir_var *var;
+    struct hlsl_buffer *buffer;
+    enum hlsl_regset regset;
+    size_t capacity = 0;
+    char *name;
+
+    *count = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (separate_components)
+        {
+            unsigned int component_count = hlsl_type_component_count(var->data_type);
+            unsigned int k, regset_offset;
+
+            for (k = 0; k < component_count; ++k)
+            {
+                struct hlsl_type *component_type = hlsl_type_get_component_type(ctx, var->data_type, k);
+                struct vkd3d_string_buffer *name_buffer;
+
+                if (!hlsl_type_is_resource(component_type))
+                    continue;
+
+                regset_offset = hlsl_type_get_component_offset(ctx, var->data_type, k, &regset);
+                if (regset_offset > var->regs[regset].allocation_size)
+                    continue;
+
+                if (!var->objects_usage[regset][regset_offset].used)
+                    continue;
+
+                if (!(hlsl_array_reserve(ctx, (void **)&extern_resources,
+                        &capacity, *count + 1, sizeof(*extern_resources))))
+                {
+                    sm4_free_extern_resources(extern_resources, *count);
+                    *count = 0;
+                    return NULL;
+                }
+
+                if (!(name_buffer = hlsl_component_to_string(ctx, var, k)))
+                {
+                    sm4_free_extern_resources(extern_resources, *count);
+                    *count = 0;
+                    return NULL;
+                }
+                if (!(name = hlsl_strdup(ctx, string_skip_tag(name_buffer->buffer))))
+                {
+                    sm4_free_extern_resources(extern_resources, *count);
+                    *count = 0;
+                    hlsl_release_string_buffer(ctx, name_buffer);
+                    return NULL;
+                }
+                hlsl_release_string_buffer(ctx, name_buffer);
+
+                extern_resources[*count].var = NULL;
+                extern_resources[*count].buffer = NULL;
+
+                extern_resources[*count].name = name;
+                extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
+
+                extern_resources[*count].component_type = component_type;
+
+                extern_resources[*count].regset = regset;
+                extern_resources[*count].id = var->regs[regset].id;
+                extern_resources[*count].space = var->regs[regset].space;
+                extern_resources[*count].index = var->regs[regset].index + regset_offset;
+                extern_resources[*count].bind_count = 1;
+                extern_resources[*count].loc = var->loc;
+
+                ++*count;
+            }
+        }
+        else
+        {
+            unsigned int r;
+
+            if (!hlsl_type_is_resource(var->data_type))
+                continue;
+
+            for (r = 0; r <= HLSL_REGSET_LAST; ++r)
+            {
+                if (!var->regs[r].allocated)
+                    continue;
+
+                if (!(hlsl_array_reserve(ctx, (void **)&extern_resources,
+                        &capacity, *count + 1, sizeof(*extern_resources))))
+                {
+                    sm4_free_extern_resources(extern_resources, *count);
+                    *count = 0;
+                    return NULL;
+                }
+
+                if (!(name = hlsl_strdup(ctx, string_skip_tag(var->name))))
+                {
+                    sm4_free_extern_resources(extern_resources, *count);
+                    *count = 0;
+                    return NULL;
+                }
+
+                extern_resources[*count].var = var;
+                extern_resources[*count].buffer = NULL;
+
+                extern_resources[*count].name = name;
+                /* For some reason 5.1 resources aren't marked as
+                 * user-packed, but cbuffers still are. */
+                extern_resources[*count].is_user_packed = hlsl_version_lt(ctx, 5, 1)
+                        && !!var->reg_reservation.reg_type;
+
+                extern_resources[*count].component_type = hlsl_type_get_component_type(ctx, var->data_type, 0);
+
+                extern_resources[*count].regset = r;
+                extern_resources[*count].id = var->regs[r].id;
+                extern_resources[*count].space = var->regs[r].space;
+                extern_resources[*count].index = var->regs[r].index;
+                extern_resources[*count].bind_count = var->bind_count[r];
+                extern_resources[*count].loc = var->loc;
+
+                ++*count;
+            }
+        }
+    }
+
+    LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, struct hlsl_buffer, entry)
+    {
+        if (!buffer->reg.allocated)
+            continue;
+
+        if (!(hlsl_array_reserve(ctx, (void **)&extern_resources,
+                &capacity, *count + 1, sizeof(*extern_resources))))
+        {
+            sm4_free_extern_resources(extern_resources, *count);
+            *count = 0;
+            return NULL;
+        }
+
+        if (!(name = hlsl_strdup(ctx, buffer->name)))
+        {
+            sm4_free_extern_resources(extern_resources, *count);
+            *count = 0;
+            return NULL;
+        }
+
+        extern_resources[*count].var = NULL;
+        extern_resources[*count].buffer = buffer;
+
+        extern_resources[*count].name = name;
+        extern_resources[*count].is_user_packed = !!buffer->reservation.reg_type;
+
+        extern_resources[*count].component_type = NULL;
+
+        extern_resources[*count].regset = HLSL_REGSET_NUMERIC;
+        extern_resources[*count].id = buffer->reg.id;
+        extern_resources[*count].space = buffer->reg.space;
+        extern_resources[*count].index = buffer->reg.index;
+        extern_resources[*count].bind_count = 1;
+        extern_resources[*count].loc = buffer->loc;
+
+        ++*count;
+    }
+
+    qsort(extern_resources, *count, sizeof(*extern_resources), sm4_compare_extern_resources);
+
+    return extern_resources;
+}
+
 static void generate_vsir_scan_required_features(struct hlsl_ctx *ctx, struct vsir_program *program)
 {
     struct extern_resource *extern_resources;
