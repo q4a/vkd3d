@@ -1,4 +1,4 @@
-[pixel shader]
+[pixel shader fail(sm<2)]
 uniform float2 u;
 
 float4 main() : sv_target
