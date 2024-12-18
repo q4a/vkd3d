@@ -160,6 +160,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
                 srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 srv_desc.Buffer.NumElements = params->desc.width * params->desc.height;
+                srv_desc.Buffer.StructureByteStride = params->stride;
                 srv_desc.Buffer.Flags = params->is_raw ? D3D12_BUFFER_SRV_FLAG_RAW : 0;
 
                 ID3D12Device_CreateShaderResourceView(device, resource->resource,
