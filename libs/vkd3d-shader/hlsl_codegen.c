@@ -5489,7 +5489,8 @@ static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     return allocator.reg_count;
 }
 
-enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hlsl_type *type, unsigned int storage_modifiers)
+static enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hlsl_type *type,
+        unsigned int storage_modifiers)
 {
     unsigned int i;
 
