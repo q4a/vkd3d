@@ -396,7 +396,8 @@ size_t bytecode_put_bytes_unaligned(struct vkd3d_bytecode_buffer *buffer, const 
         buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
         return offset;
     }
-    memcpy(buffer->data + offset, bytes, size);
+    if (size)
+        memcpy(&buffer->data[offset], bytes, size);
     buffer->size = offset + size;
     return offset;
 }
