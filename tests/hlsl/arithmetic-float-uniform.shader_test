@@ -3,32 +3,35 @@ uniform float2 a;
 
 float4 main() : SV_TARGET
 {
-    float x = a.x;
+    float x = +a.x;
     float y = a.y;
-    return float4(x + y, x - y, x * y, x / y);
+    return float4(x + y, x - y, x * y, -y);
 }
 
 [test]
-uniform 0 float4 5.0 15.0 0.0 0.0
+uniform 0 float4 0.05 0.15 0.0 0.0
 draw quad
-probe (0, 0) rgba (20.0, -10.0, 75.0, 0.33333333) 1
+probe (0, 0) rgba (0.20, -0.10, 0.0075, -0.15) 1
 
-[pixel shader]
+
+% 1.x has no division or modulo.
+[pixel shader notimpl(sm<2)]
 uniform float2 a;
 
 float4 main() : SV_TARGET
 {
     float x = a.x;
     float y = a.y;
-    return float4(x % y, +x, -x, y / x);
+    return float4(x / y, -x / y, x / -y, -x / -y);
 }
 
 [test]
-uniform 0 float4 5.0 15.0 0.0 0.0
+uniform 0 float4 42.0 5.0 0.0 0.0
 draw quad
-probe (0, 0) rgba (5.0, 5.0, -5.0, 3.0) 1
+probe (0, 0) rgba (8.4, -8.4, -8.4, 8.4) 16
 
-[pixel shader]
+
+[pixel shader fail(sm<2)]
 uniform float2 a;
 
 float4 main() : SV_TARGET
@@ -43,7 +46,8 @@ uniform 0 float4 42.0 5.0 0.0 0.0
 draw quad
 probe (0, 0) rgba (2.0, -2.0, 2.0, -2.0) 16
 
-[pixel shader]
+
+[pixel shader fail(sm<2)]
 uniform float2 a;
 
 float4 main() : SV_TARGET
@@ -58,7 +62,8 @@ uniform 0 float4 45.0 5.0 0.0 0.0
 draw quad
 probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader]
+
+[pixel shader fail(sm<2)]
 float4 x, y;
 
 float4 main() : sv_target
@@ -72,11 +77,8 @@ uniform 4 float4 15.0 -5.0 4.1 5.0
 draw quad
 probe (0, 0) rgba (5.0, -2.1, 4.0, 0.0) 6
 
-[require]
-% Infinities are not allowed in SM1
-shader model >= 4.0
 
-[pixel shader]
+[pixel shader notimpl(sm<2)]
 uniform float2 a;
 
 float4 main() : SV_TARGET
@@ -91,7 +93,9 @@ uniform 0 float4 1.0 0.0 0.0 0.0
 draw quad
 probe (0, 0) rgba (1e99, 1e99, 1e99, 1e99)
 
-[pixel shader]
+
+% d3dx9/d3dcompiler < 41 does not have mad().
+[pixel shader fail(sm<2)]
 uniform float4 a, b, c;
 
 float4 main() : sv_target
@@ -107,7 +111,7 @@ draw quad
 probe (0, 0) rgba (2.62500024, 209.5, 17.0, 224.5) 1
 
 % precise mad() is not allowed to fuse, even though unfused is less precise.
-[pixel shader]
+[pixel shader fail(sm<2)]
 uniform float4 a, b, c;
 
 float4 main() : sv_target
