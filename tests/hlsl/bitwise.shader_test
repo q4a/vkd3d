@@ -129,6 +129,18 @@ float4 main() : SV_TARGET
 draw quad
 probe (0, 0) rgba (0.0, 0.0, 163840.0, 480.0)
 
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    int i = 7;
+
+    return float4(i << 32, i << 30, i << 28, i << 26);
+}
+
+[test]
+draw quad
+probe (0, 0) rgba(7, -1073741824, 1879048192, 469762048)
+
 [pixel shader fail]
 % Make sure that bitshifts DON'T work with floats
 float4 main() : SV_TARGET

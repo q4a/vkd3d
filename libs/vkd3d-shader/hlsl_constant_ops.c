@@ -952,9 +952,6 @@ static bool fold_lshift(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
         switch (src1->node.data_type->e.numeric.type)
         {
             case HLSL_TYPE_INT:
-                dst->u[k].i = src1->value.u[k].i << shift;
-                break;
-
             case HLSL_TYPE_UINT:
                 dst->u[k].u = src1->value.u[k].u << shift;
                 break;
