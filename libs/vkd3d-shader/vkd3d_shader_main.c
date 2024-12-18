@@ -379,7 +379,8 @@ size_t bytecode_align(struct vkd3d_bytecode_buffer *buffer)
         return aligned_size;
     }
 
-    memset(buffer->data + buffer->size, 0xab, aligned_size - buffer->size);
+    if (aligned_size > buffer->size)
+        memset(&buffer->data[buffer->size], 0xab, aligned_size - buffer->size);
     buffer->size = aligned_size;
     return aligned_size;
 }
