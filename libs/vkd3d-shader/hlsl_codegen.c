@@ -10106,6 +10106,17 @@ static const char *string_skip_tag(const char *string)
     return string;
 }
 
+void sm4_free_extern_resources(struct extern_resource *extern_resources, unsigned int count)
+{
+    unsigned int i;
+
+    for (i = 0; i < count; ++i)
+    {
+        vkd3d_free(extern_resources[i].name);
+    }
+    vkd3d_free(extern_resources);
+}
+
 struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
 {
     bool separate_components = ctx->profile->major_version == 5 && ctx->profile->minor_version == 0;

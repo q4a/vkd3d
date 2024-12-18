@@ -3483,15 +3483,6 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
     }
 }
 
-void sm4_free_extern_resources(struct extern_resource *extern_resources, unsigned int count)
-{
-    unsigned int i;
-
-    for (i = 0; i < count; ++i)
-        vkd3d_free(extern_resources[i].name);
-    vkd3d_free(extern_resources);
-}
-
 /* For some reason, for matrices, values from default value initializers end up in different
  * components than from regular initializers. Default value initializers fill the matrix in
  * vertical reading order (left-to-right top-to-bottom) instead of regular reading order
