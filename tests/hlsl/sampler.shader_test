@@ -75,7 +75,7 @@ size (2d, 3, 3)
 0.0 1.0 0.0 1.0     1.0 1.0 0.0 1.0     2.0 1.0 0.0 1.0
 0.0 2.0 0.0 1.0     1.0 2.0 0.0 1.0     2.0 2.0 0.0 1.0
 
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler s;
 float4 f;
 

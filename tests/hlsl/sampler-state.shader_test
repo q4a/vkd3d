@@ -135,7 +135,7 @@ float4 main(): sv_target
 }
 
 
-[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
+[pixel shader fail(sm>=6)]
 // default value initializers make it more permissive but if types don't match
 // then the whole initializer is discarded.
 float4 f = {
@@ -206,6 +206,8 @@ float4 main(): sv_target
 
 [require]
 shader model >= 5.0
+% Segfaults with 5.1 on d3dcompiler_47 10.0.19041.868
+shader model < 5.1
 options: backcompat
 
 [pixel shader fail(sm>=5.1) todo(sm>=5.1)]

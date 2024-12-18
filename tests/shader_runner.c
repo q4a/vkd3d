@@ -1612,6 +1612,7 @@ static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type 
 ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type type)
 {
     const char *source = runner->shader_source[type];
+    unsigned int options = runner->compile_options;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
     HRESULT hr;
@@ -1627,16 +1628,22 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
         [SHADER_MODEL_6_0] = "6_0",
     };
 
+    /* Behaviour is inconsistent between different versions of
+     * d3dcompiler_47.dll. Version 10.0.17134.12 seems to reject
+     * D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY for 5.1 profiles, while
+     * version 10.0.10150.0 apparently doesn't. */
+    if (runner->minimum_shader_model >= SHADER_MODEL_5_1)
+        options &= ~D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
+
     if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
     {
         assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->compile_options, source, &blob);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, options, source, &blob);
     }
     else
     {
         sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
-        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main",
-                profile, runner->compile_options, 0, &blob, &errors);
+        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, options, 0, &blob, &errors);
     }
     if (hr != S_OK)
     {
@@ -1656,6 +1663,7 @@ static void compile_shader(struct shader_runner *runner, const char *source,
         size_t len, enum shader_type type, enum shader_model model)
 {
     bool use_dxcompiler = (model >= SHADER_MODEL_6_0);
+    unsigned int options = runner->compile_options;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
     HRESULT hr;
@@ -1686,10 +1694,17 @@ static void compile_shader(struct shader_runner *runner, const char *source,
     if (model < SHADER_MODEL_5_0 && (type == SHADER_TYPE_HS || type == SHADER_TYPE_DS))
         return;
 
+    /* Behaviour is inconsistent between different versions of
+     * d3dcompiler_47.dll. Version 10.0.17134.12 seems to reject
+     * D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY for 5.1 profiles, while
+     * version 10.0.10150.0 apparently doesn't. */
+    if (model >= SHADER_MODEL_5_1)
+        options &= ~D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
+
     if (use_dxcompiler)
     {
         assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->compile_options, source, &blob);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, options, source, &blob);
     }
     else
     {
@@ -1697,7 +1712,7 @@ static void compile_shader(struct shader_runner *runner, const char *source,
             sprintf(profile, "%s_%s", shader_type_string(type), effect_models[model]);
         else
             sprintf(profile, "%s_%s", shader_type_string(type), shader_models[model]);
-        hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
+        hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, options, 0, &blob, &errors);
     }
     hr = map_special_hrs(hr);
     todo_if (runner->hlsl_todo[model])
