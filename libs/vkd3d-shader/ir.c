@@ -4775,7 +4775,8 @@ static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_
         }
     }
 
-    qsort(cfg->loop_intervals, cfg->loop_interval_count, sizeof(*cfg->loop_intervals), compare_loop_intervals);
+    if (cfg->loop_intervals)
+        qsort(cfg->loop_intervals, cfg->loop_interval_count, sizeof(*cfg->loop_intervals), compare_loop_intervals);
 
     if (TRACE_ON())
         for (i = 0; i < cfg->loop_interval_count; ++i)

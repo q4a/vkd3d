@@ -10280,7 +10280,8 @@ struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned 
         ++*count;
     }
 
-    qsort(extern_resources, *count, sizeof(*extern_resources), sm4_compare_extern_resources);
+    if (extern_resources)
+        qsort(extern_resources, *count, sizeof(*extern_resources), sm4_compare_extern_resources);
 
     return extern_resources;
 }
