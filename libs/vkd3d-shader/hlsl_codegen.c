@@ -10006,6 +10006,7 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
         [HLSL_INTERLOCKED_MAX] = VKD3DSIH_ATOMIC_UMAX,
         [HLSL_INTERLOCKED_MIN] = VKD3DSIH_ATOMIC_UMIN,
         [HLSL_INTERLOCKED_OR] = VKD3DSIH_ATOMIC_OR,
+        [HLSL_INTERLOCKED_XOR] = VKD3DSIH_ATOMIC_XOR,
     };
 
     static const enum vkd3d_shader_opcode imm_opcodes[] =
@@ -10017,6 +10018,7 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
         [HLSL_INTERLOCKED_MAX] = VKD3DSIH_IMM_ATOMIC_UMAX,
         [HLSL_INTERLOCKED_MIN] = VKD3DSIH_IMM_ATOMIC_UMIN,
         [HLSL_INTERLOCKED_OR] = VKD3DSIH_IMM_ATOMIC_OR,
+        [HLSL_INTERLOCKED_XOR] = VKD3DSIH_IMM_ATOMIC_XOR,
     };
 
     struct hlsl_ir_node *cmp_value = interlocked->cmp_value.node, *value = interlocked->value.node;
