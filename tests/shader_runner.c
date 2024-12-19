@@ -1998,7 +1998,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     break;
 
                 case STATE_TEST:
-                    if (test_action == TEST_ACTION_SKIP_EXECUTION)
+                    if (test_action == TEST_ACTION_SKIP_EXECUTION
+                            && runner->minimum_shader_model <= runner->maximum_shader_model)
                         skip("Missing capabilities.\n");
                     break;
 
