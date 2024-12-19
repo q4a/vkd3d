@@ -859,7 +859,10 @@ static bool gl_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned
                 break;
 
             case RESOURCE_TYPE_UAV:
-                if (resource->r.desc.dimension != RESOURCE_DIMENSION_BUFFER)
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
+                    glBindImageTexture(resource->r.desc.slot, resource->tbo_id, 0, GL_TRUE,
+                            0, GL_READ_WRITE, resource->format->internal_format);
+                else
                     glBindImageTexture(resource->r.desc.slot, resource->id, 0, GL_TRUE,
                             0, GL_READ_WRITE, resource->format->internal_format);
                 break;
