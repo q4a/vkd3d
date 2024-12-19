@@ -861,12 +861,16 @@ static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, V
     bool ret;
 
     ret = compile_hlsl_and_scan(runner, SHADER_TYPE_CS);
-    todo_if (runner->r.is_todo) ok(ret, "Failed to compile shader.\n");
     if (!ret)
+    {
+        trace("Failed to compile HLSL shader.\n");
         return VK_NULL_HANDLE;
+    }
 
     ret = create_shader_stage(runner, &pipeline_desc.stage, SHADER_TYPE_CS, VK_SHADER_STAGE_COMPUTE_BIT);
-    ok(ret, "Failed to compile shader.\n");
+    todo_if (runner->r.is_todo) ok(ret, "Failed to compile SPIR-V shader.\n");
+    if (!ret)
+        return VK_NULL_HANDLE;
 
     pipeline_desc.layout = pipeline_layout;
 
