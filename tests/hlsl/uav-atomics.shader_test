@@ -4,9 +4,9 @@ format r32-uint uav-load
 
 [uav 1]
 format r32-uint
-size (buffer, 9)
+size (buffer, 11)
 
-0xd 5 6 0x10 4 4 7 2 0
+0xd 5 6 0x10 4 4 7 2 0 5 0
 
 [compute shader fail(sm<5) todo(sm>=5)]
 RWBuffer<uint> u : register(u1);
@@ -26,6 +26,8 @@ void main()
     InterlockedXor(u[6], v.x);
     InterlockedExchange(u[7], v.x, old);
     InterlockedAdd(u[8], old == 2);
+    InterlockedCompareExchange(u[9], v.y, v.x, old);
+    InterlockedAdd(u[10], old == 5);
 }
 
 [test]
@@ -40,6 +42,8 @@ probe uav 1 (5) rui (3)
 probe uav 1 (6) rui (4)
 probe uav 1 (7) rui (3)
 probe uav 1 (8) rui (1)
+probe uav 1 (9) rui (3)
+probe uav 1 (10) rui (1)
 
 uniform 0 uint4 1 2 0 0
 todo(sm<6) dispatch 2 1 1
@@ -52,6 +56,8 @@ probe uav 1 (5) rui (1)
 probe uav 1 (6) rui (4)
 probe uav 1 (7) rui (1)
 probe uav 1 (8) rui (1)
+probe uav 1 (9) rui (3)
+probe uav 1 (10) rui (1)
 
 
 [uav 2]
@@ -86,9 +92,9 @@ probe uav 2 (1) ri (-3)
 
 [uav 1]
 format r32-uint
-size (2d, 9, 1)
+size (2d, 11, 1)
 
-0xd 5 6 0x10 4 4 7 2 0
+0xd 5 6 0x10 4 4 7 2 0 5 0
 
 [compute shader fail(sm<5) todo(sm>=5)]
 RWTexture2D<uint> u : register(u1);
@@ -108,6 +114,8 @@ void main()
     InterlockedXor(u[uint2(6, 0)], v.x);
     InterlockedExchange(u[uint2(7, 0)], v.x, old);
     InterlockedAdd(u[uint2(8, 0)], old == 2);
+    InterlockedCompareExchange(u[uint2(9, 0)], v.y, v.x, old);
+    InterlockedAdd(u[uint2(10, 0)], old == 5);
 }
 
 [test]
@@ -122,6 +130,8 @@ probe uav 1 (5) rui (3)
 probe uav 1 (6) rui (4)
 probe uav 1 (7) rui (3)
 probe uav 1 (8) rui (1)
+probe uav 1 (9) rui (3)
+probe uav 1 (10) rui (1)
 
 
 [compute shader fail(sm<5) todo(sm>=5)]
