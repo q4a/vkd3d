@@ -1678,10 +1678,6 @@ struct extern_resource
     struct vkd3d_shader_location loc;
 };
 
-struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count);
-void sm4_free_extern_resources(struct extern_resource *extern_resources, unsigned int count);
-void sm4_generate_rdef(struct hlsl_ctx *ctx, struct vkd3d_shader_code *rdef);
-
 struct hlsl_ir_function_decl *hlsl_compile_internal_function(struct hlsl_ctx *ctx, const char *name, const char *hlsl);
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl);
