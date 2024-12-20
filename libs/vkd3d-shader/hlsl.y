@@ -5429,7 +5429,21 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
 
     /* Interlocked*() functions always take uint for the value parameters,
      * except for InterlockedMax()/InterlockedMin(). */
-    val_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT);
+    if (op == HLSL_INTERLOCKED_MAX)
+    {
+        enum hlsl_base_type val_base_type = val->data_type->e.numeric.type;
+
+        /* Floating values are always cast to signed integers. */
+        if (val_base_type == HLSL_TYPE_FLOAT || val_base_type == HLSL_TYPE_HALF || val_base_type == HLSL_TYPE_DOUBLE)
+            val_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_INT);
+        else
+            val_type = hlsl_get_scalar_type(ctx, lhs_type->e.numeric.type);
+    }
+    else
+    {
+        val_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT);
+    }
+
     if (cmp_val && !(cmp_val = add_implicit_conversion(ctx, params->instrs, cmp_val, val_type, loc)))
         return false;
     if (!(val = add_implicit_conversion(ctx, params->instrs, val, val_type, loc)))
@@ -5516,6 +5530,12 @@ static bool intrinsic_InterlockedExchange(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_EXCH, params, loc, "InterlockedExchange");
 }
 
+static bool intrinsic_InterlockedMax(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_MAX, params, loc, "InterlockedMax");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5534,6 +5554,7 @@ intrinsic_functions[] =
     {"InterlockedCompareExchange",          4, true,  intrinsic_InterlockedCompareExchange},
     {"InterlockedCompareStore",             3, true,  intrinsic_InterlockedCompareStore},
     {"InterlockedExchange",                 3, true,  intrinsic_InterlockedExchange},
+    {"InterlockedMax",                     -1, true,  intrinsic_InterlockedMax},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},
