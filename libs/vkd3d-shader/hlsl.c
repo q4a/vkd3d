@@ -3508,6 +3508,7 @@ static void dump_ir_interlocked(struct vkd3d_string_buffer *buffer, const struct
     {
         [HLSL_INTERLOCKED_ADD] = "add",
         [HLSL_INTERLOCKED_AND] = "and",
+        [HLSL_INTERLOCKED_CMP_EXCH] = "cmp_exch",
     };
 
     VKD3D_ASSERT(interlocked->op < ARRAY_SIZE(op_names));
@@ -3515,6 +3516,11 @@ static void dump_ir_interlocked(struct vkd3d_string_buffer *buffer, const struct
     dump_deref(buffer, &interlocked->dst);
     vkd3d_string_buffer_printf(buffer, ", coords = ");
     dump_src(buffer, &interlocked->coords);
+    if (interlocked->cmp_value.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", cmp_value = ");
+        dump_src(buffer, &interlocked->cmp_value);
+    }
     vkd3d_string_buffer_printf(buffer, ", value = ");
     dump_src(buffer, &interlocked->value);
     vkd3d_string_buffer_printf(buffer, ")");

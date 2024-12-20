@@ -10008,9 +10008,11 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
     {
         [HLSL_INTERLOCKED_ADD] = VKD3DSIH_IMM_ATOMIC_IADD,
         [HLSL_INTERLOCKED_AND] = VKD3DSIH_IMM_ATOMIC_AND,
+        [HLSL_INTERLOCKED_CMP_EXCH] = VKD3DSIH_IMM_ATOMIC_CMP_EXCH,
     };
 
-    struct hlsl_ir_node *coords = interlocked->coords.node, *value = interlocked->value.node;
+    struct hlsl_ir_node *cmp_value = interlocked->cmp_value.node, *value = interlocked->value.node;
+    struct hlsl_ir_node *coords = interlocked->coords.node;
     struct hlsl_ir_node *instr = &interlocked->node;
     bool is_imm = interlocked->node.reg.allocated;
     struct vkd3d_shader_dst_param *dst_param;
@@ -10018,7 +10020,8 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
     enum vkd3d_shader_opcode opcode;
 
     opcode = is_imm ? imm_opcodes[interlocked->op] : opcodes[interlocked->op];
-    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode, is_imm ? 2 : 1, 2)))
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode,
+            is_imm ? 2 : 1, cmp_value ? 3 : 2)))
         return false;
 
     if (is_imm)
@@ -10030,7 +10033,15 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
     dst_param->reg.dimension = VSIR_DIMENSION_NONE;
 
     vsir_src_from_hlsl_node(&ins->src[0], ctx, coords, VKD3DSP_WRITEMASK_ALL);
-    vsir_src_from_hlsl_node(&ins->src[1], ctx, value, VKD3DSP_WRITEMASK_ALL);
+    if (cmp_value)
+    {
+        vsir_src_from_hlsl_node(&ins->src[1], ctx, cmp_value, VKD3DSP_WRITEMASK_ALL);
+        vsir_src_from_hlsl_node(&ins->src[2], ctx, value, VKD3DSP_WRITEMASK_ALL);
+    }
+    else
+    {
+        vsir_src_from_hlsl_node(&ins->src[1], ctx, value, VKD3DSP_WRITEMASK_ALL);
+    }
 
     return true;
 }

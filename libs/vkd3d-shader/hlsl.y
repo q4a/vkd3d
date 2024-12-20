@@ -5378,7 +5378,7 @@ static bool intrinsic_GetRenderTargetSampleCount(struct hlsl_ctx *ctx,
 static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op op,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc, const char *name)
 {
-    struct hlsl_ir_node *lhs, *coords, *val, *orig_val = NULL;
+    struct hlsl_ir_node *lhs, *coords, *val, *cmp_val = NULL, *orig_val = NULL;
     struct hlsl_ir_node *interlocked, *void_ret;
     struct hlsl_type *lhs_type, *val_type;
     struct vkd3d_string_buffer *string;
@@ -5388,7 +5388,7 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                 "Interlocked functions can only be used in shader model 5.0 or higher.");
 
-    if (params->args_count != 2 && params->args_count != 3)
+    if (op != HLSL_INTERLOCKED_CMP_EXCH && params->args_count != 2 && params->args_count != 3)
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                 "Unexpected number of arguments to function '%s': expected 2 or 3, but got %u.",
@@ -5398,6 +5398,19 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
 
     lhs = params->args[0];
     lhs_type = lhs->data_type;
+
+    if (op == HLSL_INTERLOCKED_CMP_EXCH)
+    {
+        cmp_val = params->args[1];
+        val = params->args[2];
+        orig_val = params->args[3];
+    }
+    else
+    {
+        val = params->args[1];
+        if (params->args_count == 3)
+            orig_val = params->args[2];
+    }
 
     if (lhs_type->class != HLSL_CLASS_SCALAR || (lhs_type->e.numeric.type != HLSL_TYPE_UINT
             && lhs_type->e.numeric.type != HLSL_TYPE_INT))
@@ -5415,11 +5428,10 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
     /* Interlocked*() functions always take uint for the value parameters,
      * except for InterlockedMax()/InterlockedMin(). */
     val_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT);
-    if (!(val = add_implicit_conversion(ctx, params->instrs, params->args[1], val_type, loc)))
+    if (cmp_val && !(cmp_val = add_implicit_conversion(ctx, params->instrs, cmp_val, val_type, loc)))
         return false;
-
-    if (params->args_count == 3)
-        orig_val = params->args[2];
+    if (!(val = add_implicit_conversion(ctx, params->instrs, val, val_type, loc)))
+        return false;
 
     /* TODO: groupshared variables */
     if (lhs->type == HLSL_IR_INDEX && hlsl_index_chain_has_resource_access(hlsl_ir_index(lhs)))
@@ -5449,7 +5461,7 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
         return false;
     }
 
-    interlocked = hlsl_new_interlocked(ctx, op, orig_val ? lhs_type : NULL, &dst_deref, coords, NULL, val, loc);
+    interlocked = hlsl_new_interlocked(ctx, op, orig_val ? lhs_type : NULL, &dst_deref, coords, cmp_val, val, loc);
     hlsl_cleanup_deref(&dst_deref);
     if (!interlocked)
         return false;
@@ -5484,6 +5496,12 @@ static bool intrinsic_InterlockedAnd(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_AND, params, loc, "InterlockedAnd");
 }
 
+static bool intrinsic_InterlockedCompareExchange(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_CMP_EXCH, params, loc, "InterlockedCompareExchange");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5499,6 +5517,7 @@ intrinsic_functions[] =
     {"GetRenderTargetSampleCount",          0, true,  intrinsic_GetRenderTargetSampleCount},
     {"InterlockedAdd",                     -1, true,  intrinsic_InterlockedAdd},
     {"InterlockedAnd",                     -1, true,  intrinsic_InterlockedAnd},
+    {"InterlockedCompareExchange",          4, true,  intrinsic_InterlockedCompareExchange},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},

@@ -955,6 +955,7 @@ enum hlsl_interlocked_op
 {
     HLSL_INTERLOCKED_ADD,
     HLSL_INTERLOCKED_AND,
+    HLSL_INTERLOCKED_CMP_EXCH,
 };
 
 /* Represents an interlocked operation.
