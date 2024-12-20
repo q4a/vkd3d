@@ -45,7 +45,7 @@
 #include <assert.h>
 #include "demo.h"
 
-#include "triangle_hlsl.h"
+DEMO_EMBED(triangle_hlsl, "triangle.hlsl");
 
 struct cxt_fence
 {
@@ -285,9 +285,11 @@ static void cxt_load_assets(struct cx_triangle *cxt)
     hr = demo_create_root_signature(cxt->device, &root_signature_desc, &cxt->root_signature);
     assert(SUCCEEDED(hr));
 
-    hr = D3DCompile(triangle_hlsl, strlen(triangle_hlsl), NULL, NULL, NULL, "vs_main", "vs_5_0", 0, 0, &vs, NULL);
+    hr = D3DCompile(triangle_hlsl, triangle_hlsl_size, "triangle.hlsl",
+            NULL, NULL, "vs_main", "vs_5_0", 0, 0, &vs, NULL);
     assert(SUCCEEDED(hr));
-    hr = D3DCompile(triangle_hlsl, strlen(triangle_hlsl), NULL, NULL, NULL, "ps_main", "ps_5_0", 0, 0, &ps, NULL);
+    hr = D3DCompile(triangle_hlsl, triangle_hlsl_size, "triangle.hlsl",
+            NULL, NULL, "ps_main", "ps_5_0", 0, 0, &ps, NULL);
     assert(SUCCEEDED(hr));
 
     memset(&pso_desc, 0, sizeof(pso_desc));

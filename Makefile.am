@@ -516,16 +516,18 @@ EXTRA_DIST += $(vkd3d_shader_tests)
 
 if BUILD_DEMOS
 DEMOS_LDADD = $(LDADD) libvkd3d-shader.la @DL_LIBS@ @DEMO_LIBS@
-DEMOS_CFLAGS = $(AM_CFLAGS) @DEMO_CFLAGS@
+DEMOS_CFLAGS = $(AM_CFLAGS) @DEMO_CFLAGS@ -Wa,-I$(srcdir)/demos
 bin_PROGRAMS += $(vkd3d_demos)
 
-demos_vkd3d_gears_SOURCES = demos/gears.c demos/gears_hlsl.h
+demos_vkd3d_gears_SOURCES = demos/gears.c demos/gears.hlsl
 demos_vkd3d_gears_CFLAGS = $(DEMOS_CFLAGS)
 demos_vkd3d_gears_LDADD = $(DEMOS_LDADD) -lm
+demos/vkd3d_gears-gears.$(OBJEXT): demos/gears.hlsl
 
-demos_vkd3d_triangle_SOURCES = demos/triangle.c demos/triangle_hlsl.h
+demos_vkd3d_triangle_SOURCES = demos/triangle.c demos/triangle.hlsl
 demos_vkd3d_triangle_CFLAGS = $(DEMOS_CFLAGS)
 demos_vkd3d_triangle_LDADD = $(DEMOS_LDADD)
+demos/vkd3d_triangle-triangle.$(OBJEXT): demos/triangle.hlsl
 endif
 
 noinst_HEADERS = $(vkd3d_test_headers) $(vkd3d_demos_headers)
@@ -586,7 +588,7 @@ dummy-vkd3d-version:
 ## Cross-compile tests
 cross_implibs = crosslibs/d3d12
 CROSS_CPPFLAGS = -I$(srcdir)/include -I$(srcdir)/include/private -I$(builddir)/include -I$(builddir)/tests
-CROSS_CFLAGS = -g -O2 -Wall -municode ${CROSS_CPPFLAGS} \
+CROSS_CFLAGS = -g -O2 -Wall -municode ${CROSS_CPPFLAGS} -Wa,-I$(srcdir)/demos \
 	-D_WIN32_WINNT=0x0600 -D__USE_MINGW_ANSI_STDIO=0 -DVKD3D_CROSSTEST=1
 EXTRA_DIST += $(cross_implibs:=.cross32.def) $(cross_implibs:=.cross64.def)
 EXTRA_DIST += tests/driver.c tests/shader_runner_d3d11.c tests/shader_runner_d3d9.c
@@ -610,6 +612,8 @@ CROSS32_EXEFILES += $(vkd3d_cross_tests:=.cross32.exe)
 endif
 if BUILD_DEMOS
 CROSS32_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe)
+demos/gears.cross32.exe: demos/gears.hlsl
+demos/triangle.cross32.exe: demos/triangle.hlsl
 endif
 
 CROSS32_FILES = $(CROSS32_EXEFILES)
@@ -657,6 +661,8 @@ CROSS64_EXEFILES += $(vkd3d_cross_tests:=.cross64.exe)
 endif
 if BUILD_DEMOS
 CROSS64_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe)
+demos/gears.cross64.exe: demos/gears.hlsl
+demos/triangle.cross64.exe: demos/triangle.hlsl
 endif
 
 CROSS64_FILES = $(CROSS64_EXEFILES)

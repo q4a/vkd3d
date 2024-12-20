@@ -48,7 +48,7 @@
 #include <math.h>
 #include "demo.h"
 
-#include "gears_hlsl.h"
+DEMO_EMBED(gears_hlsl, "gears.hlsl");
 
 struct cxg_fence
 {
@@ -681,11 +681,14 @@ static void cxg_load_assets(struct cx_gears *cxg)
     hr = demo_create_root_signature(cxg->device, &root_signature_desc, &cxg->root_signature);
     assert(SUCCEEDED(hr));
 
-    hr = D3DCompile(gears_hlsl, strlen(gears_hlsl), NULL, NULL, NULL, "vs_main", "vs_5_0", 0, 0, &vs, NULL);
+    hr = D3DCompile(gears_hlsl, gears_hlsl_size, "gears.hlsl",
+            NULL, NULL, "vs_main", "vs_5_0", 0, 0, &vs, NULL);
     assert(SUCCEEDED(hr));
-    hr = D3DCompile(gears_hlsl, strlen(gears_hlsl), NULL, NULL, NULL, "ps_main_flat", "ps_5_0", 0, 0, &ps_flat, NULL);
+    hr = D3DCompile(gears_hlsl, gears_hlsl_size, "gears.hlsl",
+            NULL, NULL, "ps_main_flat", "ps_5_0", 0, 0, &ps_flat, NULL);
     assert(SUCCEEDED(hr));
-    hr = D3DCompile(gears_hlsl, strlen(gears_hlsl), NULL, NULL, NULL, "ps_main_smooth", "ps_5_0", 0, 0, &ps_smooth, NULL);
+    hr = D3DCompile(gears_hlsl, gears_hlsl_size, "gears.hlsl",
+            NULL, NULL, "ps_main_smooth", "ps_5_0", 0, 0, &ps_smooth, NULL);
     assert(SUCCEEDED(hr));
 
     memset(&pso_desc, 0, sizeof(pso_desc));

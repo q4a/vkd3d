@@ -39,6 +39,42 @@
 #include <vkd3d_d3d12.h>
 #include <inttypes.h>
 
+#ifdef __WIN32__
+#define DEMO_ASM_PUSHSECTION ".section rdata\n\t"
+#define DEMO_ASM_POPSECTION ".text\n\t"
+#define DEMO_ASM_OBJECT_TYPE(name)
+#else
+#define DEMO_ASM_PUSHSECTION ".pushsection .rodata\n\t"
+#define DEMO_ASM_POPSECTION ".popsection\n\t"
+#define DEMO_ASM_OBJECT_TYPE(name) ".type "name", @object\n\t"
+#endif
+
+#if defined(__WIN32__) && defined(__i386__)
+#define DEMO_ASM_NAME(name) "_"#name
+#else
+#define DEMO_ASM_NAME(name) #name
+#endif
+
+#define DEMO_EMBED_ASM(name, file) \
+    DEMO_ASM_PUSHSECTION \
+    ".global "name"\n\t" \
+    DEMO_ASM_OBJECT_TYPE(name) \
+    ".balign 8\n\t" \
+    name":\n\t" \
+    ".incbin \""file"\"\n\t" \
+    name"_end:\n\t" \
+    ".global "name"_size\n\t" \
+    DEMO_ASM_OBJECT_TYPE(name"_size") \
+    ".balign 8\n\t" \
+    name"_size:\n\t" \
+    ".int "name"_end - "name"\n\t" \
+    DEMO_ASM_POPSECTION
+
+#define DEMO_EMBED(name, file) \
+    extern const unsigned int name##_size; \
+    extern const uint8_t name[]; \
+    __asm__(DEMO_EMBED_ASM(DEMO_ASM_NAME(name), file))
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*x))
 
 #define DEMO_KEY_UNKNOWN    0x0000
