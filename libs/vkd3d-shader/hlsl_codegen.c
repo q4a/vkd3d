@@ -8271,8 +8271,6 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer,
     const struct hlsl_type *array_type = hlsl_get_multiarray_element_type(type);
     unsigned int array_size = hlsl_get_multiarray_size(type);
     struct hlsl_struct_field *field;
-    unsigned int field_count = 0;
-    size_t fields_offset = 0;
     size_t i;
 
     if (type->bytecode_offset)
@@ -8280,7 +8278,8 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer,
 
     if (array_type->class == HLSL_CLASS_STRUCT)
     {
-        field_count = array_type->e.record.field_count;
+        unsigned int field_count = array_type->e.record.field_count;
+        size_t fields_offset;
 
         for (i = 0; i < field_count; ++i)
         {
@@ -8297,13 +8296,23 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer,
             put_u32(buffer, field->name_bytecode_offset - ctab_start);
             put_u32(buffer, field->type->bytecode_offset - ctab_start);
         }
-    }
 
-    type->bytecode_offset = put_u32(buffer,
-            vkd3d_make_u32(hlsl_sm1_class(type), hlsl_sm1_base_type(array_type, is_combined_sampler)));
-    put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
-    put_u32(buffer, vkd3d_make_u32(array_size, field_count));
-    put_u32(buffer, fields_offset);
+        type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(D3DXPC_STRUCT, D3DXPT_VOID));
+        put_u32(buffer, vkd3d_make_u32(1, hlsl_type_component_count(array_type)));
+        put_u32(buffer, vkd3d_make_u32(array_size, field_count));
+        put_u32(buffer, fields_offset);
+    }
+    else
+    {
+        type->bytecode_offset = put_u32(buffer,
+                vkd3d_make_u32(hlsl_sm1_class(type), hlsl_sm1_base_type(array_type, is_combined_sampler)));
+        if (hlsl_is_numeric_type(array_type))
+            put_u32(buffer, vkd3d_make_u32(array_type->dimy, array_type->dimx));
+        else
+            put_u32(buffer, vkd3d_make_u32(1, 1));
+        put_u32(buffer, vkd3d_make_u32(array_size, 0));
+        put_u32(buffer, 1);
+    }
 }
 
 static void sm1_sort_extern(struct list *sorted, struct hlsl_ir_var *to_sort)
