@@ -254,3 +254,44 @@ if(sm<6)  probe uav 2 (1) ri  (0)
 if(sm<6)  probe uav 2 (2) ri  (0)
 probe uav 2 (3) ri  (-1)
 if(sm<6)  probe uav 2 (4) ri  (-1)
+
+
+% Interlocked* functions return void.
+
+[compute shader fail]
+RWBuffer<uint> u : register(u1);
+
+    [numthreads(3, 1, 1)]
+void main()
+{
+    uint err = InterlockedAdd(u[0], 1);
+}
+
+[compute shader fail]
+RWBuffer<uint> u : register(u1);
+
+    [numthreads(3, 1, 1)]
+void main()
+{
+    uint old;
+    uint err = InterlockedAdd(u[0], 1, old);
+}
+
+[compute shader fail]
+RWBuffer<uint> u : register(u1);
+
+    [numthreads(3, 1, 1)]
+void main()
+{
+    uint err = InterlockedCompareStore(u[0], 0, 1);
+}
+
+[compute shader fail]
+RWBuffer<uint> u : register(u1);
+
+    [numthreads(3, 1, 1)]
+void main()
+{
+    uint old;
+    uint err = InterlockedCompareExchange(u[0], 0, 1, old);
+}
