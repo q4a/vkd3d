@@ -56,9 +56,9 @@ todo(msl) draw quad
 probe (0,0) rgba (0.0, 0.0, 1.0, 0.0)
 
 [require]
-shader model >= 4.0
+shader model >= 3.0
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 sampler s;
 Texture2D t;
 uniform float4 grad;
@@ -70,11 +70,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo(msl) draw quad
+todo(msl | sm<4) draw quad
 probe (0, 0) rgba (1.0, 0.0, 1.0, 0.0)
 uniform 0 float4 1.0 1.0 1.0 1.0
-todo(msl) draw quad
+todo(msl | sm<4) draw quad
 probe (0, 0) rgba (0.0, 0.0, 1.0, 0.0)
 uniform 0 float4 2.0 2.0 2.0 2.0
-todo(msl) draw quad
+todo(msl | sm<4) draw quad
 probe (0, 0) rgba (0.0, 0.0, 1.0, 0.0)
