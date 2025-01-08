@@ -2881,6 +2881,7 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     load = hlsl_ir_resource_load(instr);
 
     if (load->load_type != HLSL_RESOURCE_SAMPLE
+            && load->load_type != HLSL_RESOURCE_SAMPLE_GRAD
             && load->load_type != HLSL_RESOURCE_SAMPLE_LOD
             && load->load_type != HLSL_RESOURCE_SAMPLE_LOD_BIAS)
         return false;
@@ -6977,7 +6978,8 @@ static void sm1_generate_vsir_sampler_dcls(struct hlsl_ctx *ctx,
                         break;
 
                     case HLSL_SAMPLER_DIM_GENERIC:
-                        /* These can appear in sm4-style combined sample instructions. */
+                        /* These can appear in sm4-style separate sample
+                         * instructions that haven't been lowered. */
                         hlsl_fixme(ctx, &var->loc, "Generic samplers need to be lowered.");
                         continue;
 
