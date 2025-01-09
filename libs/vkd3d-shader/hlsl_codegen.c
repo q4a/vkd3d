@@ -2909,6 +2909,13 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         return false;
     vkd3d_string_buffer_printf(name, "%s+%s", sampler->name, resource->name);
 
+    if (load->texel_offset.node)
+    {
+        hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "Texel offsets are not supported on profiles lower than 4.0.\n");
+        return false;
+    }
+
     TRACE("Lowering to combined sampler %s.\n", debugstr_a(name->buffer));
 
     if (!(var = hlsl_get_var(ctx->globals, name->buffer)))
