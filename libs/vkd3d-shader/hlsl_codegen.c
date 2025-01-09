@@ -11825,6 +11825,95 @@ static bool lower_f32tof16(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, stru
     return true;
 }
 
+static bool lower_isinf(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *call, *rhs, *store;
+    struct hlsl_ir_function_decl *func;
+    unsigned int component_count;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_var *lhs;
+    const char *template;
+    char *body;
+
+    static const char template_sm2[] =
+        "typedef bool%u boolX;\n"
+        "typedef float%u floatX;\n"
+        "boolX isinf(floatX x)\n"
+        "{\n"
+        "    floatX v = 1 / x;\n"
+        "    v = v * v;\n"
+        "    return v <= 0;\n"
+        "}\n";
+
+    static const char template_sm3[] =
+        "typedef bool%u boolX;\n"
+        "typedef float%u floatX;\n"
+        "boolX isinf(floatX x)\n"
+        "{\n"
+        "    floatX v = 1 / x;\n"
+        "    return v <= 0;\n"
+        "}\n";
+
+    static const char template_sm4[] =
+        "typedef bool%u boolX;\n"
+        "typedef float%u floatX;\n"
+        "boolX isinf(floatX x)\n"
+        "{\n"
+        "    return (asuint(x) & 0x7fffffff) == 0x7f800000;\n"
+        "}\n";
+
+    static const char template_int[] =
+        "typedef bool%u boolX;\n"
+        "typedef float%u floatX;\n"
+        "boolX isinf(floatX x)\n"
+        "{\n"
+        "    return false;\n"
+        "}";
+
+    if (node->type != HLSL_IR_EXPR)
+        return false;
+
+    expr = hlsl_ir_expr(node);
+
+    if (expr->op != HLSL_OP1_ISINF)
+        return false;
+
+    rhs = expr->operands[0].node;
+
+    if (hlsl_version_lt(ctx, 3, 0))
+        template = template_sm2;
+    else if (hlsl_version_lt(ctx, 4, 0))
+        template = template_sm3;
+    else if (type_is_integer(rhs->data_type))
+        template = template_int;
+    else
+        template = template_sm4;
+
+    component_count = hlsl_type_component_count(rhs->data_type);
+    if (!(body = hlsl_sprintf_alloc(ctx, template, component_count, component_count)))
+        return false;
+
+    if (!(func = hlsl_compile_internal_function(ctx, "isinf", body)))
+        return false;
+
+    lhs = func->parameters.vars[0];
+
+    if (!(store = hlsl_new_simple_store(ctx, lhs, rhs)))
+        return false;
+    hlsl_block_add_instr(block, store);
+
+    if (!(call = hlsl_new_call(ctx, func, &node->loc)))
+        return false;
+    hlsl_block_add_instr(block, call);
+
+    if (!(load = hlsl_new_var_load(ctx, func->return_var, &node->loc)))
+        return false;
+    hlsl_block_add_instr(block, &load->node);
+
+    return true;
+}
+
 static void process_entry_function(struct hlsl_ctx *ctx,
         const struct hlsl_block *global_uniform_block, struct hlsl_ir_function_decl *entry_func)
 {
@@ -11857,6 +11946,8 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         lower_ir(ctx, lower_f16tof32, body);
         lower_ir(ctx, lower_f32tof16, body);
     }
+
+    lower_ir(ctx, lower_isinf, body);
 
     lower_return(ctx, entry_func, body, false);
 
