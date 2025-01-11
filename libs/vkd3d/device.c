@@ -3557,12 +3557,6 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device9 
                 return E_INVALIDARG;
             }
 
-            if (data->Format == DXGI_FORMAT_UNKNOWN)
-            {
-                data->PlaneCount = 1;
-                return S_OK;
-            }
-
             if (!(format = vkd3d_get_format(device, data->Format, false)))
                 format = vkd3d_get_format(device, data->Format, true);
             if (!format)
