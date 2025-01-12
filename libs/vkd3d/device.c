@@ -3443,6 +3443,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device9 
             for (i = 0; i < data->NumFeatureLevels; ++i)
             {
                 D3D_FEATURE_LEVEL fl = data->pFeatureLevelsRequested[i];
+                TRACE("Requested feature level %#x.\n", fl);
                 if (data->MaxSupportedFeatureLevel < fl && fl <= vulkan_info->max_feature_level)
                     data->MaxSupportedFeatureLevel = fl;
             }
