@@ -329,9 +329,8 @@ static bool compile_hlsl_and_scan(struct vulkan_shader_runner *runner, enum shad
     runner->signatures[type].type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
     runner->signatures[type].next = NULL;
     ret = vkd3d_shader_scan(&info, NULL);
-    ok(!ret, "Failed to scan, error %d.\n", ret);
 
-    return true;
+    return ret >= 0;
 }
 
 static bool compile_d3d_code(struct vulkan_shader_runner *runner,

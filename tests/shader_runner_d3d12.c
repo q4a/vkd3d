@@ -787,11 +787,11 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         succeeded = succeeded && gs_code;
     }
 
-    todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0)
-    ok(succeeded, "Failed to compile shaders.\n");
-
     if (!succeeded)
     {
+        todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0)
+        ok(false, "Failed to compile shaders.\n");
+
         if (ps_code)
             ID3D10Blob_Release(ps_code);
         if (vs_code)

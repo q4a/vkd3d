@@ -1643,13 +1643,58 @@ static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, const char *profi
     return hr;
 }
 
+static ID3D10Blob *parse_hex(const char *source)
+{
+    size_t len = strlen(source), i, pos = 0;
+    unsigned char *ptr, value = 0;
+    bool even = false;
+    ID3D10Blob *blob;
+
+    ptr = malloc(len / 2);
+
+    for (i = 0; i < len; ++i)
+    {
+        char c = source[i];
+
+        if (isspace(c))
+            continue;
+
+        if ('0' <= c && c <= '9')
+            value = 16 * value + (c - '0');
+        else if ('a' <= c && c <= 'f')
+            value = 16 * value + (c - 'a' + 10);
+        else if ('A' <= c && c <= 'F')
+            value = 16 * value + (c - 'A' + 10);
+        else
+            fatal_error("Invalid hex character '%c'\n", c);
+
+        if (even)
+        {
+            ptr[pos++] = value;
+            value = 0;
+        }
+
+        even = !even;
+    }
+
+    if (even)
+        fatal_error("Odd number of hex characters.\n");
+
+    D3DCreateBlob(pos, &blob);
+    if (pos)
+        memcpy(ID3D10Blob_GetBufferPointer(blob), ptr, pos);
+    free(ptr);
+
+    return blob;
+}
+
 ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type type)
 {
     const char *source = runner->shader_source[type];
     unsigned int options = runner->compile_options;
     ID3D10Blob *blob = NULL, *errors = NULL;
+    HRESULT hr = S_OK;
     char profile[7];
-    HRESULT hr;
 
     static const char *const shader_models[] =
     {
@@ -1672,16 +1717,45 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
 
     sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
 
-    if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
+    switch (runner->shader_format[type])
     {
-        assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options,
-                runner->require_shader_caps[SHADER_CAP_NATIVE_16_BIT], source, &blob);
+        case SOURCE_FORMAT_HLSL:
+            if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
+            {
+                assert(runner->dxc_compiler);
+                hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options,
+                        runner->require_shader_caps[SHADER_CAP_NATIVE_16_BIT], source, &blob);
+            }
+            else
+            {
+                hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, options, 0, &blob, &errors);
+            }
+            break;
+
+        case SOURCE_FORMAT_D3DBC_HEX:
+            if (runner->maximum_shader_model >= SHADER_MODEL_4_0)
+                fatal_error("Cannot use d3dbc-hex with maximum shader model %#x.\n", runner->maximum_shader_model);
+            blob = parse_hex(source);
+            hr = S_OK;
+            break;
+
+        case SOURCE_FORMAT_DXBC_TPF_HEX:
+            if (runner->minimum_shader_model < SHADER_MODEL_4_0)
+                fatal_error("Cannot use dxbc-tpf-hex with minimum shader model %#x.\n", runner->minimum_shader_model);
+            if (runner->maximum_shader_model >= SHADER_MODEL_6_0)
+                fatal_error("Cannot use dxbc-tpf-hex with maximum shader model %#x.\n", runner->maximum_shader_model);
+            blob = parse_hex(source);
+            hr = S_OK;
+            break;
+
+        case SOURCE_FORMAT_DXBC_DXIL_HEX:
+            if (runner->minimum_shader_model < SHADER_MODEL_6_0)
+                fatal_error("Cannot use dxbc-dxil-hex with minimum shader model %#x.\n", runner->minimum_shader_model);
+            blob = parse_hex(source);
+            hr = S_OK;
+            break;
     }
-    else
-    {
-        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, options, 0, &blob, &errors);
-    }
+
     if (hr != S_OK)
     {
         todo_if (runner->is_todo)
@@ -1724,6 +1798,17 @@ static void compile_shader(struct shader_runner *runner, const char *source,
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",
     };
+
+    switch (runner->shader_format[type])
+    {
+        case SOURCE_FORMAT_HLSL:
+            break;
+
+        case SOURCE_FORMAT_D3DBC_HEX:
+        case SOURCE_FORMAT_DXBC_TPF_HEX:
+        case SOURCE_FORMAT_DXBC_DXIL_HEX:
+            return;
+    }
 
     /* We can let this go through D3DCompile() with the invalid shader model
      * string, but it returns a unique error code. Just skip it. */
@@ -1775,13 +1860,16 @@ static void compile_shader(struct shader_runner *runner, const char *source,
     }
 }
 
-static void read_shader_directive(struct shader_runner *runner, const char *line, const char *src)
+static void read_shader_directive(struct shader_runner *runner, const char *line,
+        const char *src, enum shader_type shader_type)
 {
     for (unsigned int i = SHADER_MODEL_MIN; i <= SHADER_MODEL_MAX; ++i)
     {
         runner->hlsl_hrs[i] = S_OK;
         runner->hlsl_todo[i] = false;
     }
+
+    runner->shader_format[shader_type] = SOURCE_FORMAT_HLSL;
 
     while (*src && *src != ']')
     {
@@ -1814,6 +1902,18 @@ static void read_shader_directive(struct shader_runner *runner, const char *line
                 if (model_mask & (1u << i))
                     runner->hlsl_hrs[i] = E_NOTIMPL;
             }
+        }
+        else if (match_string(src, "d3dbc-hex", &src))
+        {
+            runner->shader_format[shader_type] = SOURCE_FORMAT_D3DBC_HEX;
+        }
+        else if (match_string(src, "dxbc-tpf-hex", &src))
+        {
+            runner->shader_format[shader_type] = SOURCE_FORMAT_DXBC_TPF_HEX;
+        }
+        else if (match_string(src, "dxbc-dxil-hex", &src))
+        {
+            runner->shader_format[shader_type] = SOURCE_FORMAT_DXBC_DXIL_HEX;
         }
         else
         {
@@ -2340,7 +2440,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
             }
 
             if (state == STATE_SHADER)
-                read_shader_directive(runner, line_buffer, line);
+                read_shader_directive(runner, line_buffer, line, shader_type);
         }
         else if (line[0] != '%' && line[0] != '\n')
         {

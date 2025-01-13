@@ -188,6 +188,14 @@ enum fog_mode
     FOG_MODE_DISABLE,
 };
 
+enum source_format
+{
+    SOURCE_FORMAT_HLSL,
+    SOURCE_FORMAT_D3DBC_HEX,
+    SOURCE_FORMAT_DXBC_TPF_HEX,
+    SOURCE_FORMAT_DXBC_DXIL_HEX,
+};
+
 struct shader_runner
 {
     const struct shader_runner_ops *ops;
@@ -199,6 +207,7 @@ struct shader_runner
     HRESULT hlsl_hrs[SHADER_MODEL_MAX + 1];
 
     char *shader_source[SHADER_TYPE_COUNT];
+    enum source_format shader_format[SHADER_TYPE_COUNT];
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
     bool require_shader_caps[SHADER_CAP_COUNT];
