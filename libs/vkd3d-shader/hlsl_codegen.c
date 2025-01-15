@@ -3115,16 +3115,16 @@ static bool sort_synthetic_separated_samplers_first(struct hlsl_ctx *ctx)
  *
  *      extra = FRACT(x) > 0 && x < 0
  *
- * where the comparisons in the extra term are performed using CMP.
+ * where the comparisons in the extra term are performed using CMP or SLT
+ * depending on whether this is a pixel or vertex shader, respectively.
  *
  * A REINTERPET (which is written as a mere MOV) is also applied to the final
  * result for type consistency.
  */
 static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
-    struct hlsl_ir_node *arg, *fract, *neg_fract, *has_fract, *floor, *extra, *res, *zero, *one;
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
-    struct hlsl_constant_value zero_value, one_value;
+    struct hlsl_ir_node *arg, *res;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -3139,42 +3139,80 @@ static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     if (arg->data_type->e.numeric.type != HLSL_TYPE_FLOAT && arg->data_type->e.numeric.type != HLSL_TYPE_HALF)
         return false;
 
-    memset(&zero_value, 0, sizeof(zero_value));
-    if (!(zero = hlsl_new_constant(ctx, arg->data_type, &zero_value, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, zero);
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+    {
+        struct hlsl_ir_node *fract, *neg_fract, *has_fract, *floor, *extra, *zero, *one;
+        struct hlsl_constant_value zero_value, one_value;
 
-    one_value.u[0].f = 1.0;
-    one_value.u[1].f = 1.0;
-    one_value.u[2].f = 1.0;
-    one_value.u[3].f = 1.0;
-    if (!(one = hlsl_new_constant(ctx, arg->data_type, &one_value, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, one);
+        memset(&zero_value, 0, sizeof(zero_value));
+        if (!(zero = hlsl_new_constant(ctx, arg->data_type, &zero_value, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, zero);
 
-    if (!(fract = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, arg, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, fract);
+        one_value.u[0].f = 1.0;
+        one_value.u[1].f = 1.0;
+        one_value.u[2].f = 1.0;
+        one_value.u[3].f = 1.0;
+        if (!(one = hlsl_new_constant(ctx, arg->data_type, &one_value, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, one);
 
-    if (!(neg_fract = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, fract, &instr->loc)))
-        return false;
-    hlsl_block_add_instr(block, neg_fract);
+        if (!(fract = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, arg, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, fract);
 
-    if (!(has_fract = hlsl_new_ternary_expr(ctx, HLSL_OP3_CMP, neg_fract, zero, one)))
-        return false;
-    hlsl_block_add_instr(block, has_fract);
+        if (!(neg_fract = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, fract, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, neg_fract);
 
-    if (!(extra = hlsl_new_ternary_expr(ctx, HLSL_OP3_CMP, arg, zero, has_fract)))
-        return false;
-    hlsl_block_add_instr(block, extra);
+        if (!(has_fract = hlsl_new_ternary_expr(ctx, HLSL_OP3_CMP, neg_fract, zero, one)))
+            return false;
+        hlsl_block_add_instr(block, has_fract);
 
-    if (!(floor = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg, neg_fract)))
-        return false;
-    hlsl_block_add_instr(block, floor);
+        if (!(extra = hlsl_new_ternary_expr(ctx, HLSL_OP3_CMP, arg, zero, has_fract)))
+            return false;
+        hlsl_block_add_instr(block, extra);
 
-    if (!(res = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, floor, extra)))
-        return false;
-    hlsl_block_add_instr(block, res);
+        if (!(floor = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg, neg_fract)))
+            return false;
+        hlsl_block_add_instr(block, floor);
+
+        if (!(res = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, floor, extra)))
+            return false;
+        hlsl_block_add_instr(block, res);
+    }
+    else
+    {
+        struct hlsl_ir_node *neg_arg, *is_neg, *fract, *neg_fract, *has_fract, *floor;
+
+        if (!(neg_arg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, neg_arg);
+
+        if (!(is_neg = hlsl_new_binary_expr(ctx, HLSL_OP2_SLT, arg, neg_arg)))
+            return false;
+        hlsl_block_add_instr(block, is_neg);
+
+        if (!(fract = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, arg, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, fract);
+
+        if (!(neg_fract = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, fract, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, neg_fract);
+
+        if (!(has_fract = hlsl_new_binary_expr(ctx, HLSL_OP2_SLT, neg_fract, fract)))
+            return false;
+        hlsl_block_add_instr(block, has_fract);
+
+        if (!(floor = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg, neg_fract)))
+            return false;
+        hlsl_block_add_instr(block, floor);
+
+        if (!(res = hlsl_new_ternary_expr(ctx, HLSL_OP3_MAD, is_neg, has_fract, floor)))
+            return false;
+        hlsl_block_add_instr(block, res);
+    }
 
     memset(operands, 0, sizeof(operands));
     operands[0] = res;
