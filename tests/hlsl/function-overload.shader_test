@@ -445,6 +445,98 @@ probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
 % argument, but with more components) for the first function and "double" for the
 % second function.
 
+[pixel shader todo(sm<6)]
+float func(float2 x, double y)
+{
+    return 1.0;
+}
+
+float func(half4 x, int y)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    float4 x = 0.0;
+    float y = 0.0;
+
+    return func(x, y);
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0, 0) r(2.0)
+
+[pixel shader todo(sm<6)]
+float func(uint4 x, double y)
+{
+    return 1.0;
+}
+
+float func(int4 x, int y)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    int x = 0.0;
+    float y = 0.0;
+
+    return func(x, y);
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0, 0) r(1.0)
+
+[pixel shader todo(sm<6)]
+float func(uint4 x, double y)
+{
+    return 1.0;
+}
+
+float func(int4 x, int y)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    int x = 0.0;
+    float y = 0.0;
+
+    return func(x, y);
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0, 0) r(1.0)
+
+[pixel shader todo(sm<6)]
+float func(half4 x, half y, half z, half a)
+{
+    return 1.0;
+}
+
+float func(float2 x, double y, double z, double a)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    float4 x = 0.0;
+    float y = 0.0;
+
+    return func(x, y, y, y);
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0, 0) r(1.0)
+
 [require]
 % Reset
 
@@ -590,3 +682,47 @@ float4 main() : sv_target
 [test]
 draw quad
 probe (0, 0) rgba(42.0, 42.0, 42.0, 42.0)
+
+[pixel shader todo(sm<6)]
+float func(float x, float y)
+{
+    return 1.0;
+}
+
+float3 func(float3 x, float3 y)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    float x = 5.0;
+    half3 y = 10.0;
+    return float4(func(x, y), 0);
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0, 0) r(2.0)
+
+[pixel shader todo(sm<6)]
+float func(float3 a, float3 b, float3 c, float3 d)
+{
+    return 1.0;
+}
+
+float func(float a, float b, float c, float d)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    float x = 10.0;
+    float3 y = 20.0;
+    return func(x, x, x, y);
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0, 0) r(1.0)
