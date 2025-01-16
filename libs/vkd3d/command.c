@@ -6455,6 +6455,7 @@ static void d3d12_command_queue_destroy_op(struct vkd3d_cs_op_data *op)
             break;
 
         case VKD3D_CS_OP_SIGNAL:
+        case VKD3D_CS_OP_SIGNAL_ON_CPU:
             d3d12_fence_decref(op->u.signal.fence);
             break;
 
@@ -7445,6 +7446,7 @@ static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *
     struct vkd3d_cs_op_data *op;
     struct d3d12_fence *fence;
     unsigned int i;
+    HRESULT hr;
 
     queue->is_flushing = true;
 
@@ -7476,6 +7478,11 @@ static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *
 
                 case VKD3D_CS_OP_SIGNAL:
                     d3d12_command_queue_signal(queue, op->u.signal.fence, op->u.signal.value);
+                    break;
+
+                case VKD3D_CS_OP_SIGNAL_ON_CPU:
+                    if (FAILED(hr = d3d12_fence_Signal(&op->u.signal.fence->ID3D12Fence1_iface, op->u.signal.value)))
+                        ERR("Failed to signal fence %p, hr %s.\n", op->u.signal.fence, debugstr_hresult(hr));
                     break;
 
                 case VKD3D_CS_OP_EXECUTE:
@@ -7618,6 +7625,36 @@ void vkd3d_release_vk_queue(ID3D12CommandQueue *queue)
     struct d3d12_command_queue *d3d12_queue = impl_from_ID3D12CommandQueue(queue);
 
     return vkd3d_queue_release(d3d12_queue->vkd3d_queue);
+}
+
+HRESULT vkd3d_queue_signal_on_cpu(ID3D12CommandQueue *iface, ID3D12Fence *fence_iface, uint64_t value)
+{
+    struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
+    struct d3d12_fence *fence = unsafe_impl_from_ID3D12Fence(fence_iface);
+    struct vkd3d_cs_op_data *op;
+    HRESULT hr = S_OK;
+
+    TRACE("iface %p, fence %p, value %#"PRIx64".\n", iface, fence_iface, value);
+
+    vkd3d_mutex_lock(&command_queue->op_mutex);
+
+    if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
+    {
+        ERR("Failed to add op.\n");
+        hr = E_OUTOFMEMORY;
+        goto done;
+    }
+    op->opcode = VKD3D_CS_OP_SIGNAL_ON_CPU;
+    op->u.signal.fence = fence;
+    op->u.signal.value = value;
+
+    d3d12_fence_incref(fence);
+
+    d3d12_command_queue_submit_locked(command_queue);
+
+done:
+    vkd3d_mutex_unlock(&command_queue->op_mutex);
+    return hr;
 }
 
 /* ID3D12CommandSignature */

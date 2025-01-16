@@ -1194,6 +1194,79 @@ static void test_application_info(void)
     ID3D12Device_Release(device);
 }
 
+static void test_queue_signal_on_cpu(void)
+{
+    PFN_vkd3d_queue_signal_on_cpu pfn_vkd3d_queue_signal_on_cpu = vkd3d_queue_signal_on_cpu;
+    D3D12_COMMAND_QUEUE_DESC queue_desc = {0};
+    ID3D12CommandQueue *queue, *queue2;
+    struct test_context context = {0};
+    struct test_context_desc desc;
+    ID3D12Fence *fence, *fence2;
+    unsigned int refcount;
+    enum vkd3d_result ret;
+    ID3D12Device *device;
+    HRESULT hr;
+
+    desc.no_render_target = true;
+    if (!init_test_context(&context, &desc))
+        return;
+    device = context.device;
+    queue = context.queue;
+
+    queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    hr = ID3D12Device_CreateCommandQueue(device, &queue_desc, &IID_ID3D12CommandQueue, (void **)&queue2);
+    ok(hr == S_OK, "Couldn't create command queue, hr %#x.\n", hr);
+
+    hr = ID3D12Device_CreateFence(device, 0, 0, &IID_ID3D12Fence, (void **)&fence);
+    ok(hr == S_OK, "Couldn't create fence, hr %#x.\n", hr);
+    hr = ID3D12Device_CreateFence(device, 0, 0, &IID_ID3D12Fence, (void **)&fence2);
+    ok(hr == S_OK, "Couldn't create fence, hr %#x.\n", hr);
+
+    /* Queue signal on CPU immediately. */
+    ret = pfn_vkd3d_queue_signal_on_cpu(queue, fence, 1);
+    ok(ret == VKD3D_OK, "Couldn't queue signal on CPU, ret %#x.\n", ret);
+    hr = ID3D12Fence_SetEventOnCompletion(fence, 1, NULL);
+    ok(hr == S_OK, "Couldn't wait for fence, hr %#x.\n", hr);
+
+    /* Queue signal on CPU depending on a CPU-side signal. */
+    hr = ID3D12CommandQueue_Wait(queue, fence2, 2);
+    ok(hr == S_OK, "Couldn't queue wait, hr %#x.\n", hr);
+    ret = pfn_vkd3d_queue_signal_on_cpu(queue, fence, 2);
+    ok(ret == VKD3D_OK, "Couldn't queue signal on CPU, ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fence2, 2);
+    ok(hr == S_OK, "Couldn't signal, hr %#x.\n", hr);
+    hr = ID3D12Fence_SetEventOnCompletion(fence, 2, NULL);
+    ok(hr == S_OK, "Couldn't wait for fence, hr %#x.\n", hr);
+
+    /* Queue signal on CPU depending on a GPU-side signal which is already satisfied. */
+    hr = ID3D12CommandQueue_Signal(queue, fence2, 3);
+    ok(hr == S_OK, "Couldn't queue signal, hr %#x.\n", hr);
+    hr = ID3D12CommandQueue_Wait(queue, fence2, 3);
+    ok(hr == S_OK, "Couldn't queue wait, hr %#x.\n", hr);
+    ret = pfn_vkd3d_queue_signal_on_cpu(queue, fence, 3);
+    ok(ret == VKD3D_OK, "Couldn't queue signal on CPU, ret %#x.\n", ret);
+    hr = ID3D12Fence_SetEventOnCompletion(fence, 3, NULL);
+    ok(hr == S_OK, "Couldn't wait for fence, hr %#x.\n", hr);
+
+    /* Queue signal on CPU depending on a GPU-side signal queued on another queue. */
+    hr = ID3D12CommandQueue_Wait(queue, fence2, 4);
+    ok(hr == S_OK, "Couldn't queue wait, hr %#x.\n", hr);
+    ret = pfn_vkd3d_queue_signal_on_cpu(queue, fence, 4);
+    ok(ret == VKD3D_OK, "Couldn't queue signal on CPU, ret %#x.\n", ret);
+    hr = ID3D12CommandQueue_Signal(queue2, fence2, 4);
+    ok(hr == S_OK, "Couldn't queue signal, hr %#x.\n", hr);
+    hr = ID3D12Fence_SetEventOnCompletion(fence, 4, NULL);
+    ok(hr == S_OK, "Couldn't wait for fence, hr %#x.\n", hr);
+
+    refcount = ID3D12CommandQueue_Release(queue2);
+    ok(refcount == 0, "%u references to command queue leaked.\n", refcount);
+    refcount = ID3D12Fence_Release(fence2);
+    ok(refcount == 0, "%u references to fence leaked.\n", refcount);
+    refcount = ID3D12Fence_Release(fence);
+    ok(refcount == 0, "%u references to fence leaked.\n", refcount);
+    destroy_test_context(&context);
+}
+
 static bool have_d3d12_device(void)
 {
     ID3D12Device *device;
@@ -1241,4 +1314,5 @@ LOAD_VK_PFN(vkGetInstanceProcAddr)
     run_test(test_external_resource_present_state);
     run_test(test_formats);
     run_test(test_application_info);
+    run_test(test_queue_signal_on_cpu);
 }
