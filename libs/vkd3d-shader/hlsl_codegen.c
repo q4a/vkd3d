@@ -10004,6 +10004,7 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
         [HLSL_INTERLOCKED_AND] = VKD3DSIH_ATOMIC_AND,
         [HLSL_INTERLOCKED_CMP_EXCH] = VKD3DSIH_ATOMIC_CMP_STORE,
         [HLSL_INTERLOCKED_MAX] = VKD3DSIH_ATOMIC_UMAX,
+        [HLSL_INTERLOCKED_MIN] = VKD3DSIH_ATOMIC_UMIN,
     };
 
     static const enum vkd3d_shader_opcode imm_opcodes[] =
@@ -10013,6 +10014,7 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
         [HLSL_INTERLOCKED_CMP_EXCH] = VKD3DSIH_IMM_ATOMIC_CMP_EXCH,
         [HLSL_INTERLOCKED_EXCH] = VKD3DSIH_IMM_ATOMIC_EXCH,
         [HLSL_INTERLOCKED_MAX] = VKD3DSIH_IMM_ATOMIC_UMAX,
+        [HLSL_INTERLOCKED_MIN] = VKD3DSIH_IMM_ATOMIC_UMIN,
     };
 
     struct hlsl_ir_node *cmp_value = interlocked->cmp_value.node, *value = interlocked->value.node;
@@ -10029,8 +10031,12 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
     {
         if (opcode == VKD3DSIH_ATOMIC_UMAX)
             opcode = VKD3DSIH_ATOMIC_IMAX;
+        else if (opcode == VKD3DSIH_ATOMIC_UMIN)
+            opcode = VKD3DSIH_ATOMIC_IMIN;
         else if (opcode == VKD3DSIH_IMM_ATOMIC_UMAX)
             opcode = VKD3DSIH_IMM_ATOMIC_IMAX;
+        else if (opcode == VKD3DSIH_IMM_ATOMIC_UMIN)
+            opcode = VKD3DSIH_IMM_ATOMIC_IMIN;
     }
 
     if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode,

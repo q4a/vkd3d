@@ -5429,7 +5429,7 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
 
     /* Interlocked*() functions always take uint for the value parameters,
      * except for InterlockedMax()/InterlockedMin(). */
-    if (op == HLSL_INTERLOCKED_MAX)
+    if (op == HLSL_INTERLOCKED_MAX || op == HLSL_INTERLOCKED_MIN)
     {
         enum hlsl_base_type val_base_type = val->data_type->e.numeric.type;
 
@@ -5536,6 +5536,12 @@ static bool intrinsic_InterlockedMax(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_MAX, params, loc, "InterlockedMax");
 }
 
+static bool intrinsic_InterlockedMin(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_MIN, params, loc, "InterlockedMin");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5555,6 +5561,7 @@ intrinsic_functions[] =
     {"InterlockedCompareStore",             3, true,  intrinsic_InterlockedCompareStore},
     {"InterlockedExchange",                 3, true,  intrinsic_InterlockedExchange},
     {"InterlockedMax",                     -1, true,  intrinsic_InterlockedMax},
+    {"InterlockedMin",                     -1, true,  intrinsic_InterlockedMin},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},

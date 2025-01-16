@@ -4030,7 +4030,9 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_ATOMIC_CMP_STORE:
         case VKD3DSIH_ATOMIC_IADD:
         case VKD3DSIH_ATOMIC_IMAX:
+        case VKD3DSIH_ATOMIC_IMIN:
         case VKD3DSIH_ATOMIC_UMAX:
+        case VKD3DSIH_ATOMIC_UMIN:
         case VKD3DSIH_AND:
         case VKD3DSIH_BREAK:
         case VKD3DSIH_CASE:
@@ -4078,7 +4080,9 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_IMM_ATOMIC_EXCH:
         case VKD3DSIH_IMM_ATOMIC_IADD:
         case VKD3DSIH_IMM_ATOMIC_IMAX:
+        case VKD3DSIH_IMM_ATOMIC_IMIN:
         case VKD3DSIH_IMM_ATOMIC_UMAX:
+        case VKD3DSIH_IMM_ATOMIC_UMIN:
         case VKD3DSIH_IMUL:
         case VKD3DSIH_INE:
         case VKD3DSIH_INEG:
