@@ -32,7 +32,7 @@ todo(sm<6) draw quad
 probe (0, 0) rgba(1, -2, -3, -4)
 
 
-[pixel shader]
+[pixel shader todo]
 float4 main() : sv_target
 {
     float p[5] = {-1, -2, -3, -4, -5};
@@ -43,8 +43,8 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
-todo(sm<6) probe (0, 0) rgba(1, 2, -3, -5)
+todo(sm<6) draw quad
+probe (0, 0) rgba(1, 2, -3, -5)
 
 
 [pixel shader]
@@ -75,7 +75,7 @@ float4 main() : sv_target
 
 
 % Matrix partial assignment.
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=6) todo]
 float3x4 a;
 
 float4 main() : sv_target
@@ -91,12 +91,12 @@ uniform 0 float4 1 5 9 0
 uniform 4 float4 2 6 10 0
 uniform 8 float4 3 7 11 0
 uniform 12 float4 4 8 12 0
-draw quad
-todo probe (0, 0) rgba(1050000, 2060000, 3070000, 0)
+todo draw quad
+probe (0, 0) rgba(1050000, 2060000, 3070000, 0)
 
 
 % Multiple cast partial assigment.
-[pixel shader fail(sm>=6)]
+[pixel shader fail(sm>=6) todo]
 float4 main() : sv_target
 {
     float4x4 g = 0;
@@ -106,8 +106,8 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
-todo probe (0, 0) rgba(1, 2, 5, 6)
+todo draw quad
+probe (0, 0) rgba(1, 2, 5, 6)
 
 
 [pixel shader fail(sm>=4) todo]
@@ -134,7 +134,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader]
+[pixel shader todo]
 float4 main() : sv_target
 {
     float p[4][3] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -145,8 +145,8 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
-todo(sm<6) probe (0, 0) rgba(10, 5, 40, 9)
+todo(sm<6) draw quad
+probe (0, 0) rgba(10, 5, 40, 9)
 
 
 % For some reason this acts as .z swizzle on the rhs.

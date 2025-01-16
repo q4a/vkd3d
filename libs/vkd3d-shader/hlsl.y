@@ -359,79 +359,11 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct hlsl_block *bl
     if (src_type->class == HLSL_CLASS_NULL)
         return node;
 
-    if (src_type->class > HLSL_CLASS_VECTOR || dst_type->class > HLSL_CLASS_VECTOR)
-    {
-        unsigned int src_comp_count = hlsl_type_component_count(src_type);
-        unsigned int dst_comp_count = hlsl_type_component_count(dst_type);
-        struct hlsl_deref var_deref;
-        bool broadcast, matrix_cast;
-        struct hlsl_ir_load *load;
-        struct hlsl_ir_var *var;
-        unsigned int dst_idx;
+    if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
+        return NULL;
+    hlsl_block_add_instr(block, cast);
 
-        broadcast = hlsl_is_numeric_type(src_type) && src_type->e.numeric.dimx == 1 && src_type->e.numeric.dimy == 1;
-        matrix_cast = !broadcast && dst_comp_count != src_comp_count
-                && src_type->class == HLSL_CLASS_MATRIX && dst_type->class == HLSL_CLASS_MATRIX;
-        VKD3D_ASSERT(src_comp_count >= dst_comp_count || broadcast);
-        if (matrix_cast)
-        {
-            VKD3D_ASSERT(dst_type->e.numeric.dimx <= src_type->e.numeric.dimx);
-            VKD3D_ASSERT(dst_type->e.numeric.dimy <= src_type->e.numeric.dimy);
-        }
-
-        if (!(var = hlsl_new_synthetic_var(ctx, "cast", dst_type, loc)))
-            return NULL;
-        hlsl_init_simple_deref_from_var(&var_deref, var);
-
-        for (dst_idx = 0; dst_idx < dst_comp_count; ++dst_idx)
-        {
-            struct hlsl_ir_node *component_load;
-            struct hlsl_type *dst_comp_type;
-            struct hlsl_block store_block;
-            unsigned int src_idx;
-
-            if (broadcast)
-            {
-                src_idx = 0;
-            }
-            else if (matrix_cast)
-            {
-                unsigned int x = dst_idx % dst_type->e.numeric.dimx, y = dst_idx / dst_type->e.numeric.dimx;
-
-                src_idx = y * src_type->e.numeric.dimx + x;
-            }
-            else
-            {
-                src_idx = dst_idx;
-            }
-
-            dst_comp_type = hlsl_type_get_component_type(ctx, dst_type, dst_idx);
-
-            if (!(component_load = hlsl_add_load_component(ctx, block, node, src_idx, loc)))
-                return NULL;
-
-            if (!(cast = hlsl_new_cast(ctx, component_load, dst_comp_type, loc)))
-                return NULL;
-            hlsl_block_add_instr(block, cast);
-
-            if (!hlsl_new_store_component(ctx, &store_block, &var_deref, dst_idx, cast))
-                return NULL;
-            hlsl_block_add_block(block, &store_block);
-        }
-
-        if (!(load = hlsl_new_var_load(ctx, var, loc)))
-            return NULL;
-        hlsl_block_add_instr(block, &load->node);
-
-        return &load->node;
-    }
-    else
-    {
-        if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
-            return NULL;
-        hlsl_block_add_instr(block, cast);
-        return cast;
-    }
+    return cast;
 }
 
 static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *block,

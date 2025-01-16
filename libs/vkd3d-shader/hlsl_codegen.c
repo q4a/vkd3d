@@ -1075,6 +1075,90 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
     return &coords_load->node;
 }
 
+static bool lower_complex_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    unsigned int src_comp_count, dst_comp_count;
+    struct hlsl_type *src_type, *dst_type;
+    struct hlsl_deref var_deref;
+    bool broadcast, matrix_cast;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *arg;
+    struct hlsl_ir_var *var;
+    unsigned int dst_idx;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+
+    if (hlsl_ir_expr(instr)->op != HLSL_OP1_CAST)
+        return false;
+
+    arg = hlsl_ir_expr(instr)->operands[0].node;
+    dst_type = instr->data_type;
+    src_type = arg->data_type;
+
+    if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR)
+        return false;
+
+    src_comp_count = hlsl_type_component_count(src_type);
+    dst_comp_count = hlsl_type_component_count(dst_type);
+    broadcast = hlsl_is_numeric_type(src_type) && src_type->e.numeric.dimx == 1 && src_type->e.numeric.dimy == 1;
+    matrix_cast = !broadcast && dst_comp_count != src_comp_count
+            && src_type->class == HLSL_CLASS_MATRIX && dst_type->class == HLSL_CLASS_MATRIX;
+
+    VKD3D_ASSERT(src_comp_count >= dst_comp_count || broadcast);
+    if (matrix_cast)
+    {
+        VKD3D_ASSERT(dst_type->e.numeric.dimx <= src_type->e.numeric.dimx);
+        VKD3D_ASSERT(dst_type->e.numeric.dimy <= src_type->e.numeric.dimy);
+    }
+
+    if (!(var = hlsl_new_synthetic_var(ctx, "cast", dst_type, &instr->loc)))
+        return false;
+    hlsl_init_simple_deref_from_var(&var_deref, var);
+
+    for (dst_idx = 0; dst_idx < dst_comp_count; ++dst_idx)
+    {
+        struct hlsl_ir_node *component_load, *cast;
+        struct hlsl_type *dst_comp_type;
+        struct hlsl_block store_block;
+        unsigned int src_idx;
+
+        if (broadcast)
+        {
+            src_idx = 0;
+        }
+        else if (matrix_cast)
+        {
+            unsigned int x = dst_idx % dst_type->e.numeric.dimx, y = dst_idx / dst_type->e.numeric.dimx;
+
+            src_idx = y * src_type->e.numeric.dimx + x;
+        }
+        else
+        {
+            src_idx = dst_idx;
+        }
+
+        dst_comp_type = hlsl_type_get_component_type(ctx, dst_type, dst_idx);
+
+        if (!(component_load = hlsl_add_load_component(ctx, block, arg, src_idx, &arg->loc)))
+            return false;
+
+        if (!(cast = hlsl_new_cast(ctx, component_load, dst_comp_type, &arg->loc)))
+            return false;
+        hlsl_block_add_instr(block, cast);
+
+        if (!hlsl_new_store_component(ctx, &store_block, &var_deref, dst_idx, cast))
+            return false;
+        hlsl_block_add_block(block, &store_block);
+    }
+
+    if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, &load->node);
+
+    return true;
+}
+
 /* hlsl_ir_swizzle nodes that directly point to a matrix value are only a parse-time construct that
  * represents matrix swizzles (e.g. mat._m01_m23) before we know if they will be used in the lhs of
  * an assignment or as a value made from different components of the matrix. The former cases should
@@ -6790,6 +6874,7 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     bool progress;
 
+    lower_ir(ctx, lower_complex_casts, body);
     lower_ir(ctx, lower_matrix_swizzles, body);
 
     lower_ir(ctx, lower_broadcasts, body);
@@ -12084,6 +12169,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 
     while (hlsl_transform_ir(ctx, lower_calls, body, NULL));
 
+    lower_ir(ctx, lower_complex_casts, body);
     lower_ir(ctx, lower_matrix_swizzles, body);
     lower_ir(ctx, lower_index_loads, body);
 
