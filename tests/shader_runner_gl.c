@@ -347,6 +347,7 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
         runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;
 
         runner->caps.tag_count = 0;
+        runner->caps.tags[runner->caps.tag_count++] = "opengl";
         if (runner->language == GLSL)
             runner->caps.tags[runner->caps.tag_count++] = "glsl";
         if (strncmp((const char *)glGetString(GL_RENDERER), "llvmpipe ", 9) == 0)
