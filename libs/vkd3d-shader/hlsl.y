@@ -5388,7 +5388,8 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                 "Interlocked functions can only be used in shader model 5.0 or higher.");
 
-    if (op != HLSL_INTERLOCKED_CMP_EXCH && params->args_count != 2 && params->args_count != 3)
+    if (op != HLSL_INTERLOCKED_CMP_EXCH && op != HLSL_INTERLOCKED_EXCH
+            && params->args_count != 2 && params->args_count != 3)
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                 "Unexpected number of arguments to function '%s': expected 2 or 3, but got %u.",
@@ -5509,6 +5510,12 @@ static bool intrinsic_InterlockedCompareStore(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_CMP_EXCH, params, loc, "InterlockedCompareStore");
 }
 
+static bool intrinsic_InterlockedExchange(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_EXCH, params, loc, "InterlockedExchange");
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5526,6 +5533,7 @@ intrinsic_functions[] =
     {"InterlockedAnd",                     -1, true,  intrinsic_InterlockedAnd},
     {"InterlockedCompareExchange",          4, true,  intrinsic_InterlockedCompareExchange},
     {"InterlockedCompareStore",             3, true,  intrinsic_InterlockedCompareStore},
+    {"InterlockedExchange",                 3, true,  intrinsic_InterlockedExchange},
     {"abs",                                 1, true,  intrinsic_abs},
     {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},

@@ -217,7 +217,7 @@ size (buffer, 5)
 
 % The value fields of other Interlocked functions are always uint.
 
-[compute shader fail(sm<5) todo(sm>=5)]
+[compute shader fail(sm<5)]
 RWBuffer<uint> u : register(u1);
 RWBuffer<int> s : register(u2);
 
@@ -245,7 +245,7 @@ void main()
 [test]
 uniform 0 uint  0xffffffff
 uniform 1 float -1
-todo(sm<6) dispatch 1 1 1
+todo(glsl | msl) dispatch 1 1 1
 if(sm<6)  probe uav 1 (0) rui (0xffffffff)
 if(sm>=6) probe uav 1 (0) rui (0xfffffffd)
 probe uav 1 (1) rui (0)

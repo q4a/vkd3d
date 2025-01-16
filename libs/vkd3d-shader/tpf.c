@@ -4073,6 +4073,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_IMIN:
         case VKD3DSIH_IMM_ATOMIC_AND:
         case VKD3DSIH_IMM_ATOMIC_CMP_EXCH:
+        case VKD3DSIH_IMM_ATOMIC_EXCH:
         case VKD3DSIH_IMM_ATOMIC_IADD:
         case VKD3DSIH_IMUL:
         case VKD3DSIH_INE:

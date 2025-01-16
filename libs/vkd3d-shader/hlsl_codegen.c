@@ -10010,6 +10010,7 @@ static bool sm4_generate_vsir_instr_interlocked(struct hlsl_ctx *ctx,
         [HLSL_INTERLOCKED_ADD] = VKD3DSIH_IMM_ATOMIC_IADD,
         [HLSL_INTERLOCKED_AND] = VKD3DSIH_IMM_ATOMIC_AND,
         [HLSL_INTERLOCKED_CMP_EXCH] = VKD3DSIH_IMM_ATOMIC_CMP_EXCH,
+        [HLSL_INTERLOCKED_EXCH] = VKD3DSIH_IMM_ATOMIC_EXCH,
     };
 
     struct hlsl_ir_node *cmp_value = interlocked->cmp_value.node, *value = interlocked->value.node;
