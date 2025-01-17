@@ -584,7 +584,7 @@ static inline HRESULT vkd3d_shader_code_from_dxc_blob(IDxcBlob *blob, struct vkd
 }
 
 static inline HRESULT dxc_compile(void *dxc_compiler, const WCHAR *profile,
-        unsigned int compile_options, const char *hlsl, struct vkd3d_shader_code *blob_out)
+        unsigned int compile_options, bool enable_16bit_types, const char *hlsl, struct vkd3d_shader_code *blob_out)
 {
     DxcBuffer src_buf = {hlsl, strlen(hlsl), 65001};
     IDxcCompiler3 *compiler = dxc_compiler;
@@ -606,17 +606,20 @@ static inline HRESULT dxc_compile(void *dxc_compiler, const WCHAR *profile,
         NULL,
         NULL,
         NULL,
+        NULL,
     };
 
     memset(blob_out, 0, sizeof(*blob_out));
 
-    arg_count = ARRAY_SIZE(args) - 3;
+    arg_count = ARRAY_SIZE(args) - 4;
     if (compile_options & D3DCOMPILE_PACK_MATRIX_ROW_MAJOR)
         args[arg_count++] = L"/Zpr";
     if (compile_options & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
         args[arg_count++] = L"/Zpc";
     if (compile_options & D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY)
         args[arg_count++] = L"/Gec";
+    if (enable_16bit_types)
+        args[arg_count++] = L"/enable-16bit-types";
 
     if (FAILED(hr = IDxcCompiler3_Compile(compiler, &src_buf, args,
             arg_count, NULL, &IID_IDxcResult, (void **)&result)))

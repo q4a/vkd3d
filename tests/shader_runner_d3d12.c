@@ -988,6 +988,7 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
         enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
 {
     ID3D12Device *device = runner->test_context.device;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS4 options4;
     D3D12_FEATURE_DATA_D3D12_OPTIONS2 options2;
     D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1;
     D3D12_FEATURE_DATA_D3D12_OPTIONS options;
@@ -1022,6 +1023,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS2, &options2, sizeof(options2));
     ok(hr == S_OK, "Failed to check feature options2 support, hr %#x.\n", hr);
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS4, &options4, sizeof(options4));
+    ok(hr == S_OK, "Failed to check feature options4 support, hr %#x.\n", hr);
 
 #ifdef VKD3D_CROSSTEST
     runner->caps.runner = "d3d12.dll";
@@ -1038,6 +1041,7 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX]
             = options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizerSupportedWithoutGSEmulation;
     runner->caps.shader_caps[SHADER_CAP_WAVE_OPS] = options1.WaveOps;
+    runner->caps.shader_caps[SHADER_CAP_NATIVE_16_BIT] = options4.Native16BitShaderOpsSupported;
 
     runner->caps.tag_count = 0;
     runner->caps.tags[runner->caps.tag_count++] = "d3d12";
@@ -1134,5 +1138,5 @@ void run_shader_tests_d3d12(void *dxc_compiler)
     run_shader_tests_for_model_range(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
 
     if (dxc_compiler)
-        run_shader_tests_for_model_range(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
+        run_shader_tests_for_model_range(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_2);
 }

@@ -79,6 +79,7 @@ static const char *const model_strings[] =
     [SHADER_MODEL_5_0] = "5.0",
     [SHADER_MODEL_5_1] = "5.1",
     [SHADER_MODEL_6_0] = "6.0",
+    [SHADER_MODEL_6_2] = "6.2",
 };
 
 void fatal_error(const char *format, ...)
@@ -356,6 +357,7 @@ static const char *const shader_cap_strings[] =
     [SHADER_CAP_FOG]               = "fog",
     [SHADER_CAP_GEOMETRY_SHADER]   = "geometry-shader",
     [SHADER_CAP_INT64]             = "int64",
+    [SHADER_CAP_NATIVE_16_BIT]     = "native-16-bit",
     [SHADER_CAP_POINT_SIZE]        = "point-size",
     [SHADER_CAP_ROV]               = "rov",
     [SHADER_CAP_RT_VP_ARRAY_INDEX] = "rt-vp-array-index",
@@ -1613,7 +1615,7 @@ static HRESULT d3d10_blob_from_vkd3d_shader_code(const struct vkd3d_shader_code 
 }
 
 static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, const char *profile,
-        unsigned int compile_options, const char *hlsl, ID3D10Blob **blob_out)
+        unsigned int compile_options, bool enable_16bit_types, const char *hlsl, ID3D10Blob **blob_out)
 {
     struct vkd3d_shader_code blob;
     WCHAR wprofile[7];
@@ -1622,7 +1624,7 @@ static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, const char *profi
     *blob_out = NULL;
 
     swprintf(wprofile, sizeof(wprofile), L"%hs", profile);
-    if (FAILED(hr = dxc_compile(dxc_compiler, wprofile, compile_options, hlsl, &blob)))
+    if (FAILED(hr = dxc_compile(dxc_compiler, wprofile, compile_options, enable_16bit_types, hlsl, &blob)))
         return hr;
 
     hr = d3d10_blob_from_vkd3d_shader_code(&blob, blob_out);
@@ -1648,6 +1650,7 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
         [SHADER_MODEL_5_0] = "5_0",
         [SHADER_MODEL_5_1] = "5_1",
         [SHADER_MODEL_6_0] = "6_0",
+        [SHADER_MODEL_6_2] = "6_2",
     };
 
     /* Behaviour is inconsistent between different versions of
@@ -1662,7 +1665,8 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
     if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
     {
         assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options, source, &blob);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options,
+                runner->require_shader_caps[SHADER_CAP_NATIVE_16_BIT], source, &blob);
     }
     else
     {
@@ -1700,6 +1704,7 @@ static void compile_shader(struct shader_runner *runner, const char *source,
         [SHADER_MODEL_5_0] = "5_0",
         [SHADER_MODEL_5_1] = "5_1",
         [SHADER_MODEL_6_0] = "6_0",
+        [SHADER_MODEL_6_2] = "6_2",
     };
 
     static const char *const effect_models[] =
@@ -1732,7 +1737,8 @@ static void compile_shader(struct shader_runner *runner, const char *source,
     if (use_dxcompiler)
     {
         assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options, source, &blob);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options,
+                runner->require_shader_caps[SHADER_CAP_NATIVE_16_BIT], source, &blob);
     }
     else
     {
