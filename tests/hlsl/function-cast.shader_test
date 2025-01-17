@@ -90,3 +90,106 @@ if(sm<4)  uniform 0 float4 -2 0 1 -3000000
 if(sm>=4) uniform 0 int4 -2 0 1 -3000000
 todo(sm<6) draw quad
 probe (0, 0) rgba (-1.0, 0.0, 1.0, -3000000.0) 4
+
+
+% An explicit cast gets applied right before assignment, as if it was on the lhs.
+[pixel shader todo fail(sm>=6)]
+void fun(out float4 f)
+{
+    f = float4(1.4, 2.6, 3.9, 4.3);
+}
+
+float4 main() : sv_target
+{
+    float4 p;
+
+    fun((int4) p);
+    return p;
+}
+
+[test]
+todo draw quad
+probe (0, 0) rgba(1, 2, 3, 4)
+
+
+[pixel shader todo fail]
+void fun(out float2 f)
+{
+    f = float2(1, 2);
+}
+
+float4 main() : sv_target
+{
+    float4 p = {-1, -2, -3, -4};
+
+    fun(p);
+    return p;
+}
+
+[pixel shader todo fail]
+void fun(out float f)
+{
+    f = 1;
+}
+
+float4 main() : sv_target
+{
+    float4 p = {-1, -2, -3, -4};
+
+    fun(p);
+    return p;
+}
+
+% However, partial assigments can happen if there are explicit casts, as if
+% they were on the lhs of an assigment.
+[pixel shader todo]
+void fun(out float2 f)
+{
+    f = float2(1, 2);
+}
+
+float4 main() : sv_target
+{
+    float4 p = {-1, -2, -3, -4};
+
+    fun((float2) p); // partial assigment to p.xy.
+    return p;
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0, 0) rgba(1, 2, -3, -4)
+
+
+[pixel shader fail]
+void fun(out float4 f)
+{
+    f = float4(1, 2, 3, 4);
+}
+
+float4 main() : sv_target
+{
+    float4 p = 0;
+
+    fun((float2)p);
+    return p;
+}
+
+
+[pixel shader fail(sm>=4) todo(sm>=4)]
+void fun(out float4 f)
+{
+    f = float4(1.1, 2.3, 3.6, 4.3);
+}
+
+float4 main() : sv_target
+{
+    float4 p = 0;
+
+    fun((float2x2)(int4)(float4)(half4)p);
+    return p;
+}
+
+[test]
+todo(sm>=4) draw quad
+todo(sm<4) probe (0, 0) rgba(1.1, 2.3, 3.6, 4.3)
