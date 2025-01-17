@@ -1612,25 +1612,17 @@ static HRESULT d3d10_blob_from_vkd3d_shader_code(const struct vkd3d_shader_code 
     return S_OK;
 }
 
-static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type,
+static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, const char *profile,
         unsigned int compile_options, const char *hlsl, ID3D10Blob **blob_out)
 {
     struct vkd3d_shader_code blob;
+    WCHAR wprofile[7];
     HRESULT hr;
-
-    static const WCHAR *const shader_profiles[] =
-    {
-        [SHADER_TYPE_CS] = L"cs_6_0",
-        [SHADER_TYPE_PS] = L"ps_6_0",
-        [SHADER_TYPE_VS] = L"vs_6_0",
-        [SHADER_TYPE_HS] = L"hs_6_0",
-        [SHADER_TYPE_DS] = L"ds_6_0",
-        [SHADER_TYPE_GS] = L"gs_6_0",
-    };
 
     *blob_out = NULL;
 
-    if (FAILED(hr = dxc_compile(dxc_compiler, shader_profiles[type], compile_options, hlsl, &blob)))
+    swprintf(wprofile, sizeof(wprofile), L"%hs", profile);
+    if (FAILED(hr = dxc_compile(dxc_compiler, wprofile, compile_options, hlsl, &blob)))
         return hr;
 
     hr = d3d10_blob_from_vkd3d_shader_code(&blob, blob_out);
@@ -1665,14 +1657,15 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
     if (runner->minimum_shader_model >= SHADER_MODEL_5_1)
         options &= ~D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
 
+    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
+
     if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
     {
         assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, options, source, &blob);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options, source, &blob);
     }
     else
     {
-        sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
         hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, options, 0, &blob, &errors);
     }
     if (hr != S_OK)
@@ -1731,17 +1724,18 @@ static void compile_shader(struct shader_runner *runner, const char *source,
     if (model >= SHADER_MODEL_5_1)
         options &= ~D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
 
+    if (type == SHADER_TYPE_FX)
+        sprintf(profile, "%s_%s", shader_type_string(type), effect_models[model]);
+    else
+        sprintf(profile, "%s_%s", shader_type_string(type), shader_models[model]);
+
     if (use_dxcompiler)
     {
         assert(runner->dxc_compiler);
-        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, options, source, &blob);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, profile, options, source, &blob);
     }
     else
     {
-        if (type == SHADER_TYPE_FX)
-            sprintf(profile, "%s_%s", shader_type_string(type), effect_models[model]);
-        else
-            sprintf(profile, "%s_%s", shader_type_string(type), shader_models[model]);
         hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, options, 0, &blob, &errors);
     }
     hr = map_special_hrs(hr);
