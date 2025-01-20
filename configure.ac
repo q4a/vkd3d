@@ -173,6 +173,7 @@ VKD3D_CHECK_FUNC([HAVE_SYNC_ADD_AND_FETCH], [__sync_add_and_fetch], [__sync_add_
 VKD3D_CHECK_FUNC([HAVE_SYNC_BOOL_COMPARE_AND_SWAP], [__sync_bool_compare_and_swap], [__sync_bool_compare_and_swap((int *)0, 0, 0)])
 VKD3D_CHECK_FUNC([HAVE_ATOMIC_EXCHANGE_N], [__atomic_exchange_n], [__atomic_exchange_n((int *)0, 0, 0)])
 AC_CHECK_FUNCS([gettid])
+AC_CHECK_FUNCS([pthread_threadid_np])
 
 dnl Makefiles
 case $host_os in
