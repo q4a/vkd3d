@@ -197,6 +197,31 @@ void main(out float4 o : sv_target)
     sub(o);
 }
 
+[pixel shader fail(sm<6)]
+void sub(out const float4 c, out float4 o)
+{
+    o = 0;
+}
+
+void main(out float4 o : sv_target)
+{
+    float4 c = 0;
+    sub(c, o);
+}
+
+% inout const is allowed, unlike out const in the above.
+[pixel shader]
+void sub(inout const float4 c, out float4 o)
+{
+    o = 0;
+}
+
+void main(out float4 o : sv_target)
+{
+    float4 c = 0;
+    sub(c, o);
+}
+
 [pixel shader fail]
 float4 main(void) : sv_target
 {
