@@ -3192,19 +3192,18 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
             break;
         arg = args->args[k];
 
-        if (!hlsl_types_are_equal(arg->data_type, param->data_type))
-        {
-            struct hlsl_ir_node *cast;
-
-            if (!(cast = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc)))
-                return NULL;
-            args->args[k] = cast;
-            arg = cast;
-        }
-
         if (param->storage_modifiers & HLSL_STORAGE_IN)
         {
             struct hlsl_ir_node *store;
+
+            if (!hlsl_types_are_equal(arg->data_type, param->data_type))
+            {
+                struct hlsl_ir_node *cast;
+
+                if (!(cast = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc)))
+                    return NULL;
+                arg = cast;
+            }
 
             if (!(store = hlsl_new_simple_store(ctx, param, arg)))
                 return NULL;
