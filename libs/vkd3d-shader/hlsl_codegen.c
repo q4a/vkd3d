@@ -6810,6 +6810,77 @@ static void validate_hull_shader_attributes(struct hlsl_ctx *ctx, const struct h
     }
 }
 
+static void validate_and_record_patch_type(struct hlsl_ctx *ctx, bool is_patch_constant_func, struct hlsl_ir_var *var)
+{
+    unsigned int control_point_count = var->data_type->e.array.elements_count;
+    enum hlsl_array_type array_type = var->data_type->e.array.array_type;
+    struct hlsl_type *control_point_type = var->data_type->e.array.type;
+    const struct hlsl_profile_info *profile = ctx->profile;
+
+    if (array_type == HLSL_ARRAY_PATCH_INPUT)
+    {
+        if (profile->type != VKD3D_SHADER_TYPE_HULL
+                && !(profile->type == VKD3D_SHADER_TYPE_GEOMETRY && hlsl_version_ge(ctx, 5, 0)))
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                    "InputPatch parameters can only be used in hull shaders, "
+                    "and geometry shaders with shader model 5.0 or higher.");
+            return;
+        }
+    }
+    else
+    {
+        if (!is_patch_constant_func && profile->type != VKD3D_SHADER_TYPE_DOMAIN)
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                    "OutputPatch parameters can only be used in "
+                    "hull shader patch constant functions and domain shaders.");
+            return;
+        }
+    }
+
+    if (control_point_count > 32)
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
+                "Control point count %u exceeds 32.", control_point_count);
+        return;
+    }
+    VKD3D_ASSERT(control_point_count > 0);
+
+    if (is_patch_constant_func && array_type == HLSL_ARRAY_PATCH_OUTPUT)
+    {
+        if (control_point_count != ctx->output_control_point_count)
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
+                    "Output control point count %u does not match the count %u specified in the control point function.",
+                    control_point_count, ctx->output_control_point_count);
+
+        if (!hlsl_types_are_equal(control_point_type, ctx->output_control_point_type))
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Output control point type does not match the output type of the control point function.");
+
+        return;
+    }
+
+    if (ctx->input_control_point_count != UINT_MAX)
+    {
+        VKD3D_ASSERT(is_patch_constant_func);
+
+        if (control_point_count != ctx->input_control_point_count)
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
+                    "Input control point count %u does not match the count %u specified in the control point function.",
+                    control_point_count, ctx->input_control_point_count);
+
+        if (!hlsl_types_are_equal(control_point_type, ctx->input_control_point_type))
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Input control point type does not match the input type specified in the control point function.");
+
+        return;
+    }
+
+    ctx->input_control_point_count = control_point_count;
+    ctx->input_control_point_type = control_point_type;
+}
+
 static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     struct hlsl_ir_node *instr, *next;
@@ -10917,7 +10988,8 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     }
     else if (version.type == VKD3D_SHADER_TYPE_HULL)
     {
-        program->input_control_point_count = 1; /* TODO: Obtain from InputPatch */
+        program->input_control_point_count = ctx->input_control_point_count == UINT_MAX
+                ? 1 : ctx->input_control_point_count;
         program->output_control_point_count = ctx->output_control_point_count;
         program->tess_domain = ctx->domain;
         program->tess_partitioning = ctx->partitioning;
@@ -10925,7 +10997,8 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     }
     else if (version.type == VKD3D_SHADER_TYPE_DOMAIN)
     {
-        program->input_control_point_count = 0; /* TODO: Obtain from OutputPatch */
+        program->input_control_point_count = ctx->input_control_point_count == UINT_MAX
+                ? 0 : ctx->input_control_point_count;
         program->tess_domain = ctx->domain;
     }
 
@@ -12134,6 +12207,8 @@ static bool lower_isinf(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct 
 static void process_entry_function(struct hlsl_ctx *ctx,
         const struct hlsl_block *global_uniform_block, struct hlsl_ir_function_decl *entry_func)
 {
+    bool is_patch_constant_func = entry_func == ctx->patch_constant_func;
+    const struct hlsl_ir_var *input_patch = NULL, *output_patch = NULL;
     const struct hlsl_profile_info *profile = ctx->profile;
     struct hlsl_block static_initializers, global_uniforms;
     struct hlsl_block *const body = &entry_func->body;
@@ -12184,7 +12259,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         }
         else if ((var->storage_modifiers & HLSL_STORAGE_UNIFORM))
         {
-            if (ctx->profile->type == VKD3D_SHADER_TYPE_HULL && entry_func == ctx->patch_constant_func)
+            if (ctx->profile->type == VKD3D_SHADER_TYPE_HULL && is_patch_constant_func)
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Patch constant function parameter \"%s\" cannot be uniform.", var->name);
             else
@@ -12192,7 +12267,33 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         }
         else if (hlsl_type_is_patch_array(var->data_type))
         {
-            hlsl_fixme(ctx, &var->loc, "InputPatch/OutputPatch function parameters.");
+            if (var->data_type->e.array.array_type == HLSL_ARRAY_PATCH_INPUT)
+            {
+                if (input_patch)
+                {
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_PATCH,
+                            "Found multiple InputPatch parameters.");
+                    hlsl_note(ctx, &input_patch->loc, VKD3D_SHADER_LOG_ERROR,
+                            "The InputPatch parameter was previously declared here.");
+                    continue;
+                }
+                input_patch = var;
+            }
+            else
+            {
+                if (output_patch)
+                {
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_PATCH,
+                            "Found multiple OutputPatch parameters.");
+                    hlsl_note(ctx, &output_patch->loc, VKD3D_SHADER_LOG_ERROR,
+                            "The OutputPatch parameter was previously declared here.");
+                    continue;
+                }
+                output_patch = var;
+            }
+
+            validate_and_record_patch_type(ctx, is_patch_constant_func, var);
+            hlsl_fixme(ctx, &var->loc, "InputPatch/OutputPatch parameters.");
         }
         else
         {
@@ -12207,7 +12308,13 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             if (var->storage_modifiers & HLSL_STORAGE_IN)
                 prepend_input_var_copy(ctx, entry_func, var);
             if (var->storage_modifiers & HLSL_STORAGE_OUT)
-                append_output_var_copy(ctx, entry_func, var);
+            {
+                if (profile->type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant_func)
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Output parameters are not supported in hull shader control point functions.");
+                else
+                    append_output_var_copy(ctx, entry_func, var);
+            }
         }
     }
     if (entry_func->return_var)
@@ -12217,6 +12324,14 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
         append_output_var_copy(ctx, entry_func, entry_func->return_var);
+
+        if (profile->type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant_func)
+            ctx->output_control_point_type = entry_func->return_var->data_type;
+    }
+    else
+    {
+        if (profile->type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant_func)
+            hlsl_fixme(ctx, &entry_func->loc, "Passthrough hull shader control point function.");
     }
 
     if (hlsl_version_ge(ctx, 4, 0))

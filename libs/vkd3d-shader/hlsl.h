@@ -1155,11 +1155,30 @@ struct hlsl_ctx
      *   compute shader profiles. It is set using the numthreads() attribute in the entry point. */
     uint32_t thread_count[3];
 
+    /* Declared information in tessellation shaders.
+     *
+     * The following fields are specific to hull shaders: output_control_point_count,
+     * output_control_point_type, output_primitive, partitioning, and patch_constant_func.
+     *
+     * The output_control_point_count and output_control_point_type fields correspond to the return
+     * type and the "outputcontrolpoints" attribute of a hull shader's control point function,
+     * respectively. Moreover, if an OutputPatch parameter is declared in the hull shader's patch
+     * constant function, its type and element count must match these fields.
+     *
+     * The input_control_point_count and input_control_point_type fields are specified by the
+     * InputPatch parameter in hull shaders, or by the _OutputPatch_ parameter in domain
+     * shaders.
+     *
+     * For input_ and output_control_point_count, the value UINT_MAX indicates that the value is
+     * unknown or not set by the shader. */
     enum vkd3d_tessellator_domain domain;
     unsigned int output_control_point_count;
+    struct hlsl_type *output_control_point_type;
     enum vkd3d_shader_tessellator_output_primitive output_primitive;
     enum vkd3d_shader_tessellator_partitioning partitioning;
     struct hlsl_ir_function_decl *patch_constant_func;
+    unsigned int input_control_point_count;
+    struct hlsl_type *input_control_point_type;
 
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we
