@@ -1323,6 +1323,11 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "Parameter '%s' is declared as both \"out\" and \"uniform\".", param->name);
 
+    if ((param->modifiers & HLSL_STORAGE_OUT) && !(param->modifiers & HLSL_STORAGE_IN)
+            && (param->type->modifiers & HLSL_MODIFIER_CONST))
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                "Parameter '%s' is declared as both \"out\" and \"const\".", param->name);
+
     if (param->reg_reservation.offset_type)
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                 "packoffset() is not allowed on function parameters.");
