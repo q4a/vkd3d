@@ -163,3 +163,30 @@ float4 main(uniform float4 b) : POSITION
 {
     return a + b + tex[uint2(0, 0)];
 }
+
+% Output parameters are not supported in control point functions for SM < 6.
+[hull shader fail(sm<6)]
+struct data
+{
+    float4 val : VAL;
+};
+
+struct patch_constant_data
+{
+    float edges[2] : SV_TessFactor;
+};
+
+patch_constant_data patch_constant()
+{
+    return (patch_constant_data)0;
+}
+
+    [domain("isoline")]
+    [outputcontrolpoints(3)]
+    [partitioning("integer")]
+    [outputtopology("point")]
+    [patchconstantfunc("patch_constant")]
+void main(out data ret, InputPatch<data, 3> input)
+{
+    ret.val = 0;
+}
