@@ -169,6 +169,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/length.shader_test \
 	tests/hlsl/lerp.shader_test \
 	tests/hlsl/lhs-cast.shader_test \
+	tests/hlsl/lhs-partial-assignment.shader_test \
 	tests/hlsl/lit.shader_test \
 	tests/hlsl/load-level.shader_test \
 	tests/hlsl/log.shader_test \
