@@ -96,3 +96,38 @@ float4 main(data input) : sv_target
 [test]
 todo(sm<6) draw 3 control point patch list 3
 todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
+
+% Passthrough hull shader control point function.
+[hull shader todo]
+struct data
+{
+    float4 position : SV_Position;
+    float r : RED;
+    float g : GREEN;
+    float b : BLUE;
+};
+
+struct patch_constant_data
+{
+    float edges[3] : SV_TessFactor;
+    float inside : SV_InsideTessFactor;
+};
+
+void patch_constant(InputPatch<data, 3> input, out patch_constant_data output)
+{
+    output.edges[0] = output.edges[1] = output.edges[2] = 1.0f;
+    output.inside = 1.0f;
+}
+
+    [domain("tri")]
+    [outputcontrolpoints(3)]
+    [partitioning("integer")]
+    [outputtopology("triangle_cw")]
+    [patchconstantfunc("patch_constant")]
+void main(InputPatch<data, 3> input)
+{
+}
+
+[test]
+todo(sm<6) draw 3 control point patch list 3
+todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
