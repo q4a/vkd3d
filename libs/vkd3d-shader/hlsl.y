@@ -2128,8 +2128,10 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
 
     if (hlsl_is_numeric_type(lhs_type))
     {
-        writemask = (1 << lhs_type->e.numeric.dimx) - 1;
-        width = lhs_type->e.numeric.dimx;
+        unsigned int size = hlsl_type_component_count(lhs_type);
+
+        writemask = (1 << size) - 1;
+        width = size;
     }
 
     if (!(rhs = add_implicit_conversion(ctx, block, rhs, lhs_type, &rhs->loc)))
@@ -2139,8 +2141,24 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
-            hlsl_fixme(ctx, &lhs->loc, "Cast on the LHS.");
-            return false;
+            struct hlsl_ir_node *cast = lhs;
+            lhs = hlsl_ir_expr(cast)->operands[0].node;
+
+            if (hlsl_type_component_count(lhs->data_type) != hlsl_type_component_count(cast->data_type))
+            {
+                hlsl_fixme(ctx, &cast->loc, "Size change on the LHS.");
+                return false;
+            }
+            if (hlsl_version_ge(ctx, 4, 0))
+            {
+                hlsl_error(ctx, &cast->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE,
+                        "Base type casts are not allowed on the LHS for profiles >= 4.");
+                return false;
+            }
+
+            lhs_type = lhs->data_type;
+            if (lhs_type->class == HLSL_CLASS_VECTOR || (lhs_type->class == HLSL_CLASS_MATRIX && matrix_writemask))
+                lhs_type = hlsl_get_vector_type(ctx, lhs->data_type->e.numeric.type, width);
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
@@ -2181,6 +2199,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
             hlsl_block_add_instr(block, new_swizzle);
 
             lhs = swizzle->val.node;
+            lhs_type = hlsl_get_vector_type(ctx, lhs_type->e.numeric.type, width);
             rhs = new_swizzle;
         }
         else
@@ -2189,6 +2208,12 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
             return false;
         }
     }
+
+    /* lhs casts could have resulted in a discrepancy between the
+     * rhs->data_type and the type of the variable that will be ulimately
+     * stored to. This is corrected. */
+    if (!(rhs = add_cast(ctx, block, rhs, lhs_type, &rhs->loc)))
+        return false;
 
     if (lhs->type == HLSL_IR_INDEX && hlsl_index_chain_has_resource_access(hlsl_ir_index(lhs)))
     {
