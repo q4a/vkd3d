@@ -556,7 +556,8 @@ static void d3d12_fence_destroy_vk_objects(struct d3d12_fence *fence)
         fence->old_vk_fences[i] = VK_NULL_HANDLE;
     }
 
-    d3d12_fence_garbage_collect_vk_semaphores_locked(fence, true);
+    if (!device->vk_info.KHR_timeline_semaphore)
+        d3d12_fence_garbage_collect_vk_semaphores_locked(fence, true);
     VK_CALL(vkDestroySemaphore(device->vk_device, fence->timeline_semaphore, NULL));
 
     vkd3d_mutex_unlock(&fence->mutex);
