@@ -327,8 +327,11 @@ static void *vkd3d_fence_worker_main(void *arg)
     struct vkd3d_waiting_fence *old_fences, *cur_fences = NULL;
     struct vkd3d_fence_worker *worker = arg;
     unsigned int i;
+    bool timeline;
 
     vkd3d_set_thread_name("vkd3d_fence");
+
+    timeline = worker->device->vk_info.KHR_timeline_semaphore;
 
     for (;;)
     {
@@ -357,7 +360,12 @@ static void *vkd3d_fence_worker_main(void *arg)
         vkd3d_mutex_unlock(&worker->mutex);
 
         for (i = 0; i < cur_fence_count; ++i)
-            worker->wait_for_gpu_fence(worker, &cur_fences[i]);
+        {
+            if (timeline)
+                vkd3d_wait_for_gpu_timeline_semaphore(worker, &cur_fences[i]);
+            else
+                vkd3d_wait_for_gpu_fence(worker, &cur_fences[i]);
+        }
     }
 
     vkd3d_free(cur_fences);
@@ -378,9 +386,6 @@ static HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
     worker->fence_count = 0;
     worker->fences = NULL;
     worker->fences_size = 0;
-
-    worker->wait_for_gpu_fence = device->vk_info.KHR_timeline_semaphore
-            ? vkd3d_wait_for_gpu_timeline_semaphore : vkd3d_wait_for_gpu_fence;
 
     vkd3d_mutex_init(&worker->mutex);
 

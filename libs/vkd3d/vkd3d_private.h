@@ -242,8 +242,6 @@ struct vkd3d_fence_worker
     struct vkd3d_waiting_fence *fences;
     size_t fences_size;
 
-    void (*wait_for_gpu_fence)(struct vkd3d_fence_worker *worker, const struct vkd3d_waiting_fence *enqueued_fence);
-
     struct vkd3d_queue *queue;
     struct d3d12_device *device;
 };
