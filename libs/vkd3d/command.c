@@ -399,6 +399,7 @@ static HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
 static HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker,
         struct d3d12_device *device)
 {
+    unsigned int i;
     HRESULT hr;
 
     TRACE("worker %p.\n", worker);
@@ -415,6 +416,9 @@ static HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker,
 
     vkd3d_mutex_destroy(&worker->mutex);
     vkd3d_cond_destroy(&worker->cond);
+
+    for (i = 0; i < worker->fence_count; ++i)
+        d3d12_fence_decref(worker->fences[i].fence);
 
     vkd3d_free(worker->fences);
 
