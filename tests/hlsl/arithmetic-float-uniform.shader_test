@@ -209,3 +209,44 @@ float4 main() : sv_target
 uniform 0 float4 0.2 0.3 9.1 3.2
 draw quad
 probe (0, 0) rgba (0.4, 0.6, 18.2, 6.4)
+
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
+
+[pixel shader todo]
+uniform double2 a, b, c, d;
+
+% Return bool4 to ensure that non-trivial destination swizzling happens on the
+% DLT instruction, rather than on the instruction to convert the result.
+bool4 main() : SV_TARGET
+{
+    bool2 first = a < b;
+    bool2 second = c < d;
+    return bool4(first.x, second.x, second.y, first.y);
+}
+
+[test]
+uniform 0 double2 1.0 3.0
+uniform 4 double2 2.0 4.0
+uniform 8 double2 5.0 7.0
+uniform 12 double2 6.0 8.0
+todo(sm<6) draw quad
+if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff)
+if(sm>=6) probe (0, 0) rgbaui(1, 1, 1, 1)
+
+uniform 0 double2 1.0 4.0
+uniform 4 double2 2.0 3.0
+uniform 8 double2 5.0 8.0
+uniform 12 double2 6.0 7.0
+todo(sm<6) draw quad
+if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0xffffffff, 0, 0)
+if(sm>=6) probe (0, 0) rgbaui(1, 1, 0, 0)
+
+uniform 0 double2 1.0 4.0
+uniform 4 double2 2.0 3.0
+uniform 8 double2 6.0 7.0
+uniform 12 double2 5.0 8.0
+todo(sm<6) draw quad
+if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0, 0xffffffff, 0)
+if(sm>=6) probe (0, 0) rgbaui(1, 0, 1, 0)
