@@ -63,3 +63,21 @@ float4 main() : sv_target
 [test]
 draw quad
 probe (0,0) rgba(1337.0, 0, 0, 0)
+
+[pixel shader todo(sm<6)]
+float4 main() : sv_target
+{
+    float i = 0;
+
+    [unroll]
+    for (;;)
+    {
+        if (((float4)1).w == 1) break;
+        ++i;
+    }
+    return i;
+}
+
+[test]
+todo(sm<6) draw quad
+probe (0,0) rgba(0, 0, 0, 0)
