@@ -144,7 +144,7 @@ build-mac:
   tags:
     - mac
   script:
-    - brew install vulkan-tools libtool spirv-headers vulkan-loader mingw-w64
+    - brew install vulkan-tools libtool spirv-headers vulkan-loader mingw-w64 spirv-tools
     - git config --global --add safe.directory $CI_PROJECT_DIR
     - git clean -fdx
     - git reset --hard
