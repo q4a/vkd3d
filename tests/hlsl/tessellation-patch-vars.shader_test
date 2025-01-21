@@ -37,7 +37,8 @@ struct patch_constant_data
     float inside : SV_InsideTessFactor;
 };
 
-void patch_constant(InputPatch<vsdata, 3> input, out patch_constant_data output)
+void patch_constant(InputPatch<vsdata, 3> input, OutputPatch<data, 3> main_out,
+        out patch_constant_data output)
 {
     output.edges[0] = output.edges[1] = output.edges[2] = 1.0f;
     output.inside = 1.0f;
@@ -45,7 +46,7 @@ void patch_constant(InputPatch<vsdata, 3> input, out patch_constant_data output)
     // separate fork phases. We need one phase that writes to o0.yzw to verify
     // that things still work when writing to an output that starts in
     // component 1.
-    output.color = input[0].color + dot(input[0].zero, input[1].zero);
+    output.color = input[0].color + main_out[2].position.xyz + dot(input[0].zero, input[1].zero);
 }
 
     [domain("tri")]
@@ -105,4 +106,4 @@ float4 main(data input) : sv_target
 
 [test]
 todo(sm<6) draw 3 control point patch list 3
-todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.5, 1.0)
+todo(mvk) probe (0, 0, 640, 480) rgba (-1.0, -2.0, 0.5, 1.0)
