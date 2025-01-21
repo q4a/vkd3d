@@ -2099,11 +2099,12 @@ static bool invert_swizzle_matrix(const struct hlsl_matrix_swizzle *swizzle,
 }
 
 static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *lhs,
-        enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
+        enum parse_assign_op assign_op, struct hlsl_ir_node *rhs, bool is_function_out_arg)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
     unsigned int writemask = 0, width = 0;
     bool matrix_writemask = false;
+    bool first_cast = true;
 
     if (lhs->data_type->class == HLSL_CLASS_ERROR || rhs->data_type->class == HLSL_CLASS_ERROR)
     {
@@ -2149,7 +2150,7 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
                 hlsl_fixme(ctx, &cast->loc, "Size change on the LHS.");
                 return false;
             }
-            if (hlsl_version_ge(ctx, 4, 0))
+            if (hlsl_version_ge(ctx, 4, 0) && (!is_function_out_arg || !first_cast))
             {
                 hlsl_error(ctx, &cast->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE,
                         "Base type casts are not allowed on the LHS for profiles >= 4.");
@@ -2159,6 +2160,8 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
             lhs_type = lhs->data_type;
             if (lhs_type->class == HLSL_CLASS_VECTOR || (lhs_type->class == HLSL_CLASS_MATRIX && matrix_writemask))
                 lhs_type = hlsl_get_vector_type(ctx, lhs->data_type->e.numeric.type, width);
+
+            first_cast = false;
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
@@ -2370,7 +2373,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool d
         return false;
     hlsl_block_add_instr(block, one);
 
-    if (!add_assignment(ctx, block, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one))
+    if (!add_assignment(ctx, block, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one, false))
         return false;
 
     if (post)
@@ -3272,7 +3275,7 @@ static struct hlsl_ir_node *add_user_call(struct hlsl_ctx *ctx,
                 return NULL;
             hlsl_block_add_instr(args->instrs, &load->node);
 
-            if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, &load->node))
+            if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, &load->node, true))
                 return NULL;
         }
     }
@@ -5457,7 +5460,7 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
             hlsl_error(ctx, &orig_val->loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                     "Output argument to '%s' is const.", name);
 
-        if (!add_assignment(ctx, params->instrs, orig_val, ASSIGN_OP_ASSIGN, interlocked))
+        if (!add_assignment(ctx, params->instrs, orig_val, ASSIGN_OP_ASSIGN, interlocked, true))
             return false;
     }
 
@@ -6394,7 +6397,7 @@ static bool add_assignment_from_component(struct hlsl_ctx *ctx, struct hlsl_bloc
     if (!(load = hlsl_add_load_component(ctx, instrs, src, component, loc)))
         return false;
 
-    if (!add_assignment(ctx, instrs, dest, ASSIGN_OP_ASSIGN, load))
+    if (!add_assignment(ctx, instrs, dest, ASSIGN_OP_ASSIGN, load, false))
         return false;
 
     return true;
@@ -6550,7 +6553,7 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
             return false;
         hlsl_block_add_instr(block, sample_info);
 
-        if (!add_assignment(ctx, block, args[ARG_SAMPLE_COUNT], ASSIGN_OP_ASSIGN, sample_info))
+        if (!add_assignment(ctx, block, args[ARG_SAMPLE_COUNT], ASSIGN_OP_ASSIGN, sample_info, false))
             return false;
     }
 
@@ -9839,7 +9842,7 @@ assignment_expr:
                 hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
             hlsl_block_add_block($3, $1);
             destroy_block($1);
-            if (!add_assignment(ctx, $3, lhs, $2, rhs))
+            if (!add_assignment(ctx, $3, lhs, $2, rhs, false))
                 YYABORT;
             $$ = $3;
         }
