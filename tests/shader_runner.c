@@ -187,17 +187,27 @@ static bool check_qualifier_args_conjunction(struct shader_runner *runner,
         }
         else
         {
+            bool negate = false;
+
+            if (*line == '!')
+            {
+                negate = true;
+                ++line;
+            }
+
             for (unsigned int i = 0; i < ARRAY_SIZE(valid_tags); ++i)
             {
                 const char *option_text = valid_tags[i];
                 size_t option_len = strlen(option_text);
+                bool tag_match;
 
                 if (strncmp(line, option_text, option_len))
                     continue;
 
                 match = true;
                 line += option_len;
-                holds &= match_tag(runner, option_text);
+                tag_match = match_tag(runner, option_text);
+                holds &= negate ? !tag_match : tag_match;
                 break;
             }
         }
