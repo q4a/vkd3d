@@ -2717,6 +2717,12 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                     "packoffset() is only allowed inside constant buffer declarations.");
     }
+    else
+    {
+        if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count)
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
+                    "Const variable \"%s\" is missing an initializer.", var->name);
+    }
 
     if (ctx->cur_scope == ctx->globals)
     {
