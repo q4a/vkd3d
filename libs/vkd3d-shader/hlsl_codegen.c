@@ -1087,8 +1087,8 @@ static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
     return true;
 }
 
-static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct hlsl_ir_node *index,
-        const struct vkd3d_shader_location *loc)
+static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     unsigned int dim_count = index->data_type->e.numeric.dimx;
     struct hlsl_ir_node *store, *zero;
@@ -1105,19 +1105,19 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
     hlsl_init_simple_deref_from_var(&coords_deref, coords);
     if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, index, (1u << dim_count) - 1, loc)))
         return NULL;
-    list_add_after(&index->entry, &store->entry);
+    hlsl_block_add_instr(block, store);
 
     if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
         return NULL;
-    list_add_after(&store->entry, &zero->entry);
+    hlsl_block_add_instr(block, zero);
 
     if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, zero, 1u << dim_count, loc)))
         return NULL;
-    list_add_after(&zero->entry, &store->entry);
+    hlsl_block_add_instr(block, store);
 
     if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
         return NULL;
-    list_add_after(&store->entry, &coords_load->node.entry);
+    hlsl_block_add_instr(block, &coords_load->node);
 
     return &coords_load->node;
 }
@@ -1283,7 +1283,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         VKD3D_ASSERT(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
         VKD3D_ASSERT(coords->data_type->e.numeric.dimx == dim_count);
 
-        if (!(coords = add_zero_mipmap_level(ctx, coords, &instr->loc)))
+        if (!(coords = add_zero_mipmap_level(ctx, block, coords, &instr->loc)))
             return false;
 
         params.type = HLSL_RESOURCE_LOAD;
