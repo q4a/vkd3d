@@ -145,6 +145,13 @@ enum hlsl_regset
     HLSL_REGSET_LAST = HLSL_REGSET_NUMERIC,
 };
 
+enum hlsl_array_type
+{
+    HLSL_ARRAY_GENERIC,
+    HLSL_ARRAY_PATCH_INPUT,
+    HLSL_ARRAY_PATCH_OUTPUT,
+};
+
 /* An HLSL source-level data type, including anonymous structs and typedefs. */
 struct hlsl_type
 {
@@ -195,6 +202,7 @@ struct hlsl_type
             struct hlsl_type *type;
             /* Array length, or HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT if it is not known yet at parse time. */
             unsigned int elements_count;
+            enum hlsl_array_type array_type;
         } array;
         /* Additional information if the class is HLSL_CLASS_TEXTURE or
          * HLSL_CLASS_UAV. */
@@ -1527,7 +1535,8 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
 
 const char *hlsl_jump_type_to_string(enum hlsl_ir_jump_type type);
 
-struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size);
+struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
+        unsigned int array_size, enum hlsl_array_type array_type);
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2);
 struct hlsl_ir_node *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location *loc);
@@ -1659,6 +1668,7 @@ unsigned int hlsl_type_major_size(const struct hlsl_type *type);
 unsigned int hlsl_type_element_count(const struct hlsl_type *type);
 bool hlsl_type_is_resource(const struct hlsl_type *type);
 bool hlsl_type_is_shader(const struct hlsl_type *type);
+bool hlsl_type_is_patch_array(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 

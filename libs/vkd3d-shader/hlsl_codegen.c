@@ -2968,7 +2968,7 @@ static struct hlsl_type *clone_texture_array_as_combined_sampler_array(struct hl
         if (!(sampler_type = clone_texture_array_as_combined_sampler_array(ctx, type->e.array.type)))
             return NULL;
 
-        return hlsl_new_array_type(ctx, sampler_type, type->e.array.elements_count);
+        return hlsl_new_array_type(ctx, sampler_type, type->e.array.elements_count, HLSL_ARRAY_GENERIC);
     }
 
     return ctx->builtin_types.sampler[type->sampler_dim];
@@ -3132,7 +3132,8 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         for (i = 0; i < load->resource.path_len; ++i)
         {
             VKD3D_ASSERT(arr_type->class == HLSL_CLASS_ARRAY);
-            texture_array_type = hlsl_new_array_type(ctx, texture_array_type, arr_type->e.array.elements_count);
+            texture_array_type = hlsl_new_array_type(ctx, texture_array_type,
+                    arr_type->e.array.elements_count, HLSL_ARRAY_GENERIC);
             arr_type = arr_type->e.array.type;
         }
 
@@ -12188,6 +12189,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                         "Patch constant function parameter \"%s\" cannot be uniform.", var->name);
             else
                 prepend_uniform_copy(ctx, body, var);
+        }
+        else if (hlsl_type_is_patch_array(var->data_type))
+        {
+            hlsl_fixme(ctx, &var->loc, "InputPatch/OutputPatch function parameters.");
         }
         else
         {

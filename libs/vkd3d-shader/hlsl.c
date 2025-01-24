@@ -297,6 +297,12 @@ bool hlsl_type_is_shader(const struct hlsl_type *type)
     return false;
 }
 
+bool hlsl_type_is_patch_array(const struct hlsl_type *type)
+{
+    return type->class == HLSL_CLASS_ARRAY && (type->e.array.array_type == HLSL_ARRAY_PATCH_INPUT
+            || type->e.array.array_type == HLSL_ARRAY_PATCH_OUTPUT);
+}
+
 /* Only intended to be used for derefs (after copies have been lowered to components or vectors) or
  * resources, since for both their data types span across a single regset. */
 static enum hlsl_regset type_get_regset(const struct hlsl_type *type)
@@ -891,7 +897,8 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
     }
 }
 
-struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size)
+struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
+        unsigned int array_size, enum hlsl_array_type array_type)
 {
     struct hlsl_type *type;
 
@@ -902,6 +909,7 @@ struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *ba
     type->modifiers = basic_type->modifiers;
     type->e.array.elements_count = array_size;
     type->e.array.type = basic_type;
+    type->e.array.array_type = array_type;
     type->sampler_dim = basic_type->sampler_dim;
     hlsl_type_calculate_reg_size(ctx, type);
 
@@ -1172,6 +1180,7 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
 
         case HLSL_CLASS_ARRAY:
             return t1->e.array.elements_count == t2->e.array.elements_count
+                    && t1->e.array.array_type == t2->e.array.array_type
                     && hlsl_types_are_equal(t1->e.array.type, t2->e.array.type);
 
         case HLSL_CLASS_TECHNIQUE:
@@ -1251,6 +1260,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
                 return NULL;
             }
             type->e.array.elements_count = old->e.array.elements_count;
+            type->e.array.array_type = old->e.array.array_type;
             break;
 
         case HLSL_CLASS_STRUCT:
@@ -2833,22 +2843,32 @@ static void hlsl_dump_type(struct vkd3d_string_buffer *buffer, const struct hlsl
             return;
 
         case HLSL_CLASS_ARRAY:
-        {
-            const struct hlsl_type *t;
-
-            for (t = type; t->class == HLSL_CLASS_ARRAY; t = t->e.array.type)
-                ;
-
-            hlsl_dump_type(buffer, t);
-            for (t = type; t->class == HLSL_CLASS_ARRAY; t = t->e.array.type)
+            if (hlsl_type_is_patch_array(type))
             {
-                if (t->e.array.elements_count == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
-                    vkd3d_string_buffer_printf(buffer, "[]");
+                if (type->e.array.array_type == HLSL_ARRAY_PATCH_INPUT)
+                    vkd3d_string_buffer_printf(buffer, "InputPatch<");
                 else
-                    vkd3d_string_buffer_printf(buffer, "[%u]", t->e.array.elements_count);
+                    vkd3d_string_buffer_printf(buffer, "OutputPatch<");
+                hlsl_dump_type(buffer, type->e.array.type);
+                vkd3d_string_buffer_printf(buffer, ", %u>", type->e.array.elements_count);
+            }
+            else
+            {
+                const struct hlsl_type *t;
+
+                for (t = type; t->class == HLSL_CLASS_ARRAY; t = t->e.array.type)
+                    ;
+
+                hlsl_dump_type(buffer, t);
+                for (t = type; t->class == HLSL_CLASS_ARRAY; t = t->e.array.type)
+                {
+                    if (t->e.array.elements_count == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+                        vkd3d_string_buffer_printf(buffer, "[]");
+                    else
+                        vkd3d_string_buffer_printf(buffer, "[%u]", t->e.array.elements_count);
+                }
             }
             return;
-        }
 
         case HLSL_CLASS_STRUCT:
             vkd3d_string_buffer_printf(buffer, "<anonymous struct>");

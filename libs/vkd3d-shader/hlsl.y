@@ -415,7 +415,7 @@ static bool add_explicit_conversion(struct hlsl_ctx *ctx, struct hlsl_block *blo
             dst_type = ctx->builtin_types.error;
             break;
         }
-        dst_type = hlsl_new_array_type(ctx, dst_type, arrays->sizes[i]);
+        dst_type = hlsl_new_array_type(ctx, dst_type, arrays->sizes[i], HLSL_ARRAY_GENERIC);
     }
 
     if (instr->data_type->class == HLSL_CLASS_ERROR)
@@ -1118,7 +1118,7 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
                     break;
                 }
 
-                field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[k]);
+                field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[k], HLSL_ARRAY_GENERIC);
             }
         }
 
@@ -1214,7 +1214,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type,
                 break;
             }
 
-            if (!(type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i])))
+            if (!(type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i], HLSL_ARRAY_GENERIC)))
             {
                 free_parse_variable_def(v);
                 ret = false;
@@ -2669,7 +2669,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
                     v->arrays.sizes[i] = size / elem_components;
                 }
             }
-            type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
+            type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i], HLSL_ARRAY_GENERIC);
         }
     }
 
@@ -7007,6 +7007,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
     enum hlsl_buffer_type buffer_type;
     enum hlsl_sampler_dim sampler_dim;
     enum hlsl_so_object_type so_type;
+    enum hlsl_array_type patch_type;
     struct hlsl_attribute *attr;
     struct parse_attribute_list attr_list;
     struct hlsl_ir_switch_case *switch_case;
@@ -7049,6 +7050,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_IN
 %token KW_INLINE
 %token KW_INOUT
+%token KW_INPUTPATCH
 %token KW_LINEAR
 %token KW_LINESTREAM
 %token KW_MATRIX
@@ -7057,6 +7059,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_NOPERSPECTIVE
 %token KW_NULL
 %token KW_OUT
+%token KW_OUTPUTPATCH
 %token KW_PACKOFFSET
 %token KW_PASS
 %token KW_PIXELSHADER
@@ -7238,6 +7241,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <reg_reservation> packoffset_reservation
 
 %type <sampler_dim> texture_type texture_ms_type uav_type rov_type
+%type <patch_type> patch_type
 
 %type <semantic> semantic
 
@@ -8147,7 +8151,7 @@ parameter_decl:
                     break;
                 }
 
-                type = hlsl_new_array_type(ctx, type, $4.sizes[i]);
+                type = hlsl_new_array_type(ctx, type, $4.sizes[i], HLSL_ARRAY_GENERIC);
             }
             vkd3d_free($4.sizes);
 
@@ -8290,6 +8294,16 @@ resource_format:
                 YYABORT;
         }
 
+patch_type:
+      KW_INPUTPATCH
+        {
+            $$ = HLSL_ARRAY_PATCH_INPUT;
+        }
+    | KW_OUTPUTPATCH
+        {
+            $$ = HLSL_ARRAY_PATCH_OUTPUT;
+        }
+
 type_no_void:
       KW_VECTOR '<' type ',' C_INTEGER '>'
         {
@@ -8427,6 +8441,20 @@ type_no_void:
     | so_type '<' type '>'
         {
             $$ = hlsl_new_stream_output_type(ctx, $1, $3);
+        }
+    | patch_type '<' type ',' C_INTEGER '>'
+        {
+            struct hlsl_type *type;
+
+            if ($5 < 1)
+            {
+                hlsl_error(ctx, &@5, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Control point size %d is not positive.", $5);
+                YYABORT;
+            }
+
+            type = hlsl_new_array_type(ctx, $3, $5, $1);
+            $$ = hlsl_type_clone(ctx, type, 0, HLSL_MODIFIER_CONST);
         }
     | KW_RWBYTEADDRESSBUFFER
         {
