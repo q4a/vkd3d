@@ -275,3 +275,22 @@ float4 main() : sv_target
 [pixel shader fail]
 
 float4 main() : sv_target;
+
+[pixel shader fail(sm<6)]
+float4 main(void) : sv_target
+{
+    const float a;
+    return 0;
+}
+
+[pixel shader fail(sm<6)]
+struct s
+{
+    float4 f;
+};
+
+float4 main(void) : sv_target
+{
+    const struct s a;
+    return 0;
+}
