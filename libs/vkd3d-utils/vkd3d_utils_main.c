@@ -318,7 +318,7 @@ HRESULT WINAPI D3DCompile2VKD3D(const void *data, SIZE_T data_size, const char *
         option->value = 0;
         if (flags & D3DCOMPILE_PACK_MATRIX_ROW_MAJOR)
             option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR;
-        if (flags & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
+        else if (flags & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
             option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR;
     }
 
