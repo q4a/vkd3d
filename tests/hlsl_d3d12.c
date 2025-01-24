@@ -2734,6 +2734,55 @@ static void test_signature_reflection(void)
         {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
     };
 
+    static const char hs4_source[] =
+        "struct vs_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "    float4 y : position;\n"
+        "    float4 apple : apple;\n"
+        "};\n"
+        "struct hs_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "};\n"
+        "struct patch_constant_data\n"
+        "{\n"
+        "    float edges[2] : sv_tessfactor;\n"
+        "};\n"
+        "patch_constant_data patch_constant(InputPatch<vs_data, 2> input, in uint a : sv_primitiveid)\n"
+        "{\n"
+        "    return (patch_constant_data)(input[0].apple.x + input[0].apple.y + input[1].apple.z);\n"
+        "}\n"
+        "[domain(\"isoline\")]\n"
+        "[outputcontrolpoints(2)]\n"
+        "[partitioning(\"integer\")]\n"
+        "[outputtopology(\"point\")]\n"
+        "[patchconstantfunc(\"patch_constant\")]\n"
+        "hs_data main(InputPatch<vs_data, 2> input, in uint a : sv_outputcontrolpointid)\n"
+        "{\n"
+        "    hs_data ret;\n"
+        "    ret.x = input[0].x;\n"
+        "    return ret;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs4_inputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"position",    0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"apple",       0, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x7},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs4_outputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs4_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_LINE_DENSITY_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+    };
+
     static const char ds1_source[] =
         "struct hs_data\n"
         "{\n"
@@ -2831,6 +2880,42 @@ static void test_signature_reflection(void)
         {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
     };
 
+    static const char ds4_source[] =
+        "struct hs_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "    float4 y : position;\n"
+        "    float4 apple : apple;\n"
+        "};\n"
+        "struct hs_pc_data\n"
+        "{\n"
+        "    float edges[2] : sv_tessfactor;\n"
+        "};\n"
+        "\n"
+        "[domain(\"isoline\")]\n"
+        "float4 main(in hs_pc_data input_pc, OutputPatch<hs_data, 2> input) : apple\n"
+        "{\n"
+        "    return input[0].apple;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds4_inputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"position",    0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"apple",       0, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds4_outputs[] =
+    {
+        {"apple", 0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds4_patch_constants[] =
+    {
+        {"sv_tessfactor",       0, 0, D3D_NAME_FINAL_LINE_DENSITY_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
     static const struct
     {
         const char *source;
@@ -2873,9 +2958,11 @@ static void test_signature_reflection(void)
         {hs1_source,  "hs_5_0", false, NULL, 0, hs1_outputs, ARRAY_SIZE(hs1_outputs), hs1_patch_constants, ARRAY_SIZE(hs1_patch_constants)},
         {hs2_source,  "hs_5_0", false, NULL, 0, hs2_outputs, ARRAY_SIZE(hs2_outputs), hs2_patch_constants, ARRAY_SIZE(hs2_patch_constants)},
         {hs3_source,  "hs_5_0", false, NULL, 0, hs3_outputs, ARRAY_SIZE(hs3_outputs), hs3_patch_constants, ARRAY_SIZE(hs3_patch_constants)},
+        {hs4_source,  "hs_5_0", false, hs4_inputs, ARRAY_SIZE(hs4_inputs), hs4_outputs, ARRAY_SIZE(hs4_outputs), hs4_patch_constants, ARRAY_SIZE(hs4_patch_constants)},
         {ds1_source,  "ds_5_0", false, NULL, 0, ds1_outputs, ARRAY_SIZE(ds1_outputs), ds1_patch_constants, ARRAY_SIZE(ds1_patch_constants)},
         {ds2_source,  "ds_5_0", false, NULL, 0, ds2_outputs, ARRAY_SIZE(ds2_outputs), ds2_patch_constants, ARRAY_SIZE(ds2_patch_constants)},
         {ds3_source,  "ds_5_0", false, NULL, 0, ds3_outputs, ARRAY_SIZE(ds3_outputs), ds3_patch_constants, ARRAY_SIZE(ds3_patch_constants)},
+        {ds4_source,  "ds_5_0", false, ds4_inputs, ARRAY_SIZE(ds4_inputs), ds4_outputs, ARRAY_SIZE(ds4_outputs), ds4_patch_constants, ARRAY_SIZE(ds4_patch_constants)},
     };
 
     for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
