@@ -456,8 +456,15 @@ struct shader_dump_data
     const char *target_suffix;
 };
 
+enum shader_dump_type
+{
+    SHADER_DUMP_TYPE_SOURCE,
+    SHADER_DUMP_TYPE_PREPROC,
+    SHADER_DUMP_TYPE_TARGET,
+};
+
 static void vkd3d_shader_dump_shader(const struct shader_dump_data *dump_data,
-        const void *data, size_t size, bool source)
+        const void *data, size_t size, enum shader_dump_type type)
 {
     static const char hexadecimal_digits[] = "0123456789abcdef";
     const uint8_t *checksum = dump_data->checksum;
@@ -482,8 +489,10 @@ static void vkd3d_shader_dump_shader(const struct shader_dump_data *dump_data,
     if (dump_data->profile)
         pos += snprintf(filename + pos, ARRAY_SIZE(filename) - pos, "-%s", dump_data->profile);
 
-    if (source)
+    if (type == SHADER_DUMP_TYPE_SOURCE)
         pos += snprintf(filename + pos, ARRAY_SIZE(filename) - pos, "-source.%s", dump_data->source_suffix);
+    else if (type == SHADER_DUMP_TYPE_PREPROC)
+        pos += snprintf(filename + pos, ARRAY_SIZE(filename) - pos, "-preproc.%s", dump_data->source_suffix);
     else
         pos += snprintf(filename + pos, ARRAY_SIZE(filename) - pos, "-target.%s", dump_data->target_suffix);
 
@@ -1633,7 +1642,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
     fill_shader_dump_data(compile_info, &dump_data);
-    vkd3d_shader_dump_shader(&dump_data, compile_info->source.code, compile_info->source.size, true);
+    vkd3d_shader_dump_shader(&dump_data, compile_info->source.code, compile_info->source.size, SHADER_DUMP_TYPE_SOURCE);
 
     if (compile_info->source_type == VKD3D_SHADER_SOURCE_HLSL)
     {
@@ -1713,13 +1722,16 @@ int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
 }
 
 static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+        const struct shader_dump_data *dump_data, struct vkd3d_shader_code *out,
+        struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_code preprocessed;
     int ret;
 
     if ((ret = preproc_lexer_parse(compile_info, &preprocessed, message_context)))
         return ret;
+
+    vkd3d_shader_dump_shader(dump_data, preprocessed.code, preprocessed.size, SHADER_DUMP_TYPE_PREPROC);
 
     ret = hlsl_compile_shader(&preprocessed, compile_info, out, message_context);
 
@@ -1747,11 +1759,11 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
     fill_shader_dump_data(compile_info, &dump_data);
-    vkd3d_shader_dump_shader(&dump_data, compile_info->source.code, compile_info->source.size, true);
+    vkd3d_shader_dump_shader(&dump_data, compile_info->source.code, compile_info->source.size, SHADER_DUMP_TYPE_SOURCE);
 
     if (compile_info->source_type == VKD3D_SHADER_SOURCE_HLSL)
     {
-        ret = compile_hlsl(compile_info, out, &message_context);
+        ret = compile_hlsl(compile_info, &dump_data, out, &message_context);
     }
     else if (compile_info->source_type == VKD3D_SHADER_SOURCE_FX)
     {
@@ -1770,7 +1782,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     if (ret >= 0)
-        vkd3d_shader_dump_shader(&dump_data, out->code, out->size, false);
+        vkd3d_shader_dump_shader(&dump_data, out->code, out->size, SHADER_DUMP_TYPE_TARGET);
 
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
