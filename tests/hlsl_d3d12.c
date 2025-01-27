@@ -1420,6 +1420,10 @@ static void test_reflection(void)
         "    float q;\n"
         "    struct r_name {float a; float4 b;} r;\n"
         "    column_major float3x1 t;\n"
+        "    struct\n"
+        "    {\n"
+        "        min16uint2 a;\n"
+        "    } v;\n"
         "};\n"
         "\n"
         "cbuffer b5 : register(b5)\n"
@@ -1458,6 +1462,11 @@ static void test_reflection(void)
         {D3D_SVC_VECTOR, D3D_SVT_FLOAT, 1, 4, 0, 0, 16, "float4"},
     };
 
+    static const D3D12_SHADER_TYPE_DESC v_field_types[] =
+    {
+        {D3D_SVC_VECTOR, D3D_SVT_MIN16UINT, 1, 2, 0, 0, 0, "min16uint2"},
+    };
+
     static const struct shader_variable globals_vars =
         {{"m",   0,  4, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"}};
     static const struct shader_variable params_vars =
@@ -1480,6 +1489,7 @@ static void test_reflection(void)
         {{"q", 240,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"}},
         {{"r", 256, 32,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT,         D3D_SVT_VOID,  1, 5, 0, ARRAY_SIZE(r_field_types), 0, "r_name"}, r_field_types},
         {{"t", 288, 12,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_COLUMNS, D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
+        {{"v", 304,  8,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT,         D3D_SVT_VOID,  1, 2, 0, ARRAY_SIZE(v_field_types), 0, "<unnamed>"}, v_field_types},
     };
     static const struct shader_variable b5_vars =
         {{"u",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
@@ -1488,7 +1498,7 @@ static void test_reflection(void)
     {
         {{"$Globals", D3D_CT_CBUFFER, 1, 16}, &globals_vars},
         {{"$Params", D3D_CT_CBUFFER, 1, 16}, &params_vars},
-        {{"b1", D3D_CT_CBUFFER, ARRAY_SIZE(buffer_vars), 304}, buffer_vars},
+        {{"b1", D3D_CT_CBUFFER, ARRAY_SIZE(buffer_vars), 320}, buffer_vars},
         {{"b5", D3D_CT_CBUFFER, 1, 16}, &b5_vars},
     };
 
@@ -1546,6 +1556,7 @@ static void test_reflection(void)
         "    Texture2D<unorm float4> b;\n"
         "    RWTexture2D<snorm float4> c;\n"
         "    RWTexture2D<unorm float4> d;\n"
+        "    Texture3D<min16uint3> e;\n"
         "} l;\n"
         "cbuffer buf : register(b3[-1])\n"
         "{\n"
@@ -1561,7 +1572,7 @@ static void test_reflection(void)
         "    l.d[uint2(0,0)] = 0;\n"
         "    return a.Sample(b, pos) + a.Sample(c, pos) + a.Sample(d, pos) + tex2D(f, pos) + tex2D(e, pos)"
         "            + tex2D(g, pos) + h.b.Load(h.c).x + k.b.Sample(k.c.a, pos) + v + vv + l.a.Load(int3(0,0,0))"
-        "            + l.b.Load(int3(0,0,0));\n"
+        "            + l.b.Load(int3(0,0,0)) + l.e.Load(0).x;\n"
         "}";
 
     static const D3D12_SHADER_INPUT_BIND_DESC ps_bindings[] =
@@ -1581,6 +1592,7 @@ static void test_reflection(void)
         {"h.b", D3D_SIT_TEXTURE, 7, 1, D3D_SIF_USERPACKED | D3D_SIF_TEXTURE_COMPONENT_0, D3D_RETURN_TYPE_SINT, D3D_SRV_DIMENSION_TEXTURE1D, ~0u, 0, 7},
         {"l.a", D3D_SIT_TEXTURE, 9, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_SNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 9},
         {"l.b", D3D_SIT_TEXTURE, 10, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_UNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 10},
+        {"l.e", D3D_SIT_TEXTURE, 11, 1, D3D_SIF_TEXTURE_COMPONENT_1, D3D_RETURN_TYPE_UINT, D3D_SRV_DIMENSION_TEXTURE3D, ~0u, 0, 11},
         {"l.c", D3D_SIT_UAV_RWTYPED, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_SNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 1},
         {"l.d", D3D_SIT_UAV_RWTYPED, 2, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_UNORM, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 2},
         {"buf2", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .uID = 0},
@@ -2067,6 +2079,7 @@ static void check_signature_element_(const char *file, int line, const D3D12_SIG
         ok_(file, line)(desc->ReadWriteMask == expect->ReadWriteMask, "Got used mask %#x.\n", desc->ReadWriteMask);
     todo_if(is_todo && desc->Stream != expect->Stream)
         ok_(file, line)(desc->Stream == expect->Stream, "Got stream %u.\n", desc->Stream);
+    ok_(file, line)(desc->MinPrecision == expect->MinPrecision, "Got minimum precision %#x.\n", desc->MinPrecision);
 }
 
 static void test_signature_reflection(void)
@@ -2088,7 +2101,8 @@ static void test_signature_reflection(void)
         "        in uint3 f : fruit,\n"
         "        inout bool2 g : grape,\n"
         "        in int h : honeydew,\n"
-        "        in uint i : sv_vertexid)\n"
+        "        in uint i : sv_vertexid,\n"
+        "        inout min16uint4 j : jujube)\n"
         "{\n"
         "    b.yw = a.xz;\n"
         "}";
@@ -2103,6 +2117,7 @@ static void test_signature_reflection(void)
         {"grape",       0, 5, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_UINT32, 0x3, 0x3},
         {"honeydew",    0, 6, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_SINT32, 0x1},
         {"sv_vertexid", 0, 7, D3D_NAME_VERTEX_ID, D3D_REGISTER_COMPONENT_UINT32, 0x1},
+        {"jujube",      0, 8, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_UINT32, 0xf, 0xf, 0, D3D_MIN_PRECISION_UINT_16},
     };
 
     static const D3D12_SIGNATURE_PARAMETER_DESC vs1_outputs[] =
@@ -2112,6 +2127,7 @@ static void test_signature_reflection(void)
         {"depth",       0, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
         {"sv_position", 0, 3, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
         {"grape",       0, 4, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_UINT32, 0x3, 0xc},
+        {"jujube",      0, 5, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_UINT32, 0xf, 0, 0, D3D_MIN_PRECISION_UINT_16},
     };
 
     static const char vs2_source[] =

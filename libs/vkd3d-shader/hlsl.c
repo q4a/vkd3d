@@ -304,6 +304,7 @@ bool hlsl_base_type_is_integer(enum hlsl_base_type type)
     {
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_INT:
+        case HLSL_TYPE_MIN16UINT:
         case HLSL_TYPE_UINT:
             return true;
 
@@ -515,6 +516,8 @@ static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, e
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy)
 {
     struct hlsl_type *type;
+
+    TRACE("New type %s.\n", name);
 
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
@@ -2908,6 +2911,7 @@ static void hlsl_dump_type(struct vkd3d_string_buffer *buffer, const struct hlsl
         [HLSL_TYPE_HALF] = "half",
         [HLSL_TYPE_DOUBLE] = "double",
         [HLSL_TYPE_INT] = "int",
+        [HLSL_TYPE_MIN16UINT] = "min16uint",
         [HLSL_TYPE_UINT] = "uint",
         [HLSL_TYPE_BOOL] = "bool",
     };
@@ -3375,6 +3379,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
                 vkd3d_string_buffer_printf(buffer, "%d ", value->i);
                 break;
 
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 vkd3d_string_buffer_printf(buffer, "%u ", value->u);
                 break;
@@ -4401,17 +4406,17 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     static const char * const names[] =
     {
-        [HLSL_TYPE_FLOAT]  = "float",
-        [HLSL_TYPE_HALF]   = "half",
-        [HLSL_TYPE_DOUBLE] = "double",
-        [HLSL_TYPE_INT]    = "int",
-        [HLSL_TYPE_UINT]   = "uint",
-        [HLSL_TYPE_BOOL]   = "bool",
+        [HLSL_TYPE_FLOAT]       = "float",
+        [HLSL_TYPE_HALF]        = "half",
+        [HLSL_TYPE_DOUBLE]      = "double",
+        [HLSL_TYPE_INT]         = "int",
+        [HLSL_TYPE_UINT]        = "uint",
+        [HLSL_TYPE_BOOL]        = "bool",
+        [HLSL_TYPE_MIN16UINT]   = "min16uint",
     };
 
     static const char *const variants_float[] = {"min10float", "min16float"};
     static const char *const variants_int[] = {"min12int", "min16int"};
-    static const char *const variants_uint[] = {"min16uint"};
 
     static const char *const sampler_names[] =
     {
@@ -4500,11 +4505,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
             case HLSL_TYPE_INT:
                 variants = variants_int;
                 n_variants = ARRAY_SIZE(variants_int);
-                break;
-
-            case HLSL_TYPE_UINT:
-                variants = variants_uint;
-                n_variants = ARRAY_SIZE(variants_uint);
                 break;
 
             default:

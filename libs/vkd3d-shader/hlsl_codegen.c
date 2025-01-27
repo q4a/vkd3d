@@ -246,13 +246,23 @@ static void validate_field_semantic(struct hlsl_ctx *ctx, struct hlsl_struct_fie
 
 static enum hlsl_base_type base_type_get_semantic_equivalent(enum hlsl_base_type base)
 {
-    if (base == HLSL_TYPE_BOOL)
-        return HLSL_TYPE_UINT;
-    if (base == HLSL_TYPE_INT)
-        return HLSL_TYPE_UINT;
-    if (base == HLSL_TYPE_HALF)
-        return HLSL_TYPE_FLOAT;
-    return base;
+    switch (base)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_MIN16UINT:
+        case HLSL_TYPE_UINT:
+            return HLSL_TYPE_UINT;
+
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_FLOAT:
+            return HLSL_TYPE_FLOAT;
+
+        case HLSL_TYPE_DOUBLE:
+            return HLSL_TYPE_DOUBLE;
+    }
+
+    vkd3d_unreachable();
 }
 
 static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hlsl_type *type1,
@@ -3190,7 +3200,7 @@ static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
 
     arg = expr->operands[0].node;
-    if (instr->data_type->e.numeric.type != HLSL_TYPE_INT && instr->data_type->e.numeric.type != HLSL_TYPE_UINT)
+    if (!hlsl_type_is_integer(instr->data_type) || instr->data_type->e.numeric.type == HLSL_TYPE_BOOL)
         return false;
     if (arg->data_type->e.numeric.type != HLSL_TYPE_FLOAT && arg->data_type->e.numeric.type != HLSL_TYPE_HALF)
         return false;
@@ -4009,8 +4019,7 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     if (expr->op != HLSL_OP2_DOT)
         return false;
 
-    if (type->e.numeric.type == HLSL_TYPE_INT || type->e.numeric.type == HLSL_TYPE_UINT
-            || type->e.numeric.type == HLSL_TYPE_BOOL)
+    if (hlsl_type_is_integer(type))
     {
         arg1 = expr->operands[0].node;
         arg2 = expr->operands[1].node;
@@ -5099,6 +5108,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                             f = value->i;
                             break;
 
+                        case HLSL_TYPE_MIN16UINT:
                         case HLSL_TYPE_UINT:
                             f = value->u;
                             break;
@@ -6674,6 +6684,7 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
                 break;
 
             case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 component_type = VKD3D_SHADER_COMPONENT_UINT;
                 break;
@@ -6763,6 +6774,22 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
     element->used_mask = use_mask;
     if (program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL && !output)
         element->interpolation_mode = VKD3DSIM_LINEAR;
+
+    switch (var->data_type->e.numeric.type)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_DOUBLE:
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            element->min_precision = VKD3D_SHADER_MINIMUM_PRECISION_NONE;
+            break;
+
+        case HLSL_TYPE_MIN16UINT:
+            element->min_precision = VKD3D_SHADER_MINIMUM_PRECISION_UINT_16;
+            break;
+    }
 }
 
 static void generate_vsir_signature(struct hlsl_ctx *ctx,
@@ -6830,6 +6857,7 @@ static enum vkd3d_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, 
                 return VKD3D_DATA_INT;
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_MIN16UINT:
                 return VKD3D_DATA_UINT;
         }
     }
@@ -7522,6 +7550,7 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
             switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT:
                 case HLSL_TYPE_UINT:
                 case HLSL_TYPE_BOOL:
                     /* Integrals are internally represented as floats, so no change is necessary.*/
@@ -7543,8 +7572,9 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_TYPE_INT:
+        case HLSL_TYPE_MIN16UINT:
         case HLSL_TYPE_UINT:
-            switch(src_type->e.numeric.type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
@@ -7554,6 +7584,7 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                     break;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT:
                 case HLSL_TYPE_UINT:
                 case HLSL_TYPE_BOOL:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
@@ -8251,6 +8282,10 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type, bool is_comb
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
                     return D3DXPT_INT;
+                /* Minimum-precision types are not supported until 46, but at
+                 * that point they do the same thing, and return sm4 types. */
+                case HLSL_TYPE_MIN16UINT:
+                    return 0x39;
             }
             break;
 
@@ -8535,6 +8570,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
                                 uni.f = var->default_values[k].number.i;
                                 break;
 
+                            case HLSL_TYPE_MIN16UINT:
                             case HLSL_TYPE_UINT:
                             case HLSL_TYPE_BOOL:
                                 uni.f = var->default_values[k].number.u;
@@ -8782,6 +8818,7 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_ITOF, 0, 0, true);
                     return true;
 
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_UTOF, 0, 0, true);
                     return true;
@@ -8805,6 +8842,7 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
                     return true;
@@ -8819,6 +8857,7 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
             }
             break;
 
+        case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
         case HLSL_TYPE_UINT:
             switch (src_type->e.numeric.type)
             {
@@ -8828,6 +8867,7 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
                     return true;
@@ -9025,6 +9065,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_INEG, 0, 0, true);
                     return true;
@@ -9092,6 +9133,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_IADD, 0, 0, true);
                     return true;
@@ -9123,6 +9165,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DIV, 0, 0, true);
                     return true;
 
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_UDIV, expr, 0);
                     return true;
@@ -9171,6 +9214,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
 
                 case HLSL_TYPE_BOOL:
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_IEQ, 0, 0, true);
                     return true;
@@ -9195,6 +9239,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_BOOL:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_UGE, 0, 0, true);
                     return true;
@@ -9219,6 +9264,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_BOOL:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_ULT, 0, 0, true);
                     return true;
@@ -9253,6 +9299,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_IMAD, 0, 0, true);
                     return true;
@@ -9273,6 +9320,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_IMAX, 0, 0, true);
                     return true;
 
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_UMAX, 0, 0, true);
                     return true;
@@ -9293,6 +9341,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_IMIN, 0, 0, true);
                     return true;
 
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_UMIN, 0, 0, true);
                     return true;
@@ -9305,6 +9354,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
         case HLSL_OP2_MOD:
             switch (dst_type->e.numeric.type)
             {
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     sm4_generate_vsir_expr_with_two_destinations(ctx, program, VKD3DSIH_UDIV, expr, 1);
                     return true;
@@ -9322,6 +9372,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
                     return true;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     /* Using IMUL instead of UMUL because we're taking the low
                      * bits, and the native compiler generates IMUL. */
@@ -9344,6 +9395,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
 
                 case HLSL_TYPE_BOOL:
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_MIN16UINT: /* FIXME: Needs minimum-precision annotations. */
                 case HLSL_TYPE_UINT:
                     generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_INE, 0, 0, true);
                     return true;
@@ -10434,6 +10486,25 @@ static void generate_vsir_scan_required_features(struct hlsl_ctx *ctx, struct vs
      * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
 }
 
+static bool is_minimum_precision(enum hlsl_base_type type)
+{
+    switch (type)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_DOUBLE:
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            return false;
+
+        case HLSL_TYPE_MIN16UINT:
+            return true;
+    }
+
+    vkd3d_unreachable();
+}
+
 static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
         struct vsir_program *program, const struct hlsl_ir_function_decl *entry_func)
 {
@@ -10471,7 +10542,7 @@ static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
         /* Note that it doesn't matter if the semantic is unused or doesn't
          * generate a signature element (e.g. SV_DispatchThreadID). */
         if ((var->is_input_semantic || var->is_output_semantic)
-                && type->is_minimum_precision)
+                && (type->is_minimum_precision || is_minimum_precision(type->e.numeric.type)))
         {
             program->global_flags |= VKD3DSGF_ENABLE_MINIMUM_PRECISION;
             break;
@@ -10608,6 +10679,7 @@ static enum vkd3d_data_type sm4_generate_vsir_get_format_type(const struct hlsl_
             return VKD3D_DATA_INT;
 
         case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_MIN16UINT:
         case HLSL_TYPE_UINT:
             return VKD3D_DATA_UINT;
     }
@@ -10902,6 +10974,7 @@ static enum D3D_RESOURCE_RETURN_TYPE sm4_data_type(const struct hlsl_type *type)
             break;
 
         case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_MIN16UINT:
         case HLSL_TYPE_UINT:
             return D3D_RETURN_TYPE_UINT;
     }
@@ -10987,6 +11060,8 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
             return D3D_SVT_INT;
         case HLSL_TYPE_UINT:
             return D3D_SVT_UINT;
+        case HLSL_TYPE_MIN16UINT:
+            return D3D_SVT_MIN16UINT;
     }
 
     vkd3d_unreachable();

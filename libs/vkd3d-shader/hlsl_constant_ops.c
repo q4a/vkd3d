@@ -51,6 +51,7 @@ static bool fold_abs(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
                     dst->u[k].i = abs(src->value.u[k].i);
                 break;
 
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = src->value.u[k].u;
                 break;
@@ -126,6 +127,7 @@ static bool fold_bit_not(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         switch (type)
         {
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = ~src->value.u[k].u;
@@ -175,6 +177,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
                 break;
 
             case HLSL_TYPE_UINT:
+            case HLSL_TYPE_MIN16UINT:
                 u = src->value.u[k].u;
                 i = src->value.u[k].u;
                 f = src->value.u[k].u;
@@ -205,6 +208,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
                 break;
 
             case HLSL_TYPE_UINT:
+            case HLSL_TYPE_MIN16UINT:
                 dst->u[k].u = u;
                 break;
 
@@ -395,6 +399,7 @@ static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
                 break;
 
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = -src->value.u[k].u;
                 break;
@@ -612,6 +617,7 @@ static bool fold_add(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
             /* Handling HLSL_TYPE_INT through the unsigned field to avoid
              * undefined behavior with signed integers in C. */
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = src1->value.u[k].u + src2->value.u[k].u;
                 break;
@@ -638,6 +644,7 @@ static bool fold_and(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
         switch (type)
         {
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u & src2->value.u[k].u;
@@ -665,6 +672,7 @@ static bool fold_or(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const
         switch (type)
         {
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u | src2->value.u[k].u;
@@ -692,6 +700,7 @@ static bool fold_bit_xor(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, 
         switch (type)
         {
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = src1->value.u[k].u ^ src2->value.u[k].u;
                 break;
@@ -813,6 +822,7 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
                     dst->u[k].i = src1->value.u[k].i / src2->value.u[k].i;
                 break;
 
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 if (src2->value.u[k].u == 0)
                 {
@@ -855,6 +865,7 @@ static bool fold_equal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, co
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_MIN16UINT:
                 dst->u[k].u = src1->value.u[k].u == src2->value.u[k].u;
                 break;
         }
@@ -891,6 +902,7 @@ static bool fold_gequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
 
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_MIN16UINT:
                 dst->u[k].u = src1->value.u[k].u >= src2->value.u[k].u;
                 break;
         }
@@ -927,6 +939,7 @@ static bool fold_less(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, con
 
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_MIN16UINT:
                 dst->u[k].u = src1->value.u[k].u < src2->value.u[k].u;
                 break;
         }
@@ -951,6 +964,7 @@ static bool fold_lshift(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
         switch (src1->node.data_type->e.numeric.type)
         {
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = src1->value.u[k].u << shift;
                 break;
@@ -989,6 +1003,7 @@ static bool fold_max(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
                 dst->u[k].i = max(src1->value.u[k].i, src2->value.u[k].i);
                 break;
 
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = max(src1->value.u[k].u, src2->value.u[k].u);
                 break;
@@ -1027,6 +1042,7 @@ static bool fold_min(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
                 dst->u[k].i = min(src1->value.u[k].i, src2->value.u[k].i);
                 break;
 
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = min(src1->value.u[k].u, src2->value.u[k].u);
                 break;
@@ -1065,6 +1081,7 @@ static bool fold_mod(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
                     dst->u[k].i = src1->value.u[k].i % src2->value.u[k].i;
                 break;
 
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 if (src2->value.u[k].u == 0)
                 {
@@ -1105,6 +1122,7 @@ static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
                 break;
 
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = src1->value.u[k].u * src2->value.u[k].u;
                 break;
@@ -1141,6 +1159,7 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_MIN16UINT:
                 dst->u[k].u = src1->value.u[k].u != src2->value.u[k].u;
                 break;
         }
@@ -1183,6 +1202,7 @@ static bool fold_rshift(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
                 dst->u[k].i = src1->value.u[k].i >> shift;
                 break;
 
+            case HLSL_TYPE_MIN16UINT:
             case HLSL_TYPE_UINT:
                 dst->u[k].u = src1->value.u[k].u >> shift;
                 break;
@@ -1399,6 +1419,7 @@ static bool constant_is_zero(struct hlsl_ir_constant *const_arg)
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_INT:
             case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_MIN16UINT:
                 if (const_arg->value.u[k].u != 0)
                     return false;
                 break;
@@ -1429,6 +1450,7 @@ static bool constant_is_one(struct hlsl_ir_constant *const_arg)
 
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_INT:
+            case HLSL_TYPE_MIN16UINT:
                 if (const_arg->value.u[k].u != 1)
                     return false;
                 break;
@@ -1524,7 +1546,7 @@ static bool is_op_associative(enum hlsl_ir_expr_op op, enum hlsl_base_type type)
     {
         case HLSL_OP2_ADD:
         case HLSL_OP2_MUL:
-            return type == HLSL_TYPE_INT || type == HLSL_TYPE_UINT;
+            return hlsl_base_type_is_integer(type);
 
         case HLSL_OP2_BIT_AND:
         case HLSL_OP2_BIT_OR:
@@ -1574,7 +1596,7 @@ static bool is_op_left_distributive(enum hlsl_ir_expr_op opl, enum hlsl_ir_expr_
 
         case HLSL_OP2_DOT:
         case HLSL_OP2_MUL:
-            return opr == HLSL_OP2_ADD && (type == HLSL_TYPE_INT || type == HLSL_TYPE_UINT);
+            return opr == HLSL_OP2_ADD && hlsl_base_type_is_integer(type);
 
         case HLSL_OP2_MAX:
             return opr == HLSL_OP2_MIN;

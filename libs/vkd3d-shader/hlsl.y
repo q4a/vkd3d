@@ -1496,7 +1496,11 @@ static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hl
         return HLSL_TYPE_FLOAT;
     if (t1 == HLSL_TYPE_UINT || t2 == HLSL_TYPE_UINT)
         return HLSL_TYPE_UINT;
-    return HLSL_TYPE_INT;
+    if (t1 == HLSL_TYPE_INT || t2 == HLSL_TYPE_INT)
+        return HLSL_TYPE_INT;
+    if (t1 == HLSL_TYPE_MIN16UINT || t2 == HLSL_TYPE_MIN16UINT)
+        return HLSL_TYPE_MIN16UINT;
+    vkd3d_unreachable();
 }
 
 static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct hlsl_type *t2,
@@ -2836,6 +2840,7 @@ static enum hlsl_base_type hlsl_base_type_class(enum hlsl_base_type t)
             return HLSL_TYPE_FLOAT;
 
         case HLSL_TYPE_INT:
+        case HLSL_TYPE_MIN16UINT:
         case HLSL_TYPE_UINT:
             return HLSL_TYPE_INT;
 
@@ -2851,6 +2856,7 @@ static unsigned int hlsl_base_type_width(enum hlsl_base_type t)
     switch (t)
     {
         case HLSL_TYPE_HALF:
+        case HLSL_TYPE_MIN16UINT:
             return 16;
 
         case HLSL_TYPE_FLOAT:
