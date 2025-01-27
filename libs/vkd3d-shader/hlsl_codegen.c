@@ -10442,6 +10442,7 @@ static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
     const struct vkd3d_shader_version *version = &program->shader_version;
     struct extern_resource *extern_resources;
     unsigned int extern_resources_count, i;
+    struct hlsl_ir_var *var;
 
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
 
@@ -10461,6 +10462,25 @@ static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
     }
 
     sm4_free_extern_resources(extern_resources, extern_resources_count);
+
+    LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        const struct hlsl_type *type = var->data_type;
+
+        if (hlsl_type_is_patch_array(type))
+            type = var->data_type->e.array.type;
+
+        /* Note that it doesn't matter if the semantic is unused or doesn't
+         * generate a signature element (e.g. SV_DispatchThreadID). */
+        if ((var->is_input_semantic || var->is_output_semantic)
+                && type->is_minimum_precision)
+        {
+            program->global_flags |= VKD3DSGF_ENABLE_MINIMUM_PRECISION;
+            break;
+        }
+    }
+    /* FIXME: We also need to check for minimum-precision uniforms and local
+     * variable arithmetic. */
 
     if (entry_func->early_depth_test && vkd3d_shader_ver_ge(version, 5, 0))
         program->global_flags |= VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL;
