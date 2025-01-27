@@ -4251,6 +4251,9 @@ static void tpf_write_sfi0(struct tpf_compiler *tpf)
     if (tpf->program->features.rovs)
         *flags |= DXBC_SFI0_REQUIRES_ROVS;
 
+    if (tpf->program->global_flags & VKD3DSGF_ENABLE_MINIMUM_PRECISION)
+        *flags |= DXBC_SFI0_REQUIRES_MINIMUM_PRECISION;
+
     /* FIXME: We also emit code that should require UAVS_AT_EVERY_STAGE,
      * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
 
