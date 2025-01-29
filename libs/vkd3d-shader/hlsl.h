@@ -1180,6 +1180,10 @@ struct hlsl_ctx
     unsigned int input_control_point_count;
     struct hlsl_type *input_control_point_type;
 
+    /* Whether the current function being processed during HLSL codegen is
+     * the patch constant function in a hull shader. */
+    bool is_patch_constant_func;
+
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we
      * are currently parsing, "mangled" with an internal prefix to avoid

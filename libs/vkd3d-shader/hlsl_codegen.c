@@ -5765,7 +5765,7 @@ static enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hl
 }
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        struct register_allocator *allocator, bool output, bool optimize, bool is_patch_constant_func)
+        struct register_allocator *allocator, bool output, bool optimize)
 {
     static const char *const shader_names[] =
     {
@@ -5817,7 +5817,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         bool has_idx;
 
         if (!sm4_sysval_semantic_from_semantic_name(&semantic, &version, ctx->semantic_compat_mapping,
-                ctx->domain, var->semantic.name, var->semantic.index, output, is_patch_constant_func))
+                ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
@@ -5870,7 +5870,6 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     struct register_allocator input_allocator = {0}, output_allocator = {0};
     bool is_vertex_shader = ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX;
     bool is_pixel_shader = ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL;
-    bool is_patch_constant_func = entry_func == ctx->patch_constant_func;
     struct hlsl_ir_var *var;
 
     input_allocator.prioritize_smaller_writemasks = true;
@@ -5879,9 +5878,9 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_input_semantic)
-            allocate_semantic_register(ctx, var, &input_allocator, false, !is_vertex_shader, is_patch_constant_func);
+            allocate_semantic_register(ctx, var, &input_allocator, false, !is_vertex_shader);
         if (var->is_output_semantic)
-            allocate_semantic_register(ctx, var, &output_allocator, true, !is_pixel_shader, is_patch_constant_func);
+            allocate_semantic_register(ctx, var, &output_allocator, true, !is_pixel_shader);
     }
 
     vkd3d_free(input_allocator.allocations);
@@ -6810,7 +6809,7 @@ static void validate_hull_shader_attributes(struct hlsl_ctx *ctx, const struct h
     }
 }
 
-static void validate_and_record_patch_type(struct hlsl_ctx *ctx, bool is_patch_constant_func, struct hlsl_ir_var *var)
+static void validate_and_record_patch_type(struct hlsl_ctx *ctx, struct hlsl_ir_var *var)
 {
     unsigned int control_point_count = var->data_type->e.array.elements_count;
     enum hlsl_array_type array_type = var->data_type->e.array.array_type;
@@ -6830,7 +6829,7 @@ static void validate_and_record_patch_type(struct hlsl_ctx *ctx, bool is_patch_c
     }
     else
     {
-        if (!is_patch_constant_func && profile->type != VKD3D_SHADER_TYPE_DOMAIN)
+        if (!ctx->is_patch_constant_func && profile->type != VKD3D_SHADER_TYPE_DOMAIN)
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                     "OutputPatch parameters can only be used in "
@@ -6847,7 +6846,7 @@ static void validate_and_record_patch_type(struct hlsl_ctx *ctx, bool is_patch_c
     }
     VKD3D_ASSERT(control_point_count > 0);
 
-    if (is_patch_constant_func && array_type == HLSL_ARRAY_PATCH_OUTPUT)
+    if (ctx->is_patch_constant_func && array_type == HLSL_ARRAY_PATCH_OUTPUT)
     {
         if (control_point_count != ctx->output_control_point_count)
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
@@ -6863,7 +6862,7 @@ static void validate_and_record_patch_type(struct hlsl_ctx *ctx, bool is_patch_c
 
     if (ctx->input_control_point_count != UINT_MAX)
     {
-        VKD3D_ASSERT(is_patch_constant_func);
+        VKD3D_ASSERT(ctx->is_patch_constant_func);
 
         if (control_point_count != ctx->input_control_point_count)
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
@@ -6982,7 +6981,7 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 }
 
 static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_program *program,
-        struct shader_signature *signature, bool output, bool is_patch_constant_func, struct hlsl_ir_var *var)
+        struct shader_signature *signature, bool output, struct hlsl_ir_var *var)
 {
     enum vkd3d_shader_component_type component_type = VKD3D_SHADER_COMPONENT_VOID;
     enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
@@ -6997,7 +6996,7 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
         bool has_idx, ret;
 
         ret = sm4_sysval_semantic_from_semantic_name(&sysval, &program->shader_version, ctx->semantic_compat_mapping,
-                ctx->domain, var->semantic.name, var->semantic.index, output, is_patch_constant_func);
+                ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func);
         VKD3D_ASSERT(ret);
         if (sysval == ~0u)
             return;
@@ -7123,26 +7122,27 @@ static void generate_vsir_signature(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_function_decl *func)
 {
     bool is_domain = program->shader_version.type == VKD3D_SHADER_TYPE_DOMAIN;
-    bool is_patch_constant_func = func == ctx->patch_constant_func;
     struct hlsl_ir_var *var;
+
+    ctx->is_patch_constant_func = func == ctx->patch_constant_func;
 
     LIST_FOR_EACH_ENTRY(var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_input_semantic)
         {
-            if (is_patch_constant_func)
-                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, true, var);
+            if (ctx->is_patch_constant_func)
+                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, var);
             else if (is_domain)
-                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, false, var);
+                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, var);
             else
-                generate_vsir_signature_entry(ctx, program, &program->input_signature, false, false, var);
+                generate_vsir_signature_entry(ctx, program, &program->input_signature, false, var);
         }
         if (var->is_output_semantic)
         {
-            if (is_patch_constant_func)
-                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, true, true, var);
+            if (ctx->is_patch_constant_func)
+                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, true, var);
             else
-                generate_vsir_signature_entry(ctx, program, &program->output_signature, true, false, var);
+                generate_vsir_signature_entry(ctx, program, &program->output_signature, true, var);
         }
     }
 }
@@ -8829,8 +8829,7 @@ static void sm1_generate_ctab(struct hlsl_ctx *ctx, struct vkd3d_shader_code *ct
 }
 
 static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vsir_program *program,
-        const struct hlsl_ir_var *var, bool is_patch_constant_func, struct hlsl_block *block,
-        const struct vkd3d_shader_location *loc)
+        const struct hlsl_ir_var *var, struct hlsl_block *block, const struct vkd3d_shader_location *loc)
 {
     const struct vkd3d_shader_version *version = &program->shader_version;
     const bool output = var->is_output_semantic;
@@ -8844,7 +8843,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     bool has_idx;
 
     sm4_sysval_semantic_from_semantic_name(&semantic, version, ctx->semantic_compat_mapping,
-            ctx->domain, var->semantic.name, var->semantic.index, output, is_patch_constant_func);
+            ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func);
     if (semantic == ~0u)
         semantic = VKD3D_SHADER_SV_NONE;
 
@@ -10416,11 +10415,12 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
 static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
         struct hlsl_ir_function_decl *func, uint64_t config_flags, struct vsir_program *program)
 {
-    bool is_patch_constant_func = func == ctx->patch_constant_func;
     struct hlsl_block block = {0};
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
     uint32_t temp_count;
+
+    ctx->is_patch_constant_func = func == ctx->patch_constant_func;
 
     compute_liveness(ctx, func);
     mark_indexable_vars(ctx, func);
@@ -10435,7 +10435,7 @@ static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
     {
         if ((var->is_input_semantic && var->last_read)
                 || (var->is_output_semantic && var->first_write))
-            sm4_generate_vsir_instr_dcl_semantic(ctx, program, var, is_patch_constant_func, &block, &var->loc);
+            sm4_generate_vsir_instr_dcl_semantic(ctx, program, var, &block, &var->loc);
     }
 
     if (temp_count)
@@ -12207,7 +12207,6 @@ static bool lower_isinf(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct 
 static void process_entry_function(struct hlsl_ctx *ctx,
         const struct hlsl_block *global_uniform_block, struct hlsl_ir_function_decl *entry_func)
 {
-    bool is_patch_constant_func = entry_func == ctx->patch_constant_func;
     const struct hlsl_ir_var *input_patch = NULL, *output_patch = NULL;
     const struct hlsl_profile_info *profile = ctx->profile;
     struct hlsl_block static_initializers, global_uniforms;
@@ -12215,6 +12214,8 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     struct recursive_call_ctx recursive_call_ctx;
     struct hlsl_ir_var *var;
     unsigned int i;
+
+    ctx->is_patch_constant_func = entry_func == ctx->patch_constant_func;
 
     if (!hlsl_clone_block(ctx, &static_initializers, &ctx->static_initializers))
         return;
@@ -12259,7 +12260,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         }
         else if ((var->storage_modifiers & HLSL_STORAGE_UNIFORM))
         {
-            if (ctx->profile->type == VKD3D_SHADER_TYPE_HULL && is_patch_constant_func)
+            if (ctx->profile->type == VKD3D_SHADER_TYPE_HULL && ctx->is_patch_constant_func)
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Patch constant function parameter \"%s\" cannot be uniform.", var->name);
             else
@@ -12292,7 +12293,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                 output_patch = var;
             }
 
-            validate_and_record_patch_type(ctx, is_patch_constant_func, var);
+            validate_and_record_patch_type(ctx, var);
             hlsl_fixme(ctx, &var->loc, "InputPatch/OutputPatch parameters.");
         }
         else
@@ -12309,7 +12310,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                 prepend_input_var_copy(ctx, entry_func, var);
             if (var->storage_modifiers & HLSL_STORAGE_OUT)
             {
-                if (profile->type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant_func)
+                if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                             "Output parameters are not supported in hull shader control point functions.");
                 else
@@ -12325,12 +12326,12 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 
         append_output_var_copy(ctx, entry_func, entry_func->return_var);
 
-        if (profile->type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant_func)
+        if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
             ctx->output_control_point_type = entry_func->return_var->data_type;
     }
     else
     {
-        if (profile->type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant_func)
+        if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
             hlsl_fixme(ctx, &entry_func->loc, "Passthrough hull shader control point function.");
     }
 
