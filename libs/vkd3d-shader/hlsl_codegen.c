@@ -274,6 +274,14 @@ static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hls
     if (ctx->profile->major_version < 4)
         return true;
 
+    if (hlsl_type_is_patch_array(type1))
+    {
+        return hlsl_type_is_patch_array(type2)
+                && type1->e.array.array_type == type2->e.array.array_type
+                && type1->e.array.elements_count == type2->e.array.elements_count
+                && types_are_semantic_equivalent(ctx, type1->e.array.type, type2->e.array.type);
+    }
+
     if (type1->e.numeric.dimx != type2->e.numeric.dimx)
         return false;
 
@@ -287,17 +295,24 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
 {
     struct hlsl_semantic new_semantic;
     struct hlsl_ir_var *ext_var;
+    const char *prefix;
     char *new_name;
 
-    if (!(new_name = hlsl_sprintf_alloc(ctx, "<%s-%s%u>", output ? "output" : "input", semantic->name, index)))
+    if (hlsl_type_is_patch_array(type))
+        prefix = type->e.array.array_type == HLSL_ARRAY_PATCH_INPUT ? "inputpatch" : "outputpatch";
+    else
+        prefix = output ? "output" : "input";
+
+    if (!(new_name = hlsl_sprintf_alloc(ctx, "<%s-%s%u>", prefix, semantic->name, index)))
         return NULL;
 
     LIST_FOR_EACH_ENTRY(ext_var, &func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (!ascii_strcasecmp(ext_var->name, new_name))
         {
-            VKD3D_ASSERT(ext_var->data_type->class <= HLSL_CLASS_VECTOR);
-            VKD3D_ASSERT(type->class <= HLSL_CLASS_VECTOR);
+            VKD3D_ASSERT(hlsl_type_is_patch_array(ext_var->data_type)
+                    || ext_var->data_type->class <= HLSL_CLASS_VECTOR);
+            VKD3D_ASSERT(hlsl_type_is_patch_array(type) || type->class <= HLSL_CLASS_VECTOR);
 
             if (output)
             {
@@ -370,7 +385,8 @@ static uint32_t combine_field_storage_modifiers(uint32_t modifiers, uint32_t fie
     return field_modifiers;
 }
 
-static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func, struct hlsl_ir_load *lhs,
+static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+        struct hlsl_ir_var *top_var, uint32_t patch_index, struct hlsl_ir_load *lhs,
         uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
@@ -404,13 +420,40 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         struct hlsl_ir_var *input;
         struct hlsl_ir_load *load;
 
-        if (!(input = add_semantic_var(ctx, func, var, vector_type_src,
-                modifiers, semantic, semantic_index + i, false, force_align, loc)))
-            return;
+        if (hlsl_type_is_patch_array(top_var->data_type))
+        {
+            struct hlsl_type *top_type = top_var->data_type;
+            struct hlsl_type *patch_type;
+            struct hlsl_deref patch_deref;
+            struct hlsl_ir_node *idx;
 
-        if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
-            return;
-        list_add_after(&lhs->node.entry, &load->node.entry);
+            if (!(patch_type = hlsl_new_array_type(ctx, vector_type_src, top_type->e.array.elements_count,
+                    top_type->e.array.array_type)))
+                return;
+
+            if (!(input = add_semantic_var(ctx, func, var, patch_type,
+                    modifiers, semantic, semantic_index + i, false, force_align, loc)))
+                return;
+            hlsl_init_simple_deref_from_var(&patch_deref, input);
+
+            if (!(idx = hlsl_new_uint_constant(ctx, patch_index, &var->loc)))
+                return;
+            list_add_after(&lhs->node.entry, &idx->entry);
+
+            if (!(load = hlsl_new_load_index(ctx, &patch_deref, idx, loc)))
+                return;
+            list_add_after(&idx->entry, &load->node.entry);
+        }
+        else
+        {
+            if (!(input = add_semantic_var(ctx, func, var, vector_type_src,
+                    modifiers, semantic, semantic_index + i, false, force_align, loc)))
+                return;
+
+            if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
+                return;
+            list_add_after(&lhs->node.entry, &load->node.entry);
+        }
 
         if (!(cast = hlsl_new_cast(ctx, &load->node, vector_type_dst, &var->loc)))
             return;
@@ -437,8 +480,8 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
     }
 }
 
-static void prepend_input_copy_recurse(struct hlsl_ctx *ctx,
-        struct hlsl_ir_function_decl *func, struct hlsl_ir_load *lhs, uint32_t modifiers,
+static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+        struct hlsl_ir_var *top_var, uint32_t patch_index, struct hlsl_ir_load *lhs,  uint32_t modifiers,
         struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct vkd3d_shader_location *loc = &lhs->node.loc;
@@ -463,6 +506,9 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx,
                         + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
                 element_modifiers = modifiers;
                 force_align = true;
+
+                if (hlsl_type_is_patch_array(type))
+                    patch_index = i;
             }
             else
             {
@@ -489,13 +535,13 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx,
                 return;
             list_add_after(&c->entry, &element_load->node.entry);
 
-            prepend_input_copy_recurse(ctx, func, element_load, element_modifiers,
+            prepend_input_copy_recurse(ctx, func, top_var, patch_index, element_load, element_modifiers,
                     semantic, elem_semantic_index, force_align);
         }
     }
     else
     {
-        prepend_input_copy(ctx, func, lhs, modifiers, semantic, semantic_index, force_align);
+        prepend_input_copy(ctx, func, var, patch_index, lhs, modifiers, semantic, semantic_index, force_align);
     }
 }
 
@@ -510,7 +556,8 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
         return;
     list_add_head(&func->body.instrs, &load->node.entry);
 
-    prepend_input_copy_recurse(ctx, func, load, var->storage_modifiers, &var->semantic, var->semantic.index, false);
+    prepend_input_copy_recurse(ctx, func, var, 0, load, var->storage_modifiers, &var->semantic,
+            var->semantic.index, false);
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
@@ -5878,7 +5925,13 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_input_semantic)
-            allocate_semantic_register(ctx, var, &input_allocator, false, !is_vertex_shader);
+        {
+            if (hlsl_type_is_patch_array(var->data_type))
+                hlsl_fixme(ctx, &var->loc, "Allocating registers for patch semantic variables.");
+            else
+                allocate_semantic_register(ctx, var, &input_allocator, false, !is_vertex_shader);
+        }
+
         if (var->is_output_semantic)
             allocate_semantic_register(ctx, var, &output_allocator, true, !is_pixel_shader);
     }
@@ -7130,6 +7183,14 @@ static void generate_vsir_signature(struct hlsl_ctx *ctx,
     {
         if (var->is_input_semantic)
         {
+            bool is_patch = hlsl_type_is_patch_array(var->data_type);
+
+            if (is_patch)
+            {
+                hlsl_fixme(ctx, &var->loc, "Generating vsir signatures for patch semantic variables.");
+                continue;
+            }
+
             if (ctx->is_patch_constant_func)
                 generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, var);
             else if (is_domain)
@@ -7524,7 +7585,14 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
     }
     else if (var->is_input_semantic)
     {
+        bool is_patch = hlsl_type_is_patch_array(var->data_type);
         bool has_idx;
+
+        if (is_patch)
+        {
+            hlsl_fixme(ctx, &var->loc, "Generating vsir registers from patch variable deref.");
+            return false;
+        }
 
         if (sm4_register_from_semantic_name(version, var->semantic.name, false, &reg->type, &has_idx))
         {
@@ -8832,6 +8900,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
         const struct hlsl_ir_var *var, struct hlsl_block *block, const struct vkd3d_shader_location *loc)
 {
     const struct vkd3d_shader_version *version = &program->shader_version;
+    const bool is_patch = hlsl_type_is_patch_array(var->data_type);
     const bool output = var->is_output_semantic;
     enum vkd3d_shader_sysval_semantic semantic;
     struct vkd3d_shader_dst_param *dst_param;
@@ -8841,6 +8910,12 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     unsigned int idx = 0;
     uint32_t write_mask;
     bool has_idx;
+
+    if (is_patch)
+    {
+        hlsl_fixme(ctx, loc, "Semantic declaration for patch variables.");
+        return;
+    }
 
     sm4_sysval_semantic_from_semantic_name(&semantic, version, ctx->semantic_compat_mapping,
             ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func);
@@ -12294,7 +12369,13 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             }
 
             validate_and_record_patch_type(ctx, var);
-            hlsl_fixme(ctx, &var->loc, "InputPatch/OutputPatch parameters.");
+            if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+            {
+                hlsl_fixme(ctx, &var->loc, "InputPatch/OutputPatch parameters in geometry shaders.");
+                continue;
+            }
+
+            prepend_input_var_copy(ctx, entry_func, var);
         }
         else
         {
