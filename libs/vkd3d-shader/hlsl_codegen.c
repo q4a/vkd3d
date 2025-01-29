@@ -5001,7 +5001,7 @@ struct register_allocator
 
     /* Indexable temps are allocated separately and always keep their index regardless of their
      * lifetime. */
-    size_t indexable_count;
+    uint32_t indexable_count;
 
     /* Total number of registers allocated so far. Used to declare sm4 temp count. */
     uint32_t reg_count;
@@ -5781,6 +5781,13 @@ static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
 
     allocate_temp_registers_recurse(ctx, &entry_func->body, &allocator);
     vkd3d_free(allocator.allocations);
+
+    if (allocator.indexable_count)
+        TRACE("Declaration of function \"%s\" required %u temp registers, and %u indexable temps.\n",
+                entry_func->func->name, allocator.reg_count, allocator.indexable_count);
+    else
+        TRACE("Declaration of function \"%s\" required %u temp registers.\n",
+                entry_func->func->name, allocator.reg_count);
 
     return allocator.reg_count;
 }
