@@ -1623,7 +1623,7 @@ static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, const char *profi
 
     *blob_out = NULL;
 
-    swprintf(wprofile, sizeof(wprofile), L"%hs", profile);
+    swprintf(wprofile, ARRAY_SIZE(wprofile), L"%hs", profile);
     if (FAILED(hr = dxc_compile(dxc_compiler, wprofile, compile_options, enable_16bit_types, hlsl, &blob)))
         return hr;
 
