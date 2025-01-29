@@ -5863,8 +5863,8 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         enum vkd3d_shader_sysval_semantic semantic;
         bool has_idx;
 
-        if (!sm4_sysval_semantic_from_semantic_name(&semantic, &version, ctx->semantic_compat_mapping,
-                ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func))
+        if (!sm4_sysval_semantic_from_semantic_name(&semantic, &version, ctx->semantic_compat_mapping, ctx->domain,
+                var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, false))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
@@ -7038,6 +7038,7 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
 {
     enum vkd3d_shader_component_type component_type = VKD3D_SHADER_COMPONENT_VOID;
     enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
+    bool is_patch = hlsl_type_is_patch_array(var->data_type);
     unsigned int register_index, mask, use_mask;
     const char *name = var->semantic.name;
     enum vkd3d_shader_register_type type;
@@ -7046,10 +7047,11 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
     if (hlsl_version_ge(ctx, 4, 0))
     {
         struct vkd3d_string_buffer *string;
+        enum hlsl_base_type numeric_type;
         bool has_idx, ret;
 
         ret = sm4_sysval_semantic_from_semantic_name(&sysval, &program->shader_version, ctx->semantic_compat_mapping,
-                ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func);
+                ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_patch);
         VKD3D_ASSERT(ret);
         if (sysval == ~0u)
             return;
@@ -7068,7 +7070,12 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
 
         use_mask = mask; /* FIXME: retrieve use mask accurately. */
 
-        switch (var->data_type->e.numeric.type)
+        if (var->data_type->class == HLSL_CLASS_ARRAY)
+            numeric_type = var->data_type->e.array.type->e.numeric.type;
+        else
+            numeric_type = var->data_type->e.numeric.type;
+
+        switch (numeric_type)
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
@@ -7185,19 +7192,24 @@ static void generate_vsir_signature(struct hlsl_ctx *ctx,
         {
             bool is_patch = hlsl_type_is_patch_array(var->data_type);
 
-            if (is_patch)
-            {
-                hlsl_fixme(ctx, &var->loc, "Generating vsir signatures for patch semantic variables.");
-                continue;
-            }
-
             if (ctx->is_patch_constant_func)
-                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, var);
+            {
+                if (!is_patch)
+                    generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, var);
+            }
             else if (is_domain)
-                generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, var);
+            {
+                if (is_patch)
+                    generate_vsir_signature_entry(ctx, program, &program->input_signature, false, var);
+                else
+                    generate_vsir_signature_entry(ctx, program, &program->patch_constant_signature, false, var);
+            }
             else
+            {
                 generate_vsir_signature_entry(ctx, program, &program->input_signature, false, var);
+            }
         }
+
         if (var->is_output_semantic)
         {
             if (ctx->is_patch_constant_func)
@@ -8917,8 +8929,8 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
         return;
     }
 
-    sm4_sysval_semantic_from_semantic_name(&semantic, version, ctx->semantic_compat_mapping,
-            ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func);
+    sm4_sysval_semantic_from_semantic_name(&semantic, version, ctx->semantic_compat_mapping, ctx->domain,
+            var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_patch);
     if (semantic == ~0u)
         semantic = VKD3D_SHADER_SV_NONE;
 
