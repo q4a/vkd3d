@@ -7391,6 +7391,39 @@ static void sm1_generate_vsir_sampler_dcls(struct hlsl_ctx *ctx,
     }
 }
 
+static enum vkd3d_shader_register_type sm4_get_semantic_register_type(enum vkd3d_shader_type shader_type,
+        bool is_patch_constant_func, const struct hlsl_ir_var *var)
+{
+    if (hlsl_type_is_patch_array(var->data_type))
+    {
+        VKD3D_ASSERT(var->is_input_semantic);
+
+        switch (shader_type)
+        {
+            case VKD3D_SHADER_TYPE_HULL:
+                if (is_patch_constant_func)
+                {
+                    bool is_inputpatch = var->data_type->e.array.array_type == HLSL_ARRAY_PATCH_INPUT;
+
+                    return is_inputpatch ? VKD3DSPR_INCONTROLPOINT : VKD3DSPR_OUTCONTROLPOINT;
+                }
+                return VKD3DSPR_INPUT;
+
+            case VKD3D_SHADER_TYPE_DOMAIN:
+                return VKD3DSPR_INCONTROLPOINT;
+
+            default:
+                return VKD3DSPR_INPUT;
+        }
+    }
+
+    if (var->is_output_semantic)
+        return VKD3DSPR_OUTPUT;
+    if (shader_type == VKD3D_SHADER_TYPE_DOMAIN)
+        return VKD3DSPR_PATCHCONST;
+    return VKD3DSPR_INPUT;
+}
+
 static struct vkd3d_shader_instruction *generate_vsir_add_program_instruction(
         struct hlsl_ctx *ctx, struct vsir_program *program,
         const struct vkd3d_shader_location *loc, enum vkd3d_shader_opcode opcode,
@@ -8923,12 +8956,6 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     uint32_t write_mask;
     bool has_idx;
 
-    if (is_patch)
-    {
-        hlsl_fixme(ctx, loc, "Semantic declaration for patch variables.");
-        return;
-    }
-
     sm4_sysval_semantic_from_semantic_name(&semantic, version, ctx->semantic_compat_mapping, ctx->domain,
             var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_patch);
     if (semantic == ~0u)
@@ -8974,13 +9001,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     }
     else
     {
-        if (output)
-            type = VKD3DSPR_OUTPUT;
-        else if (version->type == VKD3D_SHADER_TYPE_DOMAIN)
-            type = VKD3DSPR_PATCHCONST;
-        else
-            type = VKD3DSPR_INPUT;
-
+        type = sm4_get_semantic_register_type(version->type, ctx->is_patch_constant_func, var);
         has_idx = true;
         idx = var->regs[HLSL_REGSET_NUMERIC].id;
         write_mask = var->regs[HLSL_REGSET_NUMERIC].writemask;
@@ -9008,7 +9029,14 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
         dst_param = &ins->declaration.register_semantic.reg;
     }
 
-    if (has_idx)
+    if (is_patch)
+    {
+        VKD3D_ASSERT(has_idx);
+        vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 2);
+        dst_param->reg.idx[0].offset = var->data_type->e.array.elements_count;
+        dst_param->reg.idx[1].offset = idx;
+    }
+    else if (has_idx)
     {
         vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 1);
         dst_param->reg.idx[0].offset = idx;
