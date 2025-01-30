@@ -17,7 +17,7 @@ void main(uint id : SV_VertexID, out data output)
     output.zero = float3(0.0, 0.0, 0.0);
 }
 
-[hull shader todo]
+[hull shader]
 struct vsdata
 {
     float4 position : SV_Position;
@@ -61,7 +61,7 @@ data main(InputPatch<vsdata, 3> input, uint i : SV_OutputControlPointID)
     return o;
 }
 
-[domain shader todo]
+[domain shader]
 struct hsdata
 {
     float4 position : SV_Position;
@@ -105,5 +105,6 @@ float4 main(data input) : sv_target
 }
 
 [test]
-todo(sm<6) draw 3 control point patch list 3
-todo(mvk) probe (0, 0, 640, 480) rgba (-1.0, -2.0, 0.5, 1.0)
+% llvmpipe currently segfaults due to a bug during shader compilation in the driver.
+if(!llvmpipe) todo(glsl | msl | mvk & vulkan) draw 3 control point patch list 3
+if(!llvmpipe) todo(mvk) probe (0, 0, 640, 480) rgba (-1.0, -2.0, 0.5, 1.0)

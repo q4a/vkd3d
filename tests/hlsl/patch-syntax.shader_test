@@ -122,7 +122,7 @@ float4 main(InputPatch<data, 2> patch) : SV_TARGET
     return 0;
 }
 
-[hull shader todo]
+[hull shader]
 struct data
 {
     float4 val : VAL;
@@ -148,7 +148,7 @@ float4 main(InputPatch<data, 2> patch) : POSITION
     return 0;
 }
 
-[hull shader todo]
+[hull shader]
 struct data
 {
     float4 val : VAL;
@@ -242,7 +242,7 @@ float4 main(OutputPatch<data, 2> patch) : POSITION
     return patch[0].val;
 }
 
-[hull shader todo]
+[hull shader]
 struct data
 {
     float4 val : VAL;
@@ -273,7 +273,7 @@ out_data main()
     return (out_data)0;
 }
 
-[domain shader todo]
+[domain shader]
 struct data
 {
     float4 val : VAL;
@@ -304,7 +304,7 @@ void main(OutputPatch<data, 2> patch, inout PointStream<data> vout)
 
 % Patch parameters can't have more than 32 control points.
 
-[hull shader todo]
+[hull shader]
 struct data
 {
     float4 val : VAL;
@@ -356,7 +356,7 @@ float4 main(InputPatch<data, 33> patch) : POSITION
     return 0;
 }
 
-[domain shader todo]
+[domain shader]
 struct data
 {
     float4 val : VAL;
@@ -446,7 +446,7 @@ float4 main(OutputPatch<data, 2> patch, patch_constant_data input, OutputPatch<d
 
 % InputPatch types must match between the main function and the patch constant function of a hull shader.
 
-[hull shader fail todo]
+[hull shader fail]
 struct data
 {
     float4 val : VAL;
@@ -477,7 +477,7 @@ float4 main(InputPatch<data, 2> patch) : POSITION
     return 0;
 }
 
-[hull shader fail todo]
+[hull shader fail]
 struct data
 {
     float4 val : VAL;

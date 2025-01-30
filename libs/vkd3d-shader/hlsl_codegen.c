@@ -6497,6 +6497,9 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
 
     *offset = deref->const_offset;
 
+    if (hlsl_type_is_patch_array(deref->var->data_type))
+        return false;
+
     if (offset_node)
     {
         /* We should always have generated a cast to UINT. */
@@ -7505,6 +7508,22 @@ static void vsir_src_from_hlsl_node(struct vkd3d_shader_src_param *src,
     }
 }
 
+static struct vkd3d_shader_src_param *sm4_generate_vsir_new_idx_src(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_ir_node *rel_offset)
+{
+    struct vkd3d_shader_src_param *idx_src;
+
+    if (!(idx_src = vsir_program_get_src_params(program, 1)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return NULL;
+    }
+
+    memset(idx_src, 0, sizeof(*idx_src));
+    vsir_src_from_hlsl_node(idx_src, ctx, rel_offset, VKD3DSP_WRITEMASK_ALL);
+    return idx_src;
+}
+
 static bool sm4_generate_vsir_numeric_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_program *program,
         struct vkd3d_shader_register *reg, uint32_t *writemask, const struct hlsl_deref *deref)
 {
@@ -7531,17 +7550,8 @@ static bool sm4_generate_vsir_numeric_reg_from_deref(struct hlsl_ctx *ctx, struc
 
         if (deref->rel_offset.node)
         {
-            struct vkd3d_shader_src_param *idx_src;
-
-            if (!(idx_src = vsir_program_get_src_params(program, 1)))
-            {
-                ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+            if (!(reg->idx[1].rel_addr = sm4_generate_vsir_new_idx_src(ctx, program, deref->rel_offset.node)))
                 return false;
-            }
-            memset(idx_src, 0, sizeof(*idx_src));
-            reg->idx[1].rel_addr = idx_src;
-
-            vsir_src_from_hlsl_node(idx_src, ctx, deref->rel_offset.node, VKD3DSP_WRITEMASK_ALL);
         }
     }
 
@@ -7647,15 +7657,11 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
         bool is_patch = hlsl_type_is_patch_array(var->data_type);
         bool has_idx;
 
-        if (is_patch)
-        {
-            hlsl_fixme(ctx, &var->loc, "Generating vsir registers from patch variable deref.");
-            return false;
-        }
-
         if (sm4_register_from_semantic_name(version, var->semantic.name, false, &reg->type, &has_idx))
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
+
+            VKD3D_ASSERT(!is_patch);
 
             if (has_idx)
             {
@@ -7675,14 +7681,21 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
 
             VKD3D_ASSERT(hlsl_reg.allocated);
 
-            if (version->type == VKD3D_SHADER_TYPE_DOMAIN)
-                reg->type = VKD3DSPR_PATCHCONST;
-            else
-                reg->type = VKD3DSPR_INPUT;
+            reg->type = sm4_get_semantic_register_type(version->type, ctx->is_patch_constant_func, var);
             reg->dimension = VSIR_DIMENSION_VEC4;
-            reg->idx[0].offset = hlsl_reg.id;
-            reg->idx_count = 1;
+            reg->idx[is_patch ? 1 : 0].offset = hlsl_reg.id;
+            reg->idx_count = is_patch ? 2 : 1;
             *writemask = hlsl_reg.writemask;
+        }
+
+        if (is_patch)
+        {
+            reg->idx[0].offset = deref->const_offset / 4;
+            if (deref->rel_offset.node)
+            {
+                if (!(reg->idx[0].rel_addr = sm4_generate_vsir_new_idx_src(ctx, program, deref->rel_offset.node)))
+                    return false;
+            }
         }
     }
     else if (var->is_output_semantic)
@@ -8994,14 +9007,19 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
                 break;
 
             default:
-                opcode = (version->type == VKD3D_SHADER_TYPE_PIXEL)
-                        ? VKD3DSIH_DCL_INPUT_PS_SIV : VKD3DSIH_DCL_INPUT_SIV;
+                if (version->type == VKD3D_SHADER_TYPE_PIXEL)
+                    opcode = VKD3DSIH_DCL_INPUT_PS_SIV;
+                else if (is_patch)
+                    opcode = VKD3DSIH_DCL_INPUT;
+                else
+                    opcode = VKD3DSIH_DCL_INPUT_SIV;
                 break;
         }
     }
     else
     {
-        if (semantic == VKD3D_SHADER_SV_NONE || version->type == VKD3D_SHADER_TYPE_PIXEL)
+        if (semantic == VKD3D_SHADER_SV_NONE || version->type == VKD3D_SHADER_TYPE_PIXEL
+                || version->type == VKD3D_SHADER_TYPE_HULL)
             opcode = VKD3DSIH_DCL_OUTPUT;
         else
             opcode = VKD3DSIH_DCL_OUTPUT_SIV;
@@ -9026,13 +9044,13 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
 
     if (opcode == VKD3DSIH_DCL_OUTPUT)
     {
-        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE
-                || semantic == VKD3D_SHADER_SV_TARGET || type != VKD3DSPR_OUTPUT);
+        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || semantic == VKD3D_SHADER_SV_TARGET
+                || version->type == VKD3D_SHADER_TYPE_HULL || type != VKD3DSPR_OUTPUT);
         dst_param = &ins->declaration.dst;
     }
     else if (opcode == VKD3DSIH_DCL_INPUT || opcode == VKD3DSIH_DCL_INPUT_PS)
     {
-        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE);
+        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || is_patch);
         dst_param = &ins->declaration.dst;
     }
     else
