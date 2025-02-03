@@ -482,6 +482,9 @@ struct hlsl_ir_var
         union hlsl_constant_value_component number;
     } *default_values;
 
+    /* Pointer to the temp copy of the variable, in case it is uniform. */
+    struct hlsl_ir_var *temp_copy;
+
     /* A dynamic array containing the state block on the variable's declaration, if any.
      * An array variable may contain multiple state blocks.
      * A technique pass will always contain one.

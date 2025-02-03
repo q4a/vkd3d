@@ -203,47 +203,59 @@ static bool clean_constant_deref_offset_srcs(struct hlsl_ctx *ctx, struct hlsl_d
 }
 
 
-/* Split uniforms into two variables representing the constant and temp
- * registers, and copy the former to the latter, so that writes to uniforms
- * work. */
-static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_var *temp)
+/* For a uniform variable, create a temp copy of it so, in case a value is
+ * stored to the uniform at some point the shader, all derefs can be diverted
+ * to this temp copy instead.
+ * Also, promote the uniform to an extern var. */
+static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_var *uniform)
 {
-    struct hlsl_ir_var *uniform;
     struct hlsl_ir_node *store;
     struct hlsl_ir_load *load;
+    struct hlsl_ir_var *temp;
     char *new_name;
 
-    /* Use the synthetic name for the temp, rather than the uniform, so that we
-     * can write the uniform name into the shader reflection data. */
-
-    if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type,
-            &temp->loc, NULL, temp->storage_modifiers, &temp->reg_reservation)))
-        return;
-    list_add_before(&temp->scope_entry, &uniform->scope_entry);
-    list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
     uniform->is_uniform = 1;
-    uniform->is_param = temp->is_param;
-    uniform->buffer = temp->buffer;
-    if (temp->default_values)
-    {
-        /* Transfer default values from the temp to the uniform. */
-        VKD3D_ASSERT(!uniform->default_values);
-        VKD3D_ASSERT(hlsl_type_component_count(temp->data_type) == hlsl_type_component_count(uniform->data_type));
-        uniform->default_values = temp->default_values;
-        temp->default_values = NULL;
-    }
+    list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
 
-    if (!(new_name = hlsl_sprintf_alloc(ctx, "<temp-%s>", temp->name)))
+    if (!(new_name = hlsl_sprintf_alloc(ctx, "<temp-%s>", uniform->name)))
         return;
-    temp->name = new_name;
 
-    if (!(load = hlsl_new_var_load(ctx, uniform, &temp->loc)))
+    if (!(temp = hlsl_new_var(ctx, new_name, uniform->data_type,
+            &uniform->loc, NULL, uniform->storage_modifiers, NULL)))
+    {
+        vkd3d_free(new_name);
+        return;
+    }
+    list_add_before(&uniform->scope_entry, &temp->scope_entry);
+
+    uniform->temp_copy = temp;
+
+    if (!(load = hlsl_new_var_load(ctx, uniform, &uniform->loc)))
         return;
     list_add_head(&block->instrs, &load->node.entry);
 
     if (!(store = hlsl_new_simple_store(ctx, temp, &load->node)))
         return;
     list_add_after(&load->node.entry, &store->entry);
+}
+
+/* If a uniform is written to at some point in the shader, all dereferences
+ * must point to the temp copy instead, which is what this pass does. */
+static bool divert_written_uniform_derefs_to_temp(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
+        struct hlsl_ir_node *instr)
+{
+    if (!deref->var->is_uniform || !deref->var->first_write)
+        return false;
+
+    /* Skip derefs from instructions before first write so copies from the
+     * uniform to the temp are unaffected. */
+    if (instr->index < deref->var->first_write)
+        return false;
+
+    VKD3D_ASSERT(deref->var->temp_copy);
+
+    deref->var = deref->var->temp_copy;
+    return true;
 }
 
 static void validate_field_semantic(struct hlsl_ctx *ctx, struct hlsl_struct_field *field)
@@ -12508,6 +12520,9 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     lower_ir(ctx, lower_nonconstant_vector_derefs, body);
     lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
+
+    compute_liveness(ctx, entry_func);
+    transform_derefs(ctx, divert_written_uniform_derefs_to_temp, &entry_func->body);
 
     if (hlsl_version_lt(ctx, 4, 0))
         hlsl_transform_ir(ctx, lower_separate_samples, body, NULL);
