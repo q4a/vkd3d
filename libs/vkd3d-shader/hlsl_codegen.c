@@ -1398,7 +1398,7 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, s
 
 /* Allocate a unique, ordered index to each instruction, which will be used for
  * copy propagation and computing liveness ranges.
- * Index 0 means unused; index 1 means function entry, so start at 2. */
+ * Index 0 means unused, so start at 1. */
 static unsigned int index_instructions(struct hlsl_block *block, unsigned int index)
 {
     struct hlsl_ir_node *instr;
@@ -2210,7 +2210,7 @@ bool hlsl_copy_propagation_execute(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     struct copy_propagation_state state;
     bool progress;
 
-    index_instructions(block, 2);
+    index_instructions(block, 1);
 
     copy_propagation_state_init(&state, ctx);
 
@@ -4634,6 +4634,9 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
             struct hlsl_ir_store *store = hlsl_ir_store(instr);
             struct hlsl_ir_var *var = store->lhs.var;
 
+            if (var->is_output_semantic)
+                break;
+
             if (var->last_read < instr->index)
             {
                 list_remove(&instr->entry);
@@ -4938,32 +4941,18 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
     }
 }
 
-static void init_var_liveness(struct hlsl_ir_var *var)
-{
-    if (var->is_uniform || var->is_input_semantic)
-        var->first_write = 1;
-    else if (var->is_output_semantic)
-        var->last_read = UINT_MAX;
-}
-
 static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
 
-    index_instructions(&entry_func->body, 2);
+    index_instructions(&entry_func->body, 1);
 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
     {
         LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
             var->first_write = var->last_read = 0;
     }
-
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-        init_var_liveness(var);
-
-    LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
-        init_var_liveness(var);
 
     compute_liveness_recurse(&entry_func->body, 0, 0);
 }
@@ -5773,7 +5762,7 @@ static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
             if (var->is_output_semantic)
             {
                 record_allocation(ctx, &allocator, 0, VKD3DSP_WRITEMASK_ALL,
-                        var->first_write, var->last_read, 0, false);
+                        var->first_write, UINT_MAX, 0, false);
                 break;
             }
         }
