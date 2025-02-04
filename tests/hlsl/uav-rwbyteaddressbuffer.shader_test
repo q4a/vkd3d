@@ -103,3 +103,27 @@ float4 main() : sv_target
 draw quad
 probe uav 1 (0) ri64 (-12)
 probe uav 1 (1) rd (13.3)
+
+[require]
+shader model >= 6.2
+native-16-bit
+
+[compute shader]
+RWByteAddressBuffer u : register(u1);
+
+    [numthreads(1, 1, 1)]
+void main()
+{
+    u.Store<int16_t>(0, (int16_t)11);
+    u.Store<int16_t>(2, (int16_t)-12);
+    u.Store<uint16_t>(4, (uint16_t)13);
+    u.Store<uint16_t>(6, (uint16_t)0xfff2);
+    u.Store<half>(8, 13.375);
+    u.Store<half>(10, 14.5);
+}
+
+[test]
+dispatch 1 1 1
+probe uav 1 (0) rui(0xfff4000b)
+probe uav 1 (1) rui(0xfff2000d)
+probe uav 1 (2) rui(0x4b404ab0)
