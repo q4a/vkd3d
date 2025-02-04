@@ -250,3 +250,53 @@ uniform 12 double2 5.0 8.0
 todo(sm<6) draw quad
 if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0, 0xffffffff, 0)
 if(sm>=6) probe (0, 0) rgbaui(1, 0, 1, 0)
+
+
+[require]
+shader model >= 6.2
+native-16-bit
+
+[pixel shader]
+uniform half4 u;
+
+float4 main() : sv_target
+{
+    half n = -1.5, m = 65504.0;
+    return float4(u.x + n, u.y + m, u.z + n, u.w + m);
+}
+
+[test]
+uniform 0 uint 0
+uniform 1 uint 0x41804180  % 2.75 2.75
+draw quad
+probe (0, 0) rgba(-1.5, 65504.0, 1.25, 65504.0)
+
+[pixel shader]
+uniform half4 u;
+
+float4 main() : sv_target
+{
+    half n = -1.5, m = 5.5;
+    return float4(u.x * n, u.y * m, u.z * n, u.w * m);
+}
+
+[test]
+uniform 0 uint 0xc1004300   %  3.5 -2.5
+uniform 1 uint4 0x3800c480  % -4.5  0.5
+draw quad
+probe (0, 0) rgba(-5.25, -13.75, 6.75, 2.75)
+
+[pixel shader]
+uniform half4 u;
+
+float4 main() : sv_target
+{
+    half n = 65504.0, m = -0.5;
+    return float4(u.x / n, u.y / m, u.z / n, u.w / m);
+}
+
+[test]
+uniform 0 uint 0x4280e3ff  % -1023.5 3.25
+uniform 1 uint 0xc7803000  % 0.125 -7.5
+draw quad
+probe (0, 0) rgba(-0.0156173706, -6.5, 1.90734863e-06, 15.0) 1
