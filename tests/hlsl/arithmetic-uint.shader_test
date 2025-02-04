@@ -127,3 +127,33 @@ probe (0, 0) rgbaui(0x8001, 0xfffd, 0, 0)
 uniform 0 uint4 0 0 0 0
 draw quad
 probe (0, 0) rgbaui(1, 2, 0, 0)
+
+[pixel shader]
+uniform uint16_t4 u;
+
+uint4 main() : sv_target
+{
+    uint16_t i = 3, j = 5;
+    return uint4(u.x * i, u.y * j, u.z * i, u.w * j);
+}
+
+[test]
+uniform 0 uint 0x90007
+uniform 1 uint 0xfff7fff9
+draw quad
+probe (0, 0) rgbaui(21, 45, 0xffeb, 0xffd3)
+
+[pixel shader]
+uniform uint16_t4 u;
+
+uint4 main() : sv_target
+{
+    uint16_t i = 0xffff, j = 5;
+    return uint4(u.x / i, u.y / j, u.z / i, u.w / j);
+}
+
+[test]
+uniform 0 uint 0x000bfffe
+uniform 1 uint 0xffffffff
+draw quad
+probe (0, 0) rgbaui(0, 2, 1, 0x3333)
