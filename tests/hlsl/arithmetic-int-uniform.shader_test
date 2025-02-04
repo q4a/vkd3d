@@ -196,3 +196,53 @@ float4 main() : SV_TARGET
 uniform 0 int64_t2 5000000000 -7000000000
 draw quad
 probe (0, 0) rgba (5.0e9, 7.0e9, 0.0, 0.0)
+
+
+[require]
+shader model >= 6.2
+native-16-bit
+
+[pixel shader]
+uniform int16_t4 u;
+
+int4 main() : sv_target
+{
+    int16_t i = 1, j = 0x7fff;
+    return int4(u.x + i, u.y + j, u.z + i, u.w + j);
+}
+
+[test]
+uniform 0 uint 0
+uniform 1 uint 0x0001fffd
+draw quad
+probe (0, 0) rgbai(1, 0x7fff, -2, -32768)
+
+[pixel shader]
+uniform int16_t4 u;
+
+int4 main() : sv_target
+{
+    int16_t i = -3, j = 5;
+    return int4(u.x * i, u.y * j, u.z * i, u.w * j);
+}
+
+[test]
+uniform 0 uint 0xfff70007
+uniform 1 uint4 0x9fff9
+draw quad
+probe (0, 0) rgbai(-21, -45, 21, 45)
+
+[pixel shader]
+uniform int16_t4 u;
+
+int4 main() : sv_target
+{
+    int16_t i = 32767, j = -5;
+    return int4(u.x / i, u.y / j, u.z / i, u.w / j);
+}
+
+[test]
+uniform 0 uint 0x000b7ffe
+uniform 1 uint 0x80007fff
+draw quad
+probe (0, 0) rgbai(0, -2, 1, 6553)
