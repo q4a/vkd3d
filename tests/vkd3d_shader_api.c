@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define INITGUID
 #include "vkd3d_test.h"
 #include "utils.h"
 #include <vkd3d_shader.h>
@@ -27,6 +28,21 @@
 #endif
 
 #include <locale.h>
+
+static bool check_dxil_support(void)
+{
+    const enum vkd3d_shader_source_type *source_types;
+    unsigned int count, i;
+
+    source_types = vkd3d_shader_get_supported_source_types(&count);
+    for (i = 0; i < count; ++i)
+    {
+        if (source_types[i] == VKD3D_SHADER_SOURCE_DXBC_DXIL)
+            return true;
+    }
+
+    return false;
+}
 
 static void test_invalid_shaders(void)
 {
@@ -428,19 +444,29 @@ static void test_dxbc(void)
     vkd3d_shader_free_shader_code(&dxbc);
 }
 
-static void check_signature_element(const struct vkd3d_shader_signature_element *element,
-        const struct vkd3d_shader_signature_element *expect)
+#define check_signature_element(a, b) check_signature_element_(__FILE__, __LINE__, a, b)
+static void check_signature_element_(const char *file, unsigned int line,
+        const struct vkd3d_shader_signature_element *element, const struct vkd3d_shader_signature_element *expect)
 {
-    ok(!strcmp(element->semantic_name, expect->semantic_name), "Got semantic name %s.\n", element->semantic_name);
-    ok(element->semantic_index == expect->semantic_index, "Got semantic index %u.\n", element->semantic_index);
-    ok(element->stream_index == expect->stream_index, "Got stream index %u.\n", element->stream_index);
-    ok(element->sysval_semantic == expect->sysval_semantic, "Got sysval semantic %#x.\n", element->sysval_semantic);
-    ok(element->component_type == expect->component_type, "Got component type %#x.\n", element->component_type);
-    ok(element->register_index == expect->register_index, "Got register index %u.\n", element->register_index);
-    ok(element->mask == expect->mask, "Got mask %#x.\n", element->mask);
+    ok_(file, line)(!strcmp(element->semantic_name, expect->semantic_name),
+            "Got semantic name %s.\n", element->semantic_name);
+    ok_(file, line)(element->semantic_index == expect->semantic_index,
+            "Got semantic index %u.\n", element->semantic_index);
+    ok_(file, line)(element->stream_index == expect->stream_index,
+            "Got stream index %u.\n", element->stream_index);
+    ok_(file, line)(element->sysval_semantic == expect->sysval_semantic,
+            "Got sysval semantic %#x.\n", element->sysval_semantic);
+    ok_(file, line)(element->component_type == expect->component_type,
+            "Got component type %#x.\n", element->component_type);
+    ok_(file, line)(element->register_index == expect->register_index,
+            "Got register index %u.\n", element->register_index);
+    ok_(file, line)(element->mask == expect->mask,
+            "Got mask %#x.\n", element->mask);
     todo_if (expect->used_mask != expect->mask && strcmp(expect->semantic_name, "PSIZE"))
-        ok(element->used_mask == expect->used_mask, "Got used mask %#x.\n", element->used_mask);
-    ok(element->min_precision == expect->min_precision, "Got minimum precision %#x.\n", element->min_precision);
+        ok_(file, line)(element->used_mask == expect->used_mask,
+                "Got used mask %#x.\n", element->used_mask);
+    ok_(file, line)(element->min_precision == expect->min_precision,
+            "Got minimum precision %#x.\n", element->min_precision);
 }
 
 static void test_scan_signatures(void)
@@ -450,6 +476,7 @@ static void test_scan_signatures(void)
     struct vkd3d_shader_compile_info compile_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
     struct vkd3d_shader_compile_option options[1];
     struct vkd3d_shader_code dxbc;
+    IDxcCompiler3 *compiler;
     size_t i, j;
     int rc;
 
@@ -575,6 +602,53 @@ static void test_scan_signatures(void)
         {"COLOR",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 4, 0xf, 0xf},
         {"FOG",             0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 5, 0xf, 0xf},
         {"PSIZE",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 6, 0xf, 0x1},
+    };
+
+    static const char vs5_source[] =
+        "void main(\n"
+        "        inout float a[4] : A,\n"
+        "        inout float2 b[2] : B,\n"
+        "        inout float3 c[2] : C,\n"
+        "        inout float4 d[2] : D,\n"
+        "        inout uint e[2] : E,\n"
+        "        inout int f[2] : F)\n"
+        "{\n"
+        "}\n";
+
+    static const struct vkd3d_shader_signature_element vs5_io[] =
+    {
+        {"A", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  0, 0x1, 0x1},
+        {"A", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  1, 0x1, 0x1},
+        {"A", 2, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  2, 0x1, 0x1},
+        {"A", 3, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  3, 0x1, 0x1},
+        {"B", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  4, 0x3, 0x3},
+        {"B", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  5, 0x3, 0x3},
+        {"C", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  6, 0x7, 0x7},
+        {"C", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  7, 0x7, 0x7},
+        {"D", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  8, 0xf, 0xf},
+        {"D", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  9, 0xf, 0xf},
+        {"E", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  10, 0x1, 0x1},
+        {"E", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  11, 0x1, 0x1},
+        {"F", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,   12, 0x1, 0x1},
+        {"F", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,   13, 0x1, 0x1},
+    };
+
+    static const struct vkd3d_shader_signature_element vs5_outputs_dxil[] =
+    {
+        {"A", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  0, 0x1, 0x1},
+        {"A", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  1, 0x1, 0x1},
+        {"A", 2, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  2, 0x1, 0x1},
+        {"A", 3, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  3, 0x1, 0x1},
+        {"B", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  0, 0x6, 0x6},
+        {"B", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  1, 0x6, 0x6},
+        {"C", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  2, 0xe, 0xe},
+        {"C", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  3, 0xe, 0xe},
+        {"D", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  4, 0xf, 0xf},
+        {"D", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,  5, 0xf, 0xf},
+        {"E", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,   6, 0x1, 0x1},
+        {"E", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,   7, 0x1, 0x1},
+        {"F", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,    6, 0x2, 0x2},
+        {"F", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,    7, 0x2, 0x2},
     };
 
     static const char ps1_source[] =
@@ -717,6 +791,7 @@ static void test_scan_signatures(void)
         {vs1_source, true,  "vs_4_0", true,  vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
         {vs2_source, true,  "vs_4_0", false, vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
         {vs2_source, true,  "vs_4_0", true,  vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_legacy_outputs, ARRAY_SIZE(vs2_legacy_outputs)},
+        {vs5_source, true,  "vs_4_0", false, vs5_io,     ARRAY_SIZE(vs5_io),     vs5_io,      ARRAY_SIZE(vs5_io)},
         {ps1_source, true,  "ps_4_0", false, ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
         {ps5_source, true,  "ps_4_0", true,  ps5_inputs, ARRAY_SIZE(ps5_inputs), ps5_outputs, ARRAY_SIZE(ps5_outputs)},
         {cs1_source, true,  "cs_5_0", false, NULL, 0, NULL, 0},
@@ -727,6 +802,18 @@ static void test_scan_signatures(void)
         {ps2_source, false, "ps_1_1", false, ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
         {ps3_source, false, "ps_2_0", false, ps3_inputs, ARRAY_SIZE(ps3_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
         {ps4_source, false, "ps_3_0", false, ps4_inputs, ARRAY_SIZE(ps4_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
+    };
+
+    static const struct
+    {
+        const struct vkd3d_shader_signature_element *inputs;
+        size_t input_count;
+        const struct vkd3d_shader_signature_element *outputs;
+        size_t output_count;
+    }
+    dxil_tests[] =
+    {
+        {vs5_io, ARRAY_SIZE(vs5_io), vs5_outputs_dxil, ARRAY_SIZE(vs5_outputs_dxil)},
     };
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
@@ -789,6 +876,45 @@ static void test_scan_signatures(void)
 
         vkd3d_shader_free_scan_signature_info(&signature_info);
         vkd3d_shader_free_shader_code(&dxbc);
+
+        vkd3d_test_pop_context();
+    }
+
+    if (!check_dxil_support() || !(compiler = dxcompiler_create()))
+    {
+        skip("DXIL tests not supported.\n");
+        return;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(dxil_tests); ++i)
+    {
+        vkd3d_test_push_context("test %u", i);
+
+        rc = dxc_compile(compiler, L"vs_6_0", 0, false, vs5_source, &dxbc);
+        ok(rc == S_OK, "Got rc %#x.\n", rc);
+
+        compile_info.next = &signature_info;
+        compile_info.source = dxbc;
+        compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_DXIL;
+        compile_info.target_type = VKD3D_SHADER_TARGET_NONE;
+        compile_info.options = NULL;
+        compile_info.option_count = 0;
+        compile_info.log_level = VKD3D_SHADER_LOG_INFO;
+
+        rc = vkd3d_shader_scan(&compile_info, NULL);
+        ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
+
+        todo ok(signature_info.input.element_count == dxil_tests[i].input_count,
+                "Got input count %u.\n", signature_info.input.element_count);
+
+        todo ok(signature_info.output.element_count == dxil_tests[i].output_count,
+                "Got output count %u.\n", signature_info.output.element_count);
+
+        ok(!signature_info.patch_constant.element_count,
+                "Got patch constant count %u.\n", signature_info.patch_constant.element_count);
+
+        vkd3d_shader_free_scan_signature_info(&signature_info);
+        free((void *)dxbc.code);
 
         vkd3d_test_pop_context();
     }
