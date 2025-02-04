@@ -651,6 +651,69 @@ static void test_scan_signatures(void)
         {"F", 1, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,    7, 0x2, 0x2},
     };
 
+    /* Note that 64-bit types are not allowed for inputs or outputs. */
+    static const char vs6_source[] =
+        "void main(\n"
+        "        inout min16float a : A,\n"
+        "        inout min16uint b : B,\n"
+        "        inout min16int c : C,\n"
+        "        inout float d : D,\n"
+        "        inout uint e : E,\n"
+        "        inout int f : F,\n"
+        "        inout bool g : G)\n"
+        "{\n"
+        "}\n";
+
+    static const struct vkd3d_shader_signature_element vs6_inputs[] =
+    {
+        {"A", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0x1, 0x1,
+                VKD3D_SHADER_MINIMUM_PRECISION_FLOAT_16},
+        {"B", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  1, 0x1, 0x1,
+                VKD3D_SHADER_MINIMUM_PRECISION_UINT_16},
+        {"C", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,   2, 0x1, 0x1,
+                VKD3D_SHADER_MINIMUM_PRECISION_INT_16},
+        {"D", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 3, 0x1, 0x1},
+        {"E", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  4, 0x1, 0x1},
+        {"F", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,   5, 0x1, 0x1},
+        {"G", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  6, 0x1, 0x1},
+    };
+
+    static const struct vkd3d_shader_signature_element vs6_outputs[] =
+    {
+        {"A", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0x1, 0x1,
+                VKD3D_SHADER_MINIMUM_PRECISION_FLOAT_16},
+        {"B", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  1, 0x1, 0x1,
+                VKD3D_SHADER_MINIMUM_PRECISION_UINT_16},
+        {"C", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,   1, 0x2, 0x2,
+                VKD3D_SHADER_MINIMUM_PRECISION_INT_16},
+        {"D", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0x2, 0x2},
+        {"E", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  1, 0x4, 0x4},
+        {"F", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,   1, 0x8, 0x8},
+        {"G", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,  2, 0x1, 0x1},
+    };
+
+    static const struct vkd3d_shader_signature_element vs6_inputs_16[] =
+    {
+        {"A", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT16, 0, 0x1, 0x1},
+        {"B", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT16,  1, 0x1, 0x1},
+        {"C", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT16,   2, 0x1, 0x1},
+        {"D", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,   3, 0x1, 0x1},
+        {"E", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,    4, 0x1, 0x1},
+        {"F", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,     5, 0x1, 0x1},
+        {"G", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,    6, 0x1, 0x1},
+    };
+
+    static const struct vkd3d_shader_signature_element vs6_outputs_16[] =
+    {
+        {"A", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT16, 0, 0x1, 0x1},
+        {"B", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT16,  1, 0x1, 0x1},
+        {"C", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT16,   1, 0x2, 0x2},
+        {"D", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT,   2, 0x1, 0x1},
+        {"E", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,    3, 0x1, 0x1},
+        {"F", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_INT,     3, 0x2, 0x2},
+        {"G", 0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_UINT,    3, 0x4, 0x4},
+    };
+
     static const char ps1_source[] =
         "void main(\n"
         "        in float2 a : apple,\n"
@@ -806,6 +869,9 @@ static void test_scan_signatures(void)
 
     static const struct
     {
+        const char *source;
+        const wchar_t *profile;
+        bool enable_16bit;
         const struct vkd3d_shader_signature_element *inputs;
         size_t input_count;
         const struct vkd3d_shader_signature_element *outputs;
@@ -813,7 +879,10 @@ static void test_scan_signatures(void)
     }
     dxil_tests[] =
     {
-        {vs5_io, ARRAY_SIZE(vs5_io), vs5_outputs_dxil, ARRAY_SIZE(vs5_outputs_dxil)},
+        {vs5_source, L"vs_6_0", false, vs5_io, ARRAY_SIZE(vs5_io), vs5_outputs_dxil, ARRAY_SIZE(vs5_outputs_dxil)},
+        {vs6_source, L"vs_6_2", false, vs6_inputs, ARRAY_SIZE(vs6_inputs), vs6_outputs, ARRAY_SIZE(vs6_outputs)},
+        {vs6_source, L"vs_6_2", true,  vs6_inputs_16, ARRAY_SIZE(vs6_inputs_16),
+                vs6_outputs_16, ARRAY_SIZE(vs6_outputs_16)},
     };
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
@@ -890,7 +959,7 @@ static void test_scan_signatures(void)
     {
         vkd3d_test_push_context("test %u", i);
 
-        rc = dxc_compile(compiler, L"vs_6_0", 0, false, vs5_source, &dxbc);
+        rc = dxc_compile(compiler, dxil_tests[i].profile, 0, dxil_tests[i].enable_16bit, dxil_tests[i].source, &dxbc);
         ok(rc == S_OK, "Got rc %#x.\n", rc);
 
         compile_info.next = &signature_info;
