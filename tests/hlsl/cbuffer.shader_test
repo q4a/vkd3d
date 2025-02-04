@@ -979,3 +979,74 @@ float4 main() : sv_target
 {
     return ConstantBuffer;
 }
+
+[require]
+shader model >= 6.2
+native-16-bit
+
+[pixel shader]
+uniform half2 h;
+
+float4 main() : sv_target
+{
+    return float4(h, 0, 0);
+}
+
+[test]
+uniform 0 uint 0xc1003e00
+draw quad
+probe (0, 0) rgba(1.5, -2.5, 0.0, 0.0)
+
+[pixel shader]
+uniform half4 h0;
+uniform half4 h1;
+
+float4 main() : sv_target
+{
+    return float4(h0.xy, h1.zw);
+}
+
+[test]
+uniform 0 uint4 0xc1003e00 0 0 0x4480c300  # 1.5 -2.5 0 0  0 0 -3.5 4.5
+draw quad
+probe (0, 0) rgba(1.5, -2.5, -3.5, 4.5)
+
+[pixel shader]
+uniform uint16_t2 u;
+
+uint4 main() : sv_target
+{
+    return uint4(u, 0, 0);
+}
+
+[test]
+uniform 0 uint 0x7fffffff
+draw quad
+probe (0, 0) rgbaui(0xffff, 0x7fff, 0, 0)
+
+[pixel shader]
+uniform uint16_t4 u0;
+uniform uint16_t4 u1;
+
+uint4 main() : sv_target
+{
+    return uint4(u0.xy, u1.yz);
+}
+
+[test]
+uniform 0 uint4 0x20001 0x40003 0x60005 0x80007
+draw quad
+probe (0, 0) rgbaui(1, 2, 6, 7)
+
+[pixel shader]
+uniform int16_t2 i;
+
+int4 main() : sv_target
+{
+    return int4(i, 0, 0);
+}
+
+[test]
+uniform 0 uint 0x7fffffff
+draw quad
+probe (0, 0) rgbai(-1, 32767, 0, 0)
