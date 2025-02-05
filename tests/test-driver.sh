@@ -160,6 +160,7 @@ BEGIN {
     str = "<fade>(" shader_models ")" backend "<reset>"
     printf("#   %-20s\n", str)
     last_entry = ""
+    last_tag = ""
 }
 
 function print_entry(line, model, tag) {
@@ -168,12 +169,13 @@ function print_entry(line, model, tag) {
     else
         entry = "<fade>" $4 "<reset>"
 
-    if (entry == last_entry)
-        print tag
-    else
+    if (entry != last_entry)
         print entry tag
+    else if (tag != last_tag)
+        print tag
 
     last_entry = entry
+    last_tag = tag
 }
 
 /: Test failed:/ {
