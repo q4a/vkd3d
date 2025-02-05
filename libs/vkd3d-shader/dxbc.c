@@ -444,7 +444,12 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
         }
         e[i].semantic_index = read_u32(&ptr);
         e[i].sysval_semantic = read_u32(&ptr);
-        e[i].component_type = read_u32(&ptr);
+        if ((e[i].component_type = read_u32(&ptr)) > VKD3D_SHADER_COMPONENT_FLOAT)
+        {
+            vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_DXBC_INVALID_COMPONENT_TYPE,
+                    "Element %u has invalid component type %#x.\n", i, e[i].component_type);
+            fail = true;
+        }
         e[i].register_index = read_u32(&ptr);
         e[i].target_location = e[i].register_index;
         e[i].register_count = 1;
