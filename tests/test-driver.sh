@@ -159,13 +159,21 @@ BEGIN {
     gsub(/\./, "", backend)
     str = "<fade>(" shader_models ")" backend "<reset>"
     printf("#   %-20s\n", str)
+    last_entry = ""
 }
 
 function print_entry(line, model, tag) {
     if ($5 ~ " Model [^[:space:]]+")
-        print "<fade>" $4 "+" substr($5, 8) "<reset>" tag
+        entry = "<fade>" $4 "+" substr($5, 8) "<reset>"
     else
-        print "<fade>" $4 "<reset>" tag
+        entry = "<fade>" $4 "<reset>"
+
+    if (entry == last_entry)
+        print tag
+    else
+        print entry tag
+
+    last_entry = entry
 }
 
 /: Test failed:/ {
@@ -213,6 +221,9 @@ xfcount=$(echo "$details" | awk '/\[XF\]/{count++} END{printf "%d", count}')
 skcount=$(echo "$details" | awk '/\[SK\]/{count++} END{printf "%d", count}')
 
 details=$(echo "$details" |\
+    tr '\n' ' ' |\
+    tr '#' '\n' |\
+    sed "s/\] \[/][/g" |\
     sed "s/\[F\]/$color_bright_red[F]$color_reset/g" |\
     sed "s/\[XF\]/$color_yellow[XF]$color_reset/g" |\
     sed "s/\[XP\]/$color_dark_red[XP]$color_reset/g" |\
@@ -222,8 +233,6 @@ details=$(echo "$details" |\
     sed "s/\[SIGSEGV\]/$color_bright_purple[SIGSEGV]$color_reset/g" |\
     sed "s/<fade>/$color_fade/g" |\
     sed "s/<reset>/$color_reset/g" |\
-    tr '\n' ' ' |\
-    tr '#' '\n' |\
     awk 'NF != 1' )
 
 # Set VKD3D_TEST_DETAILED to 0 if unset.
