@@ -3200,13 +3200,13 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     struct vkd3d_shader_spirv_target_info *stage_target_info;
     uint32_t aligned_offsets[D3D12_VS_INPUT_REGISTER_COUNT];
     struct vkd3d_shader_descriptor_offset_info offset_info;
+    struct vkd3d_shader_scan_signature_info signature_info;
     struct vkd3d_shader_parameter ps_shader_parameters[1];
     struct vkd3d_shader_transform_feedback_info xfb_info;
     struct vkd3d_shader_spirv_target_info ps_target_info;
     struct vkd3d_shader_interface_info shader_interface;
     struct vkd3d_shader_spirv_target_info target_info;
     const struct d3d12_root_signature *root_signature;
-    struct vkd3d_shader_signature input_signature;
     bool have_attachment, is_dsv_format_unknown;
     VkShaderStageFlagBits xfb_stage = 0;
     VkSampleCountFlagBits sample_count;
@@ -3217,7 +3217,6 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     size_t rt_count;
     uint32_t mask;
     HRESULT hr;
-    int ret;
 
     static const DWORD default_ps_code[] =
     {
@@ -3250,7 +3249,8 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     memset(&state->uav_counters, 0, sizeof(state->uav_counters));
     graphics->stage_count = 0;
 
-    memset(&input_signature, 0, sizeof(input_signature));
+    memset(&signature_info, 0, sizeof(signature_info));
+    signature_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
 
     for (i = desc->rtv_formats.NumRenderTargets; i < ARRAY_SIZE(desc->rtv_formats.RTFormats); ++i)
     {
@@ -3479,7 +3479,6 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     for (i = 0; i < ARRAY_SIZE(shader_stages); ++i)
     {
         const D3D12_SHADER_BYTECODE *b = (const void *)((uintptr_t)desc + shader_stages[i].offset);
-        const struct vkd3d_shader_code dxbc = {b->pShaderBytecode, b->BytecodeLength};
 
         if (!b->pShaderBytecode)
             continue;
@@ -3493,14 +3492,6 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         stage_target_info = &target_info;
         switch (shader_stages[i].stage)
         {
-            case VK_SHADER_STAGE_VERTEX_BIT:
-                if ((ret = vkd3d_shader_parse_input_signature(&dxbc, &input_signature, NULL)) < 0)
-                {
-                    hr = hresult_from_vkd3d_result(ret);
-                    goto fail;
-                }
-                break;
-
             case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
             case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
                 if (desc->primitive_topology_type != D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH)
@@ -3511,6 +3502,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
                 }
                 break;
 
+            case VK_SHADER_STAGE_VERTEX_BIT:
             case VK_SHADER_STAGE_GEOMETRY_BIT:
                 break;
 
@@ -3532,11 +3524,14 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         ps_target_info.next = NULL;
         target_info.next = NULL;
         offset_info.next = NULL;
+        signature_info.next = NULL;
         if (shader_stages[i].stage == xfb_stage)
             vkd3d_prepend_struct(&shader_interface, &xfb_info);
         vkd3d_prepend_struct(&shader_interface, stage_target_info);
         if (root_signature->descriptor_offsets)
             vkd3d_prepend_struct(&shader_interface, &offset_info);
+        if (shader_stages[i].stage == VK_SHADER_STAGE_VERTEX_BIT)
+            vkd3d_prepend_struct(&shader_interface, &signature_info);
 
         if (FAILED(hr = create_shader_stage(device, &graphics->stages[graphics->stage_count],
                 shader_stages[i].stage, b, &shader_interface)))
@@ -3587,7 +3582,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
             goto fail;
         }
 
-        if (!(signature_element = vkd3d_shader_find_signature_element(&input_signature,
+        if (!(signature_element = vkd3d_shader_find_signature_element(&signature_info.input,
                 e->SemanticName, e->SemanticIndex, 0)))
         {
             WARN("Unused input element %u.\n", i);
@@ -3714,7 +3709,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     if (FAILED(hr = vkd3d_private_store_init(&state->private_store)))
         goto fail;
 
-    vkd3d_shader_free_shader_signature(&input_signature);
+    vkd3d_shader_free_scan_signature_info(&signature_info);
     state->vk_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
     state->implicit_root_signature = NULL;
     d3d12_device_add_ref(state->device = device);
@@ -3726,7 +3721,7 @@ fail:
     {
         VK_CALL(vkDestroyShaderModule(device->vk_device, state->u.graphics.stages[i].module, NULL));
     }
-    vkd3d_shader_free_shader_signature(&input_signature);
+    vkd3d_shader_free_scan_signature_info(&signature_info);
 
     d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
 
