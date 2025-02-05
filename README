@@ -149,12 +149,6 @@ in future versions of vkd3d.
    emitted; this can be useful for developers to make error conditions as
    conspicuous as possible.
 
- * VKD3D_SHADER_UNSUPPORTED_DXIL - enable DXIL (DirectX Intermediate Language)
-   support in vkd3d-shader, which is disabled by default because it is not
-   considered ready for release yet. Please note that this feature is not
-   currently supported, and it might change in a non-compatible way before it is
-   released.
-
  * VKD3D_SHADER_UNSUPPORTED_GLSL - enable GLSL (GL Shading Language) support in
    vkd3d-shader, which is disabled by default because it is not considered ready
    for release yet. Please note that this feature is not currently supported,

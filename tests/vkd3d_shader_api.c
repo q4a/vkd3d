@@ -29,21 +29,6 @@
 
 #include <locale.h>
 
-static bool check_dxil_support(void)
-{
-    const enum vkd3d_shader_source_type *source_types;
-    unsigned int count, i;
-
-    source_types = vkd3d_shader_get_supported_source_types(&count);
-    for (i = 0; i < count; ++i)
-    {
-        if (source_types[i] == VKD3D_SHADER_SOURCE_DXBC_DXIL)
-            return true;
-    }
-
-    return false;
-}
-
 static void test_invalid_shaders(void)
 {
     struct vkd3d_shader_compile_info info;
@@ -949,7 +934,7 @@ static void test_scan_signatures(void)
         vkd3d_test_pop_context();
     }
 
-    if (!check_dxil_support() || !(compiler = dxcompiler_create()))
+    if (!(compiler = dxcompiler_create()))
     {
         skip("DXIL tests not supported.\n");
         return;

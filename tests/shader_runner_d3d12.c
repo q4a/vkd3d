@@ -1093,12 +1093,7 @@ static void run_shader_tests_for_model_range(void *dxc_compiler,
 
     if (minimum_shader_model >= SHADER_MODEL_6_0 && !device_supports_shader_model_6_0(device))
     {
-#ifdef VKD3D_CROSSTEST
         skip("The device does not support shader model 6.0.\n");
-#else
-        skip("DXIL support is not enabled. If this is unintentional, "
-                "add -DVKD3D_SHADER_UNSUPPORTED_DXIL to CPPFLAGS.\n");
-#endif
         destroy_test_context(&runner.test_context);
         return;
     }
