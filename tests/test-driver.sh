@@ -161,20 +161,27 @@ BEGIN {
     printf("#   %-20s\n", str)
 }
 
+function print_entry(line, model, tag) {
+    if ($5 ~ " Model [^[:space:]]+")
+        print "<fade>" $4 "+" substr($5, 8) "<reset>" tag
+    else
+        print "<fade>" $4 "<reset>" tag
+}
+
 /: Test failed:/ {
-    print "<fade>" $4 "<reset>" "[F]"
+    print_entry($4, $5, "[F]")
 }
 
 /: Todo:/ {
-    print "<fade>" $4 "<reset>" "[XF]"
+    print_entry($4, $5, "[XF]")
 }
 
 /: Todo succeeded:/ {
-    print "<fade>" $4 "<reset>" "[XP]"
+    print_entry($4, $5, "[XP]")
 }
 
 /: Test skipped:/ {
-    print "<fade>" $4 "<reset>" "[SK]"
+    print_entry($4, $5, "[SK]")
 }
 
 /: Assertion .* failed\./ {
