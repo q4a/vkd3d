@@ -3375,7 +3375,8 @@ static uint32_t spirv_compiler_get_constant(struct spirv_compiler *compiler,
                     "Vectors of bool type are not supported.");
             return vkd3d_spirv_get_op_undef(builder, type_id);
         default:
-            FIXME("Unhandled component_type %#x.\n", component_type);
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_TYPE,
+                    "Unhandled component_type %#x.", component_type);
             return vkd3d_spirv_get_op_undef(builder, type_id);
     }
 
