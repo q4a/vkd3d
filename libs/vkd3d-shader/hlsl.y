@@ -4303,21 +4303,6 @@ static bool intrinsic_lerp(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, params->args[0], mul, loc);
 }
 
-static struct hlsl_ir_node * add_pow_expr(struct hlsl_ctx *ctx,
-        struct hlsl_block *instrs, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
-        const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *log, *mul;
-
-    if (!(log = add_unary_arithmetic_expr(ctx, instrs, HLSL_OP1_LOG2, arg1, loc)))
-        return NULL;
-
-    if (!(mul = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_MUL, arg2, log, loc)))
-        return NULL;
-
-    return add_unary_arithmetic_expr(ctx, instrs, HLSL_OP1_EXP2, mul, loc);
-}
-
 static bool intrinsic_lit(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -4586,10 +4571,18 @@ static bool intrinsic_normalize(struct hlsl_ctx *ctx,
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
+    struct hlsl_ir_node *log, *mul;
+
     if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
 
-    return !!add_pow_expr(ctx, params->instrs, params->args[0], params->args[1], loc);
+    if (!(log = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_LOG2, params->args[0], loc)))
+        return NULL;
+
+    if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[1], log, loc)))
+        return NULL;
+
+    return add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_EXP2, mul, loc);
 }
 
 static bool intrinsic_radians(struct hlsl_ctx *ctx,
