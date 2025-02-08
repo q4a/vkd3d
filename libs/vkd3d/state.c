@@ -755,7 +755,10 @@ struct vkd3d_descriptor_set_context
     unsigned int push_constant_index;
 
     struct vk_binding_array *root_descriptor_set;
+    struct vk_binding_array *static_samplers_descriptor_set;
     bool push_descriptor;
+    bool static_samplers;
+    bool use_vk_heaps;
 };
 
 static void descriptor_set_context_cleanup(struct vkd3d_descriptor_set_context *context)
@@ -806,13 +809,59 @@ static struct vk_binding_array *d3d12_root_signature_vk_binding_array_for_type(
 {
     struct vk_binding_array *array, **current;
 
+    /* There are a few different ways we can reach this point:
+     *  * If we are using virtual heaps we want to allocate descriptors to sets
+     *    depending on their descriptor type, in order to minimize waste when
+     *    recycling descriptor pools.
+     *    + With the exception of root descriptors when we are using push
+     *      descriptors: the push descriptors must be in a separate set, so we
+     *      keep one specifically for them.
+     *  * If we are using Vulkan heaps then all the root table descriptors don't
+     *    even reach here, because they are managed by the D3D12 descriptor
+     *    heap. Thus we only have to deal with root descriptors and static
+     *    samplers.
+     *    + If we're using push descriptors then again we have to dedicate a set
+     *      for them, so static samplers will and up in their own set too.
+     *    + If we're not using push descriptors then we can use the same set and
+     *      save one. In this case we don't care too much about minimizing
+     *      wasted descriptors, because few descriptors can end up here anyway.
+     */
+
     if (context->push_descriptor)
     {
+        /* The descriptor type is irrelevant here, it will never be used. */
         if (!context->root_descriptor_set)
             context->root_descriptor_set = d3d12_root_signature_append_vk_binding_array(root_signature,
-                    descriptor_type, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR, context);
+                    0, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR, context);
 
         return context->root_descriptor_set;
+    }
+
+    if (context->use_vk_heaps)
+    {
+        if (context->static_samplers)
+        {
+            if (!context->static_samplers_descriptor_set)
+            {
+                if (!context->push_descriptor && context->root_descriptor_set)
+                    context->static_samplers_descriptor_set = context->root_descriptor_set;
+                else
+                    /* The descriptor type is irrelevant here, it will never be used. */
+                    context->static_samplers_descriptor_set = d3d12_root_signature_append_vk_binding_array(
+                            root_signature, 0, 0, context);
+            }
+
+            return context->static_samplers_descriptor_set;
+        }
+        else
+        {
+            /* The descriptor type is irrelevant here, it will never be used. */
+            if (!context->root_descriptor_set)
+                context->root_descriptor_set = d3d12_root_signature_append_vk_binding_array(
+                        root_signature, 0, 0, context);
+
+            return context->root_descriptor_set;
+        }
     }
 
     current = context->current_binding_array;
@@ -1638,17 +1687,22 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
             sizeof(*root_signature->static_samplers))))
         goto fail;
 
+    context.use_vk_heaps = use_vk_heaps;
     context.push_descriptor = vk_info->KHR_push_descriptor;
     if (FAILED(hr = d3d12_root_signature_init_root_descriptors(root_signature, desc, &context)))
         goto fail;
-    root_signature->main_set = !!context.root_descriptor_set;
+    root_signature->main_set = context.root_descriptor_set && context.push_descriptor;
     context.push_descriptor = false;
 
     if (FAILED(hr = d3d12_root_signature_init_push_constants(root_signature, desc,
             root_signature->push_constant_ranges, &root_signature->push_constant_range_count)))
         goto fail;
+
+    context.static_samplers = true;
     if (FAILED(hr = d3d12_root_signature_init_static_samplers(root_signature, device, desc, &context)))
         goto fail;
+    context.static_samplers = false;
+
     context.push_constant_index = 0;
     if (FAILED(hr = d3d12_root_signature_init_root_descriptor_tables(root_signature, desc, &info, &context)))
         goto fail;
