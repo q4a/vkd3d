@@ -2222,7 +2222,7 @@ static bool vk_barrier_parameters_from_d3d12_resource_state(unsigned int state, 
                 if (!stencil_state || (stencil_state & D3D12_RESOURCE_STATE_DEPTH_WRITE))
                     *image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                 else
-                    *image_layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
+                    *image_layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL_KHR;
             }
             return true;
 
@@ -2256,7 +2256,7 @@ static bool vk_barrier_parameters_from_d3d12_resource_state(unsigned int state, 
             {
                 if (stencil_state & D3D12_RESOURCE_STATE_DEPTH_WRITE)
                 {
-                    *image_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
+                    *image_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL_KHR;
                     *access_mask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
                 }
                 else
