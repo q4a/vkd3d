@@ -3123,6 +3123,11 @@ static bool validate_nonconstant_vector_store_derefs(struct hlsl_ctx *ctx, struc
     return false;
 }
 
+static bool deref_supports_sm1_indirect_addressing(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
+{
+    return ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX && deref->var->is_uniform;
+}
+
 /* This pass flattens array (and row_major matrix) loads that include the indexing of a non-constant
  * index into multiple constant loads, where the value of only one of them ends up in the resulting
  * node.
@@ -3147,6 +3152,9 @@ static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_n
     deref = &load->src;
 
     if (deref->path_len == 0)
+        return false;
+
+    if (deref_supports_sm1_indirect_addressing(ctx, deref))
         return false;
 
     for (i = deref->path_len - 1; ; --i)
@@ -8352,11 +8360,51 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
         hlsl_fixme(ctx, loc, "Translate relative addressing on dst register for vsir.");
 }
 
+static void sm1_generate_vsir_instr_mova(struct hlsl_ctx *ctx,
+        struct vsir_program *program, struct hlsl_ir_node *instr)
+{
+    enum vkd3d_shader_opcode opcode = hlsl_version_ge(ctx, 2, 0) ? VKD3DSIH_MOVA : VKD3DSIH_MOV;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_instruction *ins;
+
+    VKD3D_ASSERT(instr->reg.allocated);
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, opcode, 1, 1)))
+        return;
+
+    dst_param = &ins->dst[0];
+    vsir_register_init(&dst_param->reg, VKD3DSPR_ADDR, VKD3D_DATA_FLOAT, 0);
+    dst_param->write_mask = VKD3DSP_WRITEMASK_0;
+
+    VKD3D_ASSERT(instr->data_type->class <= HLSL_CLASS_VECTOR);
+    VKD3D_ASSERT(instr->data_type->e.numeric.dimx == 1);
+    vsir_src_from_hlsl_node(&ins->src[0], ctx, instr, VKD3DSP_WRITEMASK_ALL);
+}
+
+static struct vkd3d_shader_src_param *sm1_generate_vsir_new_address_src(struct hlsl_ctx *ctx,
+        struct vsir_program *program)
+{
+    struct vkd3d_shader_src_param *idx_src;
+
+    if (!(idx_src = vsir_program_get_src_params(program, 1)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return NULL;
+    }
+
+    memset(idx_src, 0, sizeof(*idx_src));
+    vsir_register_init(&idx_src->reg, VKD3DSPR_ADDR, VKD3D_DATA_FLOAT, 0);
+    idx_src->reg.dimension = VSIR_DIMENSION_VEC4;
+    idx_src->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+    return idx_src;
+}
+
 static void sm1_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx,
-        struct vkd3d_shader_src_param *src_param, struct hlsl_deref *deref,
-        unsigned int dst_writemask, const struct vkd3d_shader_location *loc)
+        struct vsir_program *program, struct vkd3d_shader_src_param *src_param,
+        struct hlsl_deref *deref, uint32_t dst_writemask, const struct vkd3d_shader_location *loc)
 {
     enum vkd3d_shader_register_type type = VKD3DSPR_TEMP;
+    struct vkd3d_shader_src_param *src_rel_addr = NULL;
     struct vkd3d_shader_version version;
     uint32_t register_index;
     unsigned int writemask;
@@ -8374,12 +8422,26 @@ static void sm1_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx,
     }
     else if (deref->var->is_uniform)
     {
-        type = VKD3DSPR_CONST;
+        unsigned int offset = deref->const_offset;
 
-        reg = hlsl_reg_from_deref(ctx, deref);
-        register_index = reg.id;
-        writemask = reg.writemask;
-        VKD3D_ASSERT(reg.allocated);
+        type = VKD3DSPR_CONST;
+        register_index = deref->var->regs[HLSL_REGSET_NUMERIC].id + offset / 4;
+
+        writemask = 0xf & (0xf << (offset % 4));
+        if (deref->var->regs[HLSL_REGSET_NUMERIC].writemask)
+            writemask = hlsl_combine_writemasks(deref->var->regs[HLSL_REGSET_NUMERIC].writemask, writemask);
+
+        if (deref->rel_offset.node)
+        {
+            VKD3D_ASSERT(deref_supports_sm1_indirect_addressing(ctx, deref));
+
+            if (!(src_rel_addr = sm1_generate_vsir_new_address_src(ctx, program)))
+            {
+                ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+                return;
+            }
+        }
+        VKD3D_ASSERT(deref->var->regs[HLSL_REGSET_NUMERIC].allocated);
     }
     else if (deref->var->is_input_semantic)
     {
@@ -8413,10 +8475,8 @@ static void sm1_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx,
     vsir_register_init(&src_param->reg, type, VKD3D_DATA_FLOAT, 1);
     src_param->reg.dimension = VSIR_DIMENSION_VEC4;
     src_param->reg.idx[0].offset = register_index;
+    src_param->reg.idx[0].rel_addr = src_rel_addr;
     src_param->swizzle = generate_vsir_get_src_swizzle(writemask, dst_writemask);
-
-    if (deref->rel_offset.node)
-        hlsl_fixme(ctx, loc, "Translate relative addressing on src register for vsir.");
 }
 
 static void sm1_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_program *program,
@@ -8427,13 +8487,16 @@ static void sm1_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
 
     VKD3D_ASSERT(instr->reg.allocated);
 
+    if (load->src.rel_offset.node)
+        sm1_generate_vsir_instr_mova(ctx, program, load->src.rel_offset.node);
+
     if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_MOV, 1, 1)))
         return;
 
     vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
 
-    sm1_generate_vsir_init_src_param_from_deref(ctx, &ins->src[0], &load->src, ins->dst[0].write_mask,
-            &ins->location);
+    sm1_generate_vsir_init_src_param_from_deref(ctx, program, &ins->src[0],
+            &load->src, ins->dst[0].write_mask, &ins->location);
 }
 
 static void sm1_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
@@ -8486,7 +8549,7 @@ static void sm1_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
     src_param = &ins->src[0];
     vsir_src_from_hlsl_node(src_param, ctx, coords, VKD3DSP_WRITEMASK_ALL);
 
-    sm1_generate_vsir_init_src_param_from_deref(ctx, &ins->src[1], &load->resource,
+    sm1_generate_vsir_init_src_param_from_deref(ctx, program, &ins->src[1], &load->resource,
             VKD3DSP_WRITEMASK_ALL, &ins->location);
 
     if (load->load_type == HLSL_RESOURCE_SAMPLE_GRAD)

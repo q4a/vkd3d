@@ -1771,10 +1771,18 @@ static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const s
 
 static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer, const struct vkd3d_shader_src_param *reg)
 {
-    uint32_t offset = reg->reg.idx_count ? reg->reg.idx[0].offset : 0;
+    uint32_t address_mode = VKD3D_SM1_ADDRESS_MODE_ABSOLUTE, offset = 0;
+
+    if (reg->reg.idx_count)
+    {
+        offset = reg->reg.idx[0].offset;
+        if (reg->reg.idx[0].rel_addr)
+            address_mode = VKD3D_SM1_ADDRESS_MODE_RELATIVE;
+    }
 
     put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
             | sm1_encode_register_type(&reg->reg)
+            | (address_mode << VKD3D_SM1_ADDRESS_MODE_SHIFT)
             | (reg->modifiers << VKD3D_SM1_SRC_MODIFIER_SHIFT)
             | (swizzle_from_vsir(reg->swizzle) << VKD3D_SM1_SWIZZLE_SHIFT)
             | (offset & VKD3D_SM1_REGISTER_NUMBER_MASK));
@@ -1784,6 +1792,7 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct v
 {
     const struct vkd3d_shader_version *version = &d3dbc->program->shader_version;
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
+    const struct vkd3d_shader_src_param *src;
     const struct vkd3d_sm1_opcode_info *info;
     unsigned int i;
     uint32_t token;
@@ -1814,13 +1823,10 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct v
 
     for (i = 0; i < ins->src_count; ++i)
     {
-        if (ins->src[i].reg.idx[0].rel_addr)
-        {
-            vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_NOT_IMPLEMENTED,
-                    "Unhandled relative addressing on source register.");
-            d3dbc->failed = true;
-        }
-        write_sm1_src_register(buffer, &ins->src[i]);
+        src = &ins->src[i];
+        write_sm1_src_register(buffer, src);
+        if (src->reg.idx_count && src->reg.idx[0].rel_addr)
+            write_sm1_src_register(buffer, src->reg.idx[0].rel_addr);
     }
 };
 
@@ -1944,6 +1950,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_MAX:
         case VKD3DSIH_MIN:
         case VKD3DSIH_MOV:
+        case VKD3DSIH_MOVA:
         case VKD3DSIH_MUL:
         case VKD3DSIH_SINCOS:
         case VKD3DSIH_SLT:
