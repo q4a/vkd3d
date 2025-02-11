@@ -1759,21 +1759,25 @@ static bool is_inconsequential_instr(const struct vkd3d_shader_instruction *ins)
 
 static void write_sm1_dst_register(struct vkd3d_bytecode_buffer *buffer, const struct vkd3d_shader_dst_param *reg)
 {
+    uint32_t offset = reg->reg.idx_count ? reg->reg.idx[0].offset : 0;
+
     VKD3D_ASSERT(reg->write_mask);
     put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
             | sm1_encode_register_type(&reg->reg)
             | (reg->modifiers << VKD3D_SM1_DST_MODIFIER_SHIFT)
             | (reg->write_mask << VKD3D_SM1_WRITEMASK_SHIFT)
-            | (reg->reg.idx[0].offset & VKD3D_SM1_REGISTER_NUMBER_MASK));
+            | (offset & VKD3D_SM1_REGISTER_NUMBER_MASK));
 }
 
 static void write_sm1_src_register(struct vkd3d_bytecode_buffer *buffer, const struct vkd3d_shader_src_param *reg)
 {
+    uint32_t offset = reg->reg.idx_count ? reg->reg.idx[0].offset : 0;
+
     put_u32(buffer, VKD3D_SM1_INSTRUCTION_PARAMETER
             | sm1_encode_register_type(&reg->reg)
             | (reg->modifiers << VKD3D_SM1_SRC_MODIFIER_SHIFT)
             | (swizzle_from_vsir(reg->swizzle) << VKD3D_SM1_SWIZZLE_SHIFT)
-            | (reg->reg.idx[0].offset & VKD3D_SM1_REGISTER_NUMBER_MASK));
+            | (offset & VKD3D_SM1_REGISTER_NUMBER_MASK));
 }
 
 static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
@@ -1831,6 +1835,7 @@ static void d3dbc_write_vsir_def(struct d3dbc_compiler *d3dbc, const struct vkd3
         .reg.type = VKD3DSPR_CONST,
         .write_mask = VKD3DSP_WRITEMASK_ALL,
         .reg.idx[0].offset = ins->dst[0].reg.idx[0].offset,
+        .reg.idx_count = 1,
     };
 
     token = VKD3D_SM1_OP_DEF;
@@ -1863,6 +1868,7 @@ static void d3dbc_write_vsir_sampler_dcl(struct d3dbc_compiler *d3dbc,
     reg.reg.type = VKD3DSPR_COMBINED_SAMPLER;
     reg.write_mask = VKD3DSP_WRITEMASK_ALL;
     reg.reg.idx[0].offset = reg_id;
+    reg.reg.idx_count = 1;
 
     write_sm1_dst_register(buffer, &reg);
 }
@@ -1982,6 +1988,7 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
     uint32_t token, usage_idx;
     bool ret;
 
+    reg.reg.idx_count = 1;
     if (sm1_register_from_semantic_name(version, element->semantic_name,
             element->semantic_index, output, &reg.reg.type, &reg.reg.idx[0].offset))
     {
