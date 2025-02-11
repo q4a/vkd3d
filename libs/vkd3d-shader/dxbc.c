@@ -477,6 +477,7 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     }
 
     s->elements = e;
+    s->elements_capacity = count;
     s->element_count = count;
 
     return VKD3D_OK;
