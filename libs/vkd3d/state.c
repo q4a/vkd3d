@@ -3595,7 +3595,6 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         mask |= 1u << e->InputSlot;
     }
     graphics->attribute_count = j;
-    vkd3d_shader_free_shader_signature(&input_signature);
 
     switch (desc->strip_cut_value)
     {
@@ -3661,6 +3660,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     if (FAILED(hr = vkd3d_private_store_init(&state->private_store)))
         goto fail;
 
+    vkd3d_shader_free_shader_signature(&input_signature);
     state->vk_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
     state->implicit_root_signature = NULL;
     d3d12_device_add_ref(state->device = device);
