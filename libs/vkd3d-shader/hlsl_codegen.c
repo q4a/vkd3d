@@ -7880,6 +7880,7 @@ static void sm1_generate_vsir_instr_constant(struct hlsl_ctx *ctx,
 
     src_param = &ins->src[0];
     vsir_register_init(&src_param->reg, VKD3DSPR_CONST, VKD3D_DATA_FLOAT, 1);
+    src_param->reg.dimension = VSIR_DIMENSION_VEC4;
     src_param->reg.idx[0].offset = constant->reg.id;
     src_param->swizzle = generate_vsir_get_src_swizzle(constant->reg.writemask, instr->reg.writemask);
 
@@ -7970,11 +7971,13 @@ static void sm1_generate_vsir_instr_expr_per_component_instr_op(struct hlsl_ctx 
             dst_param = &ins->dst[0];
             vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
             dst_param->reg.idx[0].offset = instr->reg.id;
+            dst_param->reg.dimension = VSIR_DIMENSION_VEC4;
             dst_param->write_mask = 1u << i;
 
             src_param = &ins->src[0];
             vsir_register_init(&src_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
             src_param->reg.idx[0].offset = operand->reg.id;
+            src_param->reg.dimension = VSIR_DIMENSION_VEC4;
             c = vsir_swizzle_get_component(src_swizzle, i);
             src_param->swizzle = vsir_swizzle_from_writemask(1u << c);
         }
@@ -8003,11 +8006,13 @@ static void sm1_generate_vsir_instr_expr_sincos(struct hlsl_ctx *ctx, struct vsi
     {
         src_param = &ins->src[1];
         vsir_register_init(&src_param->reg, VKD3DSPR_CONST, VKD3D_DATA_FLOAT, 1);
+        src_param->reg.dimension = VSIR_DIMENSION_VEC4;
         src_param->reg.idx[0].offset = ctx->d3dsincosconst1.id;
         src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
 
         src_param = &ins->src[2];
         vsir_register_init(&src_param->reg, VKD3DSPR_CONST, VKD3D_DATA_FLOAT, 1);
+        src_param->reg.dimension = VSIR_DIMENSION_VEC4;
         src_param->reg.idx[0].offset = ctx->d3dsincosconst2.id;
         src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
     }
@@ -8332,11 +8337,13 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
     if (type == VKD3DSPR_DEPTHOUT)
     {
         vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 0);
+        dst_param->reg.dimension = VSIR_DIMENSION_SCALAR;
     }
     else
     {
         vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 1);
         dst_param->reg.idx[0].offset = register_index;
+        dst_param->reg.dimension = VSIR_DIMENSION_VEC4;
     }
     dst_param->write_mask = writemask;
 
@@ -8403,6 +8410,7 @@ static void sm1_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx,
     }
 
     vsir_register_init(&src_param->reg, type, VKD3D_DATA_FLOAT, 1);
+    src_param->reg.dimension = VSIR_DIMENSION_VEC4;
     src_param->reg.idx[0].offset = register_index;
     src_param->swizzle = generate_vsir_get_src_swizzle(writemask, dst_writemask);
 
