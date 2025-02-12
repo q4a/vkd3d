@@ -269,15 +269,15 @@ static void shader_glsl_print_register_name(struct vkd3d_string_buffer *buffer,
                 vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
                 break;
             }
-            if (reg->idx[0].rel_addr || reg->idx[2].rel_addr)
+            if (reg->idx[0].rel_addr)
             {
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                         "Internal compiler error: Unhandled constant buffer register indirect addressing.");
                 vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
                 break;
             }
-            vkd3d_string_buffer_printf(buffer, "%s_cb_%u[%u]",
-                    gen->prefix, reg->idx[0].offset, reg->idx[2].offset);
+            vkd3d_string_buffer_printf(buffer, "%s_cb_%u", gen->prefix, reg->idx[0].offset);
+            shader_glsl_print_subscript(buffer, gen, reg->idx[2].rel_addr, reg->idx[2].offset);
             break;
 
         case VKD3DSPR_THREADID:
@@ -485,8 +485,7 @@ static void shader_glsl_print_subscript(struct vkd3d_string_buffer *buffer, stru
     vkd3d_string_buffer_printf(buffer, "[%s", r.str->buffer);
     if (offset)
         vkd3d_string_buffer_printf(buffer, " + %u", offset);
-    else
-        vkd3d_string_buffer_printf(buffer, "]");
+    vkd3d_string_buffer_printf(buffer, "]");
     glsl_src_cleanup(&r, &gen->string_buffers);
 }
 
