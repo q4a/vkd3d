@@ -7869,7 +7869,6 @@ static void sm1_generate_vsir_instr_constant(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_constant *constant)
 {
     struct hlsl_ir_node *instr = &constant->node;
-    struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_instruction *ins;
 
@@ -7884,10 +7883,7 @@ static void sm1_generate_vsir_instr_constant(struct hlsl_ctx *ctx,
     src_param->reg.idx[0].offset = constant->reg.id;
     src_param->swizzle = generate_vsir_get_src_swizzle(constant->reg.writemask, instr->reg.writemask);
 
-    dst_param = &ins->dst[0];
-    vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
-    dst_param->reg.idx[0].offset = instr->reg.id;
-    dst_param->write_mask = instr->reg.writemask;
+    vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
 }
 
 static void sm4_generate_vsir_rasterizer_sample_count(struct hlsl_ctx *ctx,
@@ -7990,7 +7986,6 @@ static void sm1_generate_vsir_instr_expr_sincos(struct hlsl_ctx *ctx, struct vsi
 {
     struct hlsl_ir_node *operand = expr->operands[0].node;
     struct hlsl_ir_node *instr = &expr->node;
-    struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_instruction *ins;
     unsigned int src_count = 0;
@@ -8001,15 +7996,8 @@ static void sm1_generate_vsir_instr_expr_sincos(struct hlsl_ctx *ctx, struct vsi
     if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_SINCOS, 1, src_count)))
         return;
 
-    dst_param = &ins->dst[0];
-    vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
-    dst_param->reg.idx[0].offset = instr->reg.id;
-    dst_param->write_mask = instr->reg.writemask;
-
-    src_param = &ins->src[0];
-    vsir_register_init(&src_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
-    src_param->reg.idx[0].offset = operand->reg.id;
-    src_param->swizzle = generate_vsir_get_src_swizzle(operand->reg.writemask, VKD3DSP_WRITEMASK_ALL);
+    vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
+    vsir_src_from_hlsl_node(&ins->src[0], ctx, operand, VKD3DSP_WRITEMASK_ALL);
 
     if (ctx->profile->major_version < 3)
     {
@@ -8419,7 +8407,6 @@ static void sm1_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
         struct hlsl_ir_load *load)
 {
     struct hlsl_ir_node *instr = &load->node;
-    struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_instruction *ins;
 
     VKD3D_ASSERT(instr->reg.allocated);
@@ -8427,12 +8414,9 @@ static void sm1_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
     if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_MOV, 1, 1)))
         return;
 
-    dst_param = &ins->dst[0];
-    vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
-    dst_param->reg.idx[0].offset = instr->reg.id;
-    dst_param->write_mask = instr->reg.writemask;
+    vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
 
-    sm1_generate_vsir_init_src_param_from_deref(ctx, &ins->src[0], &load->src, dst_param->write_mask,
+    sm1_generate_vsir_init_src_param_from_deref(ctx, &ins->src[0], &load->src, ins->dst[0].write_mask,
             &ins->location);
 }
 
@@ -8443,7 +8427,6 @@ static void sm1_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
     struct hlsl_ir_node *ddx = load->ddx.node;
     struct hlsl_ir_node *ddy = load->ddy.node;
     struct hlsl_ir_node *instr = &load->node;
-    struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_instruction *ins;
     enum vkd3d_shader_opcode opcode;
@@ -8482,10 +8465,7 @@ static void sm1_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
         return;
     ins->flags = flags;
 
-    dst_param = &ins->dst[0];
-    vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
-    dst_param->reg.idx[0].offset = instr->reg.id;
-    dst_param->write_mask = instr->reg.writemask;
+    vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
 
     src_param = &ins->src[0];
     vsir_src_from_hlsl_node(src_param, ctx, coords, VKD3DSP_WRITEMASK_ALL);
@@ -8507,7 +8487,6 @@ static void generate_vsir_instr_swizzle(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_ir_swizzle *swizzle_instr)
 {
     struct hlsl_ir_node *instr = &swizzle_instr->node, *val = swizzle_instr->val.node;
-    struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_instruction *ins;
     uint32_t swizzle;
@@ -8517,11 +8496,7 @@ static void generate_vsir_instr_swizzle(struct hlsl_ctx *ctx,
     if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_MOV, 1, 1)))
         return;
 
-    dst_param = &ins->dst[0];
-    vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, vsir_data_type_from_hlsl_instruction(ctx, instr), 1);
-    dst_param->reg.idx[0].offset = instr->reg.id;
-    dst_param->reg.dimension = VSIR_DIMENSION_VEC4;
-    dst_param->write_mask = instr->reg.writemask;
+    vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
 
     swizzle = hlsl_swizzle_from_writemask(val->reg.writemask);
     swizzle = hlsl_combine_swizzles(swizzle, swizzle_instr->u.vector, instr->data_type->e.numeric.dimx);
@@ -8557,7 +8532,6 @@ static void sm1_generate_vsir_instr_jump(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *condition = jump->condition.node;
     struct hlsl_ir_node *instr = &jump->node;
-    struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_instruction *ins;
 
     if (jump->type == HLSL_IR_JUMP_DISCARD_NEG)
@@ -8565,10 +8539,7 @@ static void sm1_generate_vsir_instr_jump(struct hlsl_ctx *ctx,
         if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_TEXKILL, 1, 0)))
             return;
 
-        dst_param = &ins->dst[0];
-        vsir_register_init(&dst_param->reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
-        dst_param->reg.idx[0].offset = condition->reg.id;
-        dst_param->write_mask = condition->reg.writemask;
+        vsir_dst_from_hlsl_node(&ins->dst[0], ctx, condition);
     }
     else
     {
