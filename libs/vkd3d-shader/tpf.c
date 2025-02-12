@@ -3462,12 +3462,16 @@ static void sm4_write_register_index(const struct tpf_compiler *tpf, const struc
         unsigned int j)
 {
     unsigned int addressing = sm4_get_index_addressing_from_reg(reg, j);
+    const struct vkd3d_shader_register_index *idx = &reg->idx[j];
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
     unsigned int k;
 
+    if (!addressing || (addressing & VKD3D_SM4_ADDRESSING_OFFSET))
+        put_u32(buffer, idx->offset);
+
     if (addressing & VKD3D_SM4_ADDRESSING_RELATIVE)
     {
-        const struct vkd3d_shader_src_param *idx_src = reg->idx[j].rel_addr;
+        const struct vkd3d_shader_src_param *idx_src = idx->rel_addr;
         uint32_t idx_src_token;
 
         VKD3D_ASSERT(idx_src);
@@ -3481,10 +3485,6 @@ static void sm4_write_register_index(const struct tpf_compiler *tpf, const struc
             put_u32(buffer, idx_src->reg.idx[k].offset);
             VKD3D_ASSERT(!idx_src->reg.idx[k].rel_addr);
         }
-    }
-    else
-    {
-        put_u32(tpf->buffer, reg->idx[j].offset);
     }
 }
 
