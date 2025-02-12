@@ -104,11 +104,37 @@ float4 main() : sv_target
 // This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
 static Texture2D tex;
 sampler sam;
-uniform uint i;
 
 float4 main() : sv_target
 {
     float4 unused = tex.Sample(sam, int3(0, 1, 2));
+
+    return 0;
+}
+
+
+[pixel shader fail(sm<6)]
+// This fails, so SM4 resource samples always require a non-static
+// sampler, whether the result is used or not. Unlike the texture which can be
+// static if the result is not used.
+Texture2D tex;
+static sampler sam;
+
+float4 main() : sv_target
+{
+    float4 unused = tex.Sample(sam, float2(0, 0));
+
+    return 0;
+}
+
+
+[pixel shader fail]
+// The sampler can also never be static on SM1 style resource samples.
+static sampler sam;
+
+float4 main() : sv_target
+{
+    float4 unused = tex2D(sam, float2(0, 0));
 
     return 0;
 }
