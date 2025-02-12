@@ -754,7 +754,7 @@ struct vkd3d_descriptor_set_context
     unsigned int uav_counter_index;
     unsigned int push_constant_index;
 
-    struct vk_binding_array *push_descriptor_set;
+    struct vk_binding_array *root_descriptor_set;
     bool push_descriptor;
 };
 
@@ -808,11 +808,11 @@ static struct vk_binding_array *d3d12_root_signature_vk_binding_array_for_type(
 
     if (context->push_descriptor)
     {
-        if (!context->push_descriptor_set)
-            context->push_descriptor_set = d3d12_root_signature_append_vk_binding_array(root_signature,
+        if (!context->root_descriptor_set)
+            context->root_descriptor_set = d3d12_root_signature_append_vk_binding_array(root_signature,
                     descriptor_type, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR, context);
 
-        return context->push_descriptor_set;
+        return context->root_descriptor_set;
     }
 
     current = context->current_binding_array;
@@ -1641,7 +1641,7 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     context.push_descriptor = vk_info->KHR_push_descriptor;
     if (FAILED(hr = d3d12_root_signature_init_root_descriptors(root_signature, desc, &context)))
         goto fail;
-    root_signature->main_set = !!context.push_descriptor_set;
+    root_signature->main_set = !!context.root_descriptor_set;
     context.push_descriptor = false;
 
     if (FAILED(hr = d3d12_root_signature_init_push_constants(root_signature, desc,
