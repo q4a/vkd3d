@@ -8676,6 +8676,10 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
         return;
     }
 
+    program->temp_count = allocate_temp_registers(ctx, entry_func);
+    if (ctx->result)
+        return;
+
     generate_vsir_signature(ctx, program, entry_func);
 
     hlsl_block_init(&block);
@@ -12834,7 +12838,6 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     if (profile->major_version < 4)
     {
         mark_indexable_vars(ctx, entry_func);
-        allocate_temp_registers(ctx, entry_func);
         allocate_const_registers(ctx, entry_func);
         sort_uniforms_by_bind_count(ctx, HLSL_REGSET_SAMPLERS);
         allocate_objects(ctx, entry_func, HLSL_REGSET_SAMPLERS);
