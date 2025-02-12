@@ -187,3 +187,58 @@ float4 main() : sv_target
 [test]
 todo(sm<6) draw quad
 probe (0, 0) rgba (4.0, 4.0, 4.0, 4.0)
+
+[require]
+shader model >= 6.2
+native-16-bit
+
+[srv 0]
+format r32g32b32a32-float
+size (buffer, 1)
+-65536.0 -1.0 1.0 65536.0
+
+[pixel shader]
+Buffer<half4> t : register(t0);
+
+float4 main() : sv_target
+{
+    return t[0];
+}
+
+[test]
+draw quad
+probe (0, 0) rgba(-65504.0, -1.0, 1.0, 65504.0)
+
+[srv 0]
+format r32g32b32a32-sint
+size (buffer, 1)
+-65536 -1 1 65536
+
+[pixel shader]
+Buffer<int16_t4> t : register(t0);
+
+int4 main() : sv_target
+{
+    return t[0];
+}
+
+[test]
+draw quad
+probe (0, 0) rgbai(-32768, -1, 1, 32767)
+
+[srv 0]
+format r32g32b32a32-uint
+size (buffer, 1)
+0 1 0x10000 0xfffffffe
+
+[pixel shader]
+Buffer<uint16_t4> t : register(t0);
+
+uint4 main() : sv_target
+{
+    return t[0];
+}
+
+[test]
+draw quad
+probe (0, 0) rgbaui(0, 1, 0xffff, 0xffff)
