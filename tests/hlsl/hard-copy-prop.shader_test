@@ -74,3 +74,115 @@ probe (0, 0) rgba (1.0, 4.0, 0.0, 0.0)
 uniform 0 float 1.0
 todo(sm<4) draw quad
 probe (0, 0) rgba (1.0, 40.0, 0.0, 0.0)
+
+[pixel shader]
+float x[6];
+float y[3];
+uint4 i;
+
+float4 main() : sv_target
+{
+    float4 r;
+    float z[3][2];
+
+    z[0][0] = x[0];
+    z[1][0] = x[1];
+    z[2][0] = x[2];
+    z[0][1] = x[1];
+    z[1][1] = x[3];
+    z[2][1] = x[5];
+
+    r.x = z[i.x][0];
+    r.y = z[i.y][1];
+
+    z[0][1] = y[2];
+    z[1][1] = y[1];
+    z[2][1] = y[0];
+
+    r.z = z[i.z][1];
+
+    z[2][0] = x[1];
+    z[2][1] = x[5];
+
+    r.w = z[2][i.w];
+
+    return r;
+}
+
+[test]
+uniform 0  float 1.0
+uniform 4  float 2.0
+uniform 8  float 3.0
+uniform 12 float 4.0
+uniform 16 float 5.0
+uniform 20 float 6.0
+uniform 24 float -1.0
+uniform 28 float -2.0
+uniform 32 float -3.0
+if(sm<4)  uniform 36 float4 0 1 2 0
+if(sm>=4) uniform 36 uint4  0 1 2 0
+todo(msl) draw quad
+probe (0, 0) rgba(1.0, 4.0, -1.0, 2.0)
+if(sm<4)  uniform 36 float4 2 0 1 1
+if(sm>=4) uniform 36 uint4  2 0 1 1
+todo(msl) draw quad
+probe (0, 0) rgba(3.0, 2.0, -2.0, 6.0)
+
+[pixel shader]
+float x[4];
+uint4 i;
+
+float4 main() : sv_target
+{
+    float y[2][2];
+
+    y[0][0] = x[0 + 2*0];
+    y[0][1] = x[0 + 2*1];
+    y[1][0] = x[1 + 2*0];
+    y[1][1] = x[1 + 2*1];
+
+    return y[i.x][i.y];
+}
+
+[test]
+uniform 0  float 1.0
+uniform 4  float 2.0
+uniform 8  float 3.0
+uniform 12 float 4.0
+if(sm<4)  uniform 16 float4 0 1 0 0
+if(sm>=4) uniform 16 uint4  0 1 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(3.0, 3.0, 3.0, 3.0)
+if(sm<4)  uniform 16 float4 1 1 0 0
+if(sm>=4) uniform 16 uint4  1 1 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(4.0, 4.0, 4.0, 4.0)
+
+% Copy-prop is currently unable to propagate the following,
+% as structs don't yet support dynamic indexing.
+[pixel shader]
+struct s
+{
+    float4 a, b;
+};
+
+struct s x;
+uint4 i;
+
+float4 main() : sv_target
+{
+    float4 y[2] = {x.a, x.b};
+    return y[i.x];
+}
+
+[test]
+uniform 0 float4 2.0 2.0 2.0 2.0
+uniform 4 float4 3.0 3.0 3.0 3.0
+if(sm<4)  uniform 8 float4 0 0 0 0
+if(sm>=4) uniform 8 uint4  0 0 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+if(sm<4)  uniform 8 float4 1 0 0 0
+if(sm>=4) uniform 8 uint4  1 0 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(3.0, 3.0, 3.0, 3.0)

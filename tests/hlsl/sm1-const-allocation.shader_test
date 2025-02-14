@@ -410,3 +410,32 @@ probe (0, 0) rgba (3, 3, 3, 3)
 uniform 20 float 1
 draw quad
 probe (0, 0) rgba (1, 1, 1, 1)
+
+[pixel shader]
+float xs[2][2];
+float idx;
+
+float4 main() : sv_target
+{
+    float y[2] = {xs[0][1], xs[1][0]};
+    return y[idx];
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   xs           c0       3
+//   idx          c3       1
+//
+
+
+[test]
+uniform 0 float 0
+uniform 4 float 1
+uniform 8 float 2
+uniform 12 float 0
+draw quad
+probe (0, 0) rgba(1, 1, 1, 1)
+uniform 12 float 1
+draw quad
+probe (0, 0) rgba(2, 2, 2, 2)

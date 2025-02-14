@@ -222,6 +222,24 @@ if(sm>=4) uniform 0 float4 13 10 0 0
 todo(msl) draw quad
 probe (0, 0) rgba (9, 9, 9, 9)
 
+[pixel shader]
+uniform float4x2 m[2];
+uniform int4 i;
+
+float4 main() : sv_target
+{
+    return float4(m[i.x][0], m[i.y][1]);
+}
+
+[test]
+uniform 0  float4  1.0  2.0  3.0  4.0
+uniform 4  float4  5.0  6.0  7.0  8.0
+uniform 8  float4 -1.0 -2.0 -3.0 -4.0
+uniform 12 float4 -5.0 -6.0 -7.0 -8.0
+if(sm<4)  uniform 16 float4 1 0 0 0
+if(sm>=4) uniform 16 int4   1 0 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(-1.0, -5.0, 2.0, 6.0)
 
 % SM1 doesn't support relative addressing if it is used in a l-value.
 [require]
