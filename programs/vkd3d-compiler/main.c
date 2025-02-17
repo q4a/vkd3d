@@ -152,6 +152,19 @@ target_type_info[] =
         false},
 };
 
+static const struct target_type_info *get_target_type_info(enum vkd3d_shader_target_type type)
+{
+    size_t i;
+
+    for (i = 0; i < ARRAY_SIZE(target_type_info); ++i)
+    {
+        if (type == target_type_info[i].type)
+            return &target_type_info[i];
+    }
+
+    return NULL;
+}
+
 static bool read_shader(struct vkd3d_shader_code *shader, FILE *f)
 {
     size_t size = 4096;
@@ -278,7 +291,7 @@ struct options
     const char *entry_point;
     const char *profile;
     enum vkd3d_shader_source_type source_type;
-    enum vkd3d_shader_target_type target_type;
+    const struct target_type_info *target_type;
     bool preprocess_only;
     bool print_help;
     bool print_version;
@@ -445,17 +458,17 @@ static enum vkd3d_shader_source_type parse_source_type(const char *source)
     return VKD3D_SHADER_SOURCE_NONE;
 }
 
-static enum vkd3d_shader_target_type parse_target_type(const char *target)
+static const struct target_type_info *parse_target_type(const char *target)
 {
     unsigned int i;
 
     for (i = 0; i < ARRAY_SIZE(target_type_info); ++i)
     {
         if (!strcmp(target, target_type_info[i].name))
-            return target_type_info[i].type;
+            return &target_type_info[i];
     }
 
-    return VKD3D_SHADER_TARGET_NONE;
+    return NULL;
 }
 
 static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source, struct vkd3d_shader_code *code,
@@ -490,17 +503,6 @@ static const struct source_type_info *get_source_type_info(enum vkd3d_shader_sou
     for (i = 0; i < ARRAY_SIZE(source_type_info); ++i)
         if (type == source_type_info[i].type)
             return &source_type_info[i];
-
-    return NULL;
-}
-
-static const struct target_type_info *get_target_type_info(enum vkd3d_shader_target_type type)
-{
-    unsigned int i;
-
-    for (i = 0; i < ARRAY_SIZE(target_type_info); ++i)
-        if (type == target_type_info[i].type)
-            return &target_type_info[i];
 
     return NULL;
 }
@@ -553,7 +555,6 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     memset(options, 0, sizeof(*options));
     options->source_type = VKD3D_SHADER_SOURCE_NONE;
-    options->target_type = VKD3D_SHADER_TARGET_NONE;
     options->formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
             | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
 
@@ -565,7 +566,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         switch (option)
         {
             case 'b':
-                if ((options->target_type = parse_target_type(optarg)) == VKD3D_SHADER_TARGET_NONE)
+                if (!(options->target_type = parse_target_type(optarg)))
                 {
                     fprintf(stderr, "Invalid target type '%s' specified.\n", optarg);
                     return false;
@@ -862,14 +863,13 @@ int main(int argc, char **argv)
         }
     }
 
-    if (options.target_type == VKD3D_SHADER_TARGET_NONE && !options.preprocess_only)
-        options.target_type = get_source_type_info(options.source_type)->default_target_type;
+    if (!options.target_type && !options.preprocess_only)
+        options.target_type = get_target_type_info(get_source_type_info(options.source_type)->default_target_type);
 
-    if (!options.preprocess_only && !validate_target_type(options.source_type, options.target_type))
+    if (!options.preprocess_only && !validate_target_type(options.source_type, options.target_type->type))
     {
         fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
-                get_target_type_info(options.target_type)->name,
-                get_source_type_info(options.source_type)->name);
+                options.target_type->name, get_source_type_info(options.source_type)->name);
         goto done;
     }
 
@@ -896,7 +896,7 @@ int main(int argc, char **argv)
         if (options.preprocess_only)
             is_binary = get_source_type_info(options.source_type)->is_binary;
         else
-            is_binary = get_target_type_info(options.target_type)->is_binary;
+            is_binary = options.target_type->is_binary;
 
         if (is_binary)
         {
@@ -910,15 +910,15 @@ int main(int argc, char **argv)
         options.formatting |= VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR;
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, options.formatting);
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_14);
-    if (options.target_type == VKD3D_SHADER_TARGET_SPIRV_BINARY
-            || options.target_type == VKD3D_SHADER_TARGET_SPIRV_TEXT)
+    if (options.target_type->type == VKD3D_SHADER_TARGET_SPIRV_BINARY
+            || options.target_type->type == VKD3D_SHADER_TARGET_SPIRV_TEXT)
         add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FEATURE,
                 VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64 | VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64);
 
     info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     info.next = &hlsl_source_info;
     info.source_type = options.source_type;
-    info.target_type = options.target_type;
+    info.target_type = options.target_type->type;
     info.options = options.compile_options;
     info.option_count = options.compile_option_count;
     info.log_level = VKD3D_SHADER_LOG_INFO;
