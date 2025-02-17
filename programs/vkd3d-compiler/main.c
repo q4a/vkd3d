@@ -91,6 +91,7 @@ static const struct source_type_info
     const char *description;
     bool is_binary;
     enum vkd3d_shader_target_type default_target_type;
+    uint32_t dxbc_tag;
 }
 source_type_info[] =
 {
@@ -112,6 +113,9 @@ source_type_info[] =
     {VKD3D_SHADER_SOURCE_FX,
         "fx",           "Raw effect binary section. This type includes fx_2_0 and fx_4+ formats.\n",
         true, VKD3D_SHADER_TARGET_D3D_ASM},
+    {VKD3D_SHADER_SOURCE_FX,
+        "dxbc-fx",      "An effect binary embedded in a DXBC container.\n",
+        true, VKD3D_SHADER_TARGET_D3D_ASM, TAG_FX10},
 };
 
 static const struct target_type_info
@@ -500,7 +504,7 @@ static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source,
 
     if ((ret = vkd3d_shader_locate_dxbc_section(source, TAG_FX10, code, &messages)) >= 0)
     {
-        *source_type = get_source_type_info(VKD3D_SHADER_SOURCE_FX);
+        *source_type = parse_source_type("dxbc-fx");
         return true;
     }
 
@@ -690,17 +694,22 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 static void print_source_types(void)
 {
     const enum vkd3d_shader_source_type *source_types;
-    unsigned int count, i;
+    unsigned int count, i, j;
 
     source_types = vkd3d_shader_get_supported_source_types(&count);
     fputs("Supported source types:\n", stdout);
     for (i = 0; i < count; ++i)
     {
-        const struct source_type_info *type = get_source_type_info(source_types[i]);
-        if (type)
-            fprintf(stdout, "  %-12s  %s", type->name, type->description);
-    }
+        for (j = 0; j < ARRAY_SIZE(source_type_info); ++j)
+        {
+            const struct source_type_info *type = &source_type_info[j];
 
+            if (type->type != source_types[i])
+                continue;
+
+            fprintf(stdout, "  %-12s  %s", type->name, type->description);
+        }
+    }
 }
 
 static void print_target_types(const struct source_type_info *source_type)
@@ -861,6 +870,19 @@ int main(int argc, char **argv)
                 options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_FX);
             else
                 options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_HLSL);
+        }
+    }
+    else if (options.source_type->dxbc_tag)
+    {
+        if ((ret = vkd3d_shader_locate_dxbc_section(&source,
+                options.source_type->dxbc_tag, &info.source, &messages)) < 0)
+        {
+            fprintf(stderr, "Failed to locate dxbc section for source type '%s', ret %d.\n",
+                    options.source_type->name, ret);
+            if (messages)
+                fputs(messages, stderr);
+            vkd3d_shader_free_messages(messages);
+            goto done;
         }
     }
 
