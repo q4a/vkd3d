@@ -152,6 +152,19 @@ target_type_info[] =
         false},
 };
 
+static const struct source_type_info *get_source_type_info(enum vkd3d_shader_source_type type)
+{
+    size_t i;
+
+    for (i = 0; i < ARRAY_SIZE(source_type_info); ++i)
+    {
+        if (type == source_type_info[i].type)
+            return &source_type_info[i];
+    }
+
+    return NULL;
+}
+
 static const struct target_type_info *get_target_type_info(enum vkd3d_shader_target_type type)
 {
     size_t i;
@@ -290,7 +303,7 @@ struct options
     const char *output_filename;
     const char *entry_point;
     const char *profile;
-    enum vkd3d_shader_source_type source_type;
+    const struct source_type_info *source_type;
     const struct target_type_info *target_type;
     bool preprocess_only;
     bool print_help;
@@ -442,20 +455,20 @@ static bool parse_matrix_storage_order(enum vkd3d_shader_compile_option_pack_mat
     return false;
 }
 
-static enum vkd3d_shader_source_type parse_source_type(const char *source)
+static const struct source_type_info *parse_source_type(const char *source)
 {
     unsigned int i;
 
     if (!strcmp(source, "none"))
-        return VKD3D_SHADER_SOURCE_DXBC_TPF;
+        return get_source_type_info(VKD3D_SHADER_SOURCE_DXBC_TPF);
 
     for (i = 0; i < ARRAY_SIZE(source_type_info); ++i)
     {
         if (!strcmp(source, source_type_info[i].name))
-            return source_type_info[i].type;
+            return &source_type_info[i];
     }
 
-    return VKD3D_SHADER_SOURCE_NONE;
+    return NULL;
 }
 
 static const struct target_type_info *parse_target_type(const char *target)
@@ -471,21 +484,23 @@ static const struct target_type_info *parse_target_type(const char *target)
     return NULL;
 }
 
-static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source, struct vkd3d_shader_code *code,
-        enum vkd3d_shader_source_type *type)
+static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source,
+        struct vkd3d_shader_code *code, const struct source_type_info **source_type)
 {
+    enum vkd3d_shader_source_type type;
     char *messages;
     int ret;
 
-    if ((ret = vkd3d_shader_parse_dxbc_source_type(source, type, NULL)) >= 0)
+    if ((ret = vkd3d_shader_parse_dxbc_source_type(source, &type, NULL)) >= 0)
     {
+        *source_type = get_source_type_info(type);
         *code = *source;
         return true;
     }
 
     if ((ret = vkd3d_shader_locate_dxbc_section(source, TAG_FX10, code, &messages)) >= 0)
     {
-        *type = VKD3D_SHADER_SOURCE_FX;
+        *source_type = get_source_type_info(VKD3D_SHADER_SOURCE_FX);
         return true;
     }
 
@@ -494,17 +509,6 @@ static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source, struc
         fputs(messages, stderr);
     vkd3d_shader_free_messages(messages);
     return false;
-}
-
-static const struct source_type_info *get_source_type_info(enum vkd3d_shader_source_type type)
-{
-    unsigned int i;
-
-    for (i = 0; i < ARRAY_SIZE(source_type_info); ++i)
-        if (type == source_type_info[i].type)
-            return &source_type_info[i];
-
-    return NULL;
 }
 
 static bool validate_target_type(
@@ -554,7 +558,6 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     };
 
     memset(options, 0, sizeof(*options));
-    options->source_type = VKD3D_SHADER_SOURCE_NONE;
     options->formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
             | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
 
@@ -663,7 +666,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 return true;
 
             case 'x':
-                if ((options->source_type = parse_source_type(optarg)) == VKD3D_SHADER_SOURCE_NONE)
+                if (!(options->source_type = parse_source_type(optarg)))
                 {
                     fprintf(stderr, "Invalid source type '%s' specified.\n", optarg);
                     return false;
@@ -700,22 +703,20 @@ static void print_source_types(void)
 
 }
 
-static void print_target_types(enum vkd3d_shader_source_type source_type)
+static void print_target_types(const struct source_type_info *source_type)
 {
-    const struct source_type_info *source_info = get_source_type_info(source_type);
     const enum vkd3d_shader_target_type *target_types;
-    const char *source_type_name = source_info->name;
     unsigned int count, i;
 
-    target_types = vkd3d_shader_get_supported_target_types(source_type, &count);
-    fprintf(stdout, "Supported target types for source type '%s':\n", source_type_name);
+    target_types = vkd3d_shader_get_supported_target_types(source_type->type, &count);
+    fprintf(stdout, "Supported target types for source type '%s':\n", source_type->name);
     for (i = 0; i < count; ++i)
     {
         const struct target_type_info *type = get_target_type_info(target_types[i]);
         if (type)
             fprintf(stdout, "  %-12s  %s", type->name, type->description);
     }
-    printf("The default target type is '%s'.\n", get_target_type_info(source_info->default_target_type)->name);
+    printf("The default target type is '%s'.\n", get_target_type_info(source_type->default_target_type)->name);
 }
 
 static FILE *open_input(const char *filename, bool *close)
@@ -817,7 +818,7 @@ int main(int argc, char **argv)
 
     if (options.print_target_types)
     {
-        if (options.source_type == VKD3D_SHADER_SOURCE_NONE)
+        if (!options.source_type)
         {
             fprintf(stderr, "--print-target-types requires an explicitly specified source type.\n");
             goto done;
@@ -838,13 +839,13 @@ int main(int argc, char **argv)
     }
 
     info.source = source;
-    if (options.source_type == VKD3D_SHADER_SOURCE_NONE)
+    if (!options.source_type)
     {
         uint32_t token;
 
         if (options.preprocess_only || source.size < sizeof(token))
         {
-            options.source_type = VKD3D_SHADER_SOURCE_HLSL;
+            options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_HLSL);
         }
         else
         {
@@ -855,31 +856,31 @@ int main(int argc, char **argv)
                     goto done;
             }
             else if ((token & 0xfffe0000) == 0xfffe0000)
-                options.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+                options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_D3D_BYTECODE);
             else if ((token & 0xffff0000) == 0xfeff0000)
-                options.source_type = VKD3D_SHADER_SOURCE_FX;
+                options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_FX);
             else
-                options.source_type = VKD3D_SHADER_SOURCE_HLSL;
+                options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_HLSL);
         }
     }
 
     if (!options.target_type && !options.preprocess_only)
-        options.target_type = get_target_type_info(get_source_type_info(options.source_type)->default_target_type);
+        options.target_type = get_target_type_info(options.source_type->default_target_type);
 
-    if (!options.preprocess_only && !validate_target_type(options.source_type, options.target_type->type))
+    if (!options.preprocess_only && !validate_target_type(options.source_type->type, options.target_type->type))
     {
         fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
-                options.target_type->name, get_source_type_info(options.source_type)->name);
+                options.target_type->name, options.source_type->name);
         goto done;
     }
 
-    if (!options.preprocess_only && options.source_type == VKD3D_SHADER_SOURCE_HLSL && !options.profile)
+    if (!options.preprocess_only && options.source_type->type == VKD3D_SHADER_SOURCE_HLSL && !options.profile)
     {
         fprintf(stderr, "You need to specify a profile when compiling from HLSL source.\n");
         goto done;
     }
 
-    if (!options.filename && get_source_type_info(options.source_type)->is_binary && isatty(fileno(input)))
+    if (!options.filename && options.source_type->is_binary && isatty(fileno(input)))
     {
         fprintf(stderr, "Input is a tty and input format is binary, exiting.\n"
                 "If this is really what you intended, specify the input explicitly.\n");
@@ -894,7 +895,7 @@ int main(int argc, char **argv)
         bool is_binary;
 
         if (options.preprocess_only)
-            is_binary = get_source_type_info(options.source_type)->is_binary;
+            is_binary = options.source_type->is_binary;
         else
             is_binary = options.target_type->is_binary;
 
@@ -917,7 +918,7 @@ int main(int argc, char **argv)
 
     info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     info.next = &hlsl_source_info;
-    info.source_type = options.source_type;
+    info.source_type = options.source_type->type;
     info.target_type = options.target_type->type;
     info.options = options.compile_options;
     info.option_count = options.compile_option_count;
