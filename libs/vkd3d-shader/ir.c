@@ -1523,6 +1523,8 @@ static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_pro
     flattener.phase = VKD3DSIH_INVALID;
     for (i = 0, locations.count = 0; i < instructions->count; ++i)
         flattener_eliminate_phase_related_dcls(&flattener, i, &locations);
+    bitmap_clear(program->io_dcls, VKD3DSPR_FORKINSTID);
+    bitmap_clear(program->io_dcls, VKD3DSPR_JOININSTID);
 
     if ((result = flattener_flatten_phases(&flattener, &locations)) < 0)
         return result;
