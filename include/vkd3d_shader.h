@@ -540,6 +540,8 @@ enum vkd3d_shader_fog_fragment_mode
      *     k = 1 / (end - start)
      */
     VKD3D_SHADER_FOG_FRAGMENT_LINEAR = 0x3,
+
+    VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_FOG_FRAGMENT_MODE),
 };
 
 /**
@@ -577,6 +579,8 @@ enum vkd3d_shader_fog_source
      * shader.
      */
     VKD3D_SHADER_FOG_SOURCE_W = 0x3,
+
+    VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_FOG_SOURCE),
 };
 
 /**
@@ -1116,6 +1120,8 @@ enum vkd3d_shader_d3dbc_constant_register
     VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER    = 0x1,
     /** The boolean constant register set, b# in Direct3D assembly. */
     VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER   = 0x2,
+
+    VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_D3DBC_CONSTANT_REGISTER),
 };
 
 /**
