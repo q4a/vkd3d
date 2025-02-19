@@ -254,7 +254,7 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
 
     const struct vkd3d_shader_compile_option options[] =
     {
-        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_13},
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_15},
         {VKD3D_SHADER_COMPILE_OPTION_FEATURE, shader_runner_caps_get_feature_flags(&runner->caps)},
     };
 
