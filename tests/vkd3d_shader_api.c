@@ -904,11 +904,23 @@ static void test_scan_signatures(void)
         rc = vkd3d_shader_scan(&compile_info, NULL);
         ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
 
-        todo ok(signature_info.input.element_count == dxil_tests[i].input_count,
+        ok(signature_info.input.element_count == dxil_tests[i].input_count,
                 "Got input count %u.\n", signature_info.input.element_count);
+        for (j = 0; j < signature_info.input.element_count; ++j)
+        {
+            vkd3d_test_push_context("input %u", j);
+            check_signature_element(&signature_info.input.elements[j], &dxil_tests[i].inputs[j]);
+            vkd3d_test_pop_context();
+        }
 
-        todo ok(signature_info.output.element_count == dxil_tests[i].output_count,
+        ok(signature_info.output.element_count == dxil_tests[i].output_count,
                 "Got output count %u.\n", signature_info.output.element_count);
+        for (j = 0; j < signature_info.output.element_count; ++j)
+        {
+            vkd3d_test_push_context("output %u", j);
+            check_signature_element(&signature_info.output.elements[j], &dxil_tests[i].outputs[j]);
+            vkd3d_test_pop_context();
+        }
 
         ok(!signature_info.patch_constant.element_count,
                 "Got patch constant count %u.\n", signature_info.patch_constant.element_count);

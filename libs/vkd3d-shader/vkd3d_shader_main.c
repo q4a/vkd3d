@@ -748,12 +748,20 @@ void vkd3d_shader_free_messages(char *messages)
 static bool vkd3d_shader_signature_from_shader_signature(struct vkd3d_shader_signature *signature,
         const struct shader_signature *src)
 {
-    unsigned int i;
+    struct vkd3d_shader_signature_element *d;
+    const struct signature_element *e;
+    size_t count, i, j;
 
-    signature->element_count = src->element_count;
+    for (i = 0, count = 0; i < src->element_count; ++i)
+    {
+        e = &src->elements[i];
+        count += e->register_count;
+    }
+
+    signature->element_count = count;
     if (!src->elements)
     {
-        VKD3D_ASSERT(!signature->element_count);
+        VKD3D_ASSERT(!count);
         signature->elements = NULL;
         return true;
     }
@@ -761,30 +769,25 @@ static bool vkd3d_shader_signature_from_shader_signature(struct vkd3d_shader_sig
     if (!(signature->elements = vkd3d_calloc(signature->element_count, sizeof(*signature->elements))))
         return false;
 
-    for (i = 0; i < signature->element_count; ++i)
+    for (i = 0, d = signature->elements; i < src->element_count; ++i)
     {
-        struct vkd3d_shader_signature_element *d = &signature->elements[i];
-        struct signature_element *e = &src->elements[i];
-
-        if (!(d->semantic_name = vkd3d_strdup(e->semantic_name)))
+        for (j = 0, e = &src->elements[i]; j < e->register_count; ++j)
         {
-            for (unsigned int j = 0; j < i; ++j)
+            if (!(d->semantic_name = vkd3d_strdup(e->semantic_name)))
             {
-                vkd3d_free((void *)signature->elements[j].semantic_name);
+                vkd3d_shader_free_shader_signature(signature);
+                return false;
             }
-            vkd3d_free(signature->elements);
-            return false;
+            d->semantic_index = e->semantic_index + j;
+            d->stream_index = e->stream_index;
+            d->sysval_semantic = e->sysval_semantic;
+            d->component_type = e->component_type;
+            d->register_index = e->register_index + j;
+            d->mask = e->mask;
+            d->used_mask = e->used_mask;
+            d->min_precision = e->min_precision;
+            ++d;
         }
-        d->semantic_index = e->semantic_index;
-        d->stream_index = e->stream_index;
-        d->sysval_semantic = e->sysval_semantic;
-        d->component_type = e->component_type;
-        d->register_index = e->register_index;
-        if (e->register_count > 1)
-            FIXME("Arrayed elements are not supported yet.\n");
-        d->mask = e->mask;
-        d->used_mask = e->used_mask;
-        d->min_precision = e->min_precision;
     }
 
     return true;
