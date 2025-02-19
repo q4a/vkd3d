@@ -60,6 +60,8 @@
 #define VKD3D_SPIRV_INSTRUCTION_OP_SHIFT            0u
 #define VKD3D_SPIRV_INSTRUCTION_OP_MASK             (0xffffu << VKD3D_SPIRV_INSTRUCTION_OP_SHIFT)
 
+#define VKD3D_SPIRV_INDENT 15
+
 #ifdef HAVE_SPIRV_TOOLS
 # include "spirv-tools/libspirv.h"
 
@@ -211,6 +213,7 @@ struct spirv_colours
 {
     const char *reset;
     const char *comment;
+    const char *literal;
 };
 
 struct spirv_parser
@@ -238,6 +241,16 @@ static void VKD3D_PRINTF_FUNC(3, 4) spirv_parser_error(struct spirv_parser *pars
     vkd3d_shader_verror(parser->message_context, &parser->location, error, format, args);
     va_end(args);
     parser->failed = true;
+}
+
+static void VKD3D_PRINTF_FUNC(3, 4) spirv_parser_warning(struct spirv_parser *parser,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_vwarning(parser->message_context, &parser->location, error, format, args);
+    va_end(args);
 }
 
 static uint32_t spirv_parser_read_u32(struct spirv_parser *parser)
@@ -288,6 +301,13 @@ static void spirv_parser_print_generator(struct spirv_parser *parser, uint32_t m
         spirv_parser_print_comment(parser, "Generator: %s; %u", name, version);
     else
         spirv_parser_print_comment(parser, "Generator: Unknown (%#x); %u", id, version);
+}
+
+static void spirv_parser_print_immediate_word(struct spirv_parser *parser,
+        struct vkd3d_string_buffer *buffer, const char *prefix, uint32_t w, const char *suffix)
+{
+    vkd3d_string_buffer_printf(buffer, "%s!%s0x%08x%s%s",
+            prefix, parser->colours.literal, w, parser->colours.reset, suffix);
 }
 
 static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
@@ -359,7 +379,6 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
 
 static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *parser)
 {
-    struct vkd3d_string_buffer *buffer;
     uint16_t op, count;
     unsigned int i;
     uint32_t word;
@@ -375,17 +394,18 @@ static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *par
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
+    if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT)
+        vkd3d_string_buffer_printf(parser->text, "%*s", VKD3D_SPIRV_INDENT, "");
+    spirv_parser_print_immediate_word(parser, parser->text, "", word, "");
+
     --count;
-    buffer = vkd3d_string_buffer_get(&parser->string_buffers);
     for (i = 0; i < count; ++i)
     {
-        word = spirv_parser_read_u32(parser);
-        vkd3d_string_buffer_printf(buffer, " 0x%08x", word);
+        spirv_parser_print_immediate_word(parser, parser->text, " ", spirv_parser_read_u32(parser), "");
     }
-    spirv_parser_print_comment(parser, "<unrecognised instruction %#x>%s", op, buffer->buffer);
-    vkd3d_string_buffer_release(&parser->string_buffers, buffer);
+    vkd3d_string_buffer_printf(parser->text, "\n");
 
-    spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+    spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
             "Unrecognised instruction %#x.", op);
 
     return VKD3D_OK;
@@ -441,11 +461,13 @@ static enum vkd3d_result spirv_parser_init(struct spirv_parser *parser, const st
     {
         .reset = "",
         .comment = "",
+        .literal = "",
     };
     static const struct spirv_colours colours =
     {
         .reset = "\x1b[m",
         .comment = "\x1b[36m",
+        .literal = "\x1b[95m",
     };
 
     memset(parser, 0, sizeof(*parser));
