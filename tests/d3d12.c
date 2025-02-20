@@ -3491,7 +3491,6 @@ static void test_create_graphics_pipeline_state(void)
     pso_desc.VS = shader_bytecode(vs_with_rs_code, sizeof(vs_with_rs_code));
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
-    todo
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12PipelineState_Release(pipeline_state);
@@ -3501,7 +3500,6 @@ static void test_create_graphics_pipeline_state(void)
     pso_desc.PS = shader_bytecode(ps_with_rs_code, sizeof(ps_with_rs_code));
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
-    todo
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12PipelineState_Release(pipeline_state);
@@ -3512,7 +3510,6 @@ static void test_create_graphics_pipeline_state(void)
     pso_desc.PS = shader_bytecode(ps_with_rs_code, sizeof(ps_with_rs_code));
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
-    todo
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12PipelineState_Release(pipeline_state);

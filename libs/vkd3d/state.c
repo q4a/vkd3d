@@ -3206,7 +3206,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     struct vkd3d_shader_spirv_target_info ps_target_info;
     struct vkd3d_shader_interface_info shader_interface;
     struct vkd3d_shader_spirv_target_info target_info;
-    const struct d3d12_root_signature *root_signature;
+    struct d3d12_root_signature *root_signature;
     bool have_attachment, is_dsv_format_unknown;
     VkShaderStageFlagBits xfb_stage = 0;
     VkSampleCountFlagBits sample_count;
@@ -3261,10 +3261,25 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         }
     }
 
+    state->implicit_root_signature = NULL;
     if (!(root_signature = unsafe_impl_from_ID3D12RootSignature(desc->root_signature)))
     {
-        WARN("Root signature is NULL.\n");
-        return E_INVALIDARG;
+        TRACE("Root signature is NULL, looking for an embedded signature in the vertex shader.\n");
+        if (FAILED(hr = d3d12_root_signature_create(device,
+                desc->vs.pShaderBytecode, desc->vs.BytecodeLength, &root_signature))
+                && FAILED(hr = d3d12_root_signature_create(device,
+                desc->ps.pShaderBytecode, desc->ps.BytecodeLength, &root_signature))
+                && FAILED(hr = d3d12_root_signature_create(device,
+                desc->ds.pShaderBytecode, desc->ds.BytecodeLength, &root_signature))
+                && FAILED(hr = d3d12_root_signature_create(device,
+                desc->hs.pShaderBytecode, desc->hs.BytecodeLength, &root_signature))
+                && FAILED(hr = d3d12_root_signature_create(device,
+                desc->gs.pShaderBytecode, desc->gs.BytecodeLength, &root_signature)))
+        {
+            WARN("Failed to find an embedded root signature, hr %s.\n", debugstr_hresult(hr));
+            goto fail;
+        }
+        state->implicit_root_signature = &root_signature->ID3D12RootSignature_iface;
     }
 
     sample_count = vk_samples_from_dxgi_sample_desc(&desc->sample_desc);
@@ -3711,12 +3726,14 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
 
     vkd3d_shader_free_scan_signature_info(&signature_info);
     state->vk_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    state->implicit_root_signature = NULL;
     d3d12_device_add_ref(state->device = device);
 
     return S_OK;
 
 fail:
+    if (state->implicit_root_signature)
+        ID3D12RootSignature_Release(state->implicit_root_signature);
+
     for (i = 0; i < graphics->stage_count; ++i)
     {
         VK_CALL(vkDestroyShaderModule(device->vk_device, state->u.graphics.stages[i].module, NULL));
