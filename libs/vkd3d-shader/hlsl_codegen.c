@@ -5656,6 +5656,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
                 unsigned int writemask = hlsl_combine_writemasks(available_writemask,
                         vkd3d_write_mask_from_component_count(reg_size));
 
+                ret.type = VKD3DSPR_TEMP;
                 ret.id = reg_idx;
                 ret.writemask = hlsl_combine_writemasks(writemask,
                         vkd3d_write_mask_from_component_count(component_count));
@@ -5666,6 +5667,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
         }
     }
 
+    ret.type = VKD3DSPR_TEMP;
     ret.id = allocator->reg_count;
     ret.writemask = vkd3d_write_mask_from_component_count(component_count);
     record_allocation(ctx, allocator, allocator->reg_count,
@@ -5692,6 +5694,7 @@ static struct hlsl_reg allocate_register_with_masks(struct hlsl_ctx *ctx,
 
     record_allocation(ctx, allocator, reg_idx, reg_writemask, first_write, last_read, mode, vip);
 
+    ret.type = VKD3DSPR_TEMP;
     ret.id = reg_idx;
     ret.allocation_size = 1;
     ret.writemask = writemask;
@@ -5737,6 +5740,7 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct register_allo
         record_allocation(ctx, allocator, reg_idx + (reg_size / 4),
                 (1u << (reg_size % 4)) - 1, first_write, last_read, mode, vip);
 
+    ret.type = VKD3DSPR_TEMP;
     ret.id = reg_idx;
     ret.allocation_size = align(reg_size, 4) / 4;
     ret.allocated = true;
@@ -5757,10 +5761,18 @@ static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx,
         return allocate_range(ctx, allocator, first_write, last_read, reg_size, 0, false);
 }
 
-static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
+static const char *debug_register(struct hlsl_reg reg, const struct hlsl_type *type)
 {
     static const char writemask_offset[] = {'w','x','y','z'};
     unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
+    char class = 'r';
+
+    if (reg.type == VKD3DSPR_CONST)
+        class = 'c';
+    else if (reg.type == VKD3DSPR_INPUT)
+        class = 'v';
+    else if (reg.type == VKD3DSPR_OUTPUT)
+        class = 'o';
 
     if (reg_size > 4 && !hlsl_type_is_patch_array(type))
     {
@@ -5941,7 +5953,7 @@ static void allocate_instr_temp_register(struct hlsl_ctx *ctx,
                 instr->index, instr->last_read, instr->data_type);
 
     TRACE("Allocated anonymous expression @%u to %s (liveness %u-%u).\n", instr->index,
-            debug_register('r', instr->reg, instr->data_type), instr->index, instr->last_read);
+            debug_register(instr->reg, instr->data_type), instr->index, instr->last_read);
 }
 
 static void allocate_variable_temp_register(struct hlsl_ctx *ctx,
@@ -5966,8 +5978,8 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx,
             var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, allocator,
                     var->first_write, var->last_read, var->data_type);
 
-            TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name, debug_register('r',
-                    var->regs[HLSL_REGSET_NUMERIC], var->data_type), var->first_write, var->last_read);
+            TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name,
+                    debug_register(var->regs[HLSL_REGSET_NUMERIC], var->data_type), var->first_write, var->last_read);
         }
     }
 }
@@ -6051,6 +6063,7 @@ static bool find_constant(struct hlsl_ctx *ctx, const float *f, unsigned int cou
             if ((reg->allocated_mask & writemask) == writemask
                     && !memcmp(f, &reg->value.f[j], count * sizeof(float)))
             {
+                ret->type = VKD3DSPR_CONST;
                 ret->id = reg->index;
                 ret->allocation_size = 1;
                 ret->writemask = writemask;
@@ -6144,12 +6157,13 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                 if (find_constant(ctx, f, type->e.numeric.dimx, &constant->reg))
                 {
                     TRACE("Reusing already allocated constant %s for @%u.\n",
-                            debug_register('c', constant->reg, type), instr->index);
+                            debug_register(constant->reg, type), instr->index);
                     break;
                 }
 
                 constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
-                TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
+                constant->reg.type = VKD3DSPR_CONST;
+                TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register(constant->reg, type));
 
                 for (unsigned int x = 0, i = 0; x < 4; ++x)
                 {
@@ -6246,14 +6260,16 @@ static void allocate_sincos_const_registers(struct hlsl_ctx *ctx, struct hlsl_bl
             type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
 
             ctx->d3dsincosconst1 = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
-            TRACE("Allocated D3DSINCOSCONST1 to %s.\n", debug_register('c', ctx->d3dsincosconst1, type));
+            ctx->d3dsincosconst1.type = VKD3DSPR_CONST;
+            TRACE("Allocated D3DSINCOSCONST1 to %s.\n", debug_register(ctx->d3dsincosconst1, type));
             record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 0, -1.55009923e-06f, &instr->loc);
             record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 1, -2.17013894e-05f, &instr->loc);
             record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 2,  2.60416674e-03f, &instr->loc);
             record_constant(ctx, ctx->d3dsincosconst1.id * 4 + 3,  2.60416680e-04f, &instr->loc);
 
             ctx->d3dsincosconst2 = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
-            TRACE("Allocated D3DSINCOSCONST2 to %s.\n", debug_register('c', ctx->d3dsincosconst2, type));
+            ctx->d3dsincosconst2.type = VKD3DSPR_CONST;
+            TRACE("Allocated D3DSINCOSCONST2 to %s.\n", debug_register(ctx->d3dsincosconst2, type));
             record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 0, -2.08333340e-02f, &instr->loc);
             record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 1, -1.25000000e-01f, &instr->loc);
             record_constant(ctx, ctx->d3dsincosconst2.id * 4 + 2,  1.00000000e+00f, &instr->loc);
@@ -6301,12 +6317,13 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
                 record_allocation(ctx, &allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX, 0, false);
             }
 
+            var->regs[HLSL_REGSET_NUMERIC].type = VKD3DSPR_CONST;
             var->regs[HLSL_REGSET_NUMERIC].id = reg_idx;
             var->regs[HLSL_REGSET_NUMERIC].allocation_size = reg_size / 4;
             var->regs[HLSL_REGSET_NUMERIC].writemask = VKD3DSP_WRITEMASK_ALL;
             var->regs[HLSL_REGSET_NUMERIC].allocated = true;
             TRACE("Allocated reserved %s to %s.\n", var->name,
-                    debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
+                    debug_register(var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
     }
 
@@ -6322,8 +6339,9 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
         if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
         {
             var->regs[HLSL_REGSET_NUMERIC] = allocate_range(ctx, &allocator, 1, UINT_MAX, alloc_size, 0, false);
+            var->regs[HLSL_REGSET_NUMERIC].type = VKD3DSPR_CONST;
             TRACE("Allocated %s to %s.\n", var->name,
-                    debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
+                    debug_register(var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
     }
 
@@ -6519,9 +6537,10 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
         var->regs[HLSL_REGSET_NUMERIC] = allocate_register(ctx, allocator, 1, UINT_MAX,
                 reg_size, component_count, mode, var->force_align, vip_allocation);
+        var->regs[HLSL_REGSET_NUMERIC].type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
 
-        TRACE("Allocated %s to %s (mode %d).\n", var->name, debug_register(output ? 'o' : 'v',
-                var->regs[HLSL_REGSET_NUMERIC], var->data_type), mode);
+        TRACE("Allocated %s to %s (mode %d).\n", var->name,
+                debug_register(var->regs[HLSL_REGSET_NUMERIC], var->data_type), mode);
     }
 }
 

@@ -309,6 +309,8 @@ struct hlsl_reg
     unsigned int writemask;
     /* Whether the register has been allocated. */
     bool allocated;
+    /* Currently only used for numeric registers. */
+    enum vkd3d_shader_register_type type;
 };
 
 /* Types of instruction nodes for the IR.
