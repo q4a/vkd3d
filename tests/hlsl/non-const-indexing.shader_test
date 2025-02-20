@@ -41,7 +41,13 @@ probe (0, 0) rgba (11.0, 11.0, 11.0, 11.0)
 uniform 0 float 1
 draw quad
 probe (0, 0) rgba (12.0, 12.0, 12.0, 12.0)
+uniform 0 float 1.6
+draw quad
+probe (0, 0) rgba (12.0, 12.0, 12.0, 12.0)
 uniform 0 float 2
+draw quad
+probe (0, 0) rgba (13.0, 13.0, 13.0, 13.0)
+uniform 0 float 2.6
 draw quad
 probe (0, 0) rgba (13.0, 13.0, 13.0, 13.0)
 uniform 0 float 3
@@ -354,6 +360,55 @@ todo(msl) draw quad
 if(sm<4)         probe (0,0) rgba (1.0, 1.0, 1.0, 1.0)
 if(sm>=4 & sm<6) todo probe (0,0) rgba (4.0, 4.0, 4.0, 4.0)
 if(sm>=6)        probe (0,0) rgba (4.0, 3.0, 2.0, 1.0)
+
+[vertex shader]
+uniform float4 f[3];
+uniform int2 i;
+
+void main(float4 pos : position, out float4 tex : texcoord, out float4 out_pos : sv_position)
+{
+    tex = f[i.x + i.y];
+    out_pos = pos;
+}
+
+[pixel shader]
+float4 main(float4 tex : texcoord) : sv_target
+{
+    return tex;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+uniform 8 float4 9.0 10.0 11.0 12.0
+if(sm<4)  uniform 12 float4 0 0 0 0
+if(sm>=4) uniform 12 int4   0 0 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(1.0, 2.0, 3.0, 4.0)
+if(sm<4)  uniform 12 float4 1 0 0 0
+if(sm>=4) uniform 12 int4   1 0 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(5.0, 6.0, 7.0, 8.0)
+if(sm<4)  uniform 12 float4 0 1 0 0
+if(sm>=4) uniform 12 int4   0 1 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(5.0, 6.0, 7.0, 8.0)
+if(sm<4)  uniform 12 float4 1 1 0 0
+if(sm>=4) uniform 12 int4   1 1 0 0
+todo(msl) draw quad
+probe (0, 0) rgba(9.0, 10.0, 11.0, 12.0)
+if(sm<4)  uniform 12 float4 0.5 0 0 0
+if(sm>=4) uniform 12 int4   0   0 0 0
+todo(msl) draw quad
+todo(sm<4) probe (0, 0) rgba(1.0, 2.0, 3.0, 4.0)
+if(sm<4)  uniform 12 float4 0 1.4 0 0
+if(sm>=4) uniform 12 int4   0 1   0 0 0
+todo(msl) draw quad
+todo(sm<4) probe (0, 0) rgba(5.0, 6.0, 7.0, 8.0)
+if(sm<4)  uniform 12 float4 1.5 0 0 0
+if(sm>=4) uniform 12 int4   2   0 0 0
+todo(msl) draw quad
+todo(sm<4) probe (0, 0) rgba(9.0, 10.0, 11.0, 12.0)
 
 [require]
 shader model >= 4.0
