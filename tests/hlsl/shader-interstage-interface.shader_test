@@ -55,6 +55,55 @@ void main(float4 position : SV_Position, float2 t0 : TEXCOORD0,
 todo(msl) draw triangle strip 4
 probe (0, 0) rgba (10.0, 8.0, 7.0, 3.0)
 
+[input layout]
+0 r32g32-float SV_POSITION
+0 r32g32b32a32-float COLOR 0
+0 r32g32b32a32-float COLOR 1
+0 r32g32b32a32-float COLOR 2
+
+[vb 0]
+-1.0 -1.0   0 1 1 1  0 1 0 0   0 1 0 1
+-1.0  1.0   0 1 1 1  0 1 0 0   0 1 0 1
+ 1.0 -1.0   0 1 1 1  0 1 0 0   0 1 0 1
+ 1.0  1.0   0 1 1 1  0 1 0 0   0 1 0 1
+
+[vertex shader]
+uint3 index;
+
+struct vs_data
+{
+    float4 pos : SV_Position;
+    float4 color[3] : COLOR;
+};
+
+void main(in struct vs_data vs_input, out struct vs_data vs_output)
+{
+    vs_output.pos = vs_input.pos;
+    vs_output.color[0] = vs_input.color[index.x];
+    vs_output.color[1] = vs_input.color[index.y];
+    vs_output.color[2] = vs_input.color[index.z];
+}
+
+[pixel shader]
+uint4 index;
+
+struct ps_data
+{
+    float4 pos : SV_Position;
+    float4 color[3] : COLOR;
+};
+
+float4 main(struct ps_data ps_input) : SV_Target
+{
+    return ps_input.color[index.w];
+}
+
+[test]
+uniform 0 uint4 1 2 0 1
+clear rtv 0 1.0 1.0 1.0 1.0
+todo(msl) draw triangle strip 4
+probe (0, 0) rgba(0.0, 1.0, 0.0, 1.0)
+
 [require]
 shader model >= 6.2
 native-16-bit
