@@ -3299,6 +3299,51 @@ static void test_create_graphics_pipeline_state(void)
     unsigned int i;
     HRESULT hr;
 
+    static const DWORD vs_with_rs_code[] =
+    {
+#if 0
+        [RootSignature("")]
+        void main(uint id : SV_VertexID, out float4 position : SV_Position)
+        {
+            float2 coords = float2((id << 1) & 2, id & 2);
+            position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);
+        }
+#endif
+        0x43425844, 0xf892ac0c, 0x339eab3f, 0x237bdb02, 0x828dd475, 0x00000001, 0x000001b0, 0x00000004,
+        0x00000030, 0x00000064, 0x00000098, 0x00000190, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008,
+        0x00000020, 0x00000000, 0x00000006, 0x00000001, 0x00000000, 0x00000101, 0x565f5653, 0x65747265,
+        0x00444978, 0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000001,
+        0x00000003, 0x00000000, 0x0000000f, 0x505f5653, 0x7469736f, 0x006e6f69, 0x58454853, 0x000000f0,
+        0x00010050, 0x0000003c, 0x0100086a, 0x04000060, 0x00101012, 0x00000000, 0x00000006, 0x04000067,
+        0x001020f2, 0x00000000, 0x00000001, 0x02000068, 0x00000001, 0x0b00008c, 0x00100012, 0x00000000,
+        0x00004001, 0x00000001, 0x00004001, 0x00000001, 0x0010100a, 0x00000000, 0x00004001, 0x00000000,
+        0x07000001, 0x00100042, 0x00000000, 0x0010100a, 0x00000000, 0x00004001, 0x00000002, 0x05000056,
+        0x00100032, 0x00000000, 0x00100086, 0x00000000, 0x0f000032, 0x00102032, 0x00000000, 0x00100046,
+        0x00000000, 0x00004002, 0x40000000, 0xc0000000, 0x00000000, 0x00000000, 0x00004002, 0xbf800000,
+        0x3f800000, 0x00000000, 0x00000000, 0x08000036, 0x001020c2, 0x00000000, 0x00004002, 0x00000000,
+        0x00000000, 0x00000000, 0x3f800000, 0x0100003e, 0x30535452, 0x00000018, 0x00000002, 0x00000000,
+        0x00000018, 0x00000000, 0x00000018, 0x00000000,
+    };
+    static const DWORD ps_with_rs_code[] =
+    {
+#if 0
+        [RootSignature("")]
+        void main(const in float4 position : SV_Position, out float4 target : SV_Target0)
+        {
+            target = float4(0.0f, 1.0f, 0.0f, 1.0f);
+        }
+#endif
+        0x43425844, 0x7c74e73b, 0x1dc7c715, 0x61248899, 0x672da97a, 0x00000001, 0x000000fc, 0x00000004,
+        0x00000030, 0x00000064, 0x00000098, 0x000000dc, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008,
+        0x00000020, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x505f5653, 0x7469736f,
+        0x006e6f69, 0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000,
+        0x00000003, 0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000003c,
+        0x00000050, 0x0000000f, 0x0100086a, 0x03000065, 0x001020f2, 0x00000000, 0x08000036, 0x001020f2,
+        0x00000000, 0x00004002, 0x00000000, 0x3f800000, 0x00000000, 0x3f800000, 0x0100003e, 0x30535452,
+        0x00000018, 0x00000002, 0x00000000, 0x00000018, 0x00000000, 0x00000018, 0x00000000,
+    };
+
+
     static const D3D12_SO_DECLARATION_ENTRY so_declaration[] =
     {
         {0, "SV_Position", 0, 0, 4, 0},
@@ -3433,6 +3478,44 @@ static void test_create_graphics_pipeline_state(void)
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    /* Root signature embedded in the shaders. */
+    init_pipeline_state_desc(&pso_desc, root_signature, DXGI_FORMAT_R8G8B8A8_UNORM, NULL, NULL, NULL);
+    pso_desc.pRootSignature = NULL;
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    init_pipeline_state_desc(&pso_desc, root_signature, DXGI_FORMAT_R8G8B8A8_UNORM, NULL, NULL, NULL);
+    pso_desc.pRootSignature = NULL;
+    pso_desc.VS = shader_bytecode(vs_with_rs_code, sizeof(vs_with_rs_code));
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state);
+    todo
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12PipelineState_Release(pipeline_state);
+
+    init_pipeline_state_desc(&pso_desc, root_signature, DXGI_FORMAT_R8G8B8A8_UNORM, NULL, NULL, NULL);
+    pso_desc.pRootSignature = NULL;
+    pso_desc.PS = shader_bytecode(ps_with_rs_code, sizeof(ps_with_rs_code));
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state);
+    todo
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12PipelineState_Release(pipeline_state);
+
+    init_pipeline_state_desc(&pso_desc, root_signature, DXGI_FORMAT_R8G8B8A8_UNORM, NULL, NULL, NULL);
+    pso_desc.pRootSignature = NULL;
+    pso_desc.VS = shader_bytecode(vs_with_rs_code, sizeof(vs_with_rs_code));
+    pso_desc.PS = shader_bytecode(ps_with_rs_code, sizeof(ps_with_rs_code));
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state);
+    todo
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12PipelineState_Release(pipeline_state);
 
     refcount = ID3D12RootSignature_Release(root_signature);
     ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
