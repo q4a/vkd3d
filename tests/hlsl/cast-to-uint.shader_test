@@ -48,3 +48,38 @@ float4 main() : sv_target
 [test]
 draw quad
 probe (0, 0) rgba (0.5, 0.5, 0.5, 0.5)
+
+[require]
+shader model >= 6.2
+native-16-bit
+
+[pixel shader]
+uniform uint4 i;
+
+uint4 main() : sv_target
+{
+    uint16_t4 s = i;
+    return s * uint16_t4(2, 2, 1, 1);
+}
+
+[test]
+uniform 0 uint4 0x10002 0x8003 0x10002 0x8003
+draw quad
+probe (0, 0) rgbaui(4, 6, 2, 0x8003)
+uniform 0 uint4 0xffffffff 0xfffffffd 0xffffffff 0xfffffffd
+draw quad
+probe (0, 0) rgbaui(0xfffe, 0xfffa, 0xffff, 0xfffd)
+
+[pixel shader]
+uniform float4 f;
+
+uint4 main() : sv_target
+{
+    uint16_t4 s = f;
+    return s * uint16_t4(2, 2, 1, 1);
+}
+
+[test]
+uniform 0 float4 0.5 1.0 0.5 1.0
+todo draw quad
+probe (0, 0) rgbaui(0, 2, 0, 1)
