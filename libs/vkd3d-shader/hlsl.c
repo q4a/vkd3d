@@ -298,6 +298,35 @@ bool hlsl_type_is_patch_array(const struct hlsl_type *type)
             || type->e.array.array_type == HLSL_ARRAY_PATCH_OUTPUT);
 }
 
+bool hlsl_type_is_integer(const struct hlsl_type *type)
+{
+    if (!hlsl_is_numeric_type(type))
+        return false;
+
+    switch (type->e.numeric.type)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            return true;
+
+        case HLSL_TYPE_DOUBLE:
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+            return false;
+    }
+
+    vkd3d_unreachable();
+}
+
+bool hlsl_type_is_floating_point(const struct hlsl_type *type)
+{
+    if (!hlsl_is_numeric_type(type))
+        return false;
+
+    return !hlsl_type_is_integer(type);
+}
+
 /* Only intended to be used for derefs (after copies have been lowered to components or vectors) or
  * resources, since for both their data types span across a single regset. */
 static enum hlsl_regset type_get_regset(const struct hlsl_type *type)

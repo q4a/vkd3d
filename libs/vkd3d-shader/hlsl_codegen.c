@@ -4187,15 +4187,7 @@ static bool lower_nonfloat_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
 
     switch (expr->op)
     {
-        case HLSL_OP1_ABS:
-        case HLSL_OP1_NEG:
-        case HLSL_OP2_ADD:
         case HLSL_OP2_DIV:
-        case HLSL_OP2_LOGIC_AND:
-        case HLSL_OP2_LOGIC_OR:
-        case HLSL_OP2_MAX:
-        case HLSL_OP2_MIN:
-        case HLSL_OP2_MUL:
         {
             struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
             struct hlsl_ir_node *arg, *float_expr;
@@ -7711,13 +7703,8 @@ static bool sm1_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
             switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
-                    if (ctx->double_as_float_alias)
-                    {
-                        generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
-                        return true;
-                    }
-                    hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "The 'double' type is not supported for the %s profile.", ctx->profile->name);
+                    generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, 0, true);
+                    return true;
                     break;
 
                 default:
@@ -7740,12 +7727,15 @@ static bool sm1_generate_vsir_instr_expr(struct hlsl_ctx *ctx, struct vsir_progr
         struct hlsl_ir_expr *expr)
 {
     struct hlsl_ir_node *instr = &expr->node;
+    struct hlsl_type *type = instr->data_type;
 
-    if (expr->op != HLSL_OP1_REINTERPRET && expr->op != HLSL_OP1_CAST
-            && instr->data_type->e.numeric.type != HLSL_TYPE_FLOAT)
+    if (!hlsl_is_numeric_type(type))
+        goto err;
+
+    if (type->e.numeric.type == HLSL_TYPE_DOUBLE && !ctx->double_as_float_alias)
     {
-        /* These need to be lowered. */
-        hlsl_fixme(ctx, &instr->loc, "SM1 non-float expression.");
+        hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "The 'double' type is not supported for the %s profile.", ctx->profile->name);
         return false;
     }
 
@@ -7760,30 +7750,44 @@ static bool sm1_generate_vsir_instr_expr(struct hlsl_ctx *ctx, struct vsir_progr
 
         case HLSL_OP1_COS_REDUCED:
             VKD3D_ASSERT(expr->node.reg.writemask == VKD3DSP_WRITEMASK_0);
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             sm1_generate_vsir_instr_expr_sincos(ctx, program, expr);
             break;
 
         case HLSL_OP1_DSX:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DSX, 0, 0, true);
             break;
 
         case HLSL_OP1_DSY:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DSY, 0, 0, true);
             break;
 
         case HLSL_OP1_EXP2:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             sm1_generate_vsir_instr_expr_per_component_instr_op(ctx, program, expr, VKD3DSIH_EXP);
             break;
 
         case HLSL_OP1_LOG2:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             sm1_generate_vsir_instr_expr_per_component_instr_op(ctx, program, expr, VKD3DSIH_LOG);
             break;
 
         case HLSL_OP1_NEG:
+            if (type->e.numeric.type == HLSL_TYPE_BOOL)
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, VKD3DSPSM_NEG, 0, true);
             break;
 
         case HLSL_OP1_RCP:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             sm1_generate_vsir_instr_expr_per_component_instr_op(ctx, program, expr, VKD3DSIH_RCP);
             break;
 
@@ -7792,23 +7796,33 @@ static bool sm1_generate_vsir_instr_expr(struct hlsl_ctx *ctx, struct vsir_progr
             break;
 
         case HLSL_OP1_RSQ:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             sm1_generate_vsir_instr_expr_per_component_instr_op(ctx, program, expr, VKD3DSIH_RSQ);
             break;
 
         case HLSL_OP1_SAT:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MOV, 0, VKD3DSPDM_SATURATE, true);
             break;
 
         case HLSL_OP1_SIN_REDUCED:
             VKD3D_ASSERT(expr->node.reg.writemask == VKD3DSP_WRITEMASK_1);
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             sm1_generate_vsir_instr_expr_sincos(ctx, program, expr);
             break;
 
         case HLSL_OP2_ADD:
+            if (type->e.numeric.type == HLSL_TYPE_BOOL)
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_ADD, 0, 0, true);
             break;
 
         case HLSL_OP2_DOT:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             switch (expr->operands[0].node->data_type->e.numeric.dimx)
             {
                 case 3:
@@ -7842,35 +7856,49 @@ static bool sm1_generate_vsir_instr_expr(struct hlsl_ctx *ctx, struct vsir_progr
             break;
 
         case HLSL_OP2_LOGIC_AND:
+            if (type->e.numeric.type != HLSL_TYPE_BOOL)
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MIN, 0, 0, true);
             break;
 
         case HLSL_OP2_LOGIC_OR:
+            if (type->e.numeric.type != HLSL_TYPE_BOOL)
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MAX, 0, 0, true);
             break;
 
         case HLSL_OP2_SLT:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_SLT, 0, 0, true);
             break;
 
         case HLSL_OP3_CMP:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_CMP, 0, 0, true);
             break;
 
         case HLSL_OP3_DP2ADD:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_DP2ADD, 0, 0, false);
             break;
 
         case HLSL_OP3_MAD:
+            if (!hlsl_type_is_floating_point(type))
+                goto err;
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_MAD, 0, 0, true);
             break;
 
         default:
-            hlsl_fixme(ctx, &instr->loc, "SM1 \"%s\" expression.", debug_hlsl_expr_op(expr->op));
-            return false;
+            goto err;
     }
-
     return true;
+
+err:
+    hlsl_fixme(ctx, &instr->loc, "SM1 %s expression of type %s.", debug_hlsl_expr_op(expr->op), instr->data_type->name);
+    return false;
 }
 
 static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
