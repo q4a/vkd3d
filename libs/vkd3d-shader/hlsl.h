@@ -1458,6 +1458,11 @@ static inline bool hlsl_is_numeric_type(const struct hlsl_type *type)
     return type->class <= HLSL_CLASS_LAST_NUMERIC;
 }
 
+static inline bool hlsl_is_vec1(const struct hlsl_type *type)
+{
+    return type->class == HLSL_CLASS_SCALAR || (type->class == HLSL_CLASS_VECTOR && type->e.numeric.dimx == 1);
+}
+
 static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
 {
     switch (dim)

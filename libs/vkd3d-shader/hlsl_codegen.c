@@ -2167,8 +2167,7 @@ static enum validation_result validate_component_index_range_from_deref(struct h
             return DEREF_VALIDATION_NOT_CONSTANT;
 
         /* We should always have generated a cast to UINT. */
-        VKD3D_ASSERT(path_node->data_type->class == HLSL_CLASS_SCALAR
-                && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
+        VKD3D_ASSERT(hlsl_is_vec1(path_node->data_type) && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
         idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
@@ -2325,11 +2324,6 @@ static bool validate_dereferences(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     return false;
 }
 
-static bool is_vec1(const struct hlsl_type *type)
-{
-    return (type->class == HLSL_CLASS_SCALAR) || (type->class == HLSL_CLASS_VECTOR && type->e.numeric.dimx == 1);
-}
-
 static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     if (instr->type == HLSL_IR_EXPR)
@@ -2344,7 +2338,8 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         src_type = expr->operands[0].node->data_type;
 
         if (hlsl_types_are_equal(src_type, dst_type)
-                || (src_type->e.numeric.type == dst_type->e.numeric.type && is_vec1(src_type) && is_vec1(dst_type)))
+                || (src_type->e.numeric.type == dst_type->e.numeric.type
+                && hlsl_is_vec1(src_type) && hlsl_is_vec1(dst_type)))
         {
             hlsl_replace_node(&expr->node, expr->operands[0].node);
             return true;
@@ -5928,8 +5923,7 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
             return false;
 
         /* We should always have generated a cast to UINT. */
-        VKD3D_ASSERT(path_node->data_type->class == HLSL_CLASS_SCALAR
-                && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
+        VKD3D_ASSERT(hlsl_is_vec1(path_node->data_type) && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
         idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
@@ -5992,8 +5986,7 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
         if (path_node->type == HLSL_IR_CONSTANT)
         {
             /* We should always have generated a cast to UINT. */
-            VKD3D_ASSERT(path_node->data_type->class == HLSL_CLASS_SCALAR
-                    && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
+            VKD3D_ASSERT(hlsl_is_vec1(path_node->data_type) && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
             idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
@@ -6061,8 +6054,7 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
     if (offset_node)
     {
         /* We should always have generated a cast to UINT. */
-        VKD3D_ASSERT(offset_node->data_type->class == HLSL_CLASS_SCALAR
-                && offset_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
+        VKD3D_ASSERT(hlsl_is_vec1(offset_node->data_type) && offset_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
         VKD3D_ASSERT(offset_node->type != HLSL_IR_CONSTANT);
         return false;
     }
