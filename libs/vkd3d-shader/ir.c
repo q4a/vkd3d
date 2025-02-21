@@ -470,6 +470,80 @@ static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op, enum vkd3d_d
     return false;
 }
 
+static enum vkd3d_result vsir_program_normalize_addr(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    struct vkd3d_shader_instruction *ins, *ins2;
+    unsigned int tmp_idx = ~0u;
+    unsigned int i, k, r;
+
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        ins = &program->instructions.elements[i];
+
+        if (ins->opcode == VKD3DSIH_MOV && ins->dst[0].reg.type == VKD3DSPR_ADDR)
+        {
+            if (tmp_idx == ~0u)
+                tmp_idx = program->temp_count++;
+
+            ins->opcode = VKD3DSIH_FTOU;
+            vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+            ins->dst[0].reg.idx[0].offset = tmp_idx;
+            ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+        }
+        else if (ins->opcode == VKD3DSIH_MOVA)
+        {
+            if (tmp_idx == ~0u)
+                tmp_idx = program->temp_count++;
+
+            if (!shader_instruction_array_insert_at(&program->instructions, i + 1, 1))
+                return VKD3D_ERROR_OUT_OF_MEMORY;
+            ins = &program->instructions.elements[i];
+            ins2 = &program->instructions.elements[i + 1];
+
+            ins->opcode = VKD3DSIH_ROUND_NE;
+            vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+            ins->dst[0].reg.idx[0].offset = tmp_idx;
+            ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+
+            if (!vsir_instruction_init_with_params(program, ins2, &ins->location, VKD3DSIH_FTOU, 1, 1))
+                return VKD3D_ERROR_OUT_OF_MEMORY;
+
+            vsir_register_init(&ins2->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+            ins2->dst[0].reg.idx[0].offset = tmp_idx;
+            ins2->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+            ins2->dst[0].write_mask = ins->dst[0].write_mask;
+
+            vsir_register_init(&ins2->src[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+            ins2->src[0].reg.idx[0].offset = tmp_idx;
+            ins2->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+            ins2->src[0].swizzle = vsir_swizzle_from_writemask(ins2->dst[0].write_mask);
+        }
+
+        for (k = 0; k < ins->src_count; ++k)
+        {
+            struct vkd3d_shader_src_param *src = &ins->src[k];
+
+            for (r = 0; r < src->reg.idx_count; ++r)
+            {
+                struct vkd3d_shader_src_param *rel = src->reg.idx[r].rel_addr;
+
+                if (rel && rel->reg.type == VKD3DSPR_ADDR)
+                {
+                    if (tmp_idx == ~0u)
+                        tmp_idx = program->temp_count++;
+
+                    vsir_register_init(&rel->reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+                    rel->reg.idx[0].offset = tmp_idx;
+                    rel->reg.dimension = VSIR_DIMENSION_VEC4;
+                }
+            }
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_ifc(struct vsir_program *program,
         struct vkd3d_shader_instruction *ifc, unsigned int *tmp_idx,
         struct vkd3d_shader_message_context *message_context)
@@ -2426,7 +2500,8 @@ struct flat_constants_normaliser
 };
 
 static bool get_flat_constant_register_type(const struct vkd3d_shader_register *reg,
-        enum vkd3d_shader_d3dbc_constant_register *set, uint32_t *index)
+        enum vkd3d_shader_d3dbc_constant_register *set, uint32_t *index,
+        struct vkd3d_shader_src_param **rel_addr)
 {
     static const struct
     {
@@ -2446,12 +2521,8 @@ static bool get_flat_constant_register_type(const struct vkd3d_shader_register *
     {
         if (reg->type == regs[i].type)
         {
-            if (reg->idx[0].rel_addr)
-            {
-                FIXME("Unhandled relative address.\n");
-                return false;
-            }
-
+            if (rel_addr)
+                *rel_addr = reg->idx[0].rel_addr;
             *set = regs[i].set;
             *index = reg->idx[0].offset;
             return true;
@@ -2465,10 +2536,11 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
         const struct flat_constants_normaliser *normaliser)
 {
     enum vkd3d_shader_d3dbc_constant_register set;
+    struct vkd3d_shader_src_param *rel_addr;
     uint32_t index;
     size_t i, j;
 
-    if (!get_flat_constant_register_type(&param->reg, &set, &index))
+    if (!get_flat_constant_register_type(&param->reg, &set, &index, &rel_addr))
         return;
 
     for (i = 0; i < normaliser->def_count; ++i)
@@ -2486,8 +2558,11 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
 
     param->reg.type = VKD3DSPR_CONSTBUFFER;
     param->reg.idx[0].offset = set; /* register ID */
+    param->reg.idx[0].rel_addr = NULL;
     param->reg.idx[1].offset = set; /* register index */
+    param->reg.idx[1].rel_addr = NULL;
     param->reg.idx[2].offset = index; /* buffer index */
+    param->reg.idx[2].rel_addr = rel_addr;
     param->reg.idx_count = 3;
 }
 
@@ -2514,7 +2589,7 @@ static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_progr
 
             def = &normaliser.defs[normaliser.def_count++];
 
-            get_flat_constant_register_type((struct vkd3d_shader_register *)&ins->dst[0].reg, &def->set, &def->index);
+            get_flat_constant_register_type(&ins->dst[0].reg, &def->set, &def->index, NULL);
             for (j = 0; j < 4; ++j)
                 def->value[j] = ins->src[0].reg.u.immconst_u32[j];
 
@@ -9823,6 +9898,9 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
 
         if (program->shader_version.major <= 2)
             vsir_transform(&ctx, vsir_program_ensure_diffuse);
+
+        if (program->shader_version.major < 4)
+            vsir_transform(&ctx, vsir_program_normalize_addr);
 
         if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
             vsir_transform(&ctx, vsir_program_remap_output_signature);
