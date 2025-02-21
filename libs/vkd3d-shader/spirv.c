@@ -6905,6 +6905,13 @@ static void spirv_compiler_emit_workgroup_memory(struct spirv_compiler *compiler
     const SpvStorageClass storage_class = SpvStorageClassWorkgroup;
     struct vkd3d_symbol reg_symbol;
 
+    if (zero_init && !(compiler->features & VKD3D_SHADER_COMPILE_OPTION_FEATURE_ZERO_INITIALIZE_WORKGROUP_MEMORY))
+    {
+        WARN("Unsupported zero-initialized workgroup memory.\n");
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                "The target environment does not support zero-initialized workgroup memory.");
+    }
+
     /* Alignment is supported only in the Kernel execution model. */
     if (alignment)
         TRACE("Ignoring alignment %u.\n", alignment);

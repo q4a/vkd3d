@@ -97,6 +97,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(KHR_PUSH_DESCRIPTOR, KHR_push_descriptor),
     VK_EXTENSION(KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE, KHR_sampler_mirror_clamp_to_edge),
     VK_EXTENSION(KHR_TIMELINE_SEMAPHORE, KHR_timeline_semaphore),
+    VK_EXTENSION(KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY, KHR_zero_initialize_workgroup_memory),
     /* EXT extensions */
     VK_EXTENSION(EXT_4444_FORMATS, EXT_4444_formats),
     VK_EXTENSION(EXT_CALIBRATED_TIMESTAMPS, EXT_calibrated_timestamps),
@@ -835,6 +836,7 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_semaphore_features;
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_features;
     VkPhysicalDevice4444FormatsFeaturesEXT formats4444_features;
+    VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR zero_initialize_workgroup_memory_features;
 
     VkPhysicalDeviceFeatures2 features2;
 };
@@ -870,6 +872,8 @@ static void vkd3d_chain_physical_device_info_structures(struct vkd3d_physical_de
         vk_prepend_struct(&info->features2, &info->mutable_features);
     if (vulkan_info->EXT_4444_formats)
         vk_prepend_struct(&info->features2, &info->formats4444_features);
+    if (vulkan_info->KHR_zero_initialize_workgroup_memory)
+        vk_prepend_struct(&info->features2, &info->zero_initialize_workgroup_memory_features);
 
     info->properties2.pNext = NULL;
 
@@ -908,6 +912,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     info->timeline_semaphore_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR;
     info->mutable_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT;
     info->formats4444_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT;
+    info->zero_initialize_workgroup_memory_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES_KHR;
 
     info->properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     info->maintenance3_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES;
@@ -1418,6 +1423,9 @@ static void vkd3d_init_feature_level(struct vkd3d_vulkan_info *vk_info,
     else if (!vk_info->vertex_attrib_zero_divisor)
         WARN("Vertex attribute instance rate zero divisor is not supported.\n");
 
+    if (!vk_info->KHR_zero_initialize_workgroup_memory)
+        WARN("Shader zero initialize workgroup memory is not supported.\n");
+
 #undef CHECK_MIN_REQUIREMENT
 #undef CHECK_MAX_REQUIREMENT
 #undef CHECK_FEATURE
@@ -1834,6 +1842,8 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         vulkan_info->EXT_mutable_descriptor_type = false;
     if (!physical_device_info->timeline_semaphore_features.timelineSemaphore)
         vulkan_info->KHR_timeline_semaphore = false;
+    if (!physical_device_info->zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory)
+        vulkan_info->KHR_zero_initialize_workgroup_memory = false;
 
     physical_device_info->formats4444_features.formatA4B4G4R4 = VK_FALSE;
 

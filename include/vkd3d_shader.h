@@ -249,6 +249,10 @@ enum vkd3d_shader_compile_option_feature_flags
      *       QUAD bits set.
      * - supportedStages include COMPUTE and FRAGMENT. \since 1.12 */
     VKD3D_SHADER_COMPILE_OPTION_FEATURE_WAVE_OPS      = 0x00000004,
+    /** The SPIR-V target environment supports zero-initializing workgroup
+     * memory. This corresponds to the "shaderZeroInitializeWorkgroupMemory"
+     * Vulkan feature. \since 1.16 */
+    VKD3D_SHADER_COMPILE_OPTION_FEATURE_ZERO_INITIALIZE_WORKGROUP_MEMORY = 0x00000008,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLAGS),
 };
