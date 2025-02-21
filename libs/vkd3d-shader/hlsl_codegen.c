@@ -6562,6 +6562,24 @@ void hlsl_lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_block *body)
     lower_ir(ctx, lower_index_loads, body);
 }
 
+
+static bool simplify_exprs(struct hlsl_ctx *ctx, struct hlsl_block *block)
+{
+    bool progress, any_progress = false;
+
+    do
+    {
+        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, block, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_normalize_binary_exprs, block, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_identities, block, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, block, NULL);
+
+        any_progress |= progress;
+    } while (progress);
+
+    return any_progress;
+}
+
 static void hlsl_run_folding_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     bool progress;
@@ -6569,10 +6587,7 @@ static void hlsl_run_folding_passes(struct hlsl_ctx *ctx, struct hlsl_block *bod
     hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL);
     do
     {
-        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
-        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_identities, body, NULL);
-        progress |= hlsl_transform_ir(ctx, hlsl_normalize_binary_exprs, body, NULL);
-        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
+        progress = simplify_exprs(ctx, body);
         progress |= hlsl_copy_propagation_execute(ctx, body);
         progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);
         progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
@@ -11516,9 +11531,7 @@ static void loop_unrolling_simplify(struct hlsl_ctx *ctx, struct hlsl_block *blo
             copy_propagation_pop_scope(state);
         copy_propagation_push_scope(state, ctx);
 
-        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, block, NULL);
-        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_identities, block, NULL);
-        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, block, NULL);
+        progress = simplify_exprs(ctx, block);
 
         current_index = index_instructions(block, *index);
         progress |= copy_propagation_transform_block(ctx, block, state);
@@ -12218,7 +12231,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 
     /* TODO: move forward, remove when no longer needed */
     transform_derefs(ctx, replace_deref_path_with_offset, body);
-    while (hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL));
+    simplify_exprs(ctx, body);
     transform_derefs(ctx, clean_constant_deref_offset_srcs, body);
 
     do
