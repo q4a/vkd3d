@@ -5902,11 +5902,58 @@ static void allocate_objects(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     }
 }
 
+static bool component_index_from_deref_path_node(struct hlsl_ir_node *path_node,
+        struct hlsl_type *type, unsigned int *index)
+{
+    unsigned int idx;
+    unsigned int i;
+
+    if (path_node->type != HLSL_IR_CONSTANT)
+        return false;
+
+    idx = hlsl_ir_constant(path_node)->value.u[0].u;
+    *index = 0;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_VECTOR:
+            if (idx >= type->e.numeric.dimx)
+                return false;
+            *index = idx;
+            break;
+
+        case HLSL_CLASS_MATRIX:
+            if (idx >= hlsl_type_major_size(type))
+                return false;
+            if (hlsl_type_is_row_major(type))
+                *index = idx * type->e.numeric.dimx;
+            else
+                *index = idx * type->e.numeric.dimy;
+            break;
+
+        case HLSL_CLASS_ARRAY:
+            if (idx >= type->e.array.elements_count)
+                return false;
+            *index = idx * hlsl_type_component_count(type->e.array.type);
+            break;
+
+        case HLSL_CLASS_STRUCT:
+            for (i = 0; i < idx; ++i)
+                *index += hlsl_type_component_count(type->e.record.fields[i].type);
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    return true;
+}
+
 bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         unsigned int *start, unsigned int *count)
 {
     struct hlsl_type *type = deref->var->data_type;
-    unsigned int i, k;
+    unsigned int i;
 
     *start = 0;
     *count = 0;
@@ -5914,7 +5961,7 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
     for (i = 0; i < deref->path_len; ++i)
     {
         struct hlsl_ir_node *path_node = deref->path[i].node;
-        unsigned int idx = 0;
+        unsigned int index;
 
         VKD3D_ASSERT(path_node);
         if (path_node->type != HLSL_IR_CONSTANT)
@@ -5923,39 +5970,9 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
         /* We should always have generated a cast to UINT. */
         VKD3D_ASSERT(hlsl_is_vec1(path_node->data_type) && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
-        idx = hlsl_ir_constant(path_node)->value.u[0].u;
-
-        switch (type->class)
-        {
-            case HLSL_CLASS_VECTOR:
-                if (idx >= type->e.numeric.dimx)
-                    return false;
-                *start += idx;
-                break;
-
-            case HLSL_CLASS_MATRIX:
-                if (idx >= hlsl_type_major_size(type))
-                    return false;
-                if (hlsl_type_is_row_major(type))
-                    *start += idx * type->e.numeric.dimx;
-                else
-                    *start += idx * type->e.numeric.dimy;
-                break;
-
-            case HLSL_CLASS_ARRAY:
-                if (idx >= type->e.array.elements_count)
-                    return false;
-                *start += idx * hlsl_type_component_count(type->e.array.type);
-                break;
-
-            case HLSL_CLASS_STRUCT:
-                for (k = 0; k < idx; ++k)
-                    *start += hlsl_type_component_count(type->e.record.fields[k].type);
-                break;
-
-            default:
-                vkd3d_unreachable();
-        }
+        if (!component_index_from_deref_path_node(path_node, type, &index))
+            return false;
+        *start += index;
 
         type = hlsl_get_element_type_from_path_index(ctx, type, path_node);
     }
