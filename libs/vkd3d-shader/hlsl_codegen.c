@@ -4807,8 +4807,7 @@ static void register_deref_usage(struct hlsl_ctx *ctx, struct hlsl_deref *deref)
     struct hlsl_type *type;
     unsigned int index;
 
-    if (!hlsl_regset_index_from_deref(ctx, deref, regset, &index))
-        return;
+    hlsl_regset_index_from_deref(ctx, deref, regset, &index);
 
     if (regset <= HLSL_REGSET_LAST_OBJECT)
     {
@@ -4819,7 +4818,6 @@ static void register_deref_usage(struct hlsl_ctx *ctx, struct hlsl_deref *deref)
     {
         type = hlsl_deref_get_type(ctx, deref);
 
-        hlsl_regset_index_from_deref(ctx, deref, regset, &index);
         required_bind_count = align(index + type->reg_size[regset], 4) / 4;
         var->bind_count[regset] = max(var->bind_count[regset], required_bind_count);
     }
