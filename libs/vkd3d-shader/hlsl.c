@@ -739,7 +739,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
     return offset[*regset];
 }
 
-static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_var *var,
+static bool hlsl_init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_var *var,
         unsigned int path_len)
 {
     deref->var = var;
@@ -798,7 +798,7 @@ bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *d
     }
     load = hlsl_ir_load(ptr);
 
-    if (!init_deref(ctx, deref, load->src.var, load->src.path_len + chain_len))
+    if (!hlsl_init_deref(ctx, deref, load->src.var, load->src.path_len + chain_len))
         return false;
 
     for (i = 0; i < load->src.path_len; ++i)
@@ -867,7 +867,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
         ++path_len;
     }
 
-    if (!init_deref(ctx, deref, prefix->var, prefix->path_len + path_len))
+    if (!hlsl_init_deref(ctx, deref, prefix->var, prefix->path_len + path_len))
         return false;
 
     deref_path_len = 0;
@@ -1459,7 +1459,7 @@ bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, const struc
 
     VKD3D_ASSERT(!hlsl_deref_is_lowered(other));
 
-    if (!init_deref(ctx, deref, other->var, other->path_len))
+    if (!hlsl_init_deref(ctx, deref, other->var, other->path_len))
         return false;
 
     for (i = 0; i < deref->path_len; ++i)
@@ -1521,7 +1521,7 @@ struct hlsl_ir_node *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hls
         return NULL;
     init_node(&store->node, HLSL_IR_STORE, NULL, loc);
 
-    if (!init_deref(ctx, &store->lhs, lhs->var, lhs->path_len + !!idx))
+    if (!hlsl_init_deref(ctx, &store->lhs, lhs->var, lhs->path_len + !!idx))
     {
         vkd3d_free(store);
         return NULL;
@@ -1857,7 +1857,7 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
         return NULL;
     init_node(&load->node, HLSL_IR_LOAD, type, loc);
 
-    if (!init_deref(ctx, &load->src, deref->var, deref->path_len + !!idx))
+    if (!hlsl_init_deref(ctx, &load->src, deref->var, deref->path_len + !!idx))
     {
         vkd3d_free(load);
         return NULL;
@@ -2367,7 +2367,7 @@ static bool clone_deref(struct hlsl_ctx *ctx, struct clone_instr_map *map,
 
     VKD3D_ASSERT(!hlsl_deref_is_lowered(src));
 
-    if (!init_deref(ctx, dst, src->var, src->path_len))
+    if (!hlsl_init_deref(ctx, dst, src->var, src->path_len))
         return false;
 
     for (i = 0; i < src->path_len; ++i)
