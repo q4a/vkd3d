@@ -3254,6 +3254,13 @@ static void fx_4_parse_shader_blob(struct fx_parser *parser, unsigned int object
         {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_15},
     };
 
+    if (!shader->offset)
+    {
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "NULL");
+        return;
+    }
+
     fx_parser_read_unstructured(parser, &data_size, shader->offset, sizeof(data_size));
     if (data_size)
         data = fx_parser_get_unstructured_ptr(parser, shader->offset + 4, data_size);
@@ -3859,12 +3866,14 @@ static void fx_4_parse_object_initializer(struct fx_parser *parser, const struct
     };
     unsigned int i, element_count, count;
     uint32_t value;
+    bool is_array;
 
     if (!fx_4_object_has_initializer(type))
         return;
 
     vkd3d_string_buffer_printf(&parser->buffer, " = {\n");
     element_count = max(type->element_count, 1);
+    is_array = element_count > 1;
     for (i = 0; i < element_count; ++i)
     {
         switch (type->typeinfo)
@@ -3880,9 +3889,21 @@ static void fx_4_parse_object_initializer(struct fx_parser *parser, const struct
             case FX_4_OBJECT_TYPE_SAMPLER_STATE:
                 count = fx_parser_read_u32(parser);
 
+                if (is_array)
+                {
+                    parse_fx_start_indent(parser);
+                    parse_fx_print_indent(parser);
+                    vkd3d_string_buffer_printf(&parser->buffer, "{\n");
+                }
                 parse_fx_start_indent(parser);
                 fx_4_parse_state_object_initializer(parser, count, type_classes[type->typeinfo]);
                 parse_fx_end_indent(parser);
+                if (is_array)
+                {
+                    parse_fx_print_indent(parser);
+                    vkd3d_string_buffer_printf(&parser->buffer, "}");
+                    parse_fx_end_indent(parser);
+                }
                 break;
             case FX_4_OBJECT_TYPE_PIXEL_SHADER:
             case FX_4_OBJECT_TYPE_VERTEX_SHADER:
@@ -3901,7 +3922,7 @@ static void fx_4_parse_object_initializer(struct fx_parser *parser, const struct
                         "Parsing object type %u is not implemented.", type->typeinfo);
                 return;
         }
-        vkd3d_string_buffer_printf(&parser->buffer, ",\n");
+        vkd3d_string_buffer_printf(&parser->buffer, is_array ? ",\n" : "\n");
     }
     vkd3d_string_buffer_printf(&parser->buffer, "}");
 }
