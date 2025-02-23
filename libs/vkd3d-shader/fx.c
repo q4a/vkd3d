@@ -2978,13 +2978,6 @@ static void VKD3D_PRINTF_FUNC(3, 4) fx_parser_error(struct fx_parser *parser, en
     parser->failed = true;
 }
 
-static int fx_2_parse(struct fx_parser *parser)
-{
-    fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing fx_2_0 binaries is not implemented.");
-
-    return -1;
-}
-
 static const void *fx_parser_get_unstructured_ptr(struct fx_parser *parser, uint32_t offset, size_t size)
 {
     const uint8_t *ptr = parser->unstructured.ptr;
@@ -3011,6 +3004,136 @@ static uint32_t fx_parser_read_unstructured(struct fx_parser *parser, void *dst,
     return offset + size;
 }
 
+static void parse_fx_start_indent(struct fx_parser *parser)
+{
+    ++parser->indent;
+}
+
+static void parse_fx_end_indent(struct fx_parser *parser)
+{
+    --parser->indent;
+}
+
+static void parse_fx_print_indent(struct fx_parser *parser)
+{
+    vkd3d_string_buffer_printf(&parser->buffer, "%*s", 4 * parser->indent, "");
+}
+
+static void fx_2_parse_parameters(struct fx_parser *parser, uint32_t count)
+{
+    if (count)
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing fx_2_0 parameters is not implemented.");
+}
+
+static const char *fx_2_get_string(struct fx_parser *parser, uint32_t offset)
+{
+    const char *ptr;
+    uint32_t size;
+
+    fx_parser_read_unstructured(parser, &size, offset, sizeof(size));
+    ptr = fx_parser_get_unstructured_ptr(parser, offset + 4, size);
+
+    if (!ptr)
+    {
+        parser->failed = true;
+        return "<invalid>";
+    }
+
+    return ptr;
+}
+
+static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
+{
+    if (count)
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing fx_2_0 annotations is not implemented.");
+}
+
+static void fx_parse_fx_2_technique(struct fx_parser *parser)
+{
+    struct fx_technique
+    {
+        uint32_t name;
+        uint32_t annotation_count;
+        uint32_t pass_count;
+    } technique;
+    struct fx_pass
+    {
+        uint32_t name;
+        uint32_t annotation_count;
+        uint32_t assignment_count;
+    } pass;
+    const char *name;
+    uint32_t i;
+
+    if (parser->failed)
+        return;
+
+    fx_parser_read_u32s(parser, &technique, sizeof(technique));
+
+    name = fx_2_get_string(parser, technique.name);
+
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "technique %s", name);
+    fx_parse_fx_2_annotations(parser, technique.annotation_count);
+
+    vkd3d_string_buffer_printf(&parser->buffer, "\n");
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "{\n");
+
+    parse_fx_start_indent(parser);
+    for (i = 0; i < technique.pass_count; ++i)
+    {
+        fx_parser_read_u32s(parser, &pass, sizeof(pass));
+        name = fx_2_get_string(parser, pass.name);
+
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "pass %s", name);
+        fx_parse_fx_2_annotations(parser, pass.annotation_count);
+
+        vkd3d_string_buffer_printf(&parser->buffer, "\n");
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "{\n");
+
+        parse_fx_start_indent(parser);
+        if (pass.assignment_count)
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
+                    "Parsing fx_2_0 pass assignments is not implemented.");
+        parse_fx_end_indent(parser);
+
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "}\n\n");
+    }
+
+    parse_fx_end_indent(parser);
+
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "}\n\n");
+}
+
+static int fx_2_parse(struct fx_parser *parser)
+{
+    uint32_t i, size, parameter_count, technique_count;
+
+    fx_parser_skip(parser, sizeof(uint32_t)); /* Version */
+    size = fx_parser_read_u32(parser);
+
+    parser->unstructured.ptr = parser->ptr;
+    parser->unstructured.end = parser->ptr + size;
+    parser->unstructured.size = size;
+    fx_parser_skip(parser, size);
+
+    parameter_count = fx_parser_read_u32(parser);
+    technique_count = fx_parser_read_u32(parser);
+    fx_parser_read_u32(parser); /* Shader count */
+    fx_parser_read_u32(parser); /* Object count */
+
+    fx_2_parse_parameters(parser, parameter_count);
+    for (i = 0; i < technique_count; ++i)
+        fx_parse_fx_2_technique(parser);
+
+    return parser->failed ? - 1 : 0;
+}
+
 static const char *fx_4_get_string(struct fx_parser *parser, uint32_t offset)
 {
     const uint8_t *ptr = parser->unstructured.ptr;
@@ -3034,21 +3157,6 @@ static const char *fx_4_get_string(struct fx_parser *parser, uint32_t offset)
     }
 
     return (const char *)(parser->unstructured.ptr + offset);
-}
-
-static void parse_fx_start_indent(struct fx_parser *parser)
-{
-    ++parser->indent;
-}
-
-static void parse_fx_end_indent(struct fx_parser *parser)
-{
-    --parser->indent;
-}
-
-static void parse_fx_print_indent(struct fx_parser *parser)
-{
-    vkd3d_string_buffer_printf(&parser->buffer, "%*s", 4 * parser->indent, "");
 }
 
 static void parse_fx_4_numeric_value(struct fx_parser *parser, uint32_t offset,
