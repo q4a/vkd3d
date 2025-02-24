@@ -3053,7 +3053,7 @@ static void parse_fx_4_numeric_value(struct fx_parser *parser, uint32_t offset,
         fx_parser_read_unstructured(parser, &value, offset, sizeof(uint32_t));
 
         if (base_type == FX_4_NUMERIC_TYPE_FLOAT)
-            vkd3d_string_buffer_printf(&parser->buffer, "%f", value.f);
+            vkd3d_string_buffer_print_f32(&parser->buffer, value.f);
         else if (base_type == FX_4_NUMERIC_TYPE_INT)
             vkd3d_string_buffer_printf(&parser->buffer, "%d", value.i);
         else if (base_type == FX_4_NUMERIC_TYPE_UINT)
