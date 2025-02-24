@@ -3042,10 +3042,182 @@ static const char *fx_2_get_string(struct fx_parser *parser, uint32_t offset)
     return ptr;
 }
 
+static unsigned int fx_get_fx_2_type_size(struct fx_parser *parser, uint32_t *offset)
+{
+    uint32_t element_count, member_count, class, columns, rows;
+    unsigned int size = 0;
+
+    fx_parser_read_unstructured(parser, &class, *offset + 4, sizeof(class));
+    fx_parser_read_unstructured(parser, &element_count, *offset + 16, sizeof(element_count));
+
+    if (class == D3DXPC_STRUCT)
+    {
+        *offset = fx_parser_read_unstructured(parser, &member_count, *offset + 20, sizeof(member_count));
+
+        for (uint32_t i = 0; i < member_count; ++i)
+            size += fx_get_fx_2_type_size(parser, offset);
+    }
+    else if (class == D3DXPC_VECTOR)
+    {
+        fx_parser_read_unstructured(parser, &columns, *offset + 20, sizeof(columns));
+        *offset = fx_parser_read_unstructured(parser, &rows, *offset + 24, sizeof(rows));
+        size = rows * columns * sizeof(float);
+    }
+    else if (class == D3DXPC_MATRIX_ROWS
+            || class == D3DXPC_MATRIX_COLUMNS
+            || class == D3DXPC_SCALAR)
+    {
+        fx_parser_read_unstructured(parser, &rows, *offset + 20, sizeof(rows));
+        *offset = fx_parser_read_unstructured(parser, &columns, *offset + 24, sizeof(columns));
+        size = rows * columns * sizeof(float);
+    }
+    else
+    {
+        *offset += 20;
+    }
+
+    if (element_count)
+        size *= element_count;
+    return size;
+}
+
+static unsigned int fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset)
+{
+    uint32_t type, class, rows, columns;
+    static const char *const types[] =
+    {
+        [D3DXPT_VOID]           = "void",
+        [D3DXPT_BOOL]           = "bool",
+        [D3DXPT_INT]            = "int",
+        [D3DXPT_FLOAT]          = "float",
+        [D3DXPT_STRING]         = "string",
+        [D3DXPT_TEXTURE]        = "texture",
+        [D3DXPT_TEXTURE1D]      = "texture1D",
+        [D3DXPT_TEXTURE2D]      = "texture2D",
+        [D3DXPT_TEXTURE3D]      = "texture3D",
+        [D3DXPT_TEXTURECUBE]    = "textureCUBE",
+        [D3DXPT_SAMPLER]        = "sampler",
+        [D3DXPT_SAMPLER1D]      = "sampler1D",
+        [D3DXPT_SAMPLER2D]      = "sampler2D",
+        [D3DXPT_SAMPLER3D]      = "sampler3D",
+        [D3DXPT_SAMPLERCUBE]    = "samplerCUBE",
+        [D3DXPT_PIXELSHADER]    = "PixelShader",
+        [D3DXPT_VERTEXSHADER]   = "VertexShader",
+        [D3DXPT_PIXELFRAGMENT]  = "<pixel-fragment>",
+        [D3DXPT_VERTEXFRAGMENT] = "<vertex-fragment>",
+        [D3DXPT_UNSUPPORTED]    = "<unsupported>",
+    };
+    const char *name;
+
+    fx_parser_read_unstructured(parser, &type, offset, sizeof(type));
+    fx_parser_read_unstructured(parser, &class, offset + 4, sizeof(class));
+
+    if (class == D3DXPC_STRUCT)
+        name = "struct";
+    else
+        name = type < ARRAY_SIZE(types) ? types[type] : "<unknown>";
+
+    vkd3d_string_buffer_printf(&parser->buffer, "%s", name);
+    if (class == D3DXPC_VECTOR)
+    {
+        fx_parser_read_unstructured(parser, &columns, offset + 20, sizeof(columns));
+        fx_parser_read_unstructured(parser, &rows, offset + 24, sizeof(rows));
+        vkd3d_string_buffer_printf(&parser->buffer, "%u", columns);
+    }
+    else if (class == D3DXPC_MATRIX_ROWS || class == D3DXPC_MATRIX_COLUMNS)
+    {
+        fx_parser_read_unstructured(parser, &rows, offset + 20, sizeof(rows));
+        fx_parser_read_unstructured(parser, &columns, offset + 24, sizeof(columns));
+        vkd3d_string_buffer_printf(&parser->buffer, "%ux%u", rows, columns);
+    }
+
+    return fx_get_fx_2_type_size(parser, &offset);
+}
+
+static void parse_fx_2_numeric_value(struct fx_parser *parser, uint32_t offset,
+        unsigned int size, uint32_t base_type)
+{
+    unsigned int i, comp_count;
+
+    comp_count = size / sizeof(uint32_t);
+    if (comp_count > 1)
+        vkd3d_string_buffer_printf(&parser->buffer, "{");
+    for (i = 0; i < comp_count; ++i)
+    {
+        union hlsl_constant_value_component value;
+
+        fx_parser_read_unstructured(parser, &value, offset, sizeof(uint32_t));
+
+        if (base_type == D3DXPT_INT)
+            vkd3d_string_buffer_printf(&parser->buffer, "%d", value.i);
+        else if (base_type == D3DXPT_BOOL)
+            vkd3d_string_buffer_printf(&parser->buffer, "%s", value.u ? "true" : "false" );
+        else
+            vkd3d_string_buffer_print_f32(&parser->buffer, value.f);
+
+        if (i < comp_count - 1)
+            vkd3d_string_buffer_printf(&parser->buffer, ", ");
+
+        offset += sizeof(uint32_t);
+    }
+    if (comp_count > 1)
+        vkd3d_string_buffer_printf(&parser->buffer, "}");
+}
+
 static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
 {
-    if (count)
-        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing fx_2_0 annotations is not implemented.");
+    struct fx_2_var
+    {
+        uint32_t type;
+        uint32_t class;
+        uint32_t name;
+        uint32_t semantic;
+        uint32_t element_count;
+    } var;
+    uint32_t param, value;
+    unsigned int size;
+    const char *name;
+
+    if (parser->failed || !count)
+        return;
+
+    vkd3d_string_buffer_printf(&parser->buffer, "\n");
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "<\n");
+    parse_fx_start_indent(parser);
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        param = fx_parser_read_u32(parser);
+        value = fx_parser_read_u32(parser);
+
+        fx_parser_read_unstructured(parser, &var, param, sizeof(var));
+
+        parse_fx_print_indent(parser);
+        size = fx_parse_fx_2_type(parser, param);
+
+        name = fx_2_get_string(parser, var.name);
+        vkd3d_string_buffer_printf(&parser->buffer, " %s", name);
+        if (var.element_count)
+            vkd3d_string_buffer_printf(&parser->buffer, "[%u]", var.element_count);
+        vkd3d_string_buffer_printf(&parser->buffer, " = ");
+        if (var.element_count)
+            vkd3d_string_buffer_printf(&parser->buffer, "{ ");
+
+        if (var.type == D3DXPT_STRING)
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                    "Only numeric types are supported in annotations.");
+        else
+            parse_fx_2_numeric_value(parser, value, size, var.type);
+
+        if (var.element_count)
+            vkd3d_string_buffer_printf(&parser->buffer, " }");
+        vkd3d_string_buffer_printf(&parser->buffer, ";\n");
+    }
+
+    parse_fx_end_indent(parser);
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, ">");
 }
 
 static void fx_parse_fx_2_technique(struct fx_parser *parser)
