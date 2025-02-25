@@ -5637,6 +5637,7 @@ static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
         case HLSL_SAMPLER_DIM_CUBEARRAY:
         case HLSL_SAMPLER_DIM_BUFFER:
         case HLSL_SAMPLER_DIM_RAW_BUFFER:
+        case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
             /* Offset parameters not supported for these types. */
             return 0;
         default:
@@ -6554,19 +6555,25 @@ static bool add_object_property_access(struct hlsl_ctx *ctx,
     return false;
 }
 
-static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type *format,
-        const struct vkd3d_shader_location *loc)
+static void validate_texture_format_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
+        struct hlsl_type *format, const struct vkd3d_shader_location *loc)
 {
-    if (format->class > HLSL_CLASS_VECTOR)
-    {
-        struct vkd3d_string_buffer *string;
+    struct vkd3d_string_buffer *string;
 
-        string = hlsl_type_to_string(ctx, format);
-        if (string)
+    if (!(string = hlsl_type_to_string(ctx, format)))
+        return;
+
+    if (dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+    {
+        if (!type_contains_only_numerics(format))
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Texture data type %s is not scalar or vector.", string->buffer);
-        hlsl_release_string_buffer(ctx, string);
+                    "SRV type %s is not numeric.", string->buffer);
     }
+    else if (format->class > HLSL_CLASS_VECTOR)
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Texture data type %s is not scalar or vector.", string->buffer);
+
+    hlsl_release_string_buffer(ctx, string);
 }
 
 static bool check_continue(struct hlsl_ctx *ctx, const struct hlsl_scope *scope, const struct vkd3d_shader_location *loc)
@@ -6834,6 +6841,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_STATIC
 %token KW_STRING
 %token KW_STRUCT
+%token KW_STRUCTUREDBUFFER
 %token KW_SWITCH
 %token KW_TBUFFER
 %token KW_TECHNIQUE
@@ -7921,6 +7929,10 @@ texture_type:
         {
             $$ = HLSL_SAMPLER_DIM_BUFFER;
         }
+    | KW_STRUCTUREDBUFFER
+        {
+            $$ = HLSL_SAMPLER_DIM_STRUCTURED_BUFFER;
+        }
     | KW_TEXTURE1D
         {
             $$ = HLSL_SAMPLER_DIM_1D;
@@ -8144,16 +8156,19 @@ type_no_void:
         }
     | texture_type
         {
+            if ($1 == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Structured buffer type requires an explicit format.");
             $$ = hlsl_new_texture_type(ctx, $1, hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), 0);
         }
     | texture_type '<' resource_format '>'
         {
-            validate_texture_format_type(ctx, $3, &@3);
+            validate_texture_format_type(ctx, $1, $3, &@3);
             $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
         }
     | texture_ms_type '<' resource_format '>'
         {
-            validate_texture_format_type(ctx, $3, &@3);
+            validate_texture_format_type(ctx, $1, $3, &@3);
 
             $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
         }

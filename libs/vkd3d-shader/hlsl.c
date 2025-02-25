@@ -3219,11 +3219,13 @@ static void hlsl_dump_type(struct vkd3d_string_buffer *buffer, const struct hlsl
                 return;
             }
 
-            VKD3D_ASSERT(hlsl_is_numeric_type(type->e.resource.format));
-            VKD3D_ASSERT(type->e.resource.format->e.numeric.type < ARRAY_SIZE(base_types));
             if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
             {
                 vkd3d_string_buffer_printf(buffer, "Buffer<");
+            }
+            else if (type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+            {
+                vkd3d_string_buffer_printf(buffer, "StructuredBuffer<");
             }
             else
             {

@@ -11106,6 +11106,12 @@ static bool sm4_generate_vsir_instr_ld(struct hlsl_ctx *ctx,
 
     VKD3D_ASSERT(load->load_type == HLSL_RESOURCE_LOAD);
 
+    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+    {
+        hlsl_fixme(ctx, &load->node.loc, "Structured buffer loads.");
+        return false;
+    }
+
     multisampled = resource_type->class == HLSL_CLASS_TEXTURE
             && (resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
             || resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY);
