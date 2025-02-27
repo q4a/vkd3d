@@ -1400,6 +1400,17 @@ static unsigned int index_instructions(struct hlsl_block *block, unsigned int in
  *
  * we can copy-prop the load (@7) into a constant vector {123, 456}, but we
  * cannot easily vectorize the stores @3 and @6.
+ *
+ * Moreover, we implement a transformation that propagates loads with a single
+ * non-constant index in its deref path. Consider a load of the form
+ * var[[a0][a1]...[i]...[an]], where ak are integral constants, and i is an
+ * arbitrary non-constant node. If, for all j, the following holds:
+ *
+ *   var[[a0][a1]...[j]...[an]] = x[[c0*j + d0][c1*j + d1]...[cm*j + dm]],
+ *
+ * where ck, dk are constants, then we can replace the load with
+ * x[[c0*i + d0]...[cm*i + dm]]. This pass is implemented by
+ * copy_propagation_replace_with_deref().
  */
 
 struct copy_propagation_value
@@ -1757,6 +1768,332 @@ static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool component_index_from_deref_path_node(struct hlsl_ir_node *path_node,
+        struct hlsl_type *type, unsigned int *index)
+{
+    unsigned int idx, i;
+
+    if (path_node->type != HLSL_IR_CONSTANT)
+        return false;
+
+    idx = hlsl_ir_constant(path_node)->value.u[0].u;
+    *index = 0;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_VECTOR:
+            if (idx >= type->e.numeric.dimx)
+                return false;
+            *index = idx;
+            break;
+
+        case HLSL_CLASS_MATRIX:
+            if (idx >= hlsl_type_major_size(type))
+                return false;
+            if (hlsl_type_is_row_major(type))
+                *index = idx * type->e.numeric.dimx;
+            else
+                *index = idx * type->e.numeric.dimy;
+            break;
+
+        case HLSL_CLASS_ARRAY:
+            if (idx >= type->e.array.elements_count)
+                return false;
+            *index = idx * hlsl_type_component_count(type->e.array.type);
+            break;
+
+        case HLSL_CLASS_STRUCT:
+            for (i = 0; i < idx; ++i)
+                *index += hlsl_type_component_count(type->e.record.fields[i].type);
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    return true;
+}
+
+static bool nonconst_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
+        unsigned int *idx, unsigned int *base, unsigned int *scale, unsigned int *count)
+{
+    struct hlsl_type *type = deref->var->data_type;
+    bool found = false;
+    unsigned int i;
+
+    *base = 0;
+
+    for (i = 0; i < deref->path_len; ++i)
+    {
+        struct hlsl_ir_node *path_node = deref->path[i].node;
+        struct hlsl_type *next_type;
+
+        VKD3D_ASSERT(path_node);
+
+        /* We should always have generated a cast to UINT. */
+        VKD3D_ASSERT(hlsl_is_vec1(path_node->data_type) && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
+
+        next_type = hlsl_get_element_type_from_path_index(ctx, type, path_node);
+
+        if (path_node->type != HLSL_IR_CONSTANT)
+        {
+            if (found)
+                return false;
+            found = true;
+            *idx = i;
+            *scale = hlsl_type_component_count(next_type);
+            *count = hlsl_type_element_count(type);
+        }
+        else
+        {
+            unsigned int index;
+
+            if (!component_index_from_deref_path_node(path_node, type, &index))
+                return false;
+            *base += index;
+        }
+
+        type = next_type;
+    }
+
+    return found;
+}
+
+static struct hlsl_ir_node *new_affine_path_index(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
+        struct hlsl_block *block, struct hlsl_ir_node *index, int c, int d)
+{
+    struct hlsl_ir_node *c_node, *d_node, *ic, *idx;
+    bool use_uint = c >= 0 && d >= 0;
+
+    if (!c)
+    {
+        VKD3D_ASSERT(d >= 0);
+
+        return hlsl_block_add_uint_constant(ctx, block, d, loc);
+    }
+
+    if (use_uint)
+    {
+        c_node = hlsl_block_add_uint_constant(ctx, block, c, loc);
+        d_node = hlsl_block_add_uint_constant(ctx, block, d, loc);
+    }
+    else
+    {
+        c_node = hlsl_block_add_int_constant(ctx, block, c, loc);
+        d_node = hlsl_block_add_int_constant(ctx, block, d, loc);
+        index = hlsl_block_add_cast(ctx, block, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc);
+    }
+
+    ic = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_MUL, index, c_node);
+    idx = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_ADD, ic, d_node);
+    if (!use_uint)
+        idx = hlsl_block_add_cast(ctx, block, idx, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
+
+    return idx;
+}
+
+static bool copy_propagation_replace_with_deref(struct hlsl_ctx *ctx,
+        const struct copy_propagation_state *state, const struct hlsl_ir_load *load,
+        uint32_t swizzle, struct hlsl_ir_node *instr)
+{
+    const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
+    struct hlsl_ir_node *index, *new_instr = NULL;
+    const struct hlsl_deref *deref = &load->src;
+    unsigned int nonconst_i, base, scale, count;
+    const struct hlsl_ir_var *var = deref->var;
+    unsigned int time = load->node.index;
+    struct hlsl_deref tmp_deref = {0};
+    struct hlsl_ir_load *new_load;
+    struct hlsl_ir_var *x = NULL;
+    int *c = NULL, *d = NULL;
+    struct hlsl_block block;
+    unsigned int path_len;
+    bool success = false;
+    uint32_t ret_swizzle;
+    int i, j, k;
+
+    if (!nonconst_index_from_deref(ctx, deref, &nonconst_i, &base, &scale, &count))
+        return false;
+
+    if (hlsl_version_lt(ctx, 4, 0))
+    {
+        TRACE("Non-constant index propagation is not yet supported for SM1.\n");
+        return false;
+    }
+
+    VKD3D_ASSERT(count);
+
+    hlsl_block_init(&block);
+
+    index = deref->path[nonconst_i].node;
+
+    /* Iterate over the nonconst index, and check if their values all have the form
+     * x[[c0*i + d0][c1*i + d1]...[cm*i + dm]], and determine the constants c, d. */
+    for (i = 0; i < count; ++i)
+    {
+        unsigned int start = base + scale * i;
+        struct copy_propagation_value *value;
+        struct hlsl_ir_load *idx;
+        uint32_t cur_swizzle = 0;
+
+        if (!(value = copy_propagation_get_value(state, var,
+                start + hlsl_swizzle_get_component(swizzle, 0), time)))
+            goto done;
+
+        if (value->node->type != HLSL_IR_LOAD)
+            goto done;
+        idx = hlsl_ir_load(value->node);
+
+        if (!x)
+            x = idx->src.var;
+        else if (x != idx->src.var)
+            goto done;
+
+        if (i == 0)
+        {
+            path_len = idx->src.path_len;
+
+            if (path_len)
+            {
+                if (!(c = hlsl_calloc(ctx, path_len, sizeof(c[0])))
+                        || !(d = hlsl_alloc(ctx, path_len * sizeof(d[0]))))
+                    goto done;
+            }
+
+            for (k = 0; k < path_len; ++k)
+            {
+                if (idx->src.path[k].node->type != HLSL_IR_CONSTANT)
+                    goto done;
+                d[k] = hlsl_ir_constant(idx->src.path[k].node)->value.u[0].u;
+            }
+
+        }
+        else if (i == 1)
+        {
+            struct hlsl_type *type = idx->src.var->data_type;
+
+            if (idx->src.path_len != path_len)
+                goto done;
+
+            /* Calculate constants c and d based on the first two path indices. */
+            for (k = 0; k < path_len; ++k)
+            {
+                int ix;
+
+                if (idx->src.path[k].node->type != HLSL_IR_CONSTANT)
+                    goto done;
+                ix = hlsl_ir_constant(idx->src.path[k].node)->value.u[0].u;
+                c[k] = ix - d[k];
+                d[k] = ix - c[k] * i;
+
+                if (c[k] && type->class == HLSL_CLASS_STRUCT)
+                    goto done;
+
+                type = hlsl_get_element_type_from_path_index(ctx, type, idx->src.path[k].node);
+            }
+        }
+        else
+        {
+            if (idx->src.path_len != path_len)
+                goto done;
+
+            /* Check that this load has the form x[[c0*i +d0][c1*i + d1]...[cm*i + dm]]. */
+            for (k = 0; k < path_len; ++k)
+            {
+                if (idx->src.path[k].node->type != HLSL_IR_CONSTANT)
+                    goto done;
+                if (hlsl_ir_constant(idx->src.path[k].node)->value.u[0].u != c[k] * i + d[k])
+                    goto done;
+            }
+        }
+
+        hlsl_swizzle_set_component(&cur_swizzle, 0, value->component);
+
+        for (j = 1; j < instr_component_count; ++j)
+        {
+            struct copy_propagation_value *val;
+
+            if (!(val = copy_propagation_get_value(state, var,
+                    start + hlsl_swizzle_get_component(swizzle, j), time)))
+                goto done;
+            if (val->node != &idx->node)
+                goto done;
+
+            hlsl_swizzle_set_component(&cur_swizzle, j, val->component);
+        }
+
+        if (i == 0)
+            ret_swizzle = cur_swizzle;
+        else if (ret_swizzle != cur_swizzle)
+            goto done;
+    }
+
+    if (!hlsl_init_deref(ctx, &tmp_deref, x, path_len))
+        goto done;
+
+    for (k = 0; k < path_len; ++k)
+    {
+        hlsl_src_from_node(&tmp_deref.path[k],
+                new_affine_path_index(ctx, &load->node.loc, &block, index, c[k], d[k]));
+    }
+
+    if (!(new_load = hlsl_new_load_index(ctx, &tmp_deref, NULL, &load->node.loc)))
+        goto done;
+    new_instr = &new_load->node;
+    hlsl_block_add_instr(&block, new_instr);
+
+    if (new_instr->data_type->class == HLSL_CLASS_SCALAR || new_instr->data_type->class == HLSL_CLASS_VECTOR)
+    {
+        struct hlsl_ir_node *swizzle_node;
+
+        if (!(swizzle_node = hlsl_new_swizzle(ctx, ret_swizzle, instr_component_count, new_instr, &instr->loc)))
+            goto done;
+        hlsl_block_add_instr(&block, swizzle_node);
+        new_instr = swizzle_node;
+    }
+
+    if (TRACE_ON())
+    {
+        struct vkd3d_string_buffer buffer;
+
+        vkd3d_string_buffer_init(&buffer);
+
+        vkd3d_string_buffer_printf(&buffer, "Load from %s[", var->name);
+        for (j = 0; j < deref->path_len; ++j)
+        {
+            if (j == nonconst_i)
+                vkd3d_string_buffer_printf(&buffer, "[i]");
+            else
+                vkd3d_string_buffer_printf(&buffer, "[%u]", hlsl_ir_constant(deref->path[j].node)->value.u[0].u);
+        }
+        vkd3d_string_buffer_printf(&buffer, "]%s propagated as %s[",
+                debug_hlsl_swizzle(swizzle, instr_component_count), tmp_deref.var->name);
+        for (k = 0; k < path_len; ++k)
+        {
+            if (c[k])
+                vkd3d_string_buffer_printf(&buffer, "[i*%d + %d]", c[k], d[k]);
+            else
+                vkd3d_string_buffer_printf(&buffer, "[%d]", d[k]);
+        }
+        vkd3d_string_buffer_printf(&buffer, "]%s (i = %p).\n",
+                debug_hlsl_swizzle(ret_swizzle, instr_component_count), index);
+
+        vkd3d_string_buffer_trace(&buffer);
+        vkd3d_string_buffer_cleanup(&buffer);
+    }
+
+    list_move_before(&instr->entry, &block.instrs);
+    hlsl_replace_node(instr, new_instr);
+    success = true;
+
+done:
+    hlsl_cleanup_deref(&tmp_deref);
+    hlsl_block_cleanup(&block);
+    vkd3d_free(c);
+    vkd3d_free(d);
+    return success;
+}
+
 static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         struct hlsl_ir_load *load, struct copy_propagation_state *state)
 {
@@ -1811,6 +2148,9 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
     if (copy_propagation_replace_with_single_instr(ctx, state, load, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
         return true;
 
+    if (copy_propagation_replace_with_deref(ctx, state, load, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
+        return true;
+
     return false;
 }
 
@@ -1827,6 +2167,9 @@ static bool copy_propagation_transform_swizzle(struct hlsl_ctx *ctx,
         return true;
 
     if (copy_propagation_replace_with_single_instr(ctx, state, load, swizzle->u.vector, &swizzle->node))
+        return true;
+
+    if (copy_propagation_replace_with_deref(ctx, state, load, swizzle->u.vector, &swizzle->node))
         return true;
 
     return false;
@@ -5902,53 +6245,6 @@ static void allocate_objects(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     }
 }
 
-static bool component_index_from_deref_path_node(struct hlsl_ir_node *path_node,
-        struct hlsl_type *type, unsigned int *index)
-{
-    unsigned int idx;
-    unsigned int i;
-
-    if (path_node->type != HLSL_IR_CONSTANT)
-        return false;
-
-    idx = hlsl_ir_constant(path_node)->value.u[0].u;
-    *index = 0;
-
-    switch (type->class)
-    {
-        case HLSL_CLASS_VECTOR:
-            if (idx >= type->e.numeric.dimx)
-                return false;
-            *index = idx;
-            break;
-
-        case HLSL_CLASS_MATRIX:
-            if (idx >= hlsl_type_major_size(type))
-                return false;
-            if (hlsl_type_is_row_major(type))
-                *index = idx * type->e.numeric.dimx;
-            else
-                *index = idx * type->e.numeric.dimy;
-            break;
-
-        case HLSL_CLASS_ARRAY:
-            if (idx >= type->e.array.elements_count)
-                return false;
-            *index = idx * hlsl_type_component_count(type->e.array.type);
-            break;
-
-        case HLSL_CLASS_STRUCT:
-            for (i = 0; i < idx; ++i)
-                *index += hlsl_type_component_count(type->e.record.fields[i].type);
-            break;
-
-        default:
-            vkd3d_unreachable();
-    }
-
-    return true;
-}
-
 bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         unsigned int *start, unsigned int *count)
 {
@@ -6610,6 +6906,7 @@ static void hlsl_run_folding_passes(struct hlsl_ctx *ctx, struct hlsl_block *bod
         progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
         progress |= hlsl_transform_ir(ctx, remove_trivial_conditional_branches, body, NULL);
     } while (progress);
+    hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL);
 }
 
 void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
