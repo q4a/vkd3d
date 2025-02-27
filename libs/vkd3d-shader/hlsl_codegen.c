@@ -7207,7 +7207,7 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
         }
         else
         {
-            unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref) + var->buffer_offset;
+            unsigned int offset = deref->const_offset + var->buffer_offset;
 
             VKD3D_ASSERT(data_type->class <= HLSL_CLASS_VECTOR);
             reg->type = VKD3DSPR_CONSTBUFFER;
@@ -7225,6 +7225,14 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
                 reg->idx[1].offset = offset / 4;
                 reg->idx_count = 2;
             }
+
+            if (deref->rel_offset.node)
+            {
+                if (!(reg->idx[reg->idx_count - 1].rel_addr = sm4_generate_vsir_new_idx_src(ctx,
+                        program, deref->rel_offset.node)))
+                    return false;
+            }
+
             *writemask = ((1u << data_type->e.numeric.dimx) - 1) << (offset & 3);
         }
     }
