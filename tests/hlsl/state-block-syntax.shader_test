@@ -653,7 +653,7 @@ DepthStencilState dss1
     RandomField = vec.w;
 };
 
-[pixel shader todo]
+[pixel shader]
 sampler sams
 {
     Filter = <ANISOTROPIC>;

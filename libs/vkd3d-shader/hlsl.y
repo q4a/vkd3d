@@ -8642,6 +8642,26 @@ state_block:
             $$ = $1;
             hlsl_state_block_add_entry($$, entry);
         }
+    | state_block stateblock_lhs_identifier state_block_index_opt '=' '<' primary_expr '>' ';'
+        {
+            struct hlsl_state_block_entry *entry;
+
+            if (!(entry = hlsl_alloc(ctx, sizeof(*entry))))
+                YYABORT;
+
+            entry->name = $2;
+            entry->lhs_has_index = $3.has_index;
+            entry->lhs_index = $3.index;
+
+            entry->instrs = $6;
+            entry->args_count = 1;
+            if (!(entry->args = hlsl_alloc(ctx, sizeof(*entry->args) * entry->args_count)))
+                YYABORT;
+            hlsl_src_from_node(&entry->args[0], node_from_block($6));
+
+            $$ = $1;
+            hlsl_state_block_add_entry($$, entry);
+        }
     | state_block any_identifier '(' func_arguments ')' ';'
         {
             struct hlsl_state_block_entry *entry;
