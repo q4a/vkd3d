@@ -4222,7 +4222,7 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_bloc
     return hlsl_block_add_expr(ctx, instrs, HLSL_OP3_TERNARY, operands, if_true->data_type, &condition->loc);
 }
 
-static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+static bool lower_int_division_sm4(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_node *arg1, *arg2, *xor, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3, *high_bit;
     struct hlsl_type *type = instr->data_type, *utype;
@@ -4262,7 +4262,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     return hlsl_add_conditional(ctx, block, and, neg, cast3);
 }
 
-static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+static bool lower_int_modulus_sm4(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_node *arg1, *arg2, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3, *high_bit;
     struct hlsl_type *type = instr->data_type, *utype;
@@ -7067,8 +7067,11 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 
     lower_ir(ctx, lower_narrowing_casts, body);
     lower_ir(ctx, lower_int_dot, body);
-    lower_ir(ctx, lower_int_division, body);
-    lower_ir(ctx, lower_int_modulus, body);
+    if (hlsl_version_ge(ctx, 4, 0))
+    {
+        lower_ir(ctx, lower_int_modulus_sm4, body);
+        lower_ir(ctx, lower_int_division_sm4, body);
+    }
     lower_ir(ctx, lower_int_abs, body);
     lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_float_modulus, body);
