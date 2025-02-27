@@ -6087,10 +6087,13 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
 {
     const struct hlsl_ir_var *var = deref->var;
     struct hlsl_reg ret = var->regs[HLSL_REGSET_NUMERIC];
-    unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
+    unsigned int offset = 0;
 
     VKD3D_ASSERT(deref->data_type);
     VKD3D_ASSERT(hlsl_is_numeric_type(deref->data_type));
+
+    if (!hlsl_type_is_patch_array(deref->var->data_type))
+        offset = hlsl_offset_from_deref_safe(ctx, deref);
 
     ret.index += offset / 4;
     ret.id += offset / 4;
