@@ -3499,24 +3499,11 @@ static bool sort_synthetic_separated_samplers_first(struct hlsl_ctx *ctx)
     return false;
 }
 
-/* Turn CAST to int or uint as follows:
- *
- *     CAST(x) = x - FRACT(x) + extra
- *
- * where
- *
- *      extra = FRACT(x) > 0 && x < 0
- *
- * where the comparisons in the extra term are performed using CMP or SLT
- * depending on whether this is a pixel or vertex shader, respectively.
- *
- * A REINTERPET (which is written as a mere MOV) is also applied to the final
- * result for type consistency.
- */
+/* Turn CAST to int or uint into TRUNC + REINTERPRET */
 static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
-    struct hlsl_ir_node *arg, *res;
+    struct hlsl_ir_node *arg, *trunc;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -3528,8 +3515,41 @@ static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     arg = expr->operands[0].node;
     if (!hlsl_type_is_integer(instr->data_type) || instr->data_type->e.numeric.type == HLSL_TYPE_BOOL)
         return false;
-    if (arg->data_type->e.numeric.type != HLSL_TYPE_FLOAT && arg->data_type->e.numeric.type != HLSL_TYPE_HALF)
+    if (!hlsl_type_is_floating_point(arg->data_type))
         return false;
+
+    trunc = hlsl_block_add_unary_expr(ctx, block, HLSL_OP1_TRUNC, arg, &instr->loc);
+
+    memset(operands, 0, sizeof(operands));
+    operands[0] = trunc;
+    hlsl_block_add_expr(ctx, block, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc);
+
+    return true;
+}
+
+/* Turn TRUNC into:
+ *
+ *     TRUNC(x) = x - FRACT(x) + extra
+ *
+ * where
+ *
+ *      extra = FRACT(x) > 0 && x < 0
+ *
+ * where the comparisons in the extra term are performed using CMP or SLT
+ * depending on whether this is a pixel or vertex shader, respectively.
+ */
+static bool lower_trunc(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *arg, *res;
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op != HLSL_OP1_TRUNC)
+        return false;
+
+    arg = expr->operands[0].node;
 
     if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
     {
@@ -3579,9 +3599,6 @@ static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         hlsl_block_add_instr(block, res);
     }
 
-    memset(operands, 0, sizeof(operands));
-    operands[0] = res;
-    hlsl_block_add_expr(ctx, block, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc);
     return true;
 }
 
@@ -12516,6 +12533,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         lower_ir(ctx, lower_casts_to_bool, body);
 
         lower_ir(ctx, lower_casts_to_int, body);
+        lower_ir(ctx, lower_trunc, body);
         lower_ir(ctx, lower_sqrt, body);
         lower_ir(ctx, lower_dot, body);
         lower_ir(ctx, lower_round, body);
