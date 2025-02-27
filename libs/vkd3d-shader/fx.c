@@ -3548,7 +3548,7 @@ static void fx_4_parse_fxlc_argument(struct fx_parser *parser, uint32_t offset, 
             for (unsigned int i = 1; i < code->comp_count; ++i)
             {
                 vkd3d_string_buffer_printf(&parser->buffer, ", ");
-                vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg.address + code->scalar ? 0 : i]);
+                vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg.address + (code->scalar ? 0 : i)]);
             }
             vkd3d_string_buffer_printf(&parser->buffer, ")");
             break;
