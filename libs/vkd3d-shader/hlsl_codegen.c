@@ -3677,7 +3677,30 @@ static bool lower_stream_appends(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     hlsl_src_remove(&store->value);
 
     return true;
+}
 
+static void split_resource_load(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
+        struct hlsl_ir_resource_load *load, const unsigned int idx, struct hlsl_type *type)
+{
+    struct hlsl_ir_resource_load *vector_load;
+    struct hlsl_ir_node *c, *idx_offset;
+    struct hlsl_block block;
+
+    hlsl_block_init(&block);
+
+    c = hlsl_block_add_uint_constant(ctx, &block, idx, &store->node.loc);
+    idx_offset = hlsl_block_add_packed_index_offset_append(ctx, &block,
+            load->byte_offset.node, c, load->node.data_type, &store->node.loc);
+
+    vector_load = hlsl_ir_resource_load(hlsl_clone_instr(ctx, &load->node));
+    hlsl_src_remove(&vector_load->byte_offset);
+    hlsl_src_from_node(&vector_load->byte_offset, idx_offset);
+    vector_load->node.data_type = type;
+    hlsl_block_add_instr(&block, &vector_load->node);
+
+    hlsl_block_add_store_index(ctx, &block, &store->lhs, c, &vector_load->node, 0, &store->node.loc);
+
+    list_move_before(&store->node.entry, &block.instrs);
 }
 
 static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -3698,16 +3721,32 @@ static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
     element_type = hlsl_get_vector_type(ctx, type->e.numeric.type, hlsl_type_minor_size(type));
 
-    if (rhs->type != HLSL_IR_LOAD)
+    if (rhs->type != HLSL_IR_LOAD && rhs->type != HLSL_IR_RESOURCE_LOAD)
     {
         hlsl_fixme(ctx, &instr->loc, "Copying from unsupported node type.");
         return false;
     }
 
-    for (i = 0; i < hlsl_type_major_size(type); ++i)
+    if (rhs->type == HLSL_IR_RESOURCE_LOAD)
     {
-        if (!split_copy(ctx, store, hlsl_ir_load(rhs), i, element_type))
-            return false;
+        /* As we forbid non-scalar or vector types in non-structured resource
+         * loads, this is specific to structured buffer loads. */
+        struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(rhs);
+
+        VKD3D_ASSERT(hlsl_deref_get_type(ctx, &load->resource)->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER);
+
+        for (i = 0; i < hlsl_type_major_size(type); ++i)
+        {
+            split_resource_load(ctx, store, load, i, element_type);
+        }
+    }
+    else
+    {
+        for (i = 0; i < hlsl_type_major_size(type); ++i)
+        {
+            if (!split_copy(ctx, store, hlsl_ir_load(rhs), i, element_type))
+                return false;
+        }
     }
 
     list_remove(&store->node.entry);
