@@ -216,6 +216,7 @@ struct spirv_colours
     const char *comment;
     const char *literal;
     const char *opcode;
+    const char *id;
 };
 
 struct spirv_parser
@@ -312,6 +313,13 @@ static void spirv_parser_print_immediate_word(struct spirv_parser *parser,
             prefix, parser->colours.literal, w, parser->colours.reset, suffix);
 }
 
+static void spirv_parser_print_id(struct spirv_parser *parser,
+        struct vkd3d_string_buffer *buffer, const char *prefix, uint32_t id, const char *suffix)
+{
+    vkd3d_string_buffer_printf(buffer, "%s%%%s%u%s%s",
+            prefix, parser->colours.id, id, parser->colours.reset, suffix);
+}
+
 static void spirv_parser_print_opcode(struct spirv_parser *parser,
         struct vkd3d_string_buffer *buffer, const char *name)
 {
@@ -323,6 +331,13 @@ static void spirv_parser_print_instruction_offset(struct spirv_parser *parser,
 {
     vkd3d_string_buffer_printf(parser->text, "%s%s; 0x%08zx%s%s", prefix,
             parser->colours.comment, offset * sizeof(uint32_t), parser->colours.reset, suffix);
+}
+
+static const struct spirv_parser_operand_type_info *spirv_parser_get_operand_type_info(enum spirv_parser_operand_type t)
+{
+    if (t >= ARRAY_SIZE(spirv_parser_operand_type_info))
+        return NULL;
+    return &spirv_parser_operand_type_info[t];
 }
 
 static int spirv_parser_opcode_info_compare(const void *key, const void *element)
@@ -406,6 +421,37 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
     return VKD3D_OK;
 }
 
+static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d_string_buffer *buffer,
+        const char *opcode_name, enum spirv_parser_operand_type type, size_t end)
+{
+    const struct spirv_parser_operand_type_info *info;
+
+    if (parser->pos >= end)
+    {
+        spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Insufficient words remaining while parsing operands for instruction \"%s\".", opcode_name);
+        return false;
+    }
+
+    if (!(info = spirv_parser_get_operand_type_info(type)))
+    {
+        ERR("Invalid operand type %#x.\n", type);
+        return false;
+    }
+
+    switch (type)
+    {
+        case SPIRV_PARSER_OPERAND_TYPE_ID_REF:
+            spirv_parser_print_id(parser, buffer, " ", spirv_parser_read_u32(parser), "");
+            return true;
+
+        default:
+            spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                    "Unhandled operand type \"%s\".", info->name);
+            return false;
+    }
+}
+
 static void spirv_parser_parse_raw_instruction(struct spirv_parser *parser, uint16_t count)
 {
     size_t pos = parser->pos;
@@ -424,17 +470,19 @@ static void spirv_parser_parse_raw_instruction(struct spirv_parser *parser, uint
 
 static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *parser)
 {
+    const struct spirv_parser_instruction_operand *operand;
     const struct spirv_parser_opcode_info *info;
-    uint16_t op, count;
+    struct vkd3d_string_buffer *operands;
+    uint16_t op, count, rem;
+    size_t end, pos, i;
     uint32_t word;
-    size_t pos;
 
     pos = parser->pos;
     word = spirv_parser_read_u32(parser);
     count = (word & VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_MASK) >> VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_SHIFT;
     op = (word & VKD3D_SPIRV_INSTRUCTION_OP_MASK) >> VKD3D_SPIRV_INSTRUCTION_OP_SHIFT;
 
-    if (!count)
+    if (!count || count > parser->size - pos)
     {
         spirv_parser_error(parser, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
                 "Invalid word count %u.", count);
@@ -448,19 +496,44 @@ static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *par
         goto raw;
     }
 
-    if (info->operand_count)
+    operands = vkd3d_string_buffer_get(&parser->string_buffers);
+
+    for (i = 0, end = pos + count; i < info->operand_count; ++i)
+    {
+        operand = &info->operands[i];
+
+        do
+        {
+            if (parser->pos >= end && (operand->quantifier == '?' || operand->quantifier == '*'))
+                break;
+
+            if (!spirv_parser_parse_operand(parser, operands, info->name, operand->type, end))
+            {
+                vkd3d_string_buffer_release(&parser->string_buffers, operands);
+                goto raw;
+            }
+        } while (operand->quantifier == '*' && parser->pos < end);
+    }
+
+    if ((rem = end - parser->pos))
     {
         spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
-                "Operands for instruction \"%s\" not handled.", info->name);
-        goto raw;
+                "%u word(s) remaining after parsing all operands for instruction \"%s\"", rem, info->name);
+        for (i = 0; i < rem; ++i)
+        {
+            spirv_parser_print_immediate_word(parser, operands, " ", spirv_parser_read_u32(parser), "");
+        }
     }
 
     if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT)
         vkd3d_string_buffer_printf(parser->text, "%*s", VKD3D_SPIRV_INDENT, "");
     spirv_parser_print_opcode(parser, parser->text, info->name);
+    vkd3d_string_buffer_printf(parser->text, "%s", operands->buffer);
     if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_OFFSETS)
         spirv_parser_print_instruction_offset(parser, parser->text, " ", pos, "");
     vkd3d_string_buffer_printf(parser->text, "\n");
+
+    vkd3d_string_buffer_release(&parser->string_buffers, operands);
 
     return VKD3D_OK;
 
@@ -523,6 +596,7 @@ static enum vkd3d_result spirv_parser_init(struct spirv_parser *parser, const st
         .comment = "",
         .literal = "",
         .opcode = "",
+        .id = "",
     };
     static const struct spirv_colours colours =
     {
@@ -530,6 +604,7 @@ static enum vkd3d_result spirv_parser_init(struct spirv_parser *parser, const st
         .comment = "\x1b[36m",
         .literal = "\x1b[95m",
         .opcode = "\x1b[96;1m",
+        .id = "\x1b[96m",
     };
 
     memset(parser, 0, sizeof(*parser));
