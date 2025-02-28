@@ -310,6 +310,13 @@ static void spirv_parser_print_immediate_word(struct spirv_parser *parser,
             prefix, parser->colours.literal, w, parser->colours.reset, suffix);
 }
 
+static void spirv_parser_print_instruction_offset(struct spirv_parser *parser,
+        struct vkd3d_string_buffer *buffer, const char *prefix, size_t offset, const char *suffix)
+{
+    vkd3d_string_buffer_printf(parser->text, "%s%s; 0x%08zx%s%s", prefix,
+            parser->colours.comment, offset * sizeof(uint32_t), parser->colours.reset, suffix);
+}
+
 static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
 {
     uint32_t magic, version, generator, bound, schema;
@@ -382,7 +389,9 @@ static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *par
     uint16_t op, count;
     unsigned int i;
     uint32_t word;
+    size_t pos;
 
+    pos = parser->pos;
     word = spirv_parser_read_u32(parser);
     count = (word & VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_MASK) >> VKD3D_SPIRV_INSTRUCTION_WORD_COUNT_SHIFT;
     op = (word & VKD3D_SPIRV_INSTRUCTION_OP_MASK) >> VKD3D_SPIRV_INSTRUCTION_OP_SHIFT;
@@ -403,6 +412,8 @@ static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *par
     {
         spirv_parser_print_immediate_word(parser, parser->text, " ", spirv_parser_read_u32(parser), "");
     }
+    if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_OFFSETS)
+        spirv_parser_print_instruction_offset(parser, parser->text, " ", pos, "");
     vkd3d_string_buffer_printf(parser->text, "\n");
 
     spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
