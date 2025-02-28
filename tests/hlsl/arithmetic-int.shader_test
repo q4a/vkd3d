@@ -165,3 +165,17 @@ float4 main() : sv_target
 draw quad
 todo if(sm<4) probe (0, 0) rgba(16782202, 16782200, 0, 0)
 if(sm>=4) probe (0, 0) rgba(16782202, 16782202, 0, 0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    int a = 16777217;  // This rounds down to 16777216 when converted to float.
+    int b = 10;
+
+    return float4(a % b, a % (-b), (-a) % b, (-a) % (-b));
+}
+
+[test]
+draw quad
+todo if(sm<4) probe (0, 0) rgba(7, 7, -6, -6)
+if(sm>=4) probe (0, 0) rgba(7, 7, -7, -7)
