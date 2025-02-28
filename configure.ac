@@ -5,6 +5,7 @@ AC_CONFIG_AUX_DIR([bin])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(include/config.h)
 
+AC_ARG_VAR([PERL], [The Perl 5 language interpreter])
 AC_ARG_VAR([WIDL], [widl IDL compiler])
 AC_ARG_VAR([CROSSCC32], [32-bit Windows cross compiler])
 AC_ARG_VAR([CROSSCC64], [64-bit Windows cross compiler])
@@ -31,6 +32,11 @@ AC_PROG_SED
 AC_PROG_MKDIR_P
 VKD3D_PROG_WIDL(3, 21)
 AS_IF([test "x$WIDL" = "xno"], [AC_MSG_WARN([widl is required to build header files.])])
+
+AC_CHECK_PROGS([PERL], [perl], [none])
+AS_IF([test "$PERL" = "none"], [AC_MSG_ERROR([no suitable perl found. Please install the 'perl-base' package.])])
+VKD3D_CHECK_PERL_MODULE([JSON],
+                        [AC_MSG_ERROR([perl module 'JSON' not found. Please install the 'libjson-perl' package.])])
 
 AC_CHECK_PROGS([FLEX], [flex], [none])
 AS_IF([test "$FLEX" = "none"], [AC_MSG_ERROR([no suitable flex found. Please install the 'flex' package.])])

@@ -2,6 +2,7 @@ ACLOCAL_AMFLAGS = -I m4
 AM_CFLAGS = @VKD3D_CFLAGS@
 AM_CPPFLAGS = -I$(srcdir)/include -I$(srcdir)/include/private -I$(builddir)/include/private
 AM_LDFLAGS = -no-undefined
+VKD3D_PERL = $(PERL) -w
 
 widl_headers = \
 	include/vkd3d_d3d12.h \
@@ -319,6 +320,7 @@ vkd3d_demos_headers = \
 	demos/demo_xcb.h
 
 BUILT_SOURCES = $(widl_headers) \
+	include/private/spirv_grammar.h \
 	include/private/vkd3d_version.h
 
 noinst_LTLIBRARIES = libvkd3d-common.la
@@ -377,6 +379,7 @@ nodist_libvkd3d_shader_la_SOURCES = $(vkd3d_shader_yyfiles)
 libvkd3d_shader_la_SOURCES = \
 	include/private/list.h \
 	include/private/rbtree.h \
+	include/private/spirv_grammar.h \
 	include/private/vkd3d_common.h \
 	include/private/vkd3d_memory.h \
 	include/vkd3d_shader.h \
@@ -578,6 +581,15 @@ libvkd3d.pc: $(srcdir)/libs/vkd3d/libvkd3d.pc.in Makefile
 		-e 's![@]PACKAGE_VERSION[@]!$(PACKAGE_VERSION)!g' \
 		$< > $@
 
+VKD3D_V_PERL = $(vkd3d_v_perl_@AM_V@)
+vkd3d_v_perl_ = $(vkd3d_v_perl_@AM_DEFAULT_V@)
+vkd3d_v_perl_0 = @echo "  PERL    " $@;
+vkd3d_v_perl_1 =
+
+include/private/spirv_grammar.h: libs/vkd3d-shader/make_spirv include/private/spirv.core.grammar.json
+	@$(MKDIR_P) $(@D)
+	$(VKD3D_V_PERL)$(VKD3D_PERL) $^ > $@.tmp && mv $@.tmp $@
+
 include/private/vkd3d_version.h: dummy-vkd3d-version
 	@$(MKDIR_P) include/private
 	version=`(GIT_DIR=$(top_srcdir)/.git git rev-parse --short HEAD 2>/dev/null || echo '') \
@@ -586,7 +598,7 @@ include/private/vkd3d_version.h: dummy-vkd3d-version
 		&& (echo $$version | cmp -s - $@) \
 		|| echo $$version >$@ || ($(RM) $@ && exit 1)
 .SILENT: include/private/vkd3d_version.h
-CLEANFILES += include/private/vkd3d_version.h
+CLEANFILES += include/private/spirv_grammar.h include/private/vkd3d_version.h
 
 .PHONY: dummy-vkd3d-version
 dummy-vkd3d-version:
