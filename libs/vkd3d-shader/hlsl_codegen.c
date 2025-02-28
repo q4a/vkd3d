@@ -3587,6 +3587,45 @@ static bool lower_trunc(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct
     return true;
 }
 
+/* Lower modulus using:
+ *
+ *     mod(x, y) = x - trunc(x / y) * y;
+ *
+ */
+static bool lower_int_modulus_sm1(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *div, *trunc, *mul, *neg, *operands[2], *ret;
+    struct hlsl_type *float_type;
+    struct hlsl_ir_expr *expr;
+    bool is_float;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op != HLSL_OP2_MOD)
+        return false;
+
+    is_float = instr->data_type->e.numeric.type == HLSL_TYPE_FLOAT
+            || instr->data_type->e.numeric.type == HLSL_TYPE_HALF;
+    if (is_float)
+        return false;
+    float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, instr->data_type->e.numeric.dimx);
+
+    for (unsigned int i = 0; i < 2; ++i)
+    {
+        operands[i] = hlsl_block_add_cast(ctx, block, expr->operands[i].node, float_type, &instr->loc);
+    }
+
+    div = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_DIV, operands[0], operands[1]);
+    trunc = hlsl_block_add_unary_expr(ctx, block, HLSL_OP1_TRUNC, div, &instr->loc);
+    mul = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_MUL, trunc, operands[1]);
+    neg = hlsl_block_add_unary_expr(ctx, block, HLSL_OP1_NEG, mul, &instr->loc);
+    ret = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_ADD, operands[0], neg);
+    hlsl_block_add_cast(ctx, block, ret, instr->data_type, &instr->loc);
+
+    return true;
+}
+
 /* Lower DIV to RCP + MUL. */
 static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
@@ -12698,6 +12737,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         while (lower_ir(ctx, lower_nonconstant_array_loads, body));
 
         lower_ir(ctx, lower_ternary, body);
+        lower_ir(ctx, lower_int_modulus_sm1, body);
         lower_ir(ctx, lower_division, body);
         /* Constants casted to float must be folded, and new casts to bool also need to be lowered. */
         hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
