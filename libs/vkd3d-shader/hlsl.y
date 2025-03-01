@@ -1616,30 +1616,12 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
     return hlsl_block_add_expr(ctx, block, op, operands, type, loc);
 }
 
-static bool type_is_integer(enum hlsl_base_type type)
-{
-    switch (type)
-    {
-        case HLSL_TYPE_BOOL:
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-            return true;
-
-        case HLSL_TYPE_DOUBLE:
-        case HLSL_TYPE_FLOAT:
-        case HLSL_TYPE_HALF:
-            return false;
-    }
-
-    vkd3d_unreachable();
-}
-
 static void check_integer_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_type *type = instr->data_type;
     struct vkd3d_string_buffer *string;
 
-    if (type_is_integer(type->e.numeric.type))
+    if (hlsl_type_is_integer(type))
         return;
 
     if ((string = hlsl_type_to_string(ctx, type)))
@@ -3161,7 +3143,7 @@ static struct hlsl_ir_node *intrinsic_float_convert_arg(struct hlsl_ctx *ctx,
 {
     struct hlsl_type *type = arg->data_type;
 
-    if (!type_is_integer(type->e.numeric.type))
+    if (!hlsl_type_is_integer(type))
         return arg;
 
     type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->e.numeric.dimx, type->e.numeric.dimy);
@@ -3253,7 +3235,7 @@ static bool elementwise_intrinsic_float_convert_args(struct hlsl_ctx *ctx,
 
     if (!(type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
         return false;
-    if (type_is_integer(type->e.numeric.type))
+    if (hlsl_type_is_integer(type))
         type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->e.numeric.dimx, type->e.numeric.dimy);
 
     return convert_args(ctx, params, type, loc);
@@ -3676,7 +3658,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
     enum hlsl_base_type base;
 
     base = expr_common_base_type(arg1->data_type->e.numeric.type, arg2->data_type->e.numeric.type);
-    if (type_is_integer(base))
+    if (hlsl_base_type_is_integer(base))
         base = HLSL_TYPE_FLOAT;
 
     cast_type = hlsl_get_vector_type(ctx, base, 3);

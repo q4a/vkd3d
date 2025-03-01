@@ -1696,6 +1696,8 @@ void hlsl_pop_scope(struct hlsl_ctx *ctx);
 
 bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type);
 
+bool hlsl_base_type_is_integer(enum hlsl_base_type type);
+
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         unsigned int default_majority, uint32_t modifiers);
 unsigned int hlsl_type_component_count(const struct hlsl_type *type);
@@ -1710,6 +1712,7 @@ bool hlsl_type_is_row_major(const struct hlsl_type *type);
 unsigned int hlsl_type_minor_size(const struct hlsl_type *type);
 unsigned int hlsl_type_major_size(const struct hlsl_type *type);
 unsigned int hlsl_type_element_count(const struct hlsl_type *type);
+bool hlsl_type_is_integer(const struct hlsl_type *type);
 bool hlsl_type_is_resource(const struct hlsl_type *type);
 bool hlsl_type_is_shader(const struct hlsl_type *type);
 bool hlsl_type_is_patch_array(const struct hlsl_type *type);

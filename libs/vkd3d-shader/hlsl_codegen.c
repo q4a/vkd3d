@@ -8723,13 +8723,6 @@ static bool type_is_float(const struct hlsl_type *type)
     return type->e.numeric.type == HLSL_TYPE_FLOAT || type->e.numeric.type == HLSL_TYPE_HALF;
 }
 
-static bool type_is_integer(const struct hlsl_type *type)
-{
-    return type->e.numeric.type == HLSL_TYPE_BOOL
-            || type->e.numeric.type == HLSL_TYPE_INT
-            || type->e.numeric.type == HLSL_TYPE_UINT;
-}
-
 static void sm4_generate_vsir_cast_from_bool(struct hlsl_ctx *ctx, struct vsir_program *program,
         const struct hlsl_ir_expr *expr, uint32_t bits)
 {
@@ -8935,7 +8928,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             return true;
 
         case HLSL_OP1_BIT_NOT:
-            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(hlsl_type_is_integer(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_NOT, 0, 0, true);
             return true;
 
@@ -9104,17 +9097,17 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             }
 
         case HLSL_OP2_BIT_AND:
-            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(hlsl_type_is_integer(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_AND, 0, 0, true);
             return true;
 
         case HLSL_OP2_BIT_OR:
-            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(hlsl_type_is_integer(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_OR, 0, 0, true);
             return true;
 
         case HLSL_OP2_BIT_XOR:
-            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(hlsl_type_is_integer(dst_type));
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_XOR, 0, 0, true);
             return true;
 
@@ -9242,7 +9235,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             return true;
 
         case HLSL_OP2_LSHIFT:
-            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(hlsl_type_is_integer(dst_type));
             VKD3D_ASSERT(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr, VKD3DSIH_ISHL, 0, 0, true);
             return true;
@@ -9357,7 +9350,7 @@ static bool sm4_generate_vsir_instr_expr(struct hlsl_ctx *ctx,
             }
 
         case HLSL_OP2_RSHIFT:
-            VKD3D_ASSERT(type_is_integer(dst_type));
+            VKD3D_ASSERT(hlsl_type_is_integer(dst_type));
             VKD3D_ASSERT(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
             generate_vsir_instr_expr_single_instr_op(ctx, program, expr,
                     dst_type->e.numeric.type == HLSL_TYPE_INT ? VKD3DSIH_ISHR : VKD3DSIH_USHR, 0, 0, true);
@@ -11918,7 +11911,7 @@ static bool lower_isinf(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct 
         template = template_sm2;
     else if (hlsl_version_lt(ctx, 4, 0))
         template = template_sm3;
-    else if (type_is_integer(rhs->data_type))
+    else if (hlsl_type_is_integer(rhs->data_type))
         template = template_int;
     else
         template = template_sm4;

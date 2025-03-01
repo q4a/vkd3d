@@ -298,12 +298,9 @@ bool hlsl_type_is_patch_array(const struct hlsl_type *type)
             || type->e.array.array_type == HLSL_ARRAY_PATCH_OUTPUT);
 }
 
-bool hlsl_type_is_integer(const struct hlsl_type *type)
+bool hlsl_base_type_is_integer(enum hlsl_base_type type)
 {
-    if (!hlsl_is_numeric_type(type))
-        return false;
-
-    switch (type->e.numeric.type)
+    switch (type)
     {
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_INT:
@@ -317,6 +314,12 @@ bool hlsl_type_is_integer(const struct hlsl_type *type)
     }
 
     vkd3d_unreachable();
+}
+
+bool hlsl_type_is_integer(const struct hlsl_type *type)
+{
+    VKD3D_ASSERT(hlsl_is_numeric_type(type));
+    return hlsl_base_type_is_integer(type->e.numeric.type);
 }
 
 bool hlsl_type_is_floating_point(const struct hlsl_type *type)
