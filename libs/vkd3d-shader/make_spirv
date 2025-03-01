@@ -27,9 +27,21 @@ sub opcode_id($)
     sprintf "0x%04x", shift;
 }
 
+sub enumerant_id($)
+{
+    my ($value) = @_;
+
+    sprintf "%#x", $value =~ /^0[xX]/ ? hex $value : $value;
+}
+
 sub fix_name($)
 {
     shift =~ s/([A-Z]+)/_$1/rg;
+}
+
+sub operand_category_name(_)
+{
+    "SPIRV_PARSER_OPERAND_CATEGORY${\uc fix_name shift}";
 }
 
 sub operand_type_name(_)
@@ -42,6 +54,46 @@ sub grammar_version($)
     my ($grammar) = @_;
 
     "$grammar->{major_version}.$grammar->{minor_version}.$grammar->{revision}";
+}
+
+sub print_enumerant(_)
+{
+    my ($enumerant) = @_;
+    my $indent = " " x 12;
+    my $parameter_count = @{$enumerant->{parameters} // []};
+
+    if (!$parameter_count)
+    {
+        print $indent . "{${\enumerant_id $enumerant->{value}}, \"$enumerant->{enumerant}\"},\n";
+        return;
+    }
+
+    print $indent . "{\n";
+    print $indent . "    ${\enumerant_id $enumerant->{value}}, \"$enumerant->{enumerant}\", $parameter_count,\n";
+    print $indent . "    (enum spirv_parser_operand_type[])\n";
+    print $indent . "    {\n";
+    print $indent . "        ${\operand_type_name $_->{kind}},\n" foreach @{$enumerant->{parameters}};
+    print $indent . "    }\n";
+    print $indent . "},\n";
+}
+
+sub print_operand_type_info(_)
+{
+    my ($type) = @_;
+    my $enumerant_count = @{$type->{enumerants} // []};
+
+    print "    [${\operand_type_name $type->{kind}}] =\n";
+    print "    {\n";
+    print "        \"$type->{kind}\", ${\operand_category_name $type->{category}}"
+            . ($enumerant_count ? ", $enumerant_count,\n" : "\n");
+    if ($enumerant_count)
+    {
+        print "        (struct spirv_parser_enumerant[])\n";
+        print "        {\n";
+        print_enumerant foreach @{$type->{enumerants}};
+        print "        }\n";
+    }
+    print "    },\n";
 }
 
 sub instruction_operand(_)
@@ -84,6 +136,11 @@ sub print_header($)
     print map {" * $_" =~ s/ +$//r . "\n"} @{$grammar->{copyright}};
     print " */\n\n";
 
+    print "enum spirv_parser_operand_category\n";
+    print "{\n";
+    print "    ${\operand_category_name},\n" foreach sort keys %{{map {$_->{category}, undef} @operand_types}};
+    print "};\n\n";
+
     print "enum spirv_parser_operand_type\n";
     print "{\n";
     print "    ${\operand_type_name $_->{kind}},\n" foreach @operand_types;
@@ -92,10 +149,19 @@ sub print_header($)
     print "static const struct spirv_parser_operand_type_info\n";
     print "{\n";
     print "    const char *name;\n";
+    print "    enum spirv_parser_operand_category category;\n";
+    print "    size_t enumerant_count;\n";
+    print "    const struct spirv_parser_enumerant\n";
+    print "    {\n";
+    print "        uint32_t value;\n";
+    print "        const char *name;\n";
+    print "        size_t parameter_count;\n";
+    print "        enum spirv_parser_operand_type *parameters;\n";
+    print "    } *enumerants;\n";
     print "}\n";
     print "spirv_parser_operand_type_info[] =\n";
     print "{\n";
-    print "    [${\operand_type_name $_->{kind}}] = {\"$_->{kind}\"},\n" foreach @operand_types;
+    print_operand_type_info foreach @operand_types;
     print "};\n\n";
 
     print "static const struct spirv_parser_opcode_info\n";

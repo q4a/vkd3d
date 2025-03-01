@@ -215,6 +215,7 @@ struct spirv_colours
     const char *reset;
     const char *comment;
     const char *literal;
+    const char *enumerant;
     const char *opcode;
     const char *id;
 };
@@ -327,6 +328,13 @@ static void spirv_parser_print_uint_literal(struct spirv_parser *parser,
             prefix, parser->colours.literal, i, parser->colours.reset, suffix);
 }
 
+static void spirv_parser_print_enumerant(struct spirv_parser *parser,
+        struct vkd3d_string_buffer *buffer, const char *prefix, const char *name, const char *suffix)
+{
+    vkd3d_string_buffer_printf(buffer, "%s%s%s%s%s",
+            prefix, parser->colours.enumerant, name, parser->colours.reset, suffix);
+}
+
 static void spirv_parser_print_opcode(struct spirv_parser *parser,
         struct vkd3d_string_buffer *buffer, const char *name)
 {
@@ -383,6 +391,21 @@ static void spirv_parser_print_string_literal(struct spirv_parser *parser, struc
         }
     }
     vkd3d_string_buffer_printf(buffer, "%.*s%s\"%s", (int)(len - start), &s[start], parser->colours.reset, suffix);
+}
+
+static const struct spirv_parser_enumerant *spirv_parser_get_enumerant(
+        const struct spirv_parser_operand_type_info *info, uint32_t value)
+{
+    const struct spirv_parser_enumerant *e;
+    size_t i;
+
+    for (i = 0; i < info->enumerant_count; ++i)
+    {
+        if ((e = &info->enumerants[i])->value == value)
+            return e;
+    }
+
+    return NULL;
 }
 
 static const struct spirv_parser_operand_type_info *spirv_parser_get_operand_type_info(enum spirv_parser_operand_type t)
@@ -498,6 +521,8 @@ static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d
         const char *opcode_name, enum spirv_parser_operand_type type, size_t end, uint32_t *result_id)
 {
     const struct spirv_parser_operand_type_info *info;
+    const struct spirv_parser_enumerant *e;
+    uint32_t word, i;
 
     if (parser->pos >= end)
     {
@@ -510,6 +535,26 @@ static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d
     {
         ERR("Invalid operand type %#x.\n", type);
         return false;
+    }
+
+    if (info->category == SPIRV_PARSER_OPERAND_CATEGORY_VALUE_ENUM)
+    {
+        word = spirv_parser_read_u32(parser);
+        if (!(e = spirv_parser_get_enumerant(info, word)))
+        {
+            spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                    "Unhandled \"%s\" enumeration value %#x.", info->name, word);
+            return false;
+        }
+        spirv_parser_print_enumerant(parser, buffer, " ", e->name, "");
+
+        for (i = 0; i < e->parameter_count; ++i)
+        {
+            if (!spirv_parser_parse_operand(parser, buffer, opcode_name, e->parameters[i], end, result_id))
+                return false;
+        }
+
+        return true;
     }
 
     switch (type)
@@ -702,6 +747,7 @@ static enum vkd3d_result spirv_parser_init(struct spirv_parser *parser, const st
         .reset = "",
         .comment = "",
         .literal = "",
+        .enumerant = "",
         .opcode = "",
         .id = "",
     };
@@ -710,6 +756,7 @@ static enum vkd3d_result spirv_parser_init(struct spirv_parser *parser, const st
         .reset = "\x1b[m",
         .comment = "\x1b[36m",
         .literal = "\x1b[95m",
+        .enumerant = "\x1b[93m",
         .opcode = "\x1b[96;1m",
         .id = "\x1b[96m",
     };
