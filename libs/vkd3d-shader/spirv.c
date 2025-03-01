@@ -442,6 +442,7 @@ static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d
     switch (type)
     {
         case SPIRV_PARSER_OPERAND_TYPE_ID_REF:
+        case SPIRV_PARSER_OPERAND_TYPE_ID_RESULT_TYPE:
             spirv_parser_print_id(parser, buffer, " ", spirv_parser_read_u32(parser), "");
             return true;
 
