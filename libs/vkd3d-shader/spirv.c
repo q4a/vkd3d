@@ -340,6 +340,51 @@ static void spirv_parser_print_instruction_offset(struct spirv_parser *parser,
             parser->colours.comment, offset * sizeof(uint32_t), parser->colours.reset, suffix);
 }
 
+static char get_escape_char(char c)
+{
+    switch (c)
+    {
+        case '"':
+        case '\\':
+            return c;
+        case '\t':
+            return 't';
+        case '\n':
+            return 'n';
+        case '\v':
+            return 'v';
+        case '\f':
+            return 'f';
+        case '\r':
+            return 'r';
+        default:
+            return 0;
+    }
+}
+
+static void spirv_parser_print_string_literal(struct spirv_parser *parser, struct vkd3d_string_buffer *buffer,
+        const char *prefix, const char *s, size_t len, const char *suffix)
+{
+    size_t start, i;
+    char c;
+
+    vkd3d_string_buffer_printf(buffer, "%s\"%s", prefix, parser->colours.literal);
+    for (i = 0, start = 0; i < len; ++i)
+    {
+        if ((c = get_escape_char(s[i])))
+        {
+            vkd3d_string_buffer_printf(buffer, "%.*s\\%c", (int)(i - start), &s[start], c);
+            start = i + 1;
+        }
+        else if (!isprint(s[i]))
+        {
+            vkd3d_string_buffer_printf(buffer, "%.*s\\%03o", (int)(i - start), &s[start], (uint8_t)s[i]);
+            start = i + 1;
+        }
+    }
+    vkd3d_string_buffer_printf(buffer, "%.*s%s\"%s", (int)(len - start), &s[start], parser->colours.reset, suffix);
+}
+
 static const struct spirv_parser_operand_type_info *spirv_parser_get_operand_type_info(enum spirv_parser_operand_type t)
 {
     if (t >= ARRAY_SIZE(spirv_parser_operand_type_info))
@@ -428,6 +473,27 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
     return VKD3D_OK;
 }
 
+static bool spirv_parser_parse_string_literal(struct spirv_parser *parser,
+        struct vkd3d_string_buffer *buffer, size_t end)
+{
+    const char *s = (const char *)&parser->code[parser->pos];
+    size_t len, max_len;
+
+    max_len = (end - parser->pos) * sizeof(uint32_t);
+    len = strnlen(s, max_len);
+    if (len == max_len)
+    {
+        spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Insufficient words remaining while parsing string literal.");
+        return false;
+    }
+
+    spirv_parser_print_string_literal(parser, buffer, " ", s, len, "");
+    parser->pos += (len / sizeof(uint32_t)) + 1;
+
+    return true;
+}
+
 static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d_string_buffer *buffer,
         const char *opcode_name, enum spirv_parser_operand_type type, size_t end, uint32_t *result_id)
 {
@@ -466,6 +532,9 @@ static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d
         case SPIRV_PARSER_OPERAND_TYPE_LITERAL_INTEGER:
             spirv_parser_print_uint_literal(parser, buffer, " ", spirv_parser_read_u32(parser), "");
             return true;
+
+        case SPIRV_PARSER_OPERAND_TYPE_LITERAL_STRING:
+            return spirv_parser_parse_string_literal(parser, buffer, end);
 
         default:
             spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
