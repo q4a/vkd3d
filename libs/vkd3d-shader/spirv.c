@@ -422,7 +422,7 @@ static enum vkd3d_result spirv_parser_read_header(struct spirv_parser *parser)
 }
 
 static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d_string_buffer *buffer,
-        const char *opcode_name, enum spirv_parser_operand_type type, size_t end)
+        const char *opcode_name, enum spirv_parser_operand_type type, size_t end, uint32_t *result_id)
 {
     const struct spirv_parser_operand_type_info *info;
 
@@ -443,6 +443,16 @@ static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d
     {
         case SPIRV_PARSER_OPERAND_TYPE_ID_REF:
             spirv_parser_print_id(parser, buffer, " ", spirv_parser_read_u32(parser), "");
+            return true;
+
+        case SPIRV_PARSER_OPERAND_TYPE_ID_RESULT:
+            if (*result_id)
+            {
+                spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                        "Instruction has multiple results.");
+                return false;
+            }
+            *result_id = spirv_parser_read_u32(parser);
             return true;
 
         default:
@@ -471,11 +481,11 @@ static void spirv_parser_parse_raw_instruction(struct spirv_parser *parser, uint
 static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *parser)
 {
     const struct spirv_parser_instruction_operand *operand;
+    struct vkd3d_string_buffer *operands, *result_name;
     const struct spirv_parser_opcode_info *info;
-    struct vkd3d_string_buffer *operands;
+    uint32_t result_id, word;
     uint16_t op, count, rem;
     size_t end, pos, i;
-    uint32_t word;
 
     pos = parser->pos;
     word = spirv_parser_read_u32(parser);
@@ -498,6 +508,7 @@ static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *par
 
     operands = vkd3d_string_buffer_get(&parser->string_buffers);
 
+    result_id = 0;
     for (i = 0, end = pos + count; i < info->operand_count; ++i)
     {
         operand = &info->operands[i];
@@ -507,7 +518,7 @@ static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *par
             if (parser->pos >= end && (operand->quantifier == '?' || operand->quantifier == '*'))
                 break;
 
-            if (!spirv_parser_parse_operand(parser, operands, info->name, operand->type, end))
+            if (!spirv_parser_parse_operand(parser, operands, info->name, operand->type, end, &result_id))
             {
                 vkd3d_string_buffer_release(&parser->string_buffers, operands);
                 goto raw;
@@ -525,8 +536,23 @@ static enum vkd3d_result spirv_parser_parse_instruction(struct spirv_parser *par
         }
     }
 
-    if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT)
+    if (result_id)
+    {
+        int max_indent = 0;
+
+        if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT)
+            max_indent = VKD3D_SPIRV_INDENT - 4;
+        result_name = vkd3d_string_buffer_get(&parser->string_buffers);
+        vkd3d_string_buffer_printf(result_name, "%u", result_id);
+        vkd3d_string_buffer_printf(parser->text, "%*s%%%s%s%s = ",
+                result_name->content_size > max_indent ? 0 : max_indent - (int)result_name->content_size, "",
+                parser->colours.id, result_name->buffer, parser->colours.reset);
+        vkd3d_string_buffer_release(&parser->string_buffers, result_name);
+    }
+    else if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT)
+    {
         vkd3d_string_buffer_printf(parser->text, "%*s", VKD3D_SPIRV_INDENT, "");
+    }
     spirv_parser_print_opcode(parser, parser->text, info->name);
     vkd3d_string_buffer_printf(parser->text, "%s", operands->buffer);
     if (parser->formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_OFFSETS)
