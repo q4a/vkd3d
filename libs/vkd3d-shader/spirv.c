@@ -517,12 +517,17 @@ static bool spirv_parser_parse_string_literal(struct spirv_parser *parser,
     return true;
 }
 
+static uint32_t lowest_set(uint32_t v)
+{
+    return v & -v;
+}
+
 static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d_string_buffer *buffer,
         const char *opcode_name, enum spirv_parser_operand_type type, size_t end, uint32_t *result_id)
 {
     const struct spirv_parser_operand_type_info *info;
     const struct spirv_parser_enumerant *e;
-    uint32_t word, i;
+    uint32_t word, tmp, v, i, j;
 
     if (parser->pos >= end)
     {
@@ -535,6 +540,59 @@ static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d
     {
         ERR("Invalid operand type %#x.\n", type);
         return false;
+    }
+
+    if (info->category == SPIRV_PARSER_OPERAND_CATEGORY_BIT_ENUM)
+    {
+        if (!(word = spirv_parser_read_u32(parser)))
+        {
+            if (!(e = spirv_parser_get_enumerant(info, word)))
+            {
+                spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                        "Unhandled enumeration value %#x.", word);
+                return false;
+            }
+            spirv_parser_print_enumerant(parser, buffer, " ", e->name, "");
+
+            for (j = 0; j < e->parameter_count; ++j)
+            {
+                if (!spirv_parser_parse_operand(parser, buffer, opcode_name, e->parameters[j], end, result_id))
+                    return false;
+            }
+
+            return true;
+        }
+
+        for (i = 0, tmp = word; tmp; ++i, tmp ^= v)
+        {
+            v = lowest_set(tmp);
+            if (!(e = spirv_parser_get_enumerant(info, v)))
+            {
+                spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                        "Unhandled enumeration value %#x.", v);
+                return false;
+            }
+            spirv_parser_print_enumerant(parser, buffer, i ? " | " : " ", e->name, "");
+        }
+
+        for (i = 0, tmp = word; tmp; ++i, tmp ^= v)
+        {
+            v = lowest_set(tmp);
+            if (!(e = spirv_parser_get_enumerant(info, v)))
+            {
+                spirv_parser_warning(parser, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                        "Unhandled enumeration value %#x.", v);
+                return false;
+            }
+
+            for (j = 0; j < e->parameter_count; ++j)
+            {
+                if (!spirv_parser_parse_operand(parser, buffer, opcode_name, e->parameters[j], end, result_id))
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     if (info->category == SPIRV_PARSER_OPERAND_CATEGORY_VALUE_ENUM)
