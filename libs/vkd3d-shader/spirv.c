@@ -320,6 +320,13 @@ static void spirv_parser_print_id(struct spirv_parser *parser,
             prefix, parser->colours.id, id, parser->colours.reset, suffix);
 }
 
+static void spirv_parser_print_uint_literal(struct spirv_parser *parser,
+        struct vkd3d_string_buffer *buffer, const char *prefix, uint32_t i, const char *suffix)
+{
+    vkd3d_string_buffer_printf(buffer, "%s%s%u%s%s",
+            prefix, parser->colours.literal, i, parser->colours.reset, suffix);
+}
+
 static void spirv_parser_print_opcode(struct spirv_parser *parser,
         struct vkd3d_string_buffer *buffer, const char *name)
 {
@@ -454,6 +461,10 @@ static bool spirv_parser_parse_operand(struct spirv_parser *parser, struct vkd3d
                 return false;
             }
             *result_id = spirv_parser_read_u32(parser);
+            return true;
+
+        case SPIRV_PARSER_OPERAND_TYPE_LITERAL_INTEGER:
+            spirv_parser_print_uint_literal(parser, buffer, " ", spirv_parser_read_u32(parser), "");
             return true;
 
         default:
