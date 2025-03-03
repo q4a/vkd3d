@@ -521,7 +521,26 @@ static VkBool32 VKAPI_PTR vkd3d_debug_report_callback(VkDebugReportFlagsEXT flag
         VkDebugReportObjectTypeEXT object_type, uint64_t object, size_t location,
         int32_t message_code, const char *layer_prefix, const char *message, void *user_data)
 {
-    FIXME("%s\n", debugstr_a(message));
+    while (*message)
+    {
+        const char *end = strchr(message, '\n');
+        size_t len;
+
+        if (end)
+            len = end - message;
+        else
+            len = strlen(message);
+
+        len = min(len, 256);
+
+        FIXME("%s\n", debugstr_an(message, len));
+
+        message += len;
+
+        if (*message == '\n')
+            ++message;
+    }
+
     return VK_FALSE;
 }
 
