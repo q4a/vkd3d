@@ -2408,7 +2408,15 @@ static unsigned int decompose_fx_4_state_function_call(struct hlsl_ir_var *var, 
 static unsigned int decompose_fx_4_state_block_expand_array(struct hlsl_ir_var *var, struct hlsl_state_block *block,
         unsigned int entry_index, struct fx_write_context *fx)
 {
-    static const char *states[] = { "SrcBlend", "DestBlend", "BlendOp", "SrcBlendAlpha", "DestBlendAlpha", "BlendOpAlpha" };
+    static const char *const states[] =
+    {
+        "SrcBlend",
+        "DestBlend",
+        "BlendOp",
+        "SrcBlendAlpha",
+        "DestBlendAlpha",
+        "BlendOpAlpha",
+    };
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
     struct hlsl_state_block_entry *entry = block->entries[entry_index];
     static const unsigned int array_size = 8;
@@ -3979,7 +3987,7 @@ static void fx_4_parse_state_object_initializer(struct fx_parser *parser, uint32
             float f;
         };
     } value;
-    static const char *value_types[FX_COMPONENT_TYPE_COUNT] =
+    static const char *const value_types[FX_COMPONENT_TYPE_COUNT] =
     {
         [FX_BOOL]  = "bool",
         [FX_FLOAT] = "float",
