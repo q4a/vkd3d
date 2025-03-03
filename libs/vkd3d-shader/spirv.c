@@ -829,16 +829,16 @@ static unsigned int vkd3d_spirv_string_word_count(const char *str)
 static void vkd3d_spirv_build_string(struct vkd3d_spirv_stream *stream,
         const char *str, unsigned int word_count)
 {
-    unsigned int word_idx, i;
-    const char *ptr = str;
+    uint32_t *ptr;
 
-    for (word_idx = 0; word_idx < word_count; ++word_idx)
-    {
-        uint32_t word = 0;
-        for (i = 0; i < sizeof(uint32_t) && *ptr; ++i)
-            word |= (uint32_t)*ptr++ << (8 * i);
-        vkd3d_spirv_build_word(stream, word);
-    }
+    if (!vkd3d_array_reserve((void **)&stream->words, &stream->capacity,
+            stream->word_count + word_count, sizeof(*stream->words)))
+        return;
+
+    ptr = &stream->words[stream->word_count];
+    ptr[word_count - 1] = 0;
+    memcpy(ptr, str, strlen(str));
+    stream->word_count += word_count;
 }
 
 typedef uint32_t (*vkd3d_spirv_build_pfn)(struct vkd3d_spirv_builder *builder);
