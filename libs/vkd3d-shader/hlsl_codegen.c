@@ -5356,6 +5356,11 @@ static enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hl
         {HLSL_STORAGE_CENTROID | HLSL_STORAGE_LINEAR, VKD3DSIM_LINEAR_CENTROID},
     };
 
+    if (hlsl_type_is_patch_array(type))
+        type = type->e.array.type;
+
+    VKD3D_ASSERT(hlsl_is_numeric_type(type));
+
     if ((storage_modifiers & HLSL_STORAGE_NOINTERPOLATION)
             || base_type_get_semantic_equivalent(type->e.numeric.type) == HLSL_TYPE_UINT)
         return VKD3DSIM_CONSTANT;
