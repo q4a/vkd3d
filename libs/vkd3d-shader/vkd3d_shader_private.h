@@ -263,6 +263,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED               = 11000,
     VKD3D_SHADER_ERROR_FX_INVALID_VERSION               = 11001,
     VKD3D_SHADER_ERROR_FX_INVALID_DATA                  = 11002,
+    VKD3D_SHADER_ERROR_FX_INVALID_SIZE                  = 11003,
 };
 
 enum vkd3d_shader_opcode

@@ -4376,7 +4376,8 @@ static int fx_4_parse(struct fx_parser *parser)
 
     if (parser->end - parser->ptr < header.unstructured_size)
     {
-        parser->failed = true;
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_SIZE,
+                "Invalid unstructured data size %u.", header.unstructured_size);
         return -1;
     }
 
@@ -4432,7 +4433,8 @@ static int fx_5_parse(struct fx_parser *parser)
 
     if (parser->end - parser->ptr < header.unstructured_size)
     {
-        parser->failed = true;
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_SIZE,
+                "Invalid unstructured data size %u.", header.unstructured_size);
         return -1;
     }
 
@@ -4465,7 +4467,11 @@ int fx_parse(const struct vkd3d_shader_compile_info *compile_info,
     vkd3d_string_buffer_init(&parser.buffer);
 
     if (parser.end - parser.start < sizeof(version))
+    {
+        fx_parser_error(&parser, VKD3D_SHADER_ERROR_FX_INVALID_SIZE,
+                "Source size %zu is smaller than the FX header size.", compile_info->source.size);
         return -1;
+    }
     version = *(uint32_t *)parser.ptr;
 
     switch (version)
