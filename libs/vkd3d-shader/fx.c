@@ -3027,12 +3027,6 @@ static void parse_fx_print_indent(struct fx_parser *parser)
     vkd3d_string_buffer_printf(&parser->buffer, "%*s", 4 * parser->indent, "");
 }
 
-static void fx_2_parse_parameters(struct fx_parser *parser, uint32_t count)
-{
-    if (count)
-        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED, "Parsing fx_2_0 parameters is not implemented.");
-}
-
 static const char *fx_2_get_string(struct fx_parser *parser, uint32_t offset)
 {
     const char *ptr;
@@ -3089,7 +3083,7 @@ static unsigned int fx_get_fx_2_type_size(struct fx_parser *parser, uint32_t *of
     return size;
 }
 
-static unsigned int fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset)
+static void fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset)
 {
     uint32_t type, class, rows, columns;
     static const char *const types[] =
@@ -3138,8 +3132,6 @@ static unsigned int fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset
         fx_parser_read_unstructured(parser, &columns, offset + 24, sizeof(columns));
         vkd3d_string_buffer_printf(&parser->buffer, "%ux%u", rows, columns);
     }
-
-    return fx_get_fx_2_type_size(parser, &offset);
 }
 
 static void parse_fx_2_numeric_value(struct fx_parser *parser, uint32_t offset,
@@ -3172,7 +3164,7 @@ static void parse_fx_2_numeric_value(struct fx_parser *parser, uint32_t offset,
         vkd3d_string_buffer_printf(&parser->buffer, "}");
 }
 
-static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
+static void fx_parse_fx_2_parameter(struct fx_parser *parser, uint32_t offset)
 {
     struct fx_2_var
     {
@@ -3182,9 +3174,56 @@ static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
         uint32_t semantic;
         uint32_t element_count;
     } var;
-    uint32_t param, value;
-    unsigned int size;
     const char *name;
+
+    fx_parser_read_unstructured(parser, &var, offset, sizeof(var));
+
+    fx_parse_fx_2_type(parser, offset);
+
+    name = fx_2_get_string(parser, var.name);
+    vkd3d_string_buffer_printf(&parser->buffer, " %s", name);
+    if (var.element_count)
+        vkd3d_string_buffer_printf(&parser->buffer, "[%u]", var.element_count);
+}
+
+static void fx_parse_fx_2_initial_value(struct fx_parser *parser, uint32_t param, uint32_t value)
+{
+    struct fx_2_var
+    {
+        uint32_t type;
+        uint32_t class;
+        uint32_t name;
+        uint32_t semantic;
+        uint32_t element_count;
+    } var;
+    unsigned int size;
+    uint32_t offset;
+
+    if (!value)
+        return;
+
+    fx_parser_read_unstructured(parser, &var, param, sizeof(var));
+
+    offset = param;
+    size = fx_get_fx_2_type_size(parser, &offset);
+
+    vkd3d_string_buffer_printf(&parser->buffer, " = ");
+    if (var.element_count)
+        vkd3d_string_buffer_printf(&parser->buffer, "{ ");
+
+    if (var.type == D3DXPT_STRING)
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
+                "Only numeric initial values are supported.");
+    else
+        parse_fx_2_numeric_value(parser, value, size, var.type);
+
+    if (var.element_count)
+        vkd3d_string_buffer_printf(&parser->buffer, " }");
+}
+
+static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
+{
+    uint32_t param, value;
 
     if (parser->failed || !count)
         return;
@@ -3199,27 +3238,9 @@ static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
         param = fx_parser_read_u32(parser);
         value = fx_parser_read_u32(parser);
 
-        fx_parser_read_unstructured(parser, &var, param, sizeof(var));
-
         parse_fx_print_indent(parser);
-        size = fx_parse_fx_2_type(parser, param);
-
-        name = fx_2_get_string(parser, var.name);
-        vkd3d_string_buffer_printf(&parser->buffer, " %s", name);
-        if (var.element_count)
-            vkd3d_string_buffer_printf(&parser->buffer, "[%u]", var.element_count);
-        vkd3d_string_buffer_printf(&parser->buffer, " = ");
-        if (var.element_count)
-            vkd3d_string_buffer_printf(&parser->buffer, "{ ");
-
-        if (var.type == D3DXPT_STRING)
-            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
-                    "Only numeric types are supported in annotations.");
-        else
-            parse_fx_2_numeric_value(parser, value, size, var.type);
-
-        if (var.element_count)
-            vkd3d_string_buffer_printf(&parser->buffer, " }");
+        fx_parse_fx_2_parameter(parser, param);
+        fx_parse_fx_2_initial_value(parser, param, value);
         vkd3d_string_buffer_printf(&parser->buffer, ";\n");
     }
 
@@ -3288,6 +3309,29 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
 
     parse_fx_print_indent(parser);
     vkd3d_string_buffer_printf(&parser->buffer, "}\n\n");
+}
+
+static void fx_2_parse_parameters(struct fx_parser *parser, uint32_t count)
+{
+    struct fx_2_parameter
+    {
+        uint32_t type;
+        uint32_t value;
+        uint32_t flags;
+        uint32_t annotation_count;
+    } param;
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        fx_parser_read_u32s(parser, &param, sizeof(param));
+
+        fx_parse_fx_2_parameter(parser, param.type);
+        fx_parse_fx_2_annotations(parser, param.annotation_count);
+        fx_parse_fx_2_initial_value(parser, param.type, param.value);
+        vkd3d_string_buffer_printf(&parser->buffer, ";\n");
+    }
+    if (count)
+        vkd3d_string_buffer_printf(&parser->buffer, "\n");
 }
 
 static void fx_2_parse(struct fx_parser *parser)
