@@ -6,7 +6,7 @@ AS_IF([test "x$PTHREAD_LIBS" != x],
 [vkd3d_libs_saved="$LIBS"
 LIBS="$LIBS $PTHREAD_LIBS"
 
-AC_MSG_CHECKING([checking for pthread_create in $PTHREAD_LIBS])
+AC_MSG_CHECKING([for pthread_create in $PTHREAD_LIBS])
 AC_TRY_LINK_FUNC([pthread_create], [vkd3d_pthread_found=yes])
 AC_MSG_RESULT([$vkd3d_pthread_found])
 
@@ -19,7 +19,7 @@ AS_IF([test "x$vkd3d_pthread_found" != "xyes"],
 PTHREAD_LIBS="-pthread"
 LIBS="$LIBS $PTHREAD_LIBS"
 
-AC_MSG_CHECKING([checking for pthread_create in $PTHREAD_LIBS])
+AC_MSG_CHECKING([for pthread_create in $PTHREAD_LIBS])
 AC_TRY_LINK_FUNC([pthread_create], [vkd3d_pthread_found=yes])
 AC_MSG_RESULT([$vkd3d_pthread_found])
 
