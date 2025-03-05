@@ -12604,6 +12604,9 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                 if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                             "Output parameters are not supported in hull shader control point functions.");
+                else if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Output parameters are not allowed in geometry shaders.");
                 else
                     append_output_var_copy(ctx, entry_func, var);
             }
@@ -12611,7 +12614,11 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     }
     if (entry_func->return_var)
     {
-        if (entry_func->return_var->data_type->class != HLSL_CLASS_STRUCT && !entry_func->return_var->semantic.name)
+        if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+            hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                    "Geometry shaders cannot return values.");
+        else if (entry_func->return_var->data_type->class != HLSL_CLASS_STRUCT
+                && !entry_func->return_var->semantic.name)
             hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
