@@ -550,8 +550,8 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
     list_move_head(&func->body.instrs, &block.instrs);
 }
 
-static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
-        struct hlsl_ir_load *rhs, uint32_t modifiers,
+static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
+         struct hlsl_ir_function_decl *func, struct hlsl_ir_load *rhs, uint32_t modifiers,
         struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
@@ -587,21 +587,21 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
 
         if (type->class == HLSL_CLASS_MATRIX)
         {
-            c = hlsl_block_add_uint_constant(ctx, &func->body, i, &var->loc);
-            load = hlsl_block_add_load_index(ctx, &func->body, &rhs->src, c, &var->loc);
+            c = hlsl_block_add_uint_constant(ctx, block, i, &var->loc);
+            load = hlsl_block_add_load_index(ctx, block, &rhs->src, c, &var->loc);
         }
         else
         {
             VKD3D_ASSERT(i == 0);
 
-            load = hlsl_block_add_load_index(ctx, &func->body, &rhs->src, NULL, &var->loc);
+            load = hlsl_block_add_load_index(ctx, block, &rhs->src, NULL, &var->loc);
         }
 
-        hlsl_block_add_simple_store(ctx, &func->body, output, load);
+        hlsl_block_add_simple_store(ctx, block, output, load);
     }
 }
 
-static void append_output_copy_recurse(struct hlsl_ctx *ctx,
+static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_function_decl *func, struct hlsl_ir_load *rhs, uint32_t modifiers,
         struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
@@ -641,19 +641,19 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx,
                 force_align = (i == 0);
             }
 
-            c = hlsl_block_add_uint_constant(ctx, &func->body, i, &var->loc);
+            c = hlsl_block_add_uint_constant(ctx, block, i, &var->loc);
 
             if (!(element_load = hlsl_new_load_index(ctx, &rhs->src, c, loc)))
                 return;
-            hlsl_block_add_instr(&func->body, &element_load->node);
+            hlsl_block_add_instr(block, &element_load->node);
 
-            append_output_copy_recurse(ctx, func, element_load, element_modifiers,
+            append_output_copy_recurse(ctx, block, func, element_load, element_modifiers,
                     semantic, elem_semantic_index, force_align);
         }
     }
     else
     {
-        append_output_copy(ctx, func, rhs, modifiers, semantic, semantic_index, force_align);
+        append_output_copy(ctx, block, func, rhs, modifiers, semantic, semantic_index, force_align);
     }
 }
 
@@ -669,7 +669,8 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
         return;
     hlsl_block_add_instr(&func->body, &load->node);
 
-    append_output_copy_recurse(ctx, func, load, var->storage_modifiers, &var->semantic, var->semantic.index, false);
+    append_output_copy_recurse(ctx, &func->body, func, load, var->storage_modifiers,
+            &var->semantic, var->semantic.index, false);
 }
 
 bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
