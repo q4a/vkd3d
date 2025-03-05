@@ -12561,6 +12561,23 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 
             prepend_input_var_copy(ctx, entry_func, var);
         }
+        else if (hlsl_get_stream_output_type(var->data_type))
+        {
+            if (profile->type != VKD3D_SHADER_TYPE_GEOMETRY)
+            {
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                        "Stream output parameters can only be used in geometry shaders.");
+                continue;
+            }
+
+            if (!(var->storage_modifiers & HLSL_STORAGE_IN) || !(var->storage_modifiers & HLSL_STORAGE_OUT))
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Stream output parameter \"%s\" must be declared as \"inout\".", var->name);
+
+            /* TODO: check that maxvertexcount * component_count(element_type) <= 1024. */
+
+            continue;
+        }
         else
         {
             if (hlsl_get_multiarray_element_type(var->data_type)->class != HLSL_CLASS_STRUCT
