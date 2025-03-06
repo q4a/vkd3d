@@ -1196,6 +1196,14 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type,
     return true;
 }
 
+static void check_invalid_stream_output_object(struct hlsl_ctx *ctx, const struct hlsl_type *type,
+        const char *name, const struct vkd3d_shader_location* loc)
+{
+    if (hlsl_type_component_count(type) != 1)
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Stream output object '%s' is not single-element.", name);
+}
+
 static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
         struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src,
         bool is_default_values_initializer);
@@ -1229,6 +1237,9 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
     if (param->initializer.args_count && (param->modifiers & HLSL_STORAGE_OUT))
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "Output parameter '%s' has a default value.", param->name);
+
+    if (hlsl_get_stream_output_type(param->type))
+        check_invalid_stream_output_object(ctx, param->type, param->name, loc);
 
     if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers,
             &param->reg_reservation)))
@@ -2438,6 +2449,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     bool constant_buffer = false;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
+    bool stream_output;
     char *var_name;
     unsigned int i;
 
@@ -2529,6 +2541,10 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
         hlsl_fixme(ctx, &v->loc, "Shader model 5.1+ resource array.");
     }
 
+    stream_output = !!hlsl_get_stream_output_type(type);
+    if (stream_output)
+        check_invalid_stream_output_object(ctx, type, v->name, &v->loc);
+
     if (!(var_name = vkd3d_strdup(v->name)))
         return;
 
@@ -2582,6 +2598,10 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
             * considered uniforms, and we have no way of telling otherwise. */
         if (!(modifiers & HLSL_STORAGE_STATIC))
             var->storage_modifiers |= HLSL_STORAGE_UNIFORM;
+
+        if (stream_output)
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISPLACED_STREAM_OUTPUT,
+                    "Stream output object '%s' is not allowed in the global scope.", var->name);
 
         if ((ctx->profile->major_version < 5 || ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT)
                 && (var->storage_modifiers & HLSL_STORAGE_UNIFORM))

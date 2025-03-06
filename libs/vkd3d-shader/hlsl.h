@@ -1751,6 +1751,8 @@ void hlsl_calculate_buffer_offsets(struct hlsl_ctx *ctx);
 const struct hlsl_type *hlsl_get_multiarray_element_type(const struct hlsl_type *type);
 unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type);
 
+const struct hlsl_type *hlsl_get_stream_output_type(const struct hlsl_type *type);
+
 uint32_t hlsl_combine_swizzles(uint32_t first, uint32_t second, unsigned int dim);
 unsigned int hlsl_combine_writemasks(unsigned int first, unsigned int second);
 uint32_t hlsl_map_swizzle(uint32_t swizzle, unsigned int writemask);

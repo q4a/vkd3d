@@ -234,6 +234,33 @@ unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type)
     return 1;
 }
 
+const struct hlsl_type *hlsl_get_stream_output_type(const struct hlsl_type *type)
+{
+    unsigned int i;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_ARRAY:
+            return hlsl_get_stream_output_type(type->e.array.type);
+
+        case HLSL_CLASS_STRUCT:
+            for (i = 0; i < type->e.record.field_count; ++i)
+            {
+                const struct hlsl_type *field_type = hlsl_get_stream_output_type(type->e.record.fields[i].type);
+
+                if (field_type)
+                    return field_type;
+            }
+            return NULL;
+
+        case HLSL_CLASS_STREAM_OUTPUT:
+            return type;
+
+        default:
+            return NULL;
+    }
+}
+
 bool hlsl_type_is_resource(const struct hlsl_type *type)
 {
     switch (type->class)
@@ -1138,6 +1165,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
         case HLSL_CLASS_BLEND_STATE:
+        case HLSL_CLASS_STREAM_OUTPUT:
         case HLSL_CLASS_NULL:
             return 1;
 
@@ -1145,7 +1173,6 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VOID:
-        case HLSL_CLASS_STREAM_OUTPUT:
             break;
     }
 
