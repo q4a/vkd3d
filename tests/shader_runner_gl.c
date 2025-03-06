@@ -362,6 +362,7 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
             continue;
         }
         runner->caps.runner = language == SPIR_V ? "OpenGL/SPIR-V" : "OpenGL/GLSL";
+        runner->caps.compiler = HLSL_COMPILER;
         runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
         runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
         runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;

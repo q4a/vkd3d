@@ -73,12 +73,6 @@ static struct shader_test_options
     const char *compiler_filter;
 } shader_test_options = {0};
 
-#ifdef VKD3D_CROSSTEST
-static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
-#else
-static const char HLSL_COMPILER[] = "vkd3d-shader";
-#endif
-
 static const char *const model_strings[] =
 {
     [SHADER_MODEL_2_0] = "2.0",
@@ -2082,29 +2076,27 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     enum shader_type shader_type = SHADER_TYPE_CS;
     struct resource_params current_resource;
     struct sampler *current_sampler = NULL;
-    const char *testname, *compiler_string;
     enum parse_state state = STATE_NONE;
     char *shader_source = NULL;
     char line_buffer[256];
+    const char *testname;
     FILE *f;
-
-    compiler_string = dxc_compiler ? "dxcompiler" : HLSL_COMPILER;
 
     if (shader_test_options.executor_filter
             && strcmp(shader_test_options.executor_filter, caps->runner))
     {
         trace("Skipping compiling shaders with %s and executing with %s "
                 "because of the executor filter\n",
-                compiler_string, caps->runner);
+                caps->compiler, caps->runner);
         return;
     }
 
     if (shader_test_options.compiler_filter
-            && strcmp(shader_test_options.compiler_filter, compiler_string))
+            && strcmp(shader_test_options.compiler_filter, caps->compiler))
     {
         trace("Skipping compiling shaders with %s and executing with %s "
                 "because of the executor filter\n",
-                compiler_string, caps->runner);
+                caps->compiler, caps->runner);
         return;
     }
 
@@ -2115,13 +2107,13 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     {
         trace("Skipping compiling shaders with %s and executing with %s "
                 "because the shader model range is empty\n",
-                compiler_string, caps->runner);
+                caps->compiler, caps->runner);
         return;
     }
 
     trace("Compiling SM%s-SM%s shaders with %s and executing with %s.\n",
             model_strings[minimum_shader_model], model_strings[maximum_shader_model],
-            compiler_string, caps->runner);
+            caps->compiler, caps->runner);
     if (caps->tag_count)
         trace_tags(caps);
     trace_shader_caps(caps->shader_caps);
@@ -2612,6 +2604,7 @@ static void run_compile_tests(void *dxc_compiler)
     struct shader_runner runner = {0};
 
     caps.runner = "hlsl";
+    caps.compiler = dxc_compiler ? "dxcompiler" : HLSL_COMPILER;
     caps.minimum_shader_model = SHADER_MODEL_MIN;
     caps.maximum_shader_model = dxc_compiler ? SHADER_MODEL_MAX : SHADER_MODEL_5_1;
     for (unsigned int i = 0; i < SHADER_CAP_COUNT; ++i)

@@ -26,6 +26,12 @@
 #include "vkd3d_shader.h"
 #include "utils.h"
 
+#ifdef VKD3D_CROSSTEST
+static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
+#else
+static const char HLSL_COMPILER[] = "vkd3d-shader";
+#endif
+
 #define RENDER_TARGET_WIDTH 640
 #define RENDER_TARGET_HEIGHT 480
 
@@ -158,6 +164,7 @@ enum shader_cap
 struct shader_runner_caps
 {
     const char *runner;
+    const char *compiler;
     const char *tags[3];
     size_t tag_count;
     enum shader_model minimum_shader_model;

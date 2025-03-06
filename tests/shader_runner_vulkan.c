@@ -1739,6 +1739,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     }
 
     runner->caps.runner = "Vulkan";
+    runner->caps.compiler = HLSL_COMPILER;
     get_physical_device_info(runner, &device_info);
     ret_features = &device_info.features2.features;
 

@@ -298,6 +298,7 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
     }
 
     runner->caps.runner = "d3d11.dll";
+    runner->caps.compiler = HLSL_COMPILER;
     runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_5_0;
 

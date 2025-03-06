@@ -985,7 +985,8 @@ static uint32_t get_format_support(ID3D12Device *device, enum DXGI_FORMAT format
 }
 
 static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
-        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
+        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model,
+        bool using_dxcompiler)
 {
     ID3D12Device *device = runner->test_context.device;
     D3D12_FEATURE_DATA_D3D12_OPTIONS4 options4;
@@ -1031,6 +1032,7 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
 #else
     runner->caps.runner = "vkd3d";
 #endif
+    runner->caps.compiler = using_dxcompiler ? "dxcompiler" : HLSL_COMPILER;
     runner->caps.minimum_shader_model = minimum_shader_model;
     runner->caps.maximum_shader_model = maximum_shader_model;
     runner->caps.shader_caps[SHADER_CAP_DEPTH_BOUNDS] = options2.DepthBoundsTestSupported;
@@ -1098,7 +1100,7 @@ static void run_shader_tests_for_model_range(void *dxc_compiler,
         return;
     }
 
-    d3d12_runner_init_caps(&runner, minimum_shader_model, maximum_shader_model);
+    d3d12_runner_init_caps(&runner, minimum_shader_model, maximum_shader_model, !!dxc_compiler);
 
     runner.compute_queue = create_command_queue(device,
             D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
