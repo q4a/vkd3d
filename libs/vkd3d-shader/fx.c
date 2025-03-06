@@ -25,6 +25,41 @@ static inline size_t put_u32_unaligned(struct vkd3d_bytecode_buffer *buffer, uin
     return bytecode_put_bytes_unaligned(buffer, &value, sizeof(value));
 }
 
+enum state_property_component_type
+{
+    FX_BOOL,
+    FX_FLOAT,
+    FX_UINT,
+    FX_UINT8,
+    FX_DEPTHSTENCIL,
+    FX_RASTERIZER,
+    FX_DOMAINSHADER,
+    FX_HULLSHADER,
+    FX_COMPUTESHADER,
+    FX_TEXTURE,
+    FX_DEPTHSTENCILVIEW,
+    FX_RENDERTARGETVIEW,
+    FX_BLEND,
+    FX_VERTEXSHADER,
+    FX_PIXELSHADER,
+    FX_GEOMETRYSHADER,
+    FX_COMPONENT_TYPE_COUNT,
+};
+
+struct rhs_named_value
+{
+    const char *name;
+    unsigned int value;
+};
+
+struct fx_assignment
+{
+    uint32_t id;
+    uint32_t lhs_index;
+    uint32_t type;
+    uint32_t value;
+};
+
 struct fx_4_binary_type
 {
     uint32_t name;
@@ -460,6 +495,407 @@ static void write_fx_2_annotations(struct hlsl_ir_var *var, uint32_t count_offse
     count = write_annotations(var->annotations, fx);
     set_u32(buffer, count_offset, count);
 }
+
+static const struct rhs_named_value fx_2_zenable_values[] =
+{
+    { "USEW", 2 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_fillmode_values[] =
+{
+    { "POINT", 1 },
+    { "WIREFRAME", 2 },
+    { "SOLID", 3 },
+    { NULL },
+};
+
+static const struct rhs_named_value fx_2_shademode_values[] =
+{
+    { "FLAT", 1 },
+    { "GOURAUD", 2 },
+    { "PHONG", 3 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_blendmode_values[] =
+{
+    { "ZERO", 1 },
+    { "ONE", 2 },
+    { "SRCCOLOR", 3 },
+    { "INVSRCCOLOR", 4 },
+    { "SRCALPHA", 5 },
+    { "INVSRCALPHA", 6 },
+    { "DESTALPHA", 7 },
+    { "INVDESTALPHA", 8 },
+    { "DESTCOLOR", 9 },
+    { "INVDESTCOLOR", 10 },
+    { "SRCALPHASAT", 11 },
+    { "BOTHSRCALPHA", 12 },
+    { "BOTHINVSRCALPHA", 13 },
+    { "BLENDFACTOR", 14 },
+    { "INVBLENDFACTOR", 15 },
+    { "SRCCOLOR2", 16 },
+    { "INVSRCCOLOR2", 17 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_cullmode_values[] =
+{
+    { "NONE", 1 },
+    { "CW", 2 },
+    { "CCW", 3 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_cmpfunc_values[] =
+{
+    { "NEVER", 1 },
+    { "LESS", 2 },
+    { "EQUAL", 3 },
+    { "LESSEQUAL", 4 },
+    { "GREATER", 5 },
+    { "NOTEQUAL", 6 },
+    { "GREATEREQUAL", 7 },
+    { "ALWAYS", 8 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_fogmode_values[] =
+{
+    { "NONE", 0 },
+    { "EXP", 1 },
+    { "EXP2", 2 },
+    { "LINEAR", 3 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_stencilcaps_values[] =
+{
+    { "KEEP", 0x1 },
+    { "ZERO", 0x2 },
+    { "REPLACE", 0x4 },
+    { "INCRSAT", 0x8 },
+    { "DECRSAT", 0x10 },
+    { "INVERT", 0x20 },
+    { "INCR", 0x40 },
+    { "DECR", 0x80 },
+    { "TWOSIDED", 0x100 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_wrap_values[] =
+{
+    { "COORD_0", 0x1 },
+    { "COORD_1", 0x2 },
+    { "COORD_2", 0x4 },
+    { "COORD_3", 0x8 },
+    { "U", 0x1 },
+    { "V", 0x2 },
+    { "W", 0x4 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_materialcolorsource_values[] =
+{
+    { "MATERIAL", 0 },
+    { "COORD1", 1 },
+    { "COORD2", 2 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_vertexblend_values[] =
+{
+    { "DISABLE", 0 },
+    { "1WEIGHTS", 1 },
+    { "2WEIGHTS", 2 },
+    { "3WEIGHTS", 3 },
+    { "TWEENING", 255 },
+    { "0WEIGHTS", 256 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_clipplane_values[] =
+{
+    { "CLIPPLANE0", 0x1 },
+    { "CLIPPLANE1", 0x2 },
+    { "CLIPPLANE2", 0x4 },
+    { "CLIPPLANE3", 0x8 },
+    { "CLIPPLANE4", 0x10 },
+    { "CLIPPLANE5", 0x20 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_patchedgestyle_values[] =
+{
+    { "DISCRETE", 0 },
+    { "CONTINUOUS", 1 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_colorwriteenable_values[] =
+{
+    { "RED", 0x1 },
+    { "GREEN", 0x2 },
+    { "BLUE", 0x4 },
+    { "ALPHA", 0x8 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_blendop_values[] =
+{
+    { "ADD", 1 },
+    { "SUBTRACT", 2 },
+    { "REVSUBTRACT", 3 },
+    { "MIN", 4 },
+    { "MAX", 5 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_degree_values[] =
+{
+    { "LINEAR", 1 },
+    { "QUADRATIC", 2 },
+    { "CUBIC", 3 },
+    { "QUINTIC", 4 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_textureop_values[] =
+{
+    { "DISABLE", 1 },
+    { "SELECTARG1", 2 },
+    { "SELECTARG2", 3 },
+    { "MODULATE", 4 },
+    { "MODULATE2X", 5 },
+    { "MODULATE4X", 6 },
+    { "ADD", 7 },
+    { "ADDSIGNED", 8 },
+    { "ADDSIGNED2X", 9 },
+    { "SUBTRACT", 10 },
+    { "ADDSMOOTH", 11 },
+    { "BLENDDIFFUSEALPHA", 12 },
+    { "BLENDTEXTUREALPHA", 13 },
+    { "BLENDFACTORALPHA", 14 },
+    { "BLENDTEXTUREALPHAPM", 15 },
+    { "BLENDCURRENTALPHA", 16 },
+    { "PREMODULATE", 17 },
+    { "MODULATEALPHA_ADDCOLOR", 18 },
+    { "MODULATECOLOR_ADDALPHA", 19 },
+    { "MODULATEINVALPHA_ADDCOLOR", 20 },
+    { "MODULATEINVCOLOR_ADDALPHA", 21 },
+    { "BUMPENVMAP", 22 },
+    { "BUMPENVMAPLUMINANCE", 23 },
+    { "DOTPRODUCT3", 24 },
+    { "MULTIPLYADD", 25 },
+    { "LERP", 26 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_colorarg_values[] =
+{
+    { "DIFFUSE", 0x0 },
+    { "CURRENT", 0x1 },
+    { "TEXTURE", 0x2 },
+    { "TFACTOR", 0x3 },
+    { "SPECULAR", 0x4 },
+    { "TEMP", 0x5 },
+    { "CONSTANT", 0x6 },
+    { "COMPLEMENT", 0x10 },
+    { "ALPHAREPLICATE", 0x20 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_texturetransform_values[] =
+{
+    { "DISABLE", 0 },
+    { "COUNT1", 1 },
+    { "COUNT2", 2 },
+    { "COUNT3", 3 },
+    { "COUNT4", 4 },
+    { "PROJECTED", 256 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_lighttype_values[] =
+{
+    { "POINT", 1 },
+    { "SPOT", 2 },
+    { "DIRECTIONAL", 3 },
+    { NULL }
+};
+
+static const struct fx_2_state
+{
+    const char *name;
+    enum hlsl_type_class class;
+    enum state_property_component_type type;
+    unsigned int dimx;
+    uint32_t array_size;
+    uint32_t id;
+    const struct rhs_named_value *values;
+}
+fx_2_states[] =
+{
+    { "ZEnable",          HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 0, fx_2_zenable_values },
+    { "FillMode",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 1, fx_2_fillmode_values },
+    { "ShadeMode",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 2, fx_2_shademode_values },
+    { "ZWriteEnable",     HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 3 },
+    { "AlphaTestEnable",  HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 4 },
+    { "LastPixel",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 5 },
+    { "SrcBlend",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 6, fx_2_blendmode_values },
+    { "DestBlend",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 7, fx_2_blendmode_values },
+    { "CullMode",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 8, fx_2_cullmode_values },
+    { "ZFunc",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 9, fx_2_cmpfunc_values },
+    { "AlphaRef",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 10 },
+    { "AlphaFunc",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 11, fx_2_cmpfunc_values },
+    { "DitherEnable",     HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 12 },
+    { "AlphaBlendEnable", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 13 },
+    { "FogEnable",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 14 },
+    { "SpecularEnable",   HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 15 },
+    { "FogColor",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 16 },
+    { "FogTableMode",     HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 17, fx_2_fogmode_values },
+    { "FogStart",         HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 18 },
+    { "FogEnd",           HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 19 },
+    { "FogDensity",       HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 20 },
+    { "RangeFogEnable",   HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 21 },
+    { "StencilEnable",    HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 22 },
+    { "StencilFail",      HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 23, fx_2_stencilcaps_values },
+    { "StencilZFail",     HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 24, fx_2_stencilcaps_values },
+    { "StencilPass",      HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 25, fx_2_stencilcaps_values },
+    { "StencilFunc",      HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 26, fx_2_cmpfunc_values },
+    { "StencilRef",       HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 27 },
+    { "StencilMask",      HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 28 },
+    { "StencilWriteMask", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 29 },
+    { "TextureFactor",    HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 30 },
+    { "Wrap0",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 31, fx_2_wrap_values },
+    { "Wrap1",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 32, fx_2_wrap_values },
+    { "Wrap2",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 33, fx_2_wrap_values },
+    { "Wrap3",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 34, fx_2_wrap_values },
+    { "Wrap4",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 35, fx_2_wrap_values },
+    { "Wrap5",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 36, fx_2_wrap_values },
+    { "Wrap6",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 37, fx_2_wrap_values },
+    { "Wrap7",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 38, fx_2_wrap_values },
+    { "Wrap8",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 39, fx_2_wrap_values },
+    { "Wrap9",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 40, fx_2_wrap_values },
+    { "Wrap10",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 41, fx_2_wrap_values },
+    { "Wrap11",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 42, fx_2_wrap_values },
+    { "Wrap12",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 43, fx_2_wrap_values },
+    { "Wrap13",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 44, fx_2_wrap_values },
+    { "Wrap14",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 45, fx_2_wrap_values },
+    { "Wrap15",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 46, fx_2_wrap_values },
+    { "Clipping",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 47 },
+    { "Lighting",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 48 },
+    { "Ambient",          HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 49 },
+    { "FogVertexMode",    HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 50, fx_2_fogmode_values },
+    { "ColorVertex",      HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 51 },
+    { "LocalViewer",      HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 52 },
+    { "NormalizeNormals", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 53 },
+
+    { "DiffuseMaterialSource",  HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 54, fx_2_materialcolorsource_values },
+    { "SpecularMaterialSource", HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 55, fx_2_materialcolorsource_values },
+    { "AmbientMaterialSource",  HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 56, fx_2_materialcolorsource_values },
+    { "EmissiveMaterialSource", HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 57, fx_2_materialcolorsource_values },
+
+    { "VertexBlend",       HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 58, fx_2_vertexblend_values },
+    { "ClipPlaneEnable",   HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 59, fx_2_clipplane_values },
+    { "PointSize",         HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 60 },
+    { "PointSize_Min",     HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 61 },
+    { "PointSize_Max",     HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 62 },
+    { "PointSpriteEnable", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 63 },
+    { "PointScaleEnable",  HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 64 },
+    { "PointScale_A",      HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 65 },
+    { "PointScale_B",      HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 66 },
+    { "PointScale_C",      HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 67 },
+
+    { "MultiSampleAntialias",     HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 68 },
+    { "MultiSampleMask",          HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 69 },
+    { "PatchEdgeStyle",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 70, fx_2_patchedgestyle_values },
+    { "DebugMonitorToken",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 71 },
+    { "IndexedVertexBlendEnable", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 72 },
+    { "ColorWriteEnable",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 73, fx_2_colorwriteenable_values },
+    { "TweenFactor",              HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 74 },
+    { "BlendOp",                  HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 75, fx_2_blendop_values },
+    { "PositionDegree",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 76, fx_2_degree_values },
+    { "NormalDegree",             HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 77, fx_2_degree_values },
+    { "ScissorTestEnable",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 78 },
+    { "SlopeScaleDepthBias",      HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 79 },
+
+    { "AntialiasedLineEnable",     HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 80 },
+    { "MinTessellationLevel",      HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 81 },
+    { "MaxTessellationLevel",      HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 82 },
+    { "AdaptiveTess_X",            HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 83 },
+    { "AdaptiveTess_Y",            HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 84 },
+    { "AdaptiveTess_Z",            HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 85 },
+    { "AdaptiveTess_W",            HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 86 },
+    { "EnableAdaptiveTesselation", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 87 },
+    { "TwoSidedStencilMode",       HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 88 },
+    { "StencilFail",               HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 89, fx_2_stencilcaps_values },
+    { "StencilZFail",              HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 90, fx_2_stencilcaps_values },
+    { "StencilPass",               HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 91, fx_2_stencilcaps_values },
+    { "StencilFunc",               HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 92, fx_2_cmpfunc_values },
+
+    { "ColorWriteEnable1",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 93, fx_2_colorwriteenable_values },
+    { "ColorWriteEnable2",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 94, fx_2_colorwriteenable_values },
+    { "ColorWriteEnable3",        HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 95, fx_2_colorwriteenable_values },
+    { "BlendFactor",              HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 96 },
+    { "SRGBWriteEnable",          HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 97 },
+    { "DepthBias",                HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 98 },
+    { "SeparateAlphaBlendEnable", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 99 },
+    { "SrcBlendAlpha",            HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 100, fx_2_blendmode_values },
+    { "DestBlendAlpha",           HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 101, fx_2_blendmode_values },
+    { "BlendOpAlpha",             HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 102, fx_2_blendmode_values },
+
+    { "ColorOp",               HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 103, fx_2_textureop_values },
+    { "ColorArg0",             HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 104, fx_2_colorarg_values },
+    { "ColorArg1",             HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 105, fx_2_colorarg_values },
+    { "ColorArg2",             HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 106, fx_2_colorarg_values },
+    { "AlphaOp",               HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 107, fx_2_textureop_values },
+    { "AlphaArg0",             HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 108, fx_2_colorarg_values },
+    { "AlphaArg1",             HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 109, fx_2_colorarg_values },
+    { "AlphaArg2",             HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 110, fx_2_colorarg_values },
+    { "ResultArg",             HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 111, fx_2_colorarg_values },
+    { "BumpEnvMat00",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 112 },
+    { "BumpEnvMat01",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 113 },
+    { "BumpEnvMat10",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 114 },
+    { "BumpEnvMat11",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 115 },
+    { "TextCoordIndex",        HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 116 },
+    { "BumpEnvLScale",         HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 117 },
+    { "BumpEnvLOffset",        HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 118 },
+    { "TextureTransformFlags", HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 119, fx_2_texturetransform_values },
+    { "Constant",              HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 120 },
+    { "NPatchMode",            HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 121 },
+    { "FVF",                   HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 122 },
+
+    { "ProjectionTransform", HLSL_CLASS_MATRIX, FX_FLOAT, 4, 1, 123 },
+    { "ViewTransform",       HLSL_CLASS_MATRIX, FX_FLOAT, 4, 1, 124 },
+    { "WorldTransform",      HLSL_CLASS_MATRIX, FX_FLOAT, 4, 1, 125 },
+    { "TextureTransform",    HLSL_CLASS_MATRIX, FX_FLOAT, 4, 8, 126 },
+
+    { "MaterialAmbient",   HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 127 },
+    { "MaterialDiffuse",   HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 128 },
+    { "MaterialSpecular",  HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 129 },
+    { "MaterialEmissive",  HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 130 },
+    { "MaterialPower",     HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 131 },
+
+    { "LightType",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 132, fx_2_lighttype_values },
+    { "LightDiffuse",      HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 133 },
+    { "LightSpecular",     HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 134 },
+    { "LightAmbient",      HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 135 },
+    { "LightPosition",     HLSL_CLASS_VECTOR, FX_FLOAT, 3, 1, 136 },
+    { "LightDirection",    HLSL_CLASS_VECTOR, FX_FLOAT, 3, 1, 137 },
+    { "LightRange",        HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 138 },
+    { "LightFalloff",      HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 139 },
+    { "LightAttenuation0", HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 140 },
+    { "LightAttenuation1", HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 141 },
+    { "LightAttenuation2", HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 142 },
+    { "LightTheta",        HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 143 },
+    { "LightPhi",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 144 },
+    { "LightEnable",       HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 145 },
+
+    { "VertexShader",      HLSL_CLASS_SCALAR, FX_VERTEXSHADER, 1, 1, 146 },
+    { "PixelShader",       HLSL_CLASS_SCALAR, FX_PIXELSHADER,  1, 1, 147 },
+};
 
 static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
@@ -1607,12 +2043,6 @@ static void write_fx_4_annotation(struct hlsl_ir_var *var, struct fx_write_conte
     }
 }
 
-struct rhs_named_value
-{
-    const char *name;
-    unsigned int value;
-};
-
 static bool get_fx_4_state_enum_value(const struct rhs_named_value *pairs,
         const char *name, unsigned int *value)
 {
@@ -1843,27 +2273,6 @@ static bool replace_state_block_constant(struct hlsl_ctx *ctx, struct hlsl_ir_no
 
     return true;
 }
-
-enum state_property_component_type
-{
-    FX_BOOL,
-    FX_FLOAT,
-    FX_UINT,
-    FX_UINT8,
-    FX_DEPTHSTENCIL,
-    FX_RASTERIZER,
-    FX_DOMAINSHADER,
-    FX_HULLSHADER,
-    FX_COMPUTESHADER,
-    FX_TEXTURE,
-    FX_DEPTHSTENCILVIEW,
-    FX_RENDERTARGETVIEW,
-    FX_BLEND,
-    FX_VERTEXSHADER,
-    FX_PIXELSHADER,
-    FX_GEOMETRYSHADER,
-    FX_COMPONENT_TYPE_COUNT,
-};
 
 static inline bool is_object_fx_type(enum state_property_component_type type)
 {
@@ -3249,6 +3658,64 @@ static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
     vkd3d_string_buffer_printf(&parser->buffer, ">");
 }
 
+static void fx_parse_fx_2_assignment(struct fx_parser *parser)
+{
+    const struct rhs_named_value *named_value = NULL;
+    const struct fx_2_state *state = NULL;
+    struct fx_assignment entry;
+
+    fx_parser_read_u32s(parser, &entry, sizeof(entry));
+    if (entry.id <= ARRAY_SIZE(fx_2_states))
+    {
+        state = &fx_2_states[entry.id];
+
+        vkd3d_string_buffer_printf(&parser->buffer, "%s", state->name);
+        if (state->array_size > 1)
+            vkd3d_string_buffer_printf(&parser->buffer, "[%u]", entry.lhs_index);
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "<unrecognized state %u>", entry.id);
+    }
+    vkd3d_string_buffer_printf(&parser->buffer, " = ");
+
+    if (state && state->type == FX_UINT)
+    {
+        const struct rhs_named_value *ptr = state->values;
+        uint32_t value;
+
+        fx_parser_read_unstructured(parser, &value, entry.value, sizeof(value));
+
+        while (ptr->name)
+        {
+            if (value == ptr->value)
+            {
+                named_value = ptr;
+                break;
+            }
+            ++ptr;
+        }
+    }
+
+    if (named_value)
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "%s /* %u */", named_value->name, named_value->value);
+    }
+    else if (state && (state->type == FX_UINT || state->type == FX_FLOAT))
+    {
+        uint32_t offset = entry.type;
+        unsigned int size;
+
+        size = fx_get_fx_2_type_size(parser, &offset);
+        parse_fx_2_numeric_value(parser, entry.value, size, entry.type);
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "<ignored>");
+    }
+    vkd3d_string_buffer_printf(&parser->buffer, ";\n");
+}
+
 static void fx_parse_fx_2_technique(struct fx_parser *parser)
 {
     struct fx_technique
@@ -3264,7 +3731,6 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
         uint32_t assignment_count;
     } pass;
     const char *name;
-    uint32_t i;
 
     if (parser->failed)
         return;
@@ -3282,7 +3748,7 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
     vkd3d_string_buffer_printf(&parser->buffer, "{\n");
 
     parse_fx_start_indent(parser);
-    for (i = 0; i < technique.pass_count; ++i)
+    for (uint32_t i = 0; i < technique.pass_count; ++i)
     {
         fx_parser_read_u32s(parser, &pass, sizeof(pass));
         name = fx_2_get_string(parser, pass.name);
@@ -3296,9 +3762,11 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
         vkd3d_string_buffer_printf(&parser->buffer, "{\n");
 
         parse_fx_start_indent(parser);
-        if (pass.assignment_count)
-            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
-                    "Parsing fx_2_0 pass assignments is not implemented.");
+        for (uint32_t j = 0; j < pass.assignment_count; ++j)
+        {
+            parse_fx_print_indent(parser);
+            fx_parse_fx_2_assignment(parser);
+        }
         parse_fx_end_indent(parser);
 
         parse_fx_print_indent(parser);
@@ -4008,13 +4476,7 @@ static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offse
 static void fx_4_parse_state_object_initializer(struct fx_parser *parser, uint32_t count,
         enum hlsl_type_class type_class)
 {
-    struct fx_4_assignment
-    {
-        uint32_t id;
-        uint32_t lhs_index;
-        uint32_t type;
-        uint32_t value;
-    } entry;
+    struct fx_assignment entry;
     struct
     {
         uint32_t name;
