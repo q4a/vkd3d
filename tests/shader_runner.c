@@ -70,6 +70,7 @@ static struct shader_test_options
     const char *filename;
     enum shader_model minimum_shader_model, maximum_shader_model;
     const char *executor_filter;
+    const char *compiler_filter;
 } shader_test_options = {0};
 
 #ifdef VKD3D_CROSSTEST
@@ -2098,6 +2099,15 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
         return;
     }
 
+    if (shader_test_options.compiler_filter
+            && strcmp(shader_test_options.compiler_filter, compiler_string))
+    {
+        trace("Skipping compiling shaders with %s and executing with %s "
+                "because of the executor filter\n",
+                compiler_string, caps->runner);
+        return;
+    }
+
     minimum_shader_model = max(caps->minimum_shader_model, shader_test_options.minimum_shader_model);
     maximum_shader_model = min(caps->maximum_shader_model, shader_test_options.maximum_shader_model);
 
@@ -2641,6 +2651,8 @@ static inline void parse_shader_test_args(int argc, char **argv)
             parse_shader_model(argv[++i], &shader_test_options.maximum_shader_model);
         else if (!strcmp(argv[i], "--filter-executor"))
             shader_test_options.executor_filter = argv[++i];
+        else if (!strcmp(argv[i], "--filter-compiler"))
+            shader_test_options.compiler_filter = argv[++i];
         else if (argv[i][0] != '-')
             shader_test_options.filename = argv[i];
     }
@@ -2663,6 +2675,9 @@ START_TEST(shader_runner)
 
     if (shader_test_options.executor_filter)
         trace("Running shaders with executor %s\n", shader_test_options.executor_filter);
+
+    if (shader_test_options.compiler_filter)
+        trace("Running shaders with compiler %s\n", shader_test_options.compiler_filter);
 
     dxc = dxcompiler_create();
 
