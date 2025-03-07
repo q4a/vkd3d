@@ -7828,7 +7828,12 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
     element->mask = mask;
     element->used_mask = use_mask;
     if (program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL && !output)
-        element->interpolation_mode = VKD3DSIM_LINEAR;
+    {
+        if (program->shader_version.major >= 4)
+            element->interpolation_mode = sm4_get_interpolation_mode(var->data_type, var->storage_modifiers);
+        else
+            element->interpolation_mode = VKD3DSIM_LINEAR;
+    }
 
     switch (var->data_type->e.numeric.type)
     {
