@@ -6368,7 +6368,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
             return;
 
         builtin = sm1_register_from_semantic_name(&version,
-                var->semantic.name, var->semantic.index, output, &type, &reg);
+                var->semantic.name, var->semantic.index, output, NULL, &type, &reg);
         if (!builtin && !sm1_usage_from_semantic_name(var->semantic.name, var->semantic.index, &usage, &usage_idx))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
@@ -7763,7 +7763,7 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
             return;
 
         if (!sm1_register_from_semantic_name(&program->shader_version,
-                var->semantic.name, var->semantic.index, output, &type, &register_index))
+                var->semantic.name, var->semantic.index, output, &sysval, &type, &register_index))
         {
             enum vkd3d_decl_usage usage;
             unsigned int usage_idx;
@@ -7780,6 +7780,8 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
             if (program->shader_version.type == VKD3D_SHADER_TYPE_VERTEX
                     && output && usage == VKD3D_DECL_USAGE_POSITION)
                 sysval = VKD3D_SHADER_SV_POSITION;
+            else
+                sysval = VKD3D_SHADER_SV_NONE;
         }
 
         mask = (1 << var->data_type->e.numeric.dimx) - 1;
@@ -8880,7 +8882,7 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
             register_index = 0;
         }
         else if (!sm1_register_from_semantic_name(&version, semantic_name,
-                deref->var->semantic.index, true, &type, &register_index))
+                deref->var->semantic.index, true, NULL, &type, &register_index))
         {
             VKD3D_ASSERT(reg.allocated);
             type = VKD3DSPR_OUTPUT;
@@ -9006,7 +9008,7 @@ static void sm1_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx,
         version.minor = ctx->profile->minor_version;
         version.type = ctx->profile->type;
         if (sm1_register_from_semantic_name(&version, deref->var->semantic.name,
-                deref->var->semantic.index, false, &type, &register_index))
+                deref->var->semantic.index, false, NULL, &type, &register_index))
         {
             writemask = (1 << deref->var->data_type->e.numeric.dimx) - 1;
         }
