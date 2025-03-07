@@ -3543,6 +3543,21 @@ static void fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset)
     }
 }
 
+static void parse_fx_2_object_value(struct fx_parser *parser, uint32_t element_count, uint32_t offset)
+{
+    uint32_t id;
+
+    element_count = max(element_count, 1);
+
+    for (uint32_t i = 0; i < element_count; ++i, offset += 4)
+    {
+        fx_parser_read_unstructured(parser, &id, offset, sizeof(id));
+        vkd3d_string_buffer_printf(&parser->buffer, "<object id %u>", id);
+        if (element_count > 1)
+            vkd3d_string_buffer_printf(&parser->buffer, ", ");
+    }
+}
+
 static void parse_fx_2_numeric_value(struct fx_parser *parser, uint32_t offset,
         unsigned int size, uint32_t base_type)
 {
@@ -3595,6 +3610,15 @@ static void fx_parse_fx_2_parameter(struct fx_parser *parser, uint32_t offset)
         vkd3d_string_buffer_printf(&parser->buffer, "[%u]", var.element_count);
 }
 
+static bool is_fx_2_sampler(uint32_t type)
+{
+    return type == D3DXPT_SAMPLER
+            || type == D3DXPT_SAMPLER1D
+            || type == D3DXPT_SAMPLER2D
+            || type == D3DXPT_SAMPLER3D
+            || type == D3DXPT_SAMPLERCUBE;
+}
+
 static void fx_parse_fx_2_initial_value(struct fx_parser *parser, uint32_t param, uint32_t value)
 {
     struct fx_2_var
@@ -3620,11 +3644,18 @@ static void fx_parse_fx_2_initial_value(struct fx_parser *parser, uint32_t param
     if (var.element_count)
         vkd3d_string_buffer_printf(&parser->buffer, "{ ");
 
-    if (var.type == D3DXPT_STRING)
-        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
-                "Only numeric initial values are supported.");
+    if (var.class == D3DXPC_OBJECT)
+    {
+        if (is_fx_2_sampler(var.type))
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
+                    "Parsing sampler initializers is not supported.");
+        else
+            parse_fx_2_object_value(parser, var.element_count, value);
+    }
     else
+    {
         parse_fx_2_numeric_value(parser, value, size, var.type);
+    }
 
     if (var.element_count)
         vkd3d_string_buffer_printf(&parser->buffer, " }");
