@@ -312,6 +312,13 @@ static void vsir_dst_param_init_io(struct vkd3d_shader_dst_param *dst, enum vkd3
     dst->write_mask = e->mask;
 }
 
+void vsir_dst_param_init_null(struct vkd3d_shader_dst_param *dst)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+    dst->reg.dimension = VSIR_DIMENSION_NONE;
+    dst->write_mask = 0;
+}
+
 static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
     vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
@@ -763,7 +770,7 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
     }
     else
     {
-        vsir_dst_param_init(&ins->dst[0], VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+        vsir_dst_param_init_null(&ins->dst[0]);
     }
 
     if (sincos->dst->write_mask & VKD3DSP_WRITEMASK_0)
@@ -773,7 +780,7 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
     }
     else
     {
-        vsir_dst_param_init(&ins->dst[1], VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+        vsir_dst_param_init_null(&ins->dst[1]);
     }
 
     /* Make the original instruction no-op */
@@ -1299,7 +1306,7 @@ static void remove_unread_output_components(const struct shader_signature *signa
         if (ins->dst_count == 1)
             vkd3d_shader_instruction_make_nop(ins);
         else
-            vsir_dst_param_init(dst, VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+            vsir_dst_param_init_null(dst);
     }
 }
 

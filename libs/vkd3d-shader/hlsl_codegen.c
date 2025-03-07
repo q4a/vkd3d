@@ -10019,8 +10019,8 @@ static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
 static void sm4_generate_vsir_expr_with_two_destinations(struct hlsl_ctx *ctx, struct vsir_program *program,
         enum vkd3d_shader_opcode opcode, const struct hlsl_ir_expr *expr, unsigned int dst_idx)
 {
-    struct vkd3d_shader_dst_param *dst_param, *null_param;
     const struct hlsl_ir_node *instr = &expr->node;
+    struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_instruction *ins;
     unsigned int i, src_count;
 
@@ -10038,9 +10038,7 @@ static void sm4_generate_vsir_expr_with_two_destinations(struct hlsl_ctx *ctx, s
     dst_param = &ins->dst[dst_idx];
     vsir_dst_from_hlsl_node(dst_param, ctx, instr);
 
-    null_param = &ins->dst[1 - dst_idx];
-    vsir_dst_param_init(null_param, VKD3DSPR_NULL, VKD3D_DATA_FLOAT, 0);
-    null_param->reg.dimension = VSIR_DIMENSION_NONE;
+    vsir_dst_param_init_null(&ins->dst[1 - dst_idx]);
 
     for (i = 0; i < src_count; ++i)
         vsir_src_from_hlsl_node(&ins->src[i], ctx, expr->operands[i].node, dst_param->write_mask);
