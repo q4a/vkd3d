@@ -9263,10 +9263,10 @@ static void sm1_generate_vsir_instr_jump(struct hlsl_ctx *ctx,
 
     if (jump->type == HLSL_IR_JUMP_DISCARD_NEG)
     {
-        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_TEXKILL, 1, 0)))
+        if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_TEXKILL, 0, 1)))
             return;
 
-        vsir_dst_from_hlsl_node(&ins->dst[0], ctx, condition);
+        vsir_src_from_hlsl_node(&ins->src[0], ctx, condition, VKD3DSP_WRITEMASK_ALL);
     }
     else
     {
