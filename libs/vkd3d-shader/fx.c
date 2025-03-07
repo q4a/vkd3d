@@ -3344,6 +3344,11 @@ struct fx_parser
     uint32_t buffer_count;
     uint32_t object_count;
     uint32_t group_count;
+    struct
+    {
+        uint32_t count;
+        uint32_t *types;
+    } objects;
     bool failed;
 };
 
@@ -3407,6 +3412,17 @@ static const void *fx_parser_get_unstructured_ptr(struct fx_parser *parser, uint
     }
 
     return &ptr[offset];
+}
+
+static const void *fx_parser_get_ptr(struct fx_parser *parser, size_t size)
+{
+    if (parser->end - parser->ptr < size)
+    {
+        parser->failed = true;
+        return NULL;
+    }
+
+    return parser->ptr;
 }
 
 static uint32_t fx_parser_read_unstructured(struct fx_parser *parser, void *dst, uint32_t offset, size_t size)
@@ -3492,32 +3508,33 @@ static unsigned int fx_get_fx_2_type_size(struct fx_parser *parser, uint32_t *of
     return size;
 }
 
+static const char *const fx_2_types[] =
+{
+    [D3DXPT_VOID]           = "void",
+    [D3DXPT_BOOL]           = "bool",
+    [D3DXPT_INT]            = "int",
+    [D3DXPT_FLOAT]          = "float",
+    [D3DXPT_STRING]         = "string",
+    [D3DXPT_TEXTURE]        = "texture",
+    [D3DXPT_TEXTURE1D]      = "texture1D",
+    [D3DXPT_TEXTURE2D]      = "texture2D",
+    [D3DXPT_TEXTURE3D]      = "texture3D",
+    [D3DXPT_TEXTURECUBE]    = "textureCUBE",
+    [D3DXPT_SAMPLER]        = "sampler",
+    [D3DXPT_SAMPLER1D]      = "sampler1D",
+    [D3DXPT_SAMPLER2D]      = "sampler2D",
+    [D3DXPT_SAMPLER3D]      = "sampler3D",
+    [D3DXPT_SAMPLERCUBE]    = "samplerCUBE",
+    [D3DXPT_PIXELSHADER]    = "PixelShader",
+    [D3DXPT_VERTEXSHADER]   = "VertexShader",
+    [D3DXPT_PIXELFRAGMENT]  = "<pixel-fragment>",
+    [D3DXPT_VERTEXFRAGMENT] = "<vertex-fragment>",
+    [D3DXPT_UNSUPPORTED]    = "<unsupported>",
+};
+
 static void fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset)
 {
     uint32_t type, class, rows, columns;
-    static const char *const types[] =
-    {
-        [D3DXPT_VOID]           = "void",
-        [D3DXPT_BOOL]           = "bool",
-        [D3DXPT_INT]            = "int",
-        [D3DXPT_FLOAT]          = "float",
-        [D3DXPT_STRING]         = "string",
-        [D3DXPT_TEXTURE]        = "texture",
-        [D3DXPT_TEXTURE1D]      = "texture1D",
-        [D3DXPT_TEXTURE2D]      = "texture2D",
-        [D3DXPT_TEXTURE3D]      = "texture3D",
-        [D3DXPT_TEXTURECUBE]    = "textureCUBE",
-        [D3DXPT_SAMPLER]        = "sampler",
-        [D3DXPT_SAMPLER1D]      = "sampler1D",
-        [D3DXPT_SAMPLER2D]      = "sampler2D",
-        [D3DXPT_SAMPLER3D]      = "sampler3D",
-        [D3DXPT_SAMPLERCUBE]    = "samplerCUBE",
-        [D3DXPT_PIXELSHADER]    = "PixelShader",
-        [D3DXPT_VERTEXSHADER]   = "VertexShader",
-        [D3DXPT_PIXELFRAGMENT]  = "<pixel-fragment>",
-        [D3DXPT_VERTEXFRAGMENT] = "<vertex-fragment>",
-        [D3DXPT_UNSUPPORTED]    = "<unsupported>",
-    };
     const char *name;
 
     fx_parser_read_unstructured(parser, &type, offset, sizeof(type));
@@ -3526,7 +3543,7 @@ static void fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset)
     if (class == D3DXPC_STRUCT)
         name = "struct";
     else
-        name = type < ARRAY_SIZE(types) ? types[type] : "<unknown>";
+        name = type < ARRAY_SIZE(fx_2_types) ? fx_2_types[type] : "<unknown>";
 
     vkd3d_string_buffer_printf(&parser->buffer, "%s", name);
     if (class == D3DXPC_VECTOR)
@@ -3543,7 +3560,8 @@ static void fx_parse_fx_2_type(struct fx_parser *parser, uint32_t offset)
     }
 }
 
-static void parse_fx_2_object_value(struct fx_parser *parser, uint32_t element_count, uint32_t offset)
+static void parse_fx_2_object_value(struct fx_parser *parser, uint32_t element_count,
+        uint32_t type, uint32_t offset)
 {
     uint32_t id;
 
@@ -3555,7 +3573,14 @@ static void parse_fx_2_object_value(struct fx_parser *parser, uint32_t element_c
         vkd3d_string_buffer_printf(&parser->buffer, "<object id %u>", id);
         if (element_count > 1)
             vkd3d_string_buffer_printf(&parser->buffer, ", ");
+        if (id < parser->objects.count)
+            parser->objects.types[id] = type;
+        else
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                    "Initializer object id exceeds the number of objects in the effect.");
     }
+
+
 }
 
 static void parse_fx_2_numeric_value(struct fx_parser *parser, uint32_t offset,
@@ -3650,7 +3675,7 @@ static void fx_parse_fx_2_initial_value(struct fx_parser *parser, uint32_t param
             fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
                     "Parsing sampler initializers is not supported.");
         else
-            parse_fx_2_object_value(parser, var.element_count, value);
+            parse_fx_2_object_value(parser, var.element_count, var.type, value);
     }
     else
     {
@@ -3833,9 +3858,54 @@ static void fx_2_parse_parameters(struct fx_parser *parser, uint32_t count)
         vkd3d_string_buffer_printf(&parser->buffer, "\n");
 }
 
+static void fx_parse_fx_2_data_blob(struct fx_parser *parser)
+{
+    uint32_t id, size;
+    const char *str;
+
+    id = fx_parser_read_u32(parser);
+    size = fx_parser_read_u32(parser);
+
+    parse_fx_print_indent(parser);
+    if (id < parser->objects.count)
+    {
+        uint32_t type = parser->objects.types[id];
+        switch (type)
+        {
+            case D3DXPT_STRING:
+            case D3DXPT_TEXTURE:
+            case D3DXPT_TEXTURE1D:
+            case D3DXPT_TEXTURE2D:
+            case D3DXPT_TEXTURE3D:
+            case D3DXPT_TEXTURECUBE:
+            case D3DXPT_PIXELSHADER:
+            case D3DXPT_VERTEXSHADER:
+                vkd3d_string_buffer_printf(&parser->buffer, "%s object %u size %u bytes%s\n",
+                        fx_2_types[type], id, size, size ? ":" : ",");
+                if (size && type == D3DXPT_STRING)
+                {
+                    parse_fx_start_indent(parser);
+                    parse_fx_print_indent(parser);
+                    str = fx_parser_get_ptr(parser, size);
+                    vkd3d_string_buffer_printf(&parser->buffer, "\"%.*s\"\n", size, str);
+                    parse_fx_end_indent(parser);
+                }
+                break;
+            default:
+                vkd3d_string_buffer_printf(&parser->buffer, "<type%u> object %u size %u bytes\n", type, id, size);
+        }
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "object %u - out-of-range id\n", id);
+    }
+
+    fx_parser_skip(parser, align(size, 4));
+}
+
 static void fx_2_parse(struct fx_parser *parser)
 {
-    uint32_t i, size, parameter_count, technique_count;
+    uint32_t i, size, parameter_count, technique_count, blob_count;
 
     fx_parser_skip(parser, sizeof(uint32_t)); /* Version */
     size = fx_parser_read_u32(parser);
@@ -3848,11 +3918,27 @@ static void fx_2_parse(struct fx_parser *parser)
     parameter_count = fx_parser_read_u32(parser);
     technique_count = fx_parser_read_u32(parser);
     fx_parser_read_u32(parser); /* Shader count */
-    fx_parser_read_u32(parser); /* Object count */
+    parser->objects.count = fx_parser_read_u32(parser);
+
+    if (!(parser->objects.types = calloc(parser->objects.count, sizeof(*parser->objects.types))))
+    {
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_OUT_OF_MEMORY, "Out of memory.");
+        return;
+    }
 
     fx_2_parse_parameters(parser, parameter_count);
     for (i = 0; i < technique_count; ++i)
         fx_parse_fx_2_technique(parser);
+
+    blob_count = fx_parser_read_u32(parser);
+    fx_parser_read_u32(parser); /* Resource count */
+
+    vkd3d_string_buffer_printf(&parser->buffer, "object data {\n");
+    parse_fx_start_indent(parser);
+    for (i = 0; i < blob_count; ++i)
+        fx_parse_fx_2_data_blob(parser);
+    parse_fx_end_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "}\n");
 }
 
 static const char *fx_4_get_string(struct fx_parser *parser, uint32_t offset)
@@ -4982,19 +5068,29 @@ static void fx_5_parse(struct fx_parser *parser)
     fx_parse_groups(parser);
 }
 
+static void fx_parser_init(struct fx_parser *parser, const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context)
+{
+    memset(parser, 0, sizeof(*parser));
+    parser->start = compile_info->source.code;
+    parser->ptr = compile_info->source.code;
+    parser->end = (uint8_t *)compile_info->source.code + compile_info->source.size;
+    parser->message_context = message_context;
+    vkd3d_string_buffer_init(&parser->buffer);
+}
+
+static void fx_parser_cleanup(struct fx_parser *parser)
+{
+    free(parser->objects.types);
+}
+
 int fx_parse(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
-    struct fx_parser parser =
-    {
-        .start = compile_info->source.code,
-        .ptr = compile_info->source.code,
-        .end = (uint8_t *)compile_info->source.code + compile_info->source.size,
-        .message_context = message_context,
-    };
+    struct fx_parser parser;
     uint32_t version;
 
-    vkd3d_string_buffer_init(&parser.buffer);
+    fx_parser_init(&parser, compile_info, message_context);
 
     if (parser.end - parser.start < sizeof(version))
     {
@@ -5023,6 +5119,7 @@ int fx_parse(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     vkd3d_shader_code_from_string_buffer(out, &parser.buffer);
+    fx_parser_cleanup(&parser);
 
     if (parser.failed)
         return VKD3D_ERROR_INVALID_SHADER;
