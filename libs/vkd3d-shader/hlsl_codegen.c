@@ -7839,7 +7839,8 @@ static bool sm4_generate_vsir_init_src_param_from_deref(struct hlsl_ctx *ctx, st
 
     if (!sm4_generate_vsir_reg_from_deref(ctx, program, &src_param->reg, &writemask, deref))
         return false;
-    src_param->swizzle = generate_vsir_get_src_swizzle(writemask, dst_writemask);
+    if (src_param->reg.dimension != VSIR_DIMENSION_NONE)
+        src_param->swizzle = generate_vsir_get_src_swizzle(writemask, dst_writemask);
     return true;
 }
 
