@@ -8329,9 +8329,16 @@ static void sm1_generate_vsir_init_dst_param_from_deref(struct hlsl_ctx *ctx,
     else
         VKD3D_ASSERT(reg.allocated);
 
-    vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 1);
+    if (type == VKD3DSPR_DEPTHOUT)
+    {
+        vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 0);
+    }
+    else
+    {
+        vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 1);
+        dst_param->reg.idx[0].offset = register_index;
+    }
     dst_param->write_mask = writemask;
-    dst_param->reg.idx[0].offset = register_index;
 
     if (deref->rel_offset.node)
         hlsl_fixme(ctx, loc, "Translate relative addressing on dst register for vsir.");
