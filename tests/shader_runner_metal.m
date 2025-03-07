@@ -199,9 +199,10 @@ static void init_resource_texture(struct metal_runner *runner,
 
     desc = [[MTLTextureDescriptor alloc] init];
     if (params->desc.sample_count > 1)
-        desc.textureType = MTLTextureType2DMultisample;
-    else if (params->desc.depth > 1)
-        desc.textureType = MTLTextureType2DArray;
+        desc.textureType = params->desc.depth > 1 ? MTLTextureType2DMultisampleArray
+                : MTLTextureType2DMultisample;
+    else
+        desc.textureType = params->desc.depth > 1 ? MTLTextureType2DArray : MTLTextureType2D;
     desc.pixelFormat = get_metal_pixel_format(params->desc.format);
     ok(desc.pixelFormat != MTLPixelFormatInvalid, "Unhandled pixel format %#x.\n", params->desc.format);
     desc.width = params->desc.width;
