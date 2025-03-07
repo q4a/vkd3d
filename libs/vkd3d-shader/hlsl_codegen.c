@@ -7507,7 +7507,7 @@ static void sm1_generate_vsir_instr_expr_sincos(struct hlsl_ctx *ctx, struct vsi
         src_param->reg.idx[0].offset = ctx->d3dsincosconst1.id;
         src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
 
-        src_param = &ins->src[1];
+        src_param = &ins->src[2];
         vsir_register_init(&src_param->reg, VKD3DSPR_CONST, VKD3D_DATA_FLOAT, 1);
         src_param->reg.idx[0].offset = ctx->d3dsincosconst2.id;
         src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
