@@ -107,7 +107,7 @@ uint4 main() : SV_TARGET
 [test]
 uniform 0 uint4 0xccaa5533 7 1 2
 todo(glsl | msl) draw quad
-todo(sm<6) probe (0, 0) rgbaui(0xff77, 0xf, 0x407f, 0x9)
+probe (0, 0) rgbaui(0xff77, 0xf, 0x407f, 0x9)
 
 [require]
 shader model >= 6.2
