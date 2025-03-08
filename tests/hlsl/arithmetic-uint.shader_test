@@ -89,6 +89,26 @@ uniform 0 uint 7
 todo(msl) draw quad
 probe (0, 0) rgba(38.0, 5.0, 7.0, 0.0)
 
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
+
+[pixel shader]
+uniform uint4 c;
+
+uint4 main() : SV_TARGET
+{
+    uint x = c.x & 0xffff;
+    uint y = c.y & 0xffff;
+
+    return uint4(x | (x << c.z), y | (c.z + y), (x >> c.w) ^ x, (c.w * y) ^ y);
+}
+
+[test]
+uniform 0 uint4 0xccaa5533 7 1 2
+todo(glsl | msl) draw quad
+todo(sm<6) probe (0, 0) rgbaui(0xff77, 0xf, 0x407f, 0x9)
+
 [require]
 shader model >= 6.2
 native-16-bit
