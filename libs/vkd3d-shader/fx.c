@@ -734,6 +734,28 @@ static const struct rhs_named_value fx_2_lighttype_values[] =
     { NULL }
 };
 
+static const struct rhs_named_value fx_2_address_values[] =
+{
+    { "WRAP", 1 },
+    { "MIRROR", 2 },
+    { "CLAMP", 3 },
+    { "BORDER", 4 },
+    { "MIRROR_ONCE", 5 },
+    { NULL }
+};
+
+static const struct rhs_named_value fx_2_filter_values[] =
+{
+    { "NONE", 0 },
+    { "POINT", 1 },
+    { "LINEAR", 2 },
+    { "ANISOTROPIC", 3 },
+    { "PYRAMIDALQUAD", 6 },
+    { "GAUSSIANQUAD", 7 },
+    { "CONVOLUTIONMONO", 8 },
+    { NULL }
+};
+
 static const struct fx_2_state
 {
     const char *name;
@@ -904,6 +926,38 @@ fx_2_states[] =
 
     { "VertexShader",      HLSL_CLASS_SCALAR, FX_VERTEXSHADER, 1, 1, 146 },
     { "PixelShader",       HLSL_CLASS_SCALAR, FX_PIXELSHADER,  1, 1, 147 },
+
+    { "VertexShaderConstantF", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 148 },
+    { "VertexShaderConstantB", HLSL_CLASS_SCALAR, FX_BOOL,  1, ~0u-1, 149 },
+    { "VertexShaderConstantI", HLSL_CLASS_SCALAR, FX_UINT,  1, ~0u-1, 150 },
+    { "VertexShaderConstant",  HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 151 },
+    { "VertexShaderConstant1", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 152 },
+    { "VertexShaderConstant2", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 153 },
+    { "VertexShaderConstant3", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 154 },
+    { "VertexShaderConstant4", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 155 },
+
+    { "PixelShaderConstantF", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 156 },
+    { "PixelShaderConstantB", HLSL_CLASS_SCALAR, FX_BOOL,  1, ~0u-1, 157 },
+    { "PixelShaderConstantI", HLSL_CLASS_SCALAR, FX_UINT,  1, ~0u-1, 158 },
+    { "PixelShaderConstant",  HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 159 },
+    { "PixelShaderConstant1", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 160 },
+    { "PixelShaderConstant2", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 161 },
+    { "PixelShaderConstant3", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 162 },
+    { "PixelShaderConstant4", HLSL_CLASS_SCALAR, FX_FLOAT, 1, ~0u-1, 163 },
+
+    { "Texture",           HLSL_CLASS_SCALAR, FX_TEXTURE, 1, 1, 164 },
+    { "AddressU",          HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 165, fx_2_address_values },
+    { "AddressV",          HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 166, fx_2_address_values },
+    { "AddressW",          HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 167, fx_2_address_values },
+    { "BorderColor",       HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 168 },
+    { "MagFilter",         HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 169, fx_2_filter_values },
+    { "MinFilter",         HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 170, fx_2_filter_values },
+    { "MipFilter",         HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 171, fx_2_filter_values },
+    { "MipMapLodBias",     HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 172 },
+    { "MaxMipLevel",       HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 173 },
+    { "MaxAnisotropy",     HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 174 },
+    { "SRBTexture",        HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 175 },
+    { "ElementIndex",      HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 176 },
 };
 
 static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -3653,6 +3707,40 @@ static bool is_fx_2_sampler(uint32_t type)
             || type == D3DXPT_SAMPLERCUBE;
 }
 
+static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_assignment *entry);
+
+static void parse_fx_2_sampler(struct fx_parser *parser, uint32_t element_count,
+        uint32_t offset)
+{
+    struct fx_assignment entry;
+    uint32_t count;
+
+    element_count = max(element_count, 1);
+
+    vkd3d_string_buffer_printf(&parser->buffer, "\n");
+    for (uint32_t i = 0; i < element_count; ++i)
+    {
+        fx_parser_read_unstructured(parser, &count, offset, sizeof(count));
+        offset += sizeof(count);
+
+        parse_fx_start_indent(parser);
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "{\n");
+        parse_fx_start_indent(parser);
+        for (uint32_t j = 0; j < count; ++j, offset += sizeof(entry))
+        {
+            fx_parser_read_unstructured(parser, &entry, offset, sizeof(entry));
+
+            parse_fx_print_indent(parser);
+            fx_parse_fx_2_assignment(parser, &entry);
+        }
+        parse_fx_end_indent(parser);
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "},\n");
+        parse_fx_end_indent(parser);
+    }
+}
+
 static void fx_parse_fx_2_initial_value(struct fx_parser *parser, uint32_t param, uint32_t value)
 {
     struct fx_2_var
@@ -3681,8 +3769,7 @@ static void fx_parse_fx_2_initial_value(struct fx_parser *parser, uint32_t param
     if (var.class == D3DXPC_OBJECT)
     {
         if (is_fx_2_sampler(var.type))
-            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_NOT_IMPLEMENTED,
-                    "Parsing sampler initializers is not supported.");
+            parse_fx_2_sampler(parser, var.element_count, value);
         else
             parse_fx_2_object_value(parser, var.element_count, var.type, value);
     }
