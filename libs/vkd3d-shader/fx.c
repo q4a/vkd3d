@@ -3851,13 +3851,27 @@ static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_a
     {
         vkd3d_string_buffer_printf(&parser->buffer, "%s /* %u */", named_value->name, named_value->value);
     }
-    else if (state && (state->type == FX_UINT || state->type == FX_FLOAT))
+    else if (state)
     {
-        uint32_t offset = entry->type;
-        unsigned int size;
+        if (state->type == FX_UINT || state->type == FX_FLOAT)
+        {
+            uint32_t offset = entry->type;
+            unsigned int size;
 
-        size = fx_get_fx_2_type_size(parser, &offset);
-        parse_fx_2_numeric_value(parser, entry->value, size, entry->type);
+            size = fx_get_fx_2_type_size(parser, &offset);
+            parse_fx_2_numeric_value(parser, entry->value, size, entry->type);
+        }
+        else if (state->type == FX_VERTEXSHADER || state->type == FX_PIXELSHADER)
+        {
+            uint32_t id;
+
+            fx_parser_read_unstructured(parser, &id, entry->value, sizeof(id));
+            vkd3d_string_buffer_printf(&parser->buffer, "<object id %u>", id);
+        }
+        else
+        {
+            vkd3d_string_buffer_printf(&parser->buffer, "<ignored>");
+        }
     }
     else
     {
@@ -3956,10 +3970,62 @@ static void fx_2_parse_parameters(struct fx_parser *parser, uint32_t count)
         vkd3d_string_buffer_printf(&parser->buffer, "\n");
 }
 
+static void fx_parse_shader_blob(struct fx_parser *parser, enum vkd3d_shader_source_type source_type,
+        const void *data, uint32_t data_size)
+{
+    struct vkd3d_shader_compile_info info = { 0 };
+    struct vkd3d_shader_code output;
+    const char *p, *q, *end;
+    int ret;
+
+    static const struct vkd3d_shader_compile_option options[] =
+    {
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_15},
+    };
+
+    info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
+    info.source.code = data;
+    info.source.size = data_size;
+    info.source_type = source_type;
+    info.target_type = VKD3D_SHADER_TARGET_D3D_ASM;
+    info.options = options;
+    info.option_count = ARRAY_SIZE(options);
+    info.log_level = VKD3D_SHADER_LOG_INFO;
+
+    if ((ret = vkd3d_shader_compile(&info, &output, NULL)) < 0)
+    {
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                "Failed to disassemble shader blob.");
+        return;
+    }
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "asm {\n");
+
+    parse_fx_start_indent(parser);
+
+    end = (const char *)output.code + output.size;
+    for (p = output.code; p < end; p = q)
+    {
+        if (!(q = memchr(p, '\n', end - p)))
+            q = end;
+        else
+            ++q;
+
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "%.*s", (int)(q - p), p);
+    }
+
+    parse_fx_end_indent(parser);
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "}");
+
+    vkd3d_shader_free_shader_code(&output);
+}
+
 static void fx_parse_fx_2_data_blob(struct fx_parser *parser)
 {
     uint32_t id, size;
-    const char *str;
+    const void *data;
 
     id = fx_parser_read_u32(parser);
     size = fx_parser_read_u32(parser);
@@ -3980,14 +4046,24 @@ static void fx_parse_fx_2_data_blob(struct fx_parser *parser)
             case D3DXPT_VERTEXSHADER:
                 vkd3d_string_buffer_printf(&parser->buffer, "%s object %u size %u bytes%s\n",
                         fx_2_types[type], id, size, size ? ":" : ",");
-                if (size && type == D3DXPT_STRING)
+
+                if (size)
                 {
-                    parse_fx_start_indent(parser);
-                    parse_fx_print_indent(parser);
-                    str = fx_parser_get_ptr(parser, size);
-                    fx_print_string(&parser->buffer, "\"", str, size);
-                    vkd3d_string_buffer_printf(&parser->buffer, "\"\n");
-                    parse_fx_end_indent(parser);
+                    data = fx_parser_get_ptr(parser, size);
+
+                    if (type == D3DXPT_STRING)
+                    {
+                        parse_fx_start_indent(parser);
+                        parse_fx_print_indent(parser);
+                        fx_print_string(&parser->buffer, "\"", (const char *)data, size);
+                        vkd3d_string_buffer_printf(&parser->buffer, "\"");
+                        parse_fx_end_indent(parser);
+                    }
+                    else if (type == D3DXPT_PIXELSHADER || type == D3DXPT_VERTEXSHADER)
+                    {
+                        fx_parse_shader_blob(parser, VKD3D_SHADER_SOURCE_D3D_BYTECODE, data, size);
+                    }
+                    vkd3d_string_buffer_printf(&parser->buffer, "\n");
                 }
                 break;
             default:
@@ -4256,17 +4332,8 @@ static void fx_parse_buffers(struct fx_parser *parser)
 
 static void fx_4_parse_shader_blob(struct fx_parser *parser, unsigned int object_type, const struct fx_5_shader *shader)
 {
-    struct vkd3d_shader_compile_info info = { 0 };
-    struct vkd3d_shader_code output;
     const void *data = NULL;
-    const char *p, *q, *end;
     uint32_t data_size;
-    int ret;
-
-    static const struct vkd3d_shader_compile_option options[] =
-    {
-        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_15},
-    };
 
     if (!shader->offset)
     {
@@ -4282,42 +4349,8 @@ static void fx_4_parse_shader_blob(struct fx_parser *parser, unsigned int object
     if (!data)
         return;
 
-    info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
-    info.source.code = data;
-    info.source.size = data_size;
-    info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
-    info.target_type = VKD3D_SHADER_TARGET_D3D_ASM;
-    info.options = options;
-    info.option_count = ARRAY_SIZE(options);
-    info.log_level = VKD3D_SHADER_LOG_INFO;
+    fx_parse_shader_blob(parser, VKD3D_SHADER_SOURCE_DXBC_TPF, data, data_size);
 
-    if ((ret = vkd3d_shader_compile(&info, &output, NULL)) < 0)
-    {
-        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
-                "Failed to disassemble shader blob.");
-        return;
-    }
-    parse_fx_print_indent(parser);
-    vkd3d_string_buffer_printf(&parser->buffer, "asm {\n");
-
-    parse_fx_start_indent(parser);
-
-    end = (const char *)output.code + output.size;
-    for (p = output.code; p < end; p = q)
-    {
-        if (!(q = memchr(p, '\n', end - p)))
-            q = end;
-        else
-            ++q;
-
-        parse_fx_print_indent(parser);
-        vkd3d_string_buffer_printf(&parser->buffer, "%.*s", (int)(q - p), p);
-    }
-
-    parse_fx_end_indent(parser);
-
-    parse_fx_print_indent(parser);
-    vkd3d_string_buffer_printf(&parser->buffer, "}");
     if (object_type == FX_4_OBJECT_TYPE_GEOMETRY_SHADER_SO && shader->sodecl[0])
     {
         vkd3d_string_buffer_printf(&parser->buffer, "\n/* Stream output declaration: \"%s\" */",
@@ -4334,8 +4367,6 @@ static void fx_4_parse_shader_blob(struct fx_parser *parser, unsigned int object
         if (shader->sodecl_count)
             vkd3d_string_buffer_printf(&parser->buffer, "\n/* Rasterized stream %u */", shader->rast_stream);
     }
-
-    vkd3d_shader_free_shader_code(&output);
 }
 
 static void fx_4_parse_shader_initializer(struct fx_parser *parser, unsigned int object_type)
