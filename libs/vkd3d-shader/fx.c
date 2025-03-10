@@ -4078,9 +4078,62 @@ static void fx_parse_fx_2_data_blob(struct fx_parser *parser)
     fx_parser_skip(parser, align(size, 4));
 }
 
+static void fx_dump_blob(struct fx_parser *parser, const void *blob, uint32_t size)
+{
+    const uint32_t *data = blob;
+    unsigned int i, j, n;
+
+    size /= sizeof(*data);
+    i = 0;
+    while (i < size)
+    {
+        parse_fx_print_indent(parser);
+        n = min(size - i, 8);
+        for (j = 0; j < n; ++j)
+            vkd3d_string_buffer_printf(&parser->buffer, "0x%08x,", data[i + j]);
+        i += n;
+        vkd3d_string_buffer_printf(&parser->buffer, "\n");
+    }
+}
+
+static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
+{
+    struct
+    {
+        uint32_t technique;
+        uint32_t index;
+        uint32_t element;
+        uint32_t state;
+        uint32_t value_type;
+    } state;
+    const void *data;
+    uint32_t size;
+
+    fx_parser_read_u32s(parser, &state, sizeof(state));
+
+    if (state.technique == ~0u)
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "parameter %u[%u], state %u =\n",
+                state.index, state.element, state.state);
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "technique %u, pass %u, state %u =\n",
+                state.technique, state.index, state.state);
+    }
+
+    size = fx_parser_read_u32(parser);
+    data = fx_parser_get_ptr(parser, size);
+
+    parse_fx_print_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "blob size %u\n", size);
+    fx_dump_blob(parser, data, size);
+    fx_parser_skip(parser, align(size, 4));
+}
+
 static void fx_2_parse(struct fx_parser *parser)
 {
-    uint32_t i, size, parameter_count, technique_count, blob_count;
+    uint32_t i, size, parameter_count, technique_count, blob_count, state_count;
 
     fx_parser_skip(parser, sizeof(uint32_t)); /* Version */
     size = fx_parser_read_u32(parser);
@@ -4106,12 +4159,19 @@ static void fx_2_parse(struct fx_parser *parser)
         fx_parse_fx_2_technique(parser);
 
     blob_count = fx_parser_read_u32(parser);
-    fx_parser_read_u32(parser); /* Resource count */
+    state_count = fx_parser_read_u32(parser);
 
     vkd3d_string_buffer_printf(&parser->buffer, "object data {\n");
     parse_fx_start_indent(parser);
     for (i = 0; i < blob_count; ++i)
         fx_parse_fx_2_data_blob(parser);
+    parse_fx_end_indent(parser);
+    vkd3d_string_buffer_printf(&parser->buffer, "}\n\n");
+
+    vkd3d_string_buffer_printf(&parser->buffer, "state data {\n");
+    parse_fx_start_indent(parser);
+    for (i = 0; i < state_count; ++i)
+        fx_parse_fx_2_complex_state(parser);
     parse_fx_end_indent(parser);
     vkd3d_string_buffer_printf(&parser->buffer, "}\n");
 }
