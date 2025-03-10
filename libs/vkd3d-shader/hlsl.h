@@ -1188,6 +1188,9 @@ struct hlsl_ctx
      * the patch constant function in a hull shader. */
     bool is_patch_constant_func;
 
+    /* The maximum output vertex count of a geometry shader. */
+    unsigned int max_vertex_count;
+
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we
      * are currently parsing, "mangled" with an internal prefix to avoid
