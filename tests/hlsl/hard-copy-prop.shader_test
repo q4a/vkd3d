@@ -186,3 +186,22 @@ if(sm<4)  uniform 8 float4 1 0 0 0
 if(sm>=4) uniform 8 uint4  1 0 0 0
 todo(msl) draw quad
 probe (0, 0) rgba(3.0, 3.0, 3.0, 3.0)
+
+% OOB indexes are illegal, but sm < 6 allows them in dead code.
+% We need copy-prop to know if the code is dead.
+% This means copy-prop needs to be able to handle OOB indexes.
+[pixel shader fail(sm>=6)]
+
+float4 main() : sv_target
+{
+    static float4 arr[4];
+    bool x = false;
+
+    if (x)
+    {
+        arr[100] = 0;
+        return arr[100];
+    }
+
+    return 0;
+}

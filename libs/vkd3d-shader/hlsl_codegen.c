@@ -1627,9 +1627,18 @@ static void copy_propagation_invalidate_variable_from_deref_recurse(struct hlsl_
 
         if (path_node->type == HLSL_IR_CONSTANT)
         {
+            uint32_t index = hlsl_ir_constant(path_node)->value.u[0].u;
+
+            /* Don't bother invalidating anything if the index is constant but
+             * out-of-range.
+             * Such indices are illegal in HLSL, but only if the code is not
+             * dead, and we can't always know if code is dead without copy-prop
+             * itself. */
+            if (index >= hlsl_type_element_count(type))
+                return;
+
             copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, subtype,
-                    depth + 1, hlsl_ir_constant(path_node)->value.u[0].u * subtype_comp_count,
-                    writemask, time);
+                    depth + 1, index * subtype_comp_count, writemask, time);
         }
         else
         {
