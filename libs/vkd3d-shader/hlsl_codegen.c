@@ -6773,7 +6773,71 @@ static void validate_hull_shader_attributes(struct hlsl_ctx *ctx, const struct h
     }
 }
 
-static void validate_and_record_patch_type(struct hlsl_ctx *ctx, struct hlsl_ir_var *var)
+static enum vkd3d_primitive_type get_primitive_type(struct hlsl_ctx *ctx, struct hlsl_ir_var *var)
+{
+    uint32_t prim_modifier = var->data_type->modifiers & HLSL_PRIMITIVE_MODIFIERS_MASK;
+    enum vkd3d_primitive_type prim_type = VKD3D_PT_UNDEFINED;
+
+    if (prim_modifier)
+    {
+        unsigned int count = var->data_type->e.array.elements_count;
+        unsigned int expected_count;
+
+        VKD3D_ASSERT(!(prim_modifier & (prim_modifier - 1)));
+
+        switch (prim_modifier)
+        {
+            case HLSL_PRIMITIVE_POINT:
+                prim_type = VKD3D_PT_POINTLIST;
+                expected_count = 1;
+                break;
+
+            case HLSL_PRIMITIVE_LINE:
+                prim_type = VKD3D_PT_LINELIST;
+                expected_count = 2;
+                break;
+
+            case HLSL_PRIMITIVE_TRIANGLE:
+                prim_type = VKD3D_PT_TRIANGLELIST;
+                expected_count = 3;
+                break;
+
+            case HLSL_PRIMITIVE_LINEADJ:
+                prim_type = VKD3D_PT_LINELIST_ADJ;
+                expected_count = 4;
+                break;
+
+            case HLSL_PRIMITIVE_TRIANGLEADJ:
+                prim_type = VKD3D_PT_TRIANGLELIST_ADJ;
+                expected_count = 6;
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+
+        if (count != expected_count)
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_modifiers_to_string(ctx, prim_modifier)))
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
+                        "Control point count %u does not match the expect count %u for the %s input primitive type.",
+                        count, expected_count, string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+        }
+    }
+
+    /* Patch types take precedence over primitive modifiers. */
+    if (hlsl_type_is_patch_array(var->data_type))
+        prim_type = VKD3D_PT_PATCH;
+
+    VKD3D_ASSERT(prim_type != VKD3D_PT_UNDEFINED);
+    return prim_type;
+}
+
+
+static void validate_and_record_prim_type(struct hlsl_ctx *ctx, struct hlsl_ir_var *var)
 {
     unsigned int control_point_count = var->data_type->e.array.elements_count;
     enum hlsl_array_type array_type = var->data_type->e.array.array_type;
@@ -6791,7 +6855,7 @@ static void validate_and_record_patch_type(struct hlsl_ctx *ctx, struct hlsl_ir_
             return;
         }
     }
-    else
+    else if (array_type == HLSL_ARRAY_PATCH_OUTPUT)
     {
         if (!ctx->is_patch_constant_func && profile->type != VKD3D_SHADER_TYPE_DOMAIN)
         {
@@ -6799,6 +6863,30 @@ static void validate_and_record_patch_type(struct hlsl_ctx *ctx, struct hlsl_ir_
                     "OutputPatch parameters can only be used in "
                     "hull shader patch constant functions and domain shaders.");
             return;
+        }
+    }
+
+    if ((var->data_type->modifiers & HLSL_PRIMITIVE_MODIFIERS_MASK) && profile->type != VKD3D_SHADER_TYPE_GEOMETRY)
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "Input primitive parameters can only be used in geometry shaders.");
+        return;
+    }
+
+    if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+    {
+        enum vkd3d_primitive_type prim_type = get_primitive_type(ctx, var);
+
+        if (ctx->input_primitive_type == VKD3D_PT_UNDEFINED)
+        {
+            ctx->input_primitive_type = prim_type;
+        }
+        else if (ctx->input_primitive_type != prim_type)
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Input primitive type does not match the previously declared type.");
+            hlsl_note(ctx, &ctx->input_primitive_param->loc, VKD3D_SHADER_LOG_ERROR,
+                    "The input primitive was previously declared here.");
         }
     }
 
@@ -6814,7 +6902,7 @@ static void validate_and_record_patch_type(struct hlsl_ctx *ctx, struct hlsl_ir_
     {
         if (control_point_count != ctx->output_control_point_count)
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
-                    "Output control point count %u does not match the count %u specified in the control point function.",
+                    "Output control point count %u does not match the count %u declared in the control point function.",
                     control_point_count, ctx->output_control_point_count);
 
         if (!hlsl_types_are_equal(control_point_type, ctx->output_control_point_type))
@@ -6826,22 +6914,32 @@ static void validate_and_record_patch_type(struct hlsl_ctx *ctx, struct hlsl_ir_
 
     if (ctx->input_control_point_count != UINT_MAX)
     {
-        VKD3D_ASSERT(ctx->is_patch_constant_func);
+        VKD3D_ASSERT(profile->type == VKD3D_SHADER_TYPE_GEOMETRY || ctx->is_patch_constant_func);
 
         if (control_point_count != ctx->input_control_point_count)
+        {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
-                    "Input control point count %u does not match the count %u specified in the control point function.",
+                    "Input control point count %u does not match the count %u declared previously.",
                     control_point_count, ctx->input_control_point_count);
+            hlsl_note(ctx, &ctx->input_primitive_param->loc, VKD3D_SHADER_LOG_ERROR,
+                    "The input primitive was previously declared here.");
+        }
 
-        if (!hlsl_types_are_equal(control_point_type, ctx->input_control_point_type))
+        if (profile->type != VKD3D_SHADER_TYPE_GEOMETRY
+                && !hlsl_types_are_equal(control_point_type, ctx->input_control_point_type))
+        {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Input control point type does not match the input type specified in the control point function.");
+                    "Input control point type does not match the input type declared previously.");
+            hlsl_note(ctx, &ctx->input_primitive_param->loc, VKD3D_SHADER_LOG_ERROR,
+                    "The input primitive was previously declared here.");
+        }
 
         return;
     }
 
     ctx->input_control_point_count = control_point_count;
     ctx->input_control_point_type = control_point_type;
+    ctx->input_primitive_param = var;
 }
 
 static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *body)
@@ -12418,37 +12516,46 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             else
                 prepend_uniform_copy(ctx, body, var);
         }
-        else if (hlsl_type_is_patch_array(var->data_type))
+        else if (hlsl_type_is_primitive_array(var->data_type))
         {
-            if (var->data_type->e.array.array_type == HLSL_ARRAY_PATCH_INPUT)
+            if (var->storage_modifiers & HLSL_STORAGE_OUT)
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Input primitive parameter \"%s\" is declared as \"out\".", var->name);
+
+            if (profile->type != VKD3D_SHADER_TYPE_GEOMETRY)
             {
-                if (input_patch)
+                enum hlsl_array_type array_type = var->data_type->e.array.array_type;
+
+                if (array_type == HLSL_ARRAY_PATCH_INPUT)
                 {
-                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_PATCH,
-                            "Found multiple InputPatch parameters.");
-                    hlsl_note(ctx, &input_patch->loc, VKD3D_SHADER_LOG_ERROR,
-                            "The InputPatch parameter was previously declared here.");
-                    continue;
+                    if (input_patch)
+                    {
+                        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_PATCH,
+                                "Found multiple InputPatch parameters.");
+                        hlsl_note(ctx, &input_patch->loc, VKD3D_SHADER_LOG_ERROR,
+                                "The InputPatch parameter was previously declared here.");
+                        continue;
+                    }
+                    input_patch = var;
                 }
-                input_patch = var;
-            }
-            else
-            {
-                if (output_patch)
+                else if (array_type == HLSL_ARRAY_PATCH_OUTPUT)
                 {
-                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_PATCH,
-                            "Found multiple OutputPatch parameters.");
-                    hlsl_note(ctx, &output_patch->loc, VKD3D_SHADER_LOG_ERROR,
-                            "The OutputPatch parameter was previously declared here.");
-                    continue;
+                    if (output_patch)
+                    {
+                        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_PATCH,
+                                "Found multiple OutputPatch parameters.");
+                        hlsl_note(ctx, &output_patch->loc, VKD3D_SHADER_LOG_ERROR,
+                                "The OutputPatch parameter was previously declared here.");
+                        continue;
+                    }
+                    output_patch = var;
                 }
-                output_patch = var;
             }
 
-            validate_and_record_patch_type(ctx, var);
+            validate_and_record_prim_type(ctx, var);
             if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
             {
-                hlsl_fixme(ctx, &var->loc, "InputPatch/OutputPatch parameters in geometry shaders.");
+                hlsl_fixme(ctx, &var->loc, "Input primitive parameters in geometry shaders.");
                 continue;
             }
 
@@ -12465,7 +12572,16 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             }
 
             if (var->storage_modifiers & HLSL_STORAGE_IN)
+            {
+                if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+                {
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_PRIMITIVE_TYPE,
+                            "Input parameter \"%s\" is missing a primitive type.", var->name);
+                    continue;
+                }
+
                 prepend_input_var_copy(ctx, entry_func, var);
+            }
             if (var->storage_modifiers & HLSL_STORAGE_OUT)
             {
                 if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
@@ -12492,6 +12608,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
             hlsl_fixme(ctx, &entry_func->loc, "Passthrough hull shader control point function.");
     }
+
+    if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY && ctx->input_primitive_type == VKD3D_PT_UNDEFINED)
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_PRIMITIVE_TYPE,
+                "Entry point \"%s\" is missing an input primitive parameter.", entry_func->func->name);
 
     if (hlsl_version_ge(ctx, 4, 0))
     {

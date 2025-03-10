@@ -298,6 +298,12 @@ bool hlsl_type_is_patch_array(const struct hlsl_type *type)
             || type->e.array.array_type == HLSL_ARRAY_PATCH_OUTPUT);
 }
 
+bool hlsl_type_is_primitive_array(const struct hlsl_type *type)
+{
+    return type->class == HLSL_CLASS_ARRAY && (type->e.array.array_type != HLSL_ARRAY_GENERIC
+            || (type->modifiers & HLSL_PRIMITIVE_MODIFIERS_MASK));
+}
+
 bool hlsl_base_type_is_integer(enum hlsl_base_type type)
 {
     switch (type)
@@ -4746,6 +4752,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
     ctx->partitioning = 0;
     ctx->input_control_point_count = UINT_MAX;
     ctx->max_vertex_count = 0;
+    ctx->input_primitive_type = VKD3D_PT_UNDEFINED;
 
     return true;
 }

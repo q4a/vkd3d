@@ -1192,12 +1192,17 @@ struct hlsl_ctx
     unsigned int input_control_point_count;
     struct hlsl_type *input_control_point_type;
 
+    /* The first declared input primitive parameter in tessellation and geometry shaders. */
+    struct hlsl_ir_var *input_primitive_param;
+
     /* Whether the current function being processed during HLSL codegen is
      * the patch constant function in a hull shader. */
     bool is_patch_constant_func;
 
     /* The maximum output vertex count of a geometry shader. */
     unsigned int max_vertex_count;
+    /* The input primitive type of a geometry shader. */
+    enum vkd3d_primitive_type input_primitive_type;
 
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we
@@ -1617,6 +1622,7 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
         struct hlsl_ir_node *idx);
 
 const char *hlsl_jump_type_to_string(enum hlsl_ir_jump_type type);
+const char *hlsl_array_type_to_string(enum hlsl_array_type type);
 
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
         unsigned int array_size, enum hlsl_array_type array_type);
@@ -1736,6 +1742,7 @@ bool hlsl_type_is_integer(const struct hlsl_type *type);
 bool hlsl_type_is_resource(const struct hlsl_type *type);
 bool hlsl_type_is_shader(const struct hlsl_type *type);
 bool hlsl_type_is_patch_array(const struct hlsl_type *type);
+bool hlsl_type_is_primitive_array(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 
