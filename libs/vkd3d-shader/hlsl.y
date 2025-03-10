@@ -2401,10 +2401,10 @@ static bool type_has_numeric_components(struct hlsl_type *type)
     return false;
 }
 
-static void check_invalid_in_out_modifiers(struct hlsl_ctx *ctx, unsigned int modifiers,
+static void check_invalid_non_parameter_modifiers(struct hlsl_ctx *ctx, unsigned int modifiers,
         const struct vkd3d_shader_location *loc)
 {
-    modifiers &= (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
+    modifiers &= (HLSL_STORAGE_IN | HLSL_STORAGE_OUT | HLSL_PRIMITIVE_MODIFIERS_MASK);
     if (modifiers)
     {
         struct vkd3d_string_buffer *string;
@@ -6816,6 +6816,8 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_INLINE
 %token KW_INOUT
 %token KW_INPUTPATCH
+%token KW_LINE
+%token KW_LINEADJ
 %token KW_LINEAR
 %token KW_LINESTREAM
 %token KW_MATRIX
@@ -6828,6 +6830,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_PACKOFFSET
 %token KW_PASS
 %token KW_PIXELSHADER
+%token KW_POINT
 %token KW_POINTSTREAM
 %token KW_RASTERIZERORDEREDBUFFER
 %token KW_RASTERIZERORDEREDSTRUCTUREDBUFFER
@@ -6878,6 +6881,8 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_TEXTURE3D
 %token KW_TEXTURECUBE
 %token KW_TEXTURECUBEARRAY
+%token KW_TRIANGLE
+%token KW_TRIANGLEADJ
 %token KW_TRIANGLESTREAM
 %token KW_TRUE
 %token KW_TYPEDEF
@@ -7885,7 +7890,8 @@ parameter:
 parameter_decl:
       var_modifiers type_no_void any_identifier arrays colon_attributes
         {
-            uint32_t modifiers = $1;
+            uint32_t prim_modifiers = $1 & HLSL_PRIMITIVE_MODIFIERS_MASK;
+            uint32_t modifiers = $1 & ~HLSL_PRIMITIVE_MODIFIERS_MASK;
             struct hlsl_type *type;
             unsigned int i;
 
@@ -7909,6 +7915,22 @@ parameter_decl:
                 type = hlsl_new_array_type(ctx, type, $4.sizes[i], HLSL_ARRAY_GENERIC);
             }
             vkd3d_free($4.sizes);
+
+            if (prim_modifiers && (prim_modifiers & (prim_modifiers - 1)))
+            {
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Primitive type modifiers are mutually exclusive.");
+                prim_modifiers = 0;
+            }
+
+            if (prim_modifiers)
+            {
+                if (type->class != HLSL_CLASS_ARRAY)
+                    hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Primitive type modifiers can only be applied to arrays.");
+                else
+                    type->modifiers |= prim_modifiers;
+            }
 
             $$.type = type;
 
@@ -8629,7 +8651,7 @@ variable_def_typed:
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
 
-            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
+            check_invalid_non_parameter_modifiers(ctx, modifiers, &@1);
 
             $$ = $3;
             $$->basic_type = type;
@@ -8644,7 +8666,7 @@ variable_def_typed:
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
 
-            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
+            check_invalid_non_parameter_modifiers(ctx, modifiers, &@1);
 
             $$ = $3;
             $$->basic_type = type;
@@ -8784,6 +8806,26 @@ var_modifiers:
     | KW_SNORM var_modifiers
         {
             $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_SNORM, &@1);
+        }
+    | KW_LINE var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_PRIMITIVE_LINE, &@1);
+        }
+    | KW_LINEADJ var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_PRIMITIVE_LINEADJ, &@1);
+        }
+    | KW_POINT var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_PRIMITIVE_POINT, &@1);
+        }
+    | KW_TRIANGLE var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_PRIMITIVE_TRIANGLE, &@1);
+        }
+    | KW_TRIANGLEADJ var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_PRIMITIVE_TRIANGLEADJ, &@1);
         }
     | var_identifier var_modifiers
         {

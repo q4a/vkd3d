@@ -3202,6 +3202,16 @@ struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, uint3
         vkd3d_string_buffer_printf(string, "row_major ");
     if (modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
         vkd3d_string_buffer_printf(string, "column_major ");
+    if (modifiers & HLSL_PRIMITIVE_POINT)
+        vkd3d_string_buffer_printf(string, "point ");
+    if (modifiers & HLSL_PRIMITIVE_LINE)
+        vkd3d_string_buffer_printf(string, "line ");
+    if (modifiers & HLSL_PRIMITIVE_TRIANGLE)
+        vkd3d_string_buffer_printf(string, "triangle ");
+    if (modifiers & HLSL_PRIMITIVE_LINEADJ)
+        vkd3d_string_buffer_printf(string, "lineadj ");
+    if (modifiers & HLSL_PRIMITIVE_TRIANGLEADJ)
+        vkd3d_string_buffer_printf(string, "triangleadj ");
     if ((modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT)) == (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))
         vkd3d_string_buffer_printf(string, "inout ");
     else if (modifiers & HLSL_STORAGE_IN)
