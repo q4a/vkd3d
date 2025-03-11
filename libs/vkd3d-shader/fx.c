@@ -25,6 +25,14 @@ static inline size_t put_u32_unaligned(struct vkd3d_bytecode_buffer *buffer, uin
     return bytecode_put_bytes_unaligned(buffer, &value, sizeof(value));
 }
 
+enum fx_2_type_constants
+{
+    /* Assignment types */
+    FX_2_ASSIGNMENT_CODE_BLOB = 0x0,
+    FX_2_ASSIGNMENT_PARAMETER = 0x1,
+    FX_2_ASSIGNMENT_ARRAY_SELECTOR = 0x2,
+};
+
 enum state_property_component_type
 {
     FX_BOOL,
@@ -4096,6 +4104,46 @@ static void fx_dump_blob(struct fx_parser *parser, const void *blob, uint32_t si
     }
 }
 
+static void fx_parse_fx_2_array_selector(struct fx_parser *parser, uint32_t size)
+{
+    const uint8_t *end = parser->ptr + size;
+    uint32_t name_size, blob_size = 0;
+    const void *blob = NULL;
+    const char *name;
+
+    name_size = fx_parser_read_u32(parser);
+    name = fx_parser_get_ptr(parser, name_size);
+    fx_parser_skip(parser, name_size);
+
+    if (!name || (uint8_t *)name >= end)
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                "Malformed name entry in the array selector.");
+
+    if (parser->ptr <= end)
+    {
+        blob_size = end - parser->ptr;
+        blob = fx_parser_get_ptr(parser, blob_size);
+        fx_parser_skip(parser, blob_size);
+    }
+    else
+    {
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                "Malformed blob entry in the array selector.");
+    }
+
+    if (name)
+    {
+        fx_print_string(&parser->buffer, "array \"", name, name_size);
+        vkd3d_string_buffer_printf(&parser->buffer, "\"\n");
+    }
+    if (blob)
+    {
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "selector blob size %u\n", blob_size);
+        fx_dump_blob(parser, blob, blob_size);
+    }
+}
+
 static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
 {
     struct
@@ -4104,9 +4152,9 @@ static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
         uint32_t index;
         uint32_t element;
         uint32_t state;
-        uint32_t value_type;
+        uint32_t assignment_type;
     } state;
-    const void *data;
+    const char *data;
     uint32_t size;
 
     fx_parser_read_u32s(parser, &state, sizeof(state));
@@ -4123,12 +4171,27 @@ static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
     }
 
     size = fx_parser_read_u32(parser);
-    data = fx_parser_get_ptr(parser, size);
 
     parse_fx_print_indent(parser);
-    vkd3d_string_buffer_printf(&parser->buffer, "blob size %u\n", size);
-    fx_dump_blob(parser, data, size);
-    fx_parser_skip(parser, align(size, 4));
+
+    if (state.assignment_type == FX_2_ASSIGNMENT_PARAMETER)
+    {
+        data = fx_parser_get_ptr(parser, size);
+        fx_print_string(&parser->buffer, "parameter \"", data, size);
+        vkd3d_string_buffer_printf(&parser->buffer, "\"\n");
+        fx_parser_skip(parser, align(size, 4));
+    }
+    else if (state.assignment_type == FX_2_ASSIGNMENT_ARRAY_SELECTOR)
+    {
+        fx_parse_fx_2_array_selector(parser, size);
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "blob size %u\n", size);
+        data = fx_parser_get_ptr(parser, size);
+        fx_dump_blob(parser, data, size);
+        fx_parser_skip(parser, align(size, 4));
+    }
 }
 
 static void fx_2_parse(struct fx_parser *parser)
