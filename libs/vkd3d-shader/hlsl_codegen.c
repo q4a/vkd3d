@@ -1638,14 +1638,14 @@ static void copy_propagation_invalidate_variable_from_deref_recurse(struct hlsl_
                 return;
 
             copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, subtype,
-                    depth + 1, index * subtype_comp_count, writemask, time);
+                    depth + 1, comp_start + index * subtype_comp_count, writemask, time);
         }
         else
         {
             for (i = 0; i < hlsl_type_element_count(type); ++i)
             {
                 copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, subtype,
-                        depth + 1, i * subtype_comp_count, writemask, time);
+                        depth + 1, comp_start + i * subtype_comp_count, writemask, time);
             }
         }
     }
