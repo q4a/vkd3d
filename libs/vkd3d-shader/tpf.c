@@ -714,6 +714,22 @@ input_primitive_type_table[] =
     [VKD3D_SM4_INPUT_PT_TRIANGLEADJ]    = {6, VKD3D_PT_TRIANGLELIST_ADJ},
 };
 
+static const enum vkd3d_sm4_input_primitive_type sm4_input_primitive_type_table[] =
+{
+    [VKD3D_PT_POINTLIST]            = VKD3D_SM4_INPUT_PT_POINT,
+    [VKD3D_PT_LINELIST]             = VKD3D_SM4_INPUT_PT_LINE,
+    [VKD3D_PT_TRIANGLELIST]         = VKD3D_SM4_INPUT_PT_TRIANGLE,
+    [VKD3D_PT_LINELIST_ADJ]         = VKD3D_SM4_INPUT_PT_LINEADJ,
+    [VKD3D_PT_TRIANGLELIST_ADJ]     = VKD3D_SM4_INPUT_PT_TRIANGLEADJ,
+};
+
+static const enum vkd3d_sm4_output_primitive_type sm4_output_primitive_type_table[] =
+{
+    [VKD3D_PT_POINTLIST]            = VKD3D_SM4_OUTPUT_PT_POINTLIST,
+    [VKD3D_PT_LINESTRIP]            = VKD3D_SM4_OUTPUT_PT_LINESTRIP,
+    [VKD3D_PT_TRIANGLESTRIP]        = VKD3D_SM4_OUTPUT_PT_TRIANGLESTRIP,
+};
+
 static const enum vkd3d_shader_resource_type resource_type_table[] =
 {
     /* 0 */                                       VKD3D_SHADER_RESOURCE_NONE,
@@ -3939,6 +3955,57 @@ static void tpf_write_dcl_tessellator_output_primitive(const struct tpf_compiler
     write_sm4_instruction(tpf, &instr);
 }
 
+static void tpf_write_dcl_input_primitive(const struct tpf_compiler *tpf, enum vkd3d_primitive_type input_primitive,
+        unsigned int patch_vertex_count)
+{
+    enum vkd3d_sm4_input_primitive_type sm4_input_primitive;
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_INPUT_PRIMITIVE,
+    };
+
+    if (input_primitive == VKD3D_PT_PATCH)
+    {
+        VKD3D_ASSERT(patch_vertex_count >= 1 && patch_vertex_count <= 32);
+        sm4_input_primitive = VKD3D_SM5_INPUT_PT_PATCH1 + patch_vertex_count - 1;
+    }
+    else
+    {
+        VKD3D_ASSERT(input_primitive < ARRAY_SIZE(sm4_input_primitive_type_table));
+        sm4_input_primitive = sm4_input_primitive_type_table[input_primitive];
+    }
+
+    instr.extra_bits = sm4_input_primitive << VKD3D_SM4_PRIMITIVE_TYPE_SHIFT;
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_dcl_output_topology(const struct tpf_compiler *tpf, enum vkd3d_primitive_type output_topology)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_OUTPUT_TOPOLOGY,
+    };
+
+    VKD3D_ASSERT(output_topology < ARRAY_SIZE(sm4_output_primitive_type_table));
+    instr.extra_bits = sm4_output_primitive_type_table[output_topology] << VKD3D_SM4_PRIMITIVE_TYPE_SHIFT;
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void tpf_write_dcl_vertices_out(const struct tpf_compiler *tpf, unsigned int count)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_VERTICES_OUT,
+
+        .idx = {count},
+        .idx_count = 1,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
 static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
 {
     struct sm4_instruction_modifier *modifier;
@@ -4241,6 +4308,13 @@ static void tpf_write_shdr(struct tpf_compiler *tpf)
     {
         tpf_write_dcl_input_control_point_count(tpf, program->input_control_point_count);
         tpf_write_dcl_tessellator_domain(tpf, program->tess_domain);
+    }
+    else if (version->type == VKD3D_SHADER_TYPE_GEOMETRY)
+    {
+        tpf_write_dcl_input_primitive(tpf, program->input_primitive, program->input_control_point_count);
+        if (program->output_topology != VKD3D_PT_UNDEFINED)
+            tpf_write_dcl_output_topology(tpf, program->output_topology);
+        tpf_write_dcl_vertices_out(tpf, program->vertices_out_count);
     }
 
     tpf_write_program(tpf, program);
