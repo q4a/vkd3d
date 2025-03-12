@@ -517,7 +517,7 @@ tests_vkd3d_api_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
 tests_vkd3d_shader_api_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 tests_vkd3d_shader_api_CFLAGS = $(AM_CFLAGS) @OPENGL_CFLAGS@
-tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la @OPENGL_LIBS@
+tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la @OPENGL_LIBS@ @DL_LIBS@
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
 SHADER_TEST_LOG_DRIVER = $(srcdir)/tests/test-driver.sh
 endif
