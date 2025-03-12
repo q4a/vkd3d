@@ -8158,6 +8158,7 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
         case VKD3DSPR_IMMCONST:
         case VKD3DSPR_IMMCONST64:
         case VKD3DSPR_CONSTBUFFER:
+        case VKD3DSPR_IMMCONSTBUFFER:
         case VKD3DSPR_SAMPLER:
         case VKD3DSPR_RESOURCE:
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
