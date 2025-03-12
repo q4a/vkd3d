@@ -3,7 +3,7 @@ shader model >= 4.0
 shader model < 6.0
 
 % int and uint are compatible and generate no casts
-[effect todo]
+[effect]
 int stencil = 1;
 DepthStencilState depth {
     DepthEnable = TRUE;
