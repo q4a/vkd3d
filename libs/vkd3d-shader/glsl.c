@@ -1657,6 +1657,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_SWITCH:
             shader_glsl_switch(gen, ins);
             break;
+        case VKD3DSIH_XOR:
+            shader_glsl_binop(gen, ins, "^");
+            break;
         default:
             shader_glsl_unhandled(gen, ins);
             break;
