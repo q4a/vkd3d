@@ -7706,6 +7706,29 @@ static void vsir_validate_label_register(struct validation_context *ctx,
                 reg->idx[0].offset, ctx->program->block_count);
 }
 
+static void vsir_validate_constbuffer_register(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg)
+{
+    if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
+                "Invalid precision %#x for a CONSTBUFFER register.", reg->precision);
+
+    if (reg->dimension != VSIR_DIMENSION_VEC4)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                "Invalid dimension %#x for a CONSTBUFFER register.", reg->dimension);
+
+    if (reg->idx_count != 3)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid index count %u for a CONSTBUFFER register.", reg->idx_count);
+        return;
+    }
+
+    if (reg->idx[0].rel_addr)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Non-NULL relative address for a CONSTBUFFER register ID.");
+}
+
 static void vsir_validate_sampler_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
@@ -7941,6 +7964,10 @@ static void vsir_validate_register(struct validation_context *ctx,
 
         case VKD3DSPR_IMMCONST64:
             vsir_validate_register_without_indices(ctx, reg);
+            break;
+
+        case VKD3DSPR_CONSTBUFFER:
+            vsir_validate_constbuffer_register(ctx, reg);
             break;
 
         case VKD3DSPR_PRIMID:
