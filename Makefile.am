@@ -109,6 +109,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/effect-compile.shader_test \
 	tests/hlsl/effect-initial-values-fx_2.shader_test \
 	tests/hlsl/effect-initial-values-fx_4.shader_test \
+	tests/hlsl/effect-pass-states-fx_4.shader_test \
 	tests/hlsl/effect-pass-states-fx_5.shader_test \
 	tests/hlsl/effect-shader-objects-fx_2.shader_test \
 	tests/hlsl/effect-shader-objects-fx_5.shader_test \
