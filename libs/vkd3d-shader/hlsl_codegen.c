@@ -11343,6 +11343,13 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
                 ? 0 : ctx->input_control_point_count;
         program->tess_domain = ctx->domain;
     }
+    else if (version.type == VKD3D_SHADER_TYPE_GEOMETRY)
+    {
+        program->input_control_point_count = ctx->input_control_point_count;
+        program->input_primitive = ctx->input_primitive_type;
+        program->output_topology = VKD3D_PT_UNDEFINED; /* TODO: obtain from stream output parameters. */
+        program->vertices_out_count = ctx->max_vertex_count;
+    }
 
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {

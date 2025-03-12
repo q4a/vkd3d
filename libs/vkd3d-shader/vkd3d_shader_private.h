@@ -1478,6 +1478,9 @@ struct vsir_program
     enum vkd3d_tessellator_domain tess_domain;
     enum vkd3d_shader_tessellator_partitioning tess_partitioning;
     enum vkd3d_shader_tessellator_output_primitive tess_output_primitive;
+    enum vkd3d_primitive_type input_primitive, output_topology;
+    unsigned int vertices_out_count;
+
     uint32_t io_dcls[VKD3D_BITMAP_SIZE(VKD3DSPR_COUNT)];
 
     struct vsir_features features;

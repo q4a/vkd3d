@@ -1077,6 +1077,8 @@ static void shader_sm4_read_dcl_output_topology(struct vkd3d_shader_instruction 
 
     if (ins->declaration.primitive_type.type == VKD3D_PT_UNDEFINED)
         FIXME("Unhandled output primitive type %#x.\n", primitive_type);
+
+    priv->p.program->output_topology = ins->declaration.primitive_type.type;
 }
 
 static void shader_sm4_read_dcl_input_primitive(struct vkd3d_shader_instruction *ins, uint32_t opcode,
@@ -1104,6 +1106,8 @@ static void shader_sm4_read_dcl_input_primitive(struct vkd3d_shader_instruction 
 
     if (ins->declaration.primitive_type.type == VKD3D_PT_UNDEFINED)
         FIXME("Unhandled input primitive type %#x.\n", primitive_type);
+
+    program->input_primitive = ins->declaration.primitive_type.type;
 }
 
 static void shader_sm4_read_declaration_count(struct vkd3d_shader_instruction *ins, uint32_t opcode,
@@ -1114,6 +1118,8 @@ static void shader_sm4_read_declaration_count(struct vkd3d_shader_instruction *i
     ins->declaration.count = *tokens;
     if (opcode == VKD3D_SM4_OP_DCL_TEMPS)
         program->temp_count = max(program->temp_count, *tokens);
+    else if (opcode == VKD3D_SM4_OP_DCL_VERTICES_OUT)
+        program->vertices_out_count = *tokens;
 }
 
 static void shader_sm4_read_declaration_dst(struct vkd3d_shader_instruction *ins, uint32_t opcode,
