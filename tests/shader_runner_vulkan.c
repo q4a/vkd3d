@@ -1856,20 +1856,31 @@ out_destroy_context:
 void run_shader_tests_vulkan(void)
 {
     struct vulkan_shader_runner runner = {0};
+    bool skip_sm2 = test_skipping_execution("Vulkan", HLSL_COMPILER, SHADER_MODEL_2_0, SHADER_MODEL_3_0);
+    bool skip_sm4 = test_skipping_execution("Vulkan", HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+
+    if (skip_sm2 && skip_sm4)
+        return;
 
     if (!init_vulkan_runner(&runner))
         return;
 
-    runner.caps.minimum_shader_model = SHADER_MODEL_2_0;
-    runner.caps.maximum_shader_model = SHADER_MODEL_3_0;
-    run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
+    if (!skip_sm2)
+    {
+        runner.caps.minimum_shader_model = SHADER_MODEL_2_0;
+        runner.caps.maximum_shader_model = SHADER_MODEL_3_0;
+        run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
+    }
 
-    /* Fog requires remapping, which is only correct for sm1. */
-    runner.caps.shader_caps[SHADER_CAP_FOG] = false;
+    if (!skip_sm4)
+    {
+        /* Fog requires remapping, which is only correct for sm1. */
+        runner.caps.shader_caps[SHADER_CAP_FOG] = false;
 
-    runner.caps.minimum_shader_model = SHADER_MODEL_4_0;
-    runner.caps.maximum_shader_model = SHADER_MODEL_5_1;
-    run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
+        runner.caps.minimum_shader_model = SHADER_MODEL_4_0;
+        runner.caps.maximum_shader_model = SHADER_MODEL_5_1;
+        run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
+    }
 
     vulkan_test_context_destroy(&runner.context);
 }

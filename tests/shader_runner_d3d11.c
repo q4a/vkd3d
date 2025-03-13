@@ -1043,6 +1043,10 @@ void run_shader_tests_d3d11(void)
     struct d3d11_shader_runner runner;
     HMODULE dxgi_module, d3d11_module;
 
+    if (test_skipping_execution("d3d11.dll",
+            HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_0))
+        return;
+
     d3d11_module = LoadLibraryA("d3d11.dll");
     dxgi_module = LoadLibraryA("dxgi.dll");
     if (d3d11_module && dxgi_module)

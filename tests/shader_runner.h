@@ -288,6 +288,8 @@ ID3D10Blob *compile_hlsl(const struct shader_runner *runner, enum shader_type ty
 struct sampler *shader_runner_get_sampler(struct shader_runner *runner, unsigned int slot);
 struct resource *shader_runner_get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot);
 
+bool test_skipping_execution(const char *executor, const char *compiler,
+    enum shader_model minimum_shader_model, enum shader_model maximum_shader_model);
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
         const struct shader_runner_ops *ops, void *dxc_compiler);
 

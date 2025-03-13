@@ -645,6 +645,10 @@ void run_shader_tests_d3d9(void)
     struct d3d9_shader_runner runner;
     HMODULE d3d9_module;
 
+    if (test_skipping_execution("d3d9.dll",
+            HLSL_COMPILER, SHADER_MODEL_2_0, SHADER_MODEL_3_0))
+        return;
+
     if (!(d3d9_module = LoadLibraryA("d3d9.dll")))
         return;
 

@@ -739,6 +739,9 @@ void run_shader_tests_metal(void)
 {
     struct metal_runner runner;
 
+    if (test_skipping_execution("Metal", HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_0))
+        return;
+
     if (!metal_runner_init(&runner))
         return;
     run_shader_tests(&runner.r, &runner.caps, &metal_runner_ops, NULL);

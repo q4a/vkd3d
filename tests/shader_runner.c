@@ -2066,6 +2066,41 @@ enum test_action
     TEST_ACTION_SKIP_EXECUTION,
 };
 
+bool test_skipping_execution(const char *executor, const char *compiler,
+        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
+{
+    if (shader_test_options.executor_filter
+            && strcmp(shader_test_options.executor_filter, executor))
+    {
+        trace("Skipping compiling shaders with %s and executing with %s "
+                "because of the executor filter.\n",
+                compiler, executor);
+        return true;
+    }
+
+    if (shader_test_options.compiler_filter
+            && strcmp(shader_test_options.compiler_filter, compiler))
+    {
+        trace("Skipping compiling shaders with %s and executing with %s "
+                "because of the compiler filter.\n",
+                compiler, executor);
+        return true;
+    }
+
+    minimum_shader_model = max(minimum_shader_model, shader_test_options.minimum_shader_model);
+    maximum_shader_model = min(maximum_shader_model, shader_test_options.maximum_shader_model);
+
+    if (minimum_shader_model > maximum_shader_model)
+    {
+        trace("Skipping compiling shaders with %s and executing with %s "
+                "because the shader model range is empty.\n",
+                compiler, executor);
+        return true;
+    }
+
+    return false;
+}
+
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
         const struct shader_runner_ops *ops, void *dxc_compiler)
 {
@@ -2082,34 +2117,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     const char *testname;
     FILE *f;
 
-    if (shader_test_options.executor_filter
-            && strcmp(shader_test_options.executor_filter, caps->runner))
-    {
-        trace("Skipping compiling shaders with %s and executing with %s "
-                "because of the executor filter\n",
-                caps->compiler, caps->runner);
-        return;
-    }
-
-    if (shader_test_options.compiler_filter
-            && strcmp(shader_test_options.compiler_filter, caps->compiler))
-    {
-        trace("Skipping compiling shaders with %s and executing with %s "
-                "because of the executor filter\n",
-                caps->compiler, caps->runner);
-        return;
-    }
-
     minimum_shader_model = max(caps->minimum_shader_model, shader_test_options.minimum_shader_model);
     maximum_shader_model = min(caps->maximum_shader_model, shader_test_options.maximum_shader_model);
-
-    if (minimum_shader_model > maximum_shader_model)
-    {
-        trace("Skipping compiling shaders with %s and executing with %s "
-                "because the shader model range is empty\n",
-                caps->compiler, caps->runner);
-        return;
-    }
 
     trace("Compiling SM%s-SM%s shaders with %s and executing with %s.\n",
             model_strings[minimum_shader_model], model_strings[maximum_shader_model],
@@ -2611,6 +2620,10 @@ static void run_compile_tests(void *dxc_compiler)
         caps.shader_caps[i] = true;
     for (unsigned int i = 0; i < DXGI_FORMAT_COUNT; ++i)
         caps.format_caps[i] = ~0u;
+
+    if (test_skipping_execution(caps.runner, caps.compiler,
+            caps.minimum_shader_model, caps.maximum_shader_model))
+        return;
 
     run_shader_tests(&runner, &caps, NULL, dxc_compiler);
 }

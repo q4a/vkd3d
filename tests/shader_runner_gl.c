@@ -1459,6 +1459,10 @@ static void run_tests(enum shading_language language)
 {
     struct gl_runner runner;
 
+    if (test_skipping_execution(language == SPIR_V ? "OpenGL/SPIR-V" : "OpenGL/GLSL",
+            HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_1))
+        return;
+
     if (!gl_runner_init(&runner, language))
         return;
     run_shader_tests(&runner.r, &runner.caps, &gl_runner_ops, NULL);

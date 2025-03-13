@@ -1129,11 +1129,24 @@ static void run_shader_tests_for_model_range(void *dxc_compiler,
 
 void run_shader_tests_d3d12(void *dxc_compiler)
 {
+#ifdef VKD3D_CROSSTEST
+    const char *executor = "d3d12.dll";
+#else
+    const char *executor = "vkd3d";
+#endif
+
+    bool skip_sm4 = test_skipping_execution(executor, HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    bool skip_sm6 = test_skipping_execution(executor, "dxcompiler", SHADER_MODEL_6_0, SHADER_MODEL_6_2);
+
+    if (skip_sm4 && skip_sm6)
+        return;
+
     enable_d3d12_debug_layer();
     init_adapter_info();
 
-    run_shader_tests_for_model_range(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    if (!skip_sm4)
+        run_shader_tests_for_model_range(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
 
-    if (dxc_compiler)
+    if (dxc_compiler && !skip_sm6)
         run_shader_tests_for_model_range(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_2);
 }
