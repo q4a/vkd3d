@@ -3723,24 +3723,22 @@ static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
     vkd3d_string_buffer_printf(&parser->buffer, ">");
 }
 
-static void fx_parse_fx_2_assignment(struct fx_parser *parser)
+static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_assignment *entry)
 {
     const struct rhs_named_value *named_value = NULL;
     const struct fx_2_state *state = NULL;
-    struct fx_assignment entry;
 
-    fx_parser_read_u32s(parser, &entry, sizeof(entry));
-    if (entry.id <= ARRAY_SIZE(fx_2_states))
+    if (entry->id <= ARRAY_SIZE(fx_2_states))
     {
-        state = &fx_2_states[entry.id];
+        state = &fx_2_states[entry->id];
 
         vkd3d_string_buffer_printf(&parser->buffer, "%s", state->name);
         if (state->array_size > 1)
-            vkd3d_string_buffer_printf(&parser->buffer, "[%u]", entry.lhs_index);
+            vkd3d_string_buffer_printf(&parser->buffer, "[%u]", entry->lhs_index);
     }
     else
     {
-        vkd3d_string_buffer_printf(&parser->buffer, "<unrecognized state %u>", entry.id);
+        vkd3d_string_buffer_printf(&parser->buffer, "<unrecognized state %u>", entry->id);
     }
     vkd3d_string_buffer_printf(&parser->buffer, " = ");
 
@@ -3749,7 +3747,7 @@ static void fx_parse_fx_2_assignment(struct fx_parser *parser)
         const struct rhs_named_value *ptr = state->values;
         uint32_t value;
 
-        fx_parser_read_unstructured(parser, &value, entry.value, sizeof(value));
+        fx_parser_read_unstructured(parser, &value, entry->value, sizeof(value));
 
         while (ptr->name)
         {
@@ -3768,11 +3766,11 @@ static void fx_parse_fx_2_assignment(struct fx_parser *parser)
     }
     else if (state && (state->type == FX_UINT || state->type == FX_FLOAT))
     {
-        uint32_t offset = entry.type;
+        uint32_t offset = entry->type;
         unsigned int size;
 
         size = fx_get_fx_2_type_size(parser, &offset);
-        parse_fx_2_numeric_value(parser, entry.value, size, entry.type);
+        parse_fx_2_numeric_value(parser, entry->value, size, entry->type);
     }
     else
     {
@@ -3830,8 +3828,11 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
         parse_fx_start_indent(parser);
         for (uint32_t j = 0; j < pass.assignment_count; ++j)
         {
+            struct fx_assignment entry;
+
             parse_fx_print_indent(parser);
-            fx_parse_fx_2_assignment(parser);
+            fx_parser_read_u32s(parser, &entry, sizeof(entry));
+            fx_parse_fx_2_assignment(parser, &entry);
         }
         parse_fx_end_indent(parser);
 
