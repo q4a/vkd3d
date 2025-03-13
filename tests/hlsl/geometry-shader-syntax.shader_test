@@ -4,7 +4,7 @@ shader model >= 4.0
 shader model < 6.0
 geometry-shader
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -15,7 +15,7 @@ void main(point gs_data vin[1])
 {
 }
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -26,7 +26,7 @@ void main(line gs_data vin[2])
 {
 }
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -37,7 +37,7 @@ void main(triangle gs_data vin[3])
 {
 }
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -48,7 +48,7 @@ void main(lineadj gs_data vin[4])
 {
 }
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -60,7 +60,7 @@ void main(triangleadj gs_data vin[6])
 }
 
 % InputPatch is not supported in SM < 5.
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -85,7 +85,7 @@ void main(point gs_data vin)
 
 % InputPatch types take precedence over geometry primitive modifiers.
 % However, the specified primitive modifiers restrict the sizes of the patches for entry point parameters.
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -107,7 +107,7 @@ void main(line InputPatch<gs_data, 3> vin)
 {
 }
 
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -170,7 +170,7 @@ void main(gs_data2 data2, line gs_data vin[2])
 }
 
 % Multiple input parameters are allowed. They must have the same primitive types and dimensions.
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -191,7 +191,7 @@ void main(line gs_data data[2], line gs_data2 data2[2], line gs_data3 data3[2])
 {
 }
 
-[geometry shader fail todo]
+[geometry shader fail]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -212,7 +212,7 @@ void main(line gs_data data[2], triangle gs_data2 data2[3], line gs_data3 data3[
 {
 }
 
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -276,7 +276,7 @@ void main(InputPatch<gs_data, 3> data, InputPatch<gs_data2, 3> data2, triangle g
 }
 
 % Geometry input parameters can be written to.
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -354,7 +354,7 @@ void main(point gs_data vin[1])
 {
 }
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float val : VAL;
@@ -365,7 +365,7 @@ void main(point gs_data vin[1])
 {
 }
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float val : VAL;
@@ -389,7 +389,7 @@ void main(point gs_data vin[1])
 
 % Any single-element objects that contain a stream output object
 % are considered valid stream output objects.
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -411,7 +411,7 @@ void main(inout TriangleStream<gs_data> vout[2], point gs_data vin[1])
 {
 }
 
-[geometry shader fail(sm<5) todo]
+[geometry shader fail(sm<5) todo(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -482,7 +482,7 @@ void main(inout TriangleStream<gs_data> vout, point gs_data vin[1])
 }
 
 % Output streams must be declared as inout.
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -528,7 +528,7 @@ void main(out gs_data data, point gs_data vin[1], inout TriangleStream<gs_data> 
     data.pos = 0;
 }
 
-[geometry shader fail todo]
+[geometry shader fail]
 struct gs_data
 {
     float4 pos : SV_POSITION;

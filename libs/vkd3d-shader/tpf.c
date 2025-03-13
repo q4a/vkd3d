@@ -3071,7 +3071,8 @@ static bool get_insidetessfactor_sysval_semantic(enum vkd3d_shader_sysval_semant
 
 bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *sysval_semantic,
         const struct vkd3d_shader_version *version, bool semantic_compat_mapping, enum vkd3d_tessellator_domain domain,
-        const char *semantic_name, unsigned int semantic_idx, bool output, bool is_patch_constant_func, bool is_patch)
+        const char *semantic_name, unsigned int semantic_idx, bool output,
+        bool is_patch_constant_func, bool is_primitive)
 {
     unsigned int i;
 
@@ -3134,7 +3135,7 @@ bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *s
     };
     bool has_sv_prefix = !ascii_strncasecmp(semantic_name, "sv_", 3);
 
-    if (is_patch)
+    if (is_primitive)
     {
         VKD3D_ASSERT(!output);
 

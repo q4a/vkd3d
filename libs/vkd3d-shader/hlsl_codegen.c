@@ -271,9 +271,9 @@ static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hls
     if (ctx->profile->major_version < 4)
         return true;
 
-    if (hlsl_type_is_patch_array(type1))
+    if (hlsl_type_is_primitive_array(type1))
     {
-        return hlsl_type_is_patch_array(type2)
+        return hlsl_type_is_primitive_array(type2)
                 && type1->e.array.array_type == type2->e.array.array_type
                 && type1->e.array.elements_count == type2->e.array.elements_count
                 && types_are_semantic_equivalent(ctx, type1->e.array.type, type2->e.array.type);
@@ -295,8 +295,8 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
     const char *prefix;
     char *new_name;
 
-    if (hlsl_type_is_patch_array(type))
-        prefix = type->e.array.array_type == HLSL_ARRAY_PATCH_INPUT ? "inputpatch" : "outputpatch";
+    if (hlsl_type_is_primitive_array(type))
+        prefix = type->e.array.array_type == HLSL_ARRAY_PATCH_OUTPUT ? "outputpatch" : "inputprim";
     else
         prefix = output ? "output" : "input";
 
@@ -307,9 +307,9 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
     {
         if (!ascii_strcasecmp(ext_var->name, new_name))
         {
-            VKD3D_ASSERT(hlsl_type_is_patch_array(ext_var->data_type)
+            VKD3D_ASSERT(hlsl_type_is_primitive_array(ext_var->data_type)
                     || ext_var->data_type->class <= HLSL_CLASS_VECTOR);
-            VKD3D_ASSERT(hlsl_type_is_patch_array(type) || type->class <= HLSL_CLASS_VECTOR);
+            VKD3D_ASSERT(hlsl_type_is_primitive_array(type) || type->class <= HLSL_CLASS_VECTOR);
 
             if (output)
             {
@@ -383,7 +383,7 @@ static uint32_t combine_field_storage_modifiers(uint32_t modifiers, uint32_t fie
 }
 
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
-        struct hlsl_block *block, struct hlsl_ir_var *top_var, uint32_t patch_index, struct hlsl_ir_load *lhs,
+        struct hlsl_block *block, uint32_t prim_index, struct hlsl_ir_load *lhs,
         uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
@@ -417,25 +417,25 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         struct hlsl_ir_var *input;
         struct hlsl_ir_load *load;
 
-        if (hlsl_type_is_patch_array(top_var->data_type))
+        if (hlsl_type_is_primitive_array(var->data_type))
         {
-            struct hlsl_type *top_type = top_var->data_type;
-            struct hlsl_type *patch_type;
-            struct hlsl_deref patch_deref;
+            struct hlsl_type *prim_type_src;
+            struct hlsl_deref prim_deref;
             struct hlsl_ir_node *idx;
 
-            if (!(patch_type = hlsl_new_array_type(ctx, vector_type_src, top_type->e.array.elements_count,
-                    top_type->e.array.array_type)))
+            if (!(prim_type_src = hlsl_new_array_type(ctx, vector_type_src, var->data_type->e.array.elements_count,
+                    var->data_type->e.array.array_type)))
                 return;
+            prim_type_src->modifiers = var->data_type->modifiers & HLSL_PRIMITIVE_MODIFIERS_MASK;
 
-            if (!(input = add_semantic_var(ctx, func, var, patch_type,
+            if (!(input = add_semantic_var(ctx, func, var, prim_type_src,
                     modifiers, semantic, semantic_index + i, false, force_align, loc)))
                 return;
-            hlsl_init_simple_deref_from_var(&patch_deref, input);
+            hlsl_init_simple_deref_from_var(&prim_deref, input);
 
-            idx = hlsl_block_add_uint_constant(ctx, block, patch_index, &var->loc);
+            idx = hlsl_block_add_uint_constant(ctx, block, prim_index, &var->loc);
 
-            if (!(load = hlsl_new_load_index(ctx, &patch_deref, idx, loc)))
+            if (!(load = hlsl_new_load_index(ctx, &prim_deref, idx, loc)))
                 return;
             hlsl_block_add_instr(block, &load->node);
         }
@@ -468,7 +468,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
 }
 
 static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
-        struct hlsl_block *block, struct hlsl_ir_var *top_var, uint32_t patch_index, struct hlsl_ir_load *lhs,
+        struct hlsl_block *block, uint32_t prim_index, struct hlsl_ir_load *lhs,
         uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
 {
     struct vkd3d_shader_location *loc = &lhs->node.loc;
@@ -494,8 +494,8 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 element_modifiers = modifiers;
                 force_align = true;
 
-                if (hlsl_type_is_patch_array(type))
-                    patch_index = i;
+                if (hlsl_type_is_primitive_array(type))
+                    prim_index = i;
             }
             else
             {
@@ -520,13 +520,13 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 return;
             hlsl_block_add_instr(block, &element_load->node);
 
-            prepend_input_copy_recurse(ctx, func, block, top_var, patch_index, element_load,
+            prepend_input_copy_recurse(ctx, func, block, prim_index, element_load,
                     element_modifiers, semantic, elem_semantic_index, force_align);
         }
     }
     else
     {
-        prepend_input_copy(ctx, func, block, var, patch_index, lhs, modifiers, semantic, semantic_index, force_align);
+        prepend_input_copy(ctx, func, block, prim_index, lhs, modifiers, semantic, semantic_index, force_align);
     }
 }
 
@@ -544,8 +544,8 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
         return;
     hlsl_block_add_instr(&block, &load->node);
 
-    prepend_input_copy_recurse(ctx, func, &block, var, 0, load,
-            var->storage_modifiers, &var->semantic, var->semantic.index, false);
+    prepend_input_copy_recurse(ctx, func, &block, 0, load, var->storage_modifiers,
+            &var->semantic, var->semantic.index, false);
 
     list_move_head(&func->body.instrs, &block.instrs);
 }
@@ -5754,7 +5754,7 @@ static enum vkd3d_shader_interpolation_mode sm4_get_interpolation_mode(struct hl
         {HLSL_STORAGE_CENTROID | HLSL_STORAGE_LINEAR, VKD3DSIM_LINEAR_CENTROID},
     };
 
-    if (hlsl_type_is_patch_array(type))
+    if (hlsl_type_is_primitive_array(type))
         type = type->e.array.type;
 
     VKD3D_ASSERT(hlsl_is_numeric_type(type));
@@ -5785,7 +5785,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         [VKD3D_SHADER_TYPE_COMPUTE] = "Compute",
     };
 
-    bool is_patch = hlsl_type_is_patch_array(var->data_type);
+    bool is_primitive = hlsl_type_is_primitive_array(var->data_type);
     enum vkd3d_shader_register_type type;
     struct vkd3d_shader_version version;
     bool special_interpolation = false;
@@ -5826,7 +5826,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         bool has_idx;
 
         if (!sm4_sysval_semantic_from_semantic_name(&semantic, &version, ctx->semantic_compat_mapping, ctx->domain,
-                var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_patch))
+                var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_primitive))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
@@ -5859,7 +5859,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     }
     else
     {
-        unsigned int component_count = is_patch
+        unsigned int component_count = is_primitive
                 ? var->data_type->e.array.type->e.numeric.dimx : var->data_type->e.numeric.dimx;
         int mode = (ctx->profile->major_version < 4)
                 ? 0 : sm4_get_interpolation_mode(var->data_type, var->storage_modifiers);
@@ -5878,7 +5878,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
 static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
-    struct register_allocator in_patch_allocator = {0}, patch_constant_out_patch_allocator = {0};
+    struct register_allocator in_prim_allocator = {0}, patch_constant_out_patch_allocator = {0};
     struct register_allocator input_allocator = {0}, output_allocator = {0};
     bool is_vertex_shader = ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX;
     bool is_pixel_shader = ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL;
@@ -5891,7 +5891,7 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     {
         if (var->is_input_semantic)
         {
-            if (hlsl_type_is_patch_array(var->data_type))
+            if (hlsl_type_is_primitive_array(var->data_type))
             {
                 bool is_patch_constant_output_patch = ctx->is_patch_constant_func &&
                         var->data_type->e.array.array_type == HLSL_ARRAY_PATCH_OUTPUT;
@@ -5900,7 +5900,7 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
                     allocate_semantic_register(ctx, var, &patch_constant_out_patch_allocator, false,
                             !is_vertex_shader);
                 else
-                    allocate_semantic_register(ctx, var, &in_patch_allocator, false,
+                    allocate_semantic_register(ctx, var, &in_prim_allocator, false,
                             !is_vertex_shader);
             }
             else
@@ -6426,7 +6426,7 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
 
     *offset = deref->const_offset;
 
-    if (hlsl_type_is_patch_array(deref->var->data_type))
+    if (hlsl_type_is_primitive_array(deref->var->data_type))
         return false;
 
     if (offset_node)
@@ -6472,7 +6472,7 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     VKD3D_ASSERT(deref->data_type);
     VKD3D_ASSERT(hlsl_is_numeric_type(deref->data_type));
 
-    if (!hlsl_type_is_patch_array(deref->var->data_type))
+    if (!hlsl_type_is_primitive_array(deref->var->data_type))
         offset = hlsl_offset_from_deref_safe(ctx, deref);
 
     ret.index += offset / 4;
@@ -7122,8 +7122,8 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
         struct shader_signature *signature, bool output, struct hlsl_ir_var *var)
 {
     enum vkd3d_shader_component_type component_type = VKD3D_SHADER_COMPONENT_VOID;
+    bool is_primitive = hlsl_type_is_primitive_array(var->data_type);
     enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
-    bool is_patch = hlsl_type_is_patch_array(var->data_type);
     unsigned int register_index, mask, use_mask;
     const char *name = var->semantic.name;
     enum vkd3d_shader_register_type type;
@@ -7136,7 +7136,7 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
         bool has_idx, ret;
 
         ret = sm4_sysval_semantic_from_semantic_name(&sysval, &program->shader_version, ctx->semantic_compat_mapping,
-                ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_patch);
+                ctx->domain, var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_primitive);
         VKD3D_ASSERT(ret);
         if (sysval == ~0u)
             return;
@@ -7497,7 +7497,7 @@ static void sm1_generate_vsir_sampler_dcls(struct hlsl_ctx *ctx,
 static enum vkd3d_shader_register_type sm4_get_semantic_register_type(enum vkd3d_shader_type shader_type,
         bool is_patch_constant_func, const struct hlsl_ir_var *var)
 {
-    if (hlsl_type_is_patch_array(var->data_type))
+    if (hlsl_type_is_primitive_array(var->data_type))
     {
         VKD3D_ASSERT(var->is_input_semantic);
 
@@ -7748,14 +7748,14 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
     }
     else if (var->is_input_semantic)
     {
-        bool is_patch = hlsl_type_is_patch_array(var->data_type);
+        bool is_primitive = hlsl_type_is_primitive_array(var->data_type);
         bool has_idx;
 
         if (sm4_register_from_semantic_name(version, var->semantic.name, false, &reg->type, &has_idx))
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
-            VKD3D_ASSERT(!is_patch);
+            VKD3D_ASSERT(!is_primitive);
 
             if (has_idx)
             {
@@ -7777,12 +7777,12 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
 
             reg->type = sm4_get_semantic_register_type(version->type, ctx->is_patch_constant_func, var);
             reg->dimension = VSIR_DIMENSION_VEC4;
-            reg->idx[is_patch ? 1 : 0].offset = hlsl_reg.id;
-            reg->idx_count = is_patch ? 2 : 1;
+            reg->idx[is_primitive ? 1 : 0].offset = hlsl_reg.id;
+            reg->idx_count = is_primitive ? 2 : 1;
             *writemask = hlsl_reg.writemask;
         }
 
-        if (is_patch)
+        if (is_primitive)
         {
             reg->idx[0].offset = deref->const_offset / 4;
             if (deref->rel_offset.node)
@@ -9110,7 +9110,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
         const struct hlsl_ir_var *var, struct hlsl_block *block, const struct vkd3d_shader_location *loc)
 {
     const struct vkd3d_shader_version *version = &program->shader_version;
-    const bool is_patch = hlsl_type_is_patch_array(var->data_type);
+    const bool is_primitive = hlsl_type_is_primitive_array(var->data_type);
     const bool output = var->is_output_semantic;
     enum vkd3d_shader_sysval_semantic semantic;
     struct vkd3d_shader_dst_param *dst_param;
@@ -9122,7 +9122,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     bool has_idx;
 
     sm4_sysval_semantic_from_semantic_name(&semantic, version, ctx->semantic_compat_mapping, ctx->domain,
-            var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_patch);
+            var->semantic.name, var->semantic.index, output, ctx->is_patch_constant_func, is_primitive);
     if (semantic == ~0u)
         semantic = VKD3D_SHADER_SV_NONE;
 
@@ -9147,7 +9147,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
             default:
                 if (version->type == VKD3D_SHADER_TYPE_PIXEL)
                     opcode = VKD3DSIH_DCL_INPUT_PS_SIV;
-                else if (is_patch)
+                else if (is_primitive && version->type != VKD3D_SHADER_TYPE_GEOMETRY)
                     opcode = VKD3DSIH_DCL_INPUT;
                 else
                     opcode = VKD3DSIH_DCL_INPUT_SIV;
@@ -9188,7 +9188,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     }
     else if (opcode == VKD3DSIH_DCL_INPUT || opcode == VKD3DSIH_DCL_INPUT_PS)
     {
-        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || is_patch);
+        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || is_primitive);
         dst_param = &ins->declaration.dst;
     }
     else
@@ -9199,7 +9199,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
         dst_param = &ins->declaration.register_semantic.reg;
     }
 
-    if (is_patch)
+    if (is_primitive)
     {
         VKD3D_ASSERT(has_idx);
         vsir_register_init(&dst_param->reg, type, VKD3D_DATA_FLOAT, 2);
@@ -11032,7 +11032,7 @@ static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
     {
         const struct hlsl_type *type = var->data_type;
 
-        if (hlsl_type_is_patch_array(type))
+        if (hlsl_type_is_primitive_array(type))
             type = var->data_type->e.array.type;
 
         /* Note that it doesn't matter if the semantic is unused or doesn't
@@ -12606,12 +12606,6 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             }
 
             validate_and_record_prim_type(ctx, var);
-            if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
-            {
-                hlsl_fixme(ctx, &var->loc, "Input primitive parameters in geometry shaders.");
-                continue;
-            }
-
             prepend_input_var_copy(ctx, entry_func, var);
         }
         else if (hlsl_get_stream_output_type(var->data_type))
