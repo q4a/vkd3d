@@ -1031,6 +1031,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_DCL_INPUT_PS:
             case VKD3DSIH_DCL_INPUT_PS_SGV:
             case VKD3DSIH_DCL_INPUT_PS_SIV:
+            case VKD3DSIH_DCL_OUTPUT_SGV:
             case VKD3DSIH_DCL_OUTPUT_SIV:
                 vkd3d_shader_instruction_make_nop(ins);
                 break;
