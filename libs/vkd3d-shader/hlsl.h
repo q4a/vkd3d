@@ -1626,7 +1626,6 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
         struct hlsl_ir_node *idx);
 
 const char *hlsl_jump_type_to_string(enum hlsl_ir_jump_type type);
-const char *hlsl_array_type_to_string(enum hlsl_array_type type);
 
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
         unsigned int array_size, enum hlsl_array_type array_type);
