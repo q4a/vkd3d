@@ -24919,6 +24919,7 @@ static void test_query_timestamp(void)
 
     for (i = 0; i < ARRAY_SIZE(timestamps) - 1; ++i)
     {
+        bug_if(is_mvk_device(device))
         ok(timestamps[i] <= timestamps[i + 1], "Expected timestamps to monotonically increase, "
                 "but got %"PRIu64" > %"PRIu64".\n", timestamps[i], timestamps[i + 1]);
     }
@@ -24926,6 +24927,7 @@ static void test_query_timestamp(void)
     time_diff = (uint64_t)difftime(time_end, time_start) * timestamp_frequency;
     timestamp_diff = timestamps[ARRAY_SIZE(timestamps) - 1] - timestamps[0];
 
+    bug_if(is_mvk_device(device))
     ok(timestamp_diff <= time_diff, "Expected timestamp difference to be bounded by CPU time difference, "
             "but got %"PRIu64" > %"PRIu64".\n", timestamp_diff, time_diff);
 
@@ -25243,6 +25245,7 @@ static void test_resolve_non_issued_query_data(void)
 
     get_buffer_readback_with_command_list(readback_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     timestamps = get_readback_data(&rb.rb, 0, 0, 0, sizeof(*timestamps));
+    bug_if(is_mvk_device(device))
     ok(timestamps[0] != initial_data[0] && timestamps[0] > 0,
             "Got unexpected timestamp %#"PRIx64".\n", timestamps[0]);
     ok(!timestamps[1], "Got unexpected timestamp %#"PRIx64".\n", timestamps[1]);
