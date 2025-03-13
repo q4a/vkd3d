@@ -281,6 +281,15 @@ static void set_status(struct fx_write_context *fx, int status)
         fx->status = status;
 }
 
+static void fx_print_string(struct vkd3d_string_buffer *buffer, const char *prefix,
+        const char *s, size_t len)
+{
+    if (len)
+        --len; /* Trim terminating null. */
+    vkd3d_string_buffer_printf(buffer, "%s", prefix);
+    vkd3d_string_buffer_print_string_escaped(buffer, s, len);
+}
+
 static uint32_t write_string(const char *string, struct fx_write_context *fx)
 {
     return fx->ops->write_string(string, fx);
@@ -3452,13 +3461,12 @@ static void parse_fx_print_indent(struct fx_parser *parser)
     vkd3d_string_buffer_printf(&parser->buffer, "%*s", 4 * parser->indent, "");
 }
 
-static const char *fx_2_get_string(struct fx_parser *parser, uint32_t offset)
+static const char *fx_2_get_string(struct fx_parser *parser, uint32_t offset, uint32_t *size)
 {
     const char *ptr;
-    uint32_t size;
 
-    fx_parser_read_unstructured(parser, &size, offset, sizeof(size));
-    ptr = fx_parser_get_unstructured_ptr(parser, offset + 4, size);
+    fx_parser_read_unstructured(parser, size, offset, sizeof(*size));
+    ptr = fx_parser_get_unstructured_ptr(parser, offset + 4, *size);
 
     if (!ptr)
     {
@@ -3624,13 +3632,14 @@ static void fx_parse_fx_2_parameter(struct fx_parser *parser, uint32_t offset)
         uint32_t element_count;
     } var;
     const char *name;
+    uint32_t size;
 
     fx_parser_read_unstructured(parser, &var, offset, sizeof(var));
 
     fx_parse_fx_2_type(parser, offset);
 
-    name = fx_2_get_string(parser, var.name);
-    vkd3d_string_buffer_printf(&parser->buffer, " %s", name);
+    name = fx_2_get_string(parser, var.name, &size);
+    fx_print_string(&parser->buffer, " ", name, size);
     if (var.element_count)
         vkd3d_string_buffer_printf(&parser->buffer, "[%u]", var.element_count);
 }
@@ -3787,16 +3796,17 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
         uint32_t assignment_count;
     } pass;
     const char *name;
+    uint32_t size;
 
     if (parser->failed)
         return;
 
     fx_parser_read_u32s(parser, &technique, sizeof(technique));
 
-    name = fx_2_get_string(parser, technique.name);
+    name = fx_2_get_string(parser, technique.name, &size);
 
     parse_fx_print_indent(parser);
-    vkd3d_string_buffer_printf(&parser->buffer, "technique %s", name);
+    fx_print_string(&parser->buffer, "technique ", name, size);
     fx_parse_fx_2_annotations(parser, technique.annotation_count);
 
     vkd3d_string_buffer_printf(&parser->buffer, "\n");
@@ -3807,10 +3817,10 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
     for (uint32_t i = 0; i < technique.pass_count; ++i)
     {
         fx_parser_read_u32s(parser, &pass, sizeof(pass));
-        name = fx_2_get_string(parser, pass.name);
+        name = fx_2_get_string(parser, pass.name, &size);
 
         parse_fx_print_indent(parser);
-        vkd3d_string_buffer_printf(&parser->buffer, "pass %s", name);
+        fx_print_string(&parser->buffer, "pass ", name, size);
         fx_parse_fx_2_annotations(parser, pass.annotation_count);
 
         vkd3d_string_buffer_printf(&parser->buffer, "\n");
@@ -3887,7 +3897,8 @@ static void fx_parse_fx_2_data_blob(struct fx_parser *parser)
                     parse_fx_start_indent(parser);
                     parse_fx_print_indent(parser);
                     str = fx_parser_get_ptr(parser, size);
-                    vkd3d_string_buffer_printf(&parser->buffer, "\"%.*s\"\n", size, str);
+                    fx_print_string(&parser->buffer, "\"", str, size);
+                    vkd3d_string_buffer_printf(&parser->buffer, "\"\n");
                     parse_fx_end_indent(parser);
                 }
                 break;

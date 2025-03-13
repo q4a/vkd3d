@@ -1565,6 +1565,7 @@ void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer);
 void vkd3d_string_buffer_truncate(struct vkd3d_string_buffer *buffer, size_t size);
 int vkd3d_string_buffer_print_f32(struct vkd3d_string_buffer *buffer, float f);
 int vkd3d_string_buffer_print_f64(struct vkd3d_string_buffer *buffer, double d);
+int vkd3d_string_buffer_print_string_escaped(struct vkd3d_string_buffer *buffer, const char *s, size_t len);
 int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer, const char *format, ...) VKD3D_PRINTF_FUNC(2, 3);
 void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *list, struct vkd3d_string_buffer *buffer);
 #define vkd3d_string_buffer_trace(buffer) \

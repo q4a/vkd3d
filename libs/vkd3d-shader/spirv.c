@@ -348,49 +348,12 @@ static void spirv_parser_print_instruction_offset(struct spirv_parser *parser,
             parser->colours.comment, offset * sizeof(uint32_t), parser->colours.reset, suffix);
 }
 
-static char get_escape_char(char c)
-{
-    switch (c)
-    {
-        case '"':
-        case '\\':
-            return c;
-        case '\t':
-            return 't';
-        case '\n':
-            return 'n';
-        case '\v':
-            return 'v';
-        case '\f':
-            return 'f';
-        case '\r':
-            return 'r';
-        default:
-            return 0;
-    }
-}
-
 static void spirv_parser_print_string_literal(struct spirv_parser *parser, struct vkd3d_string_buffer *buffer,
         const char *prefix, const char *s, size_t len, const char *suffix)
 {
-    size_t start, i;
-    char c;
-
     vkd3d_string_buffer_printf(buffer, "%s\"%s", prefix, parser->colours.literal);
-    for (i = 0, start = 0; i < len; ++i)
-    {
-        if ((c = get_escape_char(s[i])))
-        {
-            vkd3d_string_buffer_printf(buffer, "%.*s\\%c", (int)(i - start), &s[start], c);
-            start = i + 1;
-        }
-        else if (!isprint(s[i]))
-        {
-            vkd3d_string_buffer_printf(buffer, "%.*s\\%03o", (int)(i - start), &s[start], (uint8_t)s[i]);
-            start = i + 1;
-        }
-    }
-    vkd3d_string_buffer_printf(buffer, "%.*s%s\"%s", (int)(len - start), &s[start], parser->colours.reset, suffix);
+    vkd3d_string_buffer_print_string_escaped(buffer, s, len);
+    vkd3d_string_buffer_printf(buffer, "%s\"%s", parser->colours.reset, suffix);
 }
 
 static const struct spirv_parser_enumerant *spirv_parser_get_enumerant(

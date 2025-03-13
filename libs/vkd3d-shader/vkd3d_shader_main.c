@@ -163,6 +163,60 @@ int vkd3d_string_buffer_print_f64(struct vkd3d_string_buffer *buffer, double d)
     return ret;
 }
 
+static char get_escape_char(char c)
+{
+    switch (c)
+    {
+        case '"':
+        case '\\':
+            return c;
+        case '\t':
+            return 't';
+        case '\n':
+            return 'n';
+        case '\v':
+            return 'v';
+        case '\f':
+            return 'f';
+        case '\r':
+            return 'r';
+        default:
+            return 0;
+    }
+}
+
+int vkd3d_string_buffer_print_string_escaped(struct vkd3d_string_buffer *buffer, const char *s, size_t len)
+{
+    size_t content_size, start, i;
+    int ret;
+    char c;
+
+    content_size = buffer->content_size;
+    for (i = 0, start = 0; i < len; ++i)
+    {
+        if ((c = get_escape_char(s[i])))
+        {
+            if ((ret = vkd3d_string_buffer_printf(buffer, "%.*s\\%c", (int)(i - start), &s[start], c)) < 0)
+                goto fail;
+            start = i + 1;
+        }
+        else if (!isprint(s[i]))
+        {
+            if ((ret = vkd3d_string_buffer_printf(buffer, "%.*s\\%03o",
+                    (int)(i - start), &s[start], (uint8_t)s[i])) < 0)
+                goto fail;
+            start = i + 1;
+        }
+    }
+    if ((ret = vkd3d_string_buffer_printf(buffer, "%.*s", (int)(len - start), &s[start])) < 0)
+        goto fail;
+    return ret;
+
+fail:
+    buffer->content_size = content_size;
+    return ret;
+}
+
 void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function)
 {
     vkd3d_shader_trace_text_(buffer->buffer, buffer->content_size, function);
