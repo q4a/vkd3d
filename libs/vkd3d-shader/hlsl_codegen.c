@@ -11838,25 +11838,6 @@ static void generate_vsir_scan_required_features(struct hlsl_ctx *ctx, struct vs
      * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
 }
 
-static bool is_minimum_precision(enum hlsl_base_type type)
-{
-    switch (type)
-    {
-        case HLSL_TYPE_BOOL:
-        case HLSL_TYPE_DOUBLE:
-        case HLSL_TYPE_FLOAT:
-        case HLSL_TYPE_HALF:
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-            return false;
-
-        case HLSL_TYPE_MIN16UINT:
-            return true;
-    }
-
-    vkd3d_unreachable();
-}
-
 static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
         struct vsir_program *program, const struct hlsl_ir_function_decl *entry_func)
 {
@@ -11894,7 +11875,7 @@ static void generate_vsir_scan_global_flags(struct hlsl_ctx *ctx,
         /* Note that it doesn't matter if the semantic is unused or doesn't
          * generate a signature element (e.g. SV_DispatchThreadID). */
         if ((var->is_input_semantic || var->is_output_semantic)
-                && (type->is_minimum_precision || is_minimum_precision(type->e.numeric.type)))
+                && (type->is_minimum_precision || hlsl_type_is_minimum_precision(type)))
         {
             program->global_flags |= VKD3DSGF_ENABLE_MINIMUM_PRECISION;
             break;

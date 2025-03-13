@@ -8177,14 +8177,14 @@ type_no_void:
     | TYPE_IDENTIFIER
         {
             $$ = hlsl_get_type(ctx->cur_scope, $1, true, true);
-            if ($$->is_minimum_precision)
+            if ($$->is_minimum_precision || hlsl_type_is_minimum_precision($$))
             {
                 if (hlsl_version_lt(ctx, 4, 0))
                 {
                     hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Target profile doesn't support minimum-precision types.");
                 }
-                else
+                else if ($$->is_minimum_precision)
                 {
                     FIXME("Reinterpreting type %s.\n", $$->name);
                 }
