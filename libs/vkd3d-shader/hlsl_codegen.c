@@ -1898,19 +1898,19 @@ static bool copy_propagation_replace_with_deref(struct hlsl_ctx *ctx,
         uint32_t swizzle, struct hlsl_ir_node *instr)
 {
     const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
+    unsigned int nonconst_i = 0, base, scale, count;
     struct hlsl_ir_node *index, *new_instr = NULL;
     const struct hlsl_deref *deref = &load->src;
-    unsigned int nonconst_i, base, scale, count;
     const struct hlsl_ir_var *var = deref->var;
     unsigned int time = load->node.index;
     struct hlsl_deref tmp_deref = {0};
     struct hlsl_ir_load *new_load;
     struct hlsl_ir_var *x = NULL;
     int *c = NULL, *d = NULL;
+    uint32_t ret_swizzle = 0;
     struct hlsl_block block;
     unsigned int path_len;
     bool success = false;
-    uint32_t ret_swizzle;
     int i, j, k;
 
     if (!nonconst_index_from_deref(ctx, deref, &nonconst_i, &base, &scale, &count))
