@@ -1569,7 +1569,7 @@ static enum vkd3d_result convert_descriptor_info(struct vkd3d_shader_scan_descri
     return VKD3D_OK;
 }
 
-static void vkd3d_shader_free_scan_descriptor_info1(struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info)
+void vkd3d_shader_free_scan_descriptor_info1(struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info)
 {
     TRACE("scan_descriptor_info %p.\n", scan_descriptor_info);
 
@@ -1577,12 +1577,10 @@ static void vkd3d_shader_free_scan_descriptor_info1(struct vkd3d_shader_scan_des
 }
 
 static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_message_context *message_context,
-        struct vkd3d_shader_scan_descriptor_info1 *descriptor_info1)
+        struct vkd3d_shader_message_context *message_context, bool add_descriptor_info)
 {
     struct vkd3d_shader_scan_combined_resource_sampler_info *combined_sampler_info;
     struct vkd3d_shader_scan_hull_shader_tessellation_info *tessellation_info;
-    struct vkd3d_shader_scan_descriptor_info1 local_descriptor_info1 = {0};
     struct vkd3d_shader_scan_descriptor_info *descriptor_info;
     struct vkd3d_shader_scan_signature_info *signature_info;
     struct vkd3d_shader_instruction *instruction;
@@ -1591,29 +1589,22 @@ static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_sh
     unsigned int i;
 
     descriptor_info = vkd3d_find_struct(compile_info->next, SCAN_DESCRIPTOR_INFO);
-    if (descriptor_info1)
-    {
-        descriptor_info1->descriptors = NULL;
-        descriptor_info1->descriptor_count = 0;
-    }
-    else if (descriptor_info)
-    {
-        descriptor_info1 = &local_descriptor_info1;
-    }
+    if (descriptor_info)
+        add_descriptor_info = true;
+
     signature_info = vkd3d_find_struct(compile_info->next, SCAN_SIGNATURE_INFO);
 
     if ((combined_sampler_info = vkd3d_find_struct(compile_info->next, SCAN_COMBINED_RESOURCE_SAMPLER_INFO)))
     {
         combined_sampler_info->combined_samplers = NULL;
         combined_sampler_info->combined_sampler_count = 0;
-        if (!descriptor_info1)
-            descriptor_info1 = &local_descriptor_info1;
+        add_descriptor_info = true;
     }
 
     tessellation_info = vkd3d_find_struct(compile_info->next, SCAN_HULL_SHADER_TESSELLATION_INFO);
 
     vkd3d_shader_scan_context_init(&context, &program->shader_version, compile_info,
-            descriptor_info1, combined_sampler_info, message_context);
+            add_descriptor_info ? &program->descriptors : NULL, combined_sampler_info, message_context);
 
     if (TRACE_ON())
         vsir_program_trace(program);
@@ -1653,7 +1644,7 @@ static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_sh
     }
 
     if (!ret && descriptor_info)
-        ret = convert_descriptor_info(descriptor_info, descriptor_info1);
+        ret = convert_descriptor_info(descriptor_info, &program->descriptors);
 
     if (!ret && tessellation_info)
     {
@@ -1667,15 +1658,10 @@ static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_sh
             vkd3d_shader_free_scan_combined_resource_sampler_info(combined_sampler_info);
         if (descriptor_info)
             vkd3d_shader_free_scan_descriptor_info(descriptor_info);
-        if (descriptor_info1)
-            vkd3d_shader_free_scan_descriptor_info1(descriptor_info1);
         if (signature_info)
             vkd3d_shader_free_scan_signature_info(signature_info);
     }
-    else
-    {
-        vkd3d_shader_free_scan_descriptor_info1(&local_descriptor_info1);
-    }
+
     vkd3d_shader_scan_context_cleanup(&context);
     return ret;
 }
@@ -1713,7 +1699,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
 
         if (!(ret = vsir_parse(compile_info, config_flags, &message_context, &program)))
         {
-            ret = vsir_program_scan(&program, compile_info, &message_context, NULL);
+            ret = vsir_program_scan(&program, compile_info, &message_context, false);
             vsir_program_cleanup(&program);
         }
     }
@@ -1730,7 +1716,6 @@ int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_combined_resource_sampler_info combined_sampler_info;
-    struct vkd3d_shader_scan_descriptor_info1 scan_descriptor_info;
     struct vkd3d_shader_compile_info scan_info;
     int ret;
 
@@ -1746,28 +1731,24 @@ int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
             combined_sampler_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_COMBINED_RESOURCE_SAMPLER_INFO;
             combined_sampler_info.next = scan_info.next;
             scan_info.next = &combined_sampler_info;
-            if ((ret = vsir_program_scan(program, &scan_info, message_context, &scan_descriptor_info)) < 0)
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, true)) < 0)
                 return ret;
-            ret = glsl_compile(program, config_flags, &scan_descriptor_info,
+            ret = glsl_compile(program, config_flags,
                     &combined_sampler_info, compile_info, out, message_context);
             vkd3d_shader_free_scan_combined_resource_sampler_info(&combined_sampler_info);
-            vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;
 
         case VKD3D_SHADER_TARGET_SPIRV_BINARY:
         case VKD3D_SHADER_TARGET_SPIRV_TEXT:
-            if ((ret = vsir_program_scan(program, &scan_info, message_context, &scan_descriptor_info)) < 0)
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, true)) < 0)
                 return ret;
-            ret = spirv_compile(program, config_flags, &scan_descriptor_info,
-                    compile_info, out, message_context);
-            vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
+            ret = spirv_compile(program, config_flags, compile_info, out, message_context);
             break;
 
         case VKD3D_SHADER_TARGET_MSL:
-            if ((ret = vsir_program_scan(program, &scan_info, message_context, &scan_descriptor_info)) < 0)
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, true)) < 0)
                 return ret;
-            ret = msl_compile(program, config_flags, &scan_descriptor_info, compile_info, out, message_context);
-            vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
+            ret = msl_compile(program, config_flags, compile_info, out, message_context);
             break;
 
         default:

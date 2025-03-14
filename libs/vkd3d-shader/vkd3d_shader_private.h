@@ -1422,6 +1422,30 @@ enum vsir_normalisation_level
     VSIR_NORMALISED_SM6,
 };
 
+struct vkd3d_shader_descriptor_info1
+{
+    enum vkd3d_shader_descriptor_type type;
+    unsigned int register_space;
+    unsigned int register_index;
+    unsigned int register_id;
+    enum vkd3d_shader_resource_type resource_type;
+    enum vkd3d_shader_resource_data_type resource_data_type;
+    unsigned int flags;
+    unsigned int sample_count;
+    unsigned int buffer_size;
+    unsigned int structure_stride;
+    unsigned int count;
+    uint32_t uav_flags;
+};
+
+struct vkd3d_shader_scan_descriptor_info1
+{
+    struct vkd3d_shader_descriptor_info1 *descriptors;
+    unsigned int descriptor_count;
+};
+
+void vkd3d_shader_free_scan_descriptor_info1(struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info);
+
 struct vsir_program
 {
     struct vkd3d_shader_version shader_version;
@@ -1430,6 +1454,8 @@ struct vsir_program
     struct shader_signature input_signature;
     struct shader_signature output_signature;
     struct shader_signature patch_constant_signature;
+
+    struct vkd3d_shader_scan_descriptor_info1 descriptors;
 
     unsigned int parameter_count;
     const struct vkd3d_shader_parameter1 *parameters;
@@ -1507,28 +1533,6 @@ void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_pr
         struct vkd3d_shader_message_context *message_context, const char *source_name);
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
-
-struct vkd3d_shader_descriptor_info1
-{
-    enum vkd3d_shader_descriptor_type type;
-    unsigned int register_space;
-    unsigned int register_index;
-    unsigned int register_id;
-    enum vkd3d_shader_resource_type resource_type;
-    enum vkd3d_shader_resource_data_type resource_data_type;
-    unsigned int flags;
-    unsigned int sample_count;
-    unsigned int buffer_size;
-    unsigned int structure_stride;
-    unsigned int count;
-    uint32_t uav_flags;
-};
-
-struct vkd3d_shader_scan_descriptor_info1
-{
-    struct vkd3d_shader_descriptor_info1 *descriptors;
-    unsigned int descriptor_count;
-};
 
 void vsir_program_trace(const struct vsir_program *program);
 
@@ -1673,7 +1677,6 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
 int glsl_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info,
         const struct vkd3d_shader_scan_combined_resource_sampler_info *combined_sampler_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
@@ -1681,12 +1684,10 @@ int glsl_compile(struct vsir_program *program, uint64_t config_flags,
 #define SPIRV_MAX_SRC_COUNT 6
 
 int spirv_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
 int msl_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
         struct vkd3d_shader_message_context *message_context);
 

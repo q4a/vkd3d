@@ -3105,7 +3105,6 @@ struct spirv_compiler
 
     uint32_t binding_idx;
 
-    const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info;
     unsigned int input_control_point_count;
     unsigned int output_control_point_count;
 
@@ -3191,7 +3190,6 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
 
 static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *program,
         const struct vkd3d_shader_compile_info *compile_info,
-        const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, uint64_t config_flags)
 {
     const struct vkd3d_shader_interface_info *shader_interface;
@@ -3333,8 +3331,6 @@ static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *p
         compiler->emit_point_size = true;
     else if (compiler->shader_type != VKD3D_SHADER_TYPE_GEOMETRY)
         compiler->emit_point_size = compiler->xfb_info && compiler->xfb_info->element_count;
-
-    compiler->scan_descriptor_info = scan_descriptor_info;
 
     compiler->phase = VKD3DSIH_INVALID;
 
@@ -6732,7 +6728,7 @@ static const struct vkd3d_shader_descriptor_info1 *spirv_compiler_get_descriptor
         struct spirv_compiler *compiler, enum vkd3d_shader_descriptor_type type,
         const struct vkd3d_shader_register_range *range)
 {
-    const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info = compiler->scan_descriptor_info;
+    const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info = &compiler->program->descriptors;
     unsigned int register_last = (range->last == ~0u) ? range->first : range->last;
     const struct vkd3d_shader_descriptor_info1 *d;
     unsigned int i;
@@ -11159,11 +11155,12 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
 
 static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *compiler)
 {
+    const struct vkd3d_shader_scan_descriptor_info1 *descriptors = &compiler->program->descriptors;
     unsigned int i;
 
-    for (i = 0; i < compiler->scan_descriptor_info->descriptor_count; ++i)
+    for (i = 0; i < descriptors->descriptor_count; ++i)
     {
-        const struct vkd3d_shader_descriptor_info1 *descriptor = &compiler->scan_descriptor_info->descriptors[i];
+        const struct vkd3d_shader_descriptor_info1 *descriptor = &descriptors->descriptors[i];
         struct vkd3d_shader_register_range range;
 
         range.first = descriptor->register_index;
@@ -11354,7 +11351,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 }
 
 int spirv_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
@@ -11367,7 +11363,7 @@ int spirv_compile(struct vsir_program *program, uint64_t config_flags,
     VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_SM6);
 
     if (!(spirv_compiler = spirv_compiler_create(program, compile_info,
-            scan_descriptor_info, message_context, config_flags)))
+            message_context, config_flags)))
     {
         ERR("Failed to create SPIR-V compiler.\n");
         return VKD3D_ERROR;

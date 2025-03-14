@@ -116,6 +116,7 @@ void vsir_program_cleanup(struct vsir_program *program)
     shader_signature_cleanup(&program->input_signature);
     shader_signature_cleanup(&program->output_signature);
     shader_signature_cleanup(&program->patch_constant_signature);
+    vkd3d_shader_free_scan_descriptor_info1(&program->descriptors);
 }
 
 const struct vkd3d_shader_parameter1 *vsir_program_get_parameter(
