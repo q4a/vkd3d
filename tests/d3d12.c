@@ -35215,6 +35215,7 @@ static void test_graphics_compute_queue_synchronization(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     value = get_readback_uint(&rb.rb, 0, 0, 0);
+    bug_if(is_mvk_device(device))
     ok(value == 24, "Got unexpected value %u.\n", value);
     release_resource_readback(&rb);
 
