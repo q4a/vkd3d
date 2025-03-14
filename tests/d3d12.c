@@ -32900,6 +32900,7 @@ static void test_64kb_texture_alignment(void)
     transition_resource_state(command_list, textures[1],
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_resource_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
+    todo_if(is_mvk_device(device))
     check_readback_data_uint(&rb.rb, &box, 0xdeadbeef, 0);
     release_resource_readback(&rb);
 
