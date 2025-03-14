@@ -35343,6 +35343,7 @@ static void test_early_depth_stencil_tests(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     check_sub_resource_float(ds.texture, 0, queue, command_list, 0.6f, 1);
     reset_command_list(command_list, context.allocator);
+    bug_if(is_mvk_device(context.device))
     check_sub_resource_uint(texture, 0, queue, command_list, 2, 1);
 
     reset_command_list(command_list, context.allocator);
@@ -35379,6 +35380,7 @@ static void test_early_depth_stencil_tests(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     check_sub_resource_float(ds.texture, 0, queue, command_list, 0.5f, 1);
     reset_command_list(command_list, context.allocator);
+    bug_if(is_mvk_device(context.device))
     check_sub_resource_uint(texture, 0, queue, command_list, 4, 1);
 
     ID3D12Resource_Release(texture);
