@@ -5191,6 +5191,8 @@ static char get_regset_name(enum hlsl_regset regset)
             return 't';
         case HLSL_REGSET_UAVS:
             return 'u';
+        case HLSL_REGSET_STREAM_OUTPUTS:
+            return 'm';
         case HLSL_REGSET_NUMERIC:
             vkd3d_unreachable();
     }
@@ -13248,7 +13250,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             validate_and_record_prim_type(ctx, var);
             prepend_input_var_copy(ctx, entry_func, var);
         }
-        else if (hlsl_get_stream_output_type(var->data_type))
+        else if (var->data_type->reg_size[HLSL_REGSET_STREAM_OUTPUTS])
         {
             if (profile->type != VKD3D_SHADER_TYPE_GEOMETRY)
             {

@@ -387,6 +387,9 @@ static enum hlsl_regset type_get_regset(const struct hlsl_type *type)
         case HLSL_CLASS_UAV:
             return HLSL_REGSET_UAVS;
 
+        case HLSL_CLASS_STREAM_OUTPUT:
+            return HLSL_REGSET_STREAM_OUTPUTS;
+
         default:
             break;
     }
@@ -493,6 +496,10 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
             type->reg_size[HLSL_REGSET_UAVS] = 1;
             break;
 
+        case HLSL_CLASS_STREAM_OUTPUT:
+            type->reg_size[HLSL_REGSET_STREAM_OUTPUTS] = 1;
+            break;
+
         case HLSL_CLASS_DEPTH_STENCIL_STATE:
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
@@ -511,7 +518,6 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         case HLSL_CLASS_HULL_SHADER:
         case HLSL_CLASS_GEOMETRY_SHADER:
         case HLSL_CLASS_BLEND_STATE:
-        case HLSL_CLASS_STREAM_OUTPUT:
         case HLSL_CLASS_NULL:
             break;
     }
@@ -984,6 +990,7 @@ struct hlsl_type *hlsl_new_stream_output_type(struct hlsl_ctx *ctx,
     type->class = HLSL_CLASS_STREAM_OUTPUT;
     type->e.so.so_type = so_type;
     type->e.so.type = data_type;
+    hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);
 
