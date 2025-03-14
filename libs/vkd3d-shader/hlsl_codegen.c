@@ -9135,9 +9135,17 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
                         ? VKD3DSIH_DCL_INPUT_PS : VKD3DSIH_DCL_INPUT;
                 break;
 
+            case VKD3D_SHADER_SV_PRIMITIVE_ID:
+                if (version->type == VKD3D_SHADER_TYPE_PIXEL)
+                    opcode = VKD3DSIH_DCL_INPUT_PS_SGV;
+                else if (version->type == VKD3D_SHADER_TYPE_GEOMETRY)
+                    opcode = VKD3DSIH_DCL_INPUT;
+                else
+                    opcode = VKD3DSIH_DCL_INPUT_SGV;
+                break;
+
             case VKD3D_SHADER_SV_INSTANCE_ID:
             case VKD3D_SHADER_SV_IS_FRONT_FACE:
-            case VKD3D_SHADER_SV_PRIMITIVE_ID:
             case VKD3D_SHADER_SV_SAMPLE_INDEX:
             case VKD3D_SHADER_SV_VERTEX_ID:
                 opcode = (version->type == VKD3D_SHADER_TYPE_PIXEL)
@@ -9188,7 +9196,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     }
     else if (opcode == VKD3DSIH_DCL_INPUT || opcode == VKD3DSIH_DCL_INPUT_PS)
     {
-        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || is_primitive);
+        VKD3D_ASSERT(semantic == VKD3D_SHADER_SV_NONE || is_primitive || version->type == VKD3D_SHADER_TYPE_GEOMETRY);
         dst_param = &ins->declaration.dst;
     }
     else
@@ -12637,7 +12645,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 
             if (var->storage_modifiers & HLSL_STORAGE_IN)
             {
-                if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+                if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY && !var->semantic.name)
                 {
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_PRIMITIVE_TYPE,
                             "Input parameter \"%s\" is missing a primitive type.", var->name);
