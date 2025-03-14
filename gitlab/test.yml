@@ -20,12 +20,14 @@ test-win-64:
   variables:
     TEST_ARCH: "64"
     VKD3D_TEST_SKIP_DXC: "1"
+    VKD3D_TEST_DEBUG: '1'
 
 test-win-32:
   extends: .test-win
   variables:
     TEST_ARCH: "32"
     VKD3D_TEST_SKIP_DXC: "1"
+    VKD3D_TEST_DEBUG: '1'
 
 test-win-64-dxc:
   stage: test
@@ -37,6 +39,8 @@ test-win-64-dxc:
     - job: build-crosstest
   tags:
     - win10-21h2
+  variables:
+    VKD3D_TEST_DEBUG: '1'
   script:
     - 'Invoke-WebRequest -Uri "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2407/dxc_2024_07_31.zip" -OutFile ".\dxc.zip"'
     - 'Expand-Archive -Path "dxc.zip" -DestinationPath ".\dxc"'

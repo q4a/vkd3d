@@ -32,6 +32,7 @@ build-radv-64:
   variables:
     VK_LOADER_DRIVERS_SELECT: 'radeon_*'
     VKD3D_SHADER_CONFIG: 'force_validation'
+    VKD3D_TEST_DEBUG: '1'
 
 build-llvmpipe-64:
   extends: .build-linux
@@ -41,6 +42,7 @@ build-llvmpipe-64:
   variables:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
     VKD3D_SHADER_CONFIG: 'force_validation'
+    VKD3D_TEST_DEBUG: '1'
 
 build-radv-32:
   extends: .build-linux
@@ -50,6 +52,7 @@ build-radv-32:
     VK_LOADER_DRIVERS_SELECT: 'radeon_*'
     CC: 'i686-linux-gnu-gcc'
     VKD3D_SHADER_CONFIG: 'force_validation'
+    VKD3D_TEST_DEBUG: '1'
 
 build-llvmpipe-32:
   extends: .build-linux
@@ -60,6 +63,7 @@ build-llvmpipe-32:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
     CC: 'i686-linux-gnu-gcc'
     VKD3D_SHADER_CONFIG: 'force_validation'
+    VKD3D_TEST_DEBUG: '1'
 
 build-llvmpipe-64-mesa24:
   extends: .build-linux
@@ -68,6 +72,7 @@ build-llvmpipe-64-mesa24:
     LD_LIBRARY_PATH: '/opt/mesa24/lib/x86_64-linux-gnu'
     __EGL_VENDOR_LIBRARY_FILENAMES: '/opt/mesa24/share/glvnd/egl_vendor.d/50_mesa.json'
     VKD3D_SHADER_CONFIG: 'force_validation'
+    VKD3D_TEST_DEBUG: '1'
 
 build-crosstest:
   stage: build
@@ -163,6 +168,7 @@ build-mac:
   variables:
     VKD3D_DISABLE_EXTENSIONS: "VK_EXT_descriptor_indexing"
     VKD3D_SHADER_CONFIG: 'force_validation'
+    VKD3D_TEST_DEBUG: '1'
     MVK_CONFIG_LOG_LEVEL: 2
     SONAME_LIBVULKAN: "/opt/homebrew/opt/vulkan-loader/lib/libvulkan.1.dylib"
     WIDL: "x86_64-w64-mingw32-widl"
