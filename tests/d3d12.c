@@ -32892,11 +32892,13 @@ static void test_64kb_texture_alignment(void)
     ID3D12Resource_Release(textures[1]);
     /* Create an aliased texture. */
     hr = ID3D12Device_CreatePlacedResource(device, heap, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
-            &resource_desc, D3D12_RESOURCE_STATE_COPY_SOURCE, NULL, &IID_ID3D12Resource, (void **)&textures[1]);
+            &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, NULL, &IID_ID3D12Resource, (void **)&textures[1]);
     ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
 
     /* If the heap could not be used, the texture is not aliased. */
     reset_command_list(command_list, context.allocator);
+    transition_resource_state(command_list, textures[1],
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_resource_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
     check_readback_data_uint(&rb.rb, &box, 0xdeadbeef, 0);
     release_resource_readback(&rb);
