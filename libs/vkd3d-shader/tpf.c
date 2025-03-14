@@ -3132,6 +3132,9 @@ bool sm4_sysval_semantic_from_semantic_name(enum vkd3d_shader_sysval_semantic *s
         {"position",                    true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_POSITION},
         {"sv_position",                 true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_POSITION},
         {"sv_primitiveid",              true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_PRIMITIVE_ID},
+        {"sv_isfrontface",              true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_IS_FRONT_FACE},
+        {"sv_rendertargetarrayindex",   true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_RENDER_TARGET_ARRAY_INDEX},
+        {"sv_viewportarrayindex",       true,  VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX},
 
         {"sv_outputcontrolpointid",     false, VKD3D_SHADER_TYPE_HULL,      ~0u},
         {"sv_position",                 false, VKD3D_SHADER_TYPE_HULL,      ~0u},
@@ -4136,6 +4139,10 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
 
         case VKD3DSIH_DCL_OUTPUT:
             tpf_dcl_semantic(tpf, VKD3D_SM4_OP_DCL_OUTPUT, &ins->declaration.dst, 0);
+            break;
+
+        case VKD3DSIH_DCL_OUTPUT_SGV:
+            tpf_dcl_siv_semantic(tpf, VKD3D_SM4_OP_DCL_OUTPUT_SGV, &ins->declaration.register_semantic, 0);
             break;
 
         case VKD3DSIH_DCL_OUTPUT_SIV:
