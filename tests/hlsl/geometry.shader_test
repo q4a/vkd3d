@@ -22,7 +22,7 @@ void main(in struct vs_data vs_input, out struct vs_data vs_output)
     vs_output.color = vs_input.color;
 }
 
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -60,9 +60,9 @@ float4 main(struct ps_data ps_input) : SV_Target
 }
 
 [test]
-todo(sm<6) draw point list 1
-todo(mvk) probe rtv 0 (320, 190) rgba(0.0, 0.0, 0.0, 0.0)
-todo(mvk) probe rtv 0 (255, 240) rgba(0.0, 0.0, 0.0, 0.0)
-todo(mvk) probe rtv 0 (320, 240) rgba(0.0, 1.0, 1.0, 1.0)
-todo(mvk) probe rtv 0 (385, 240) rgba(0.0, 0.0, 0.0, 0.0)
-todo(mvk) probe rtv 0 (320, 290) rgba(0.0, 0.0, 0.0, 0.0)
+todo(msl) draw point list 1
+probe rtv 0 (320, 190) rgba(0.0, 0.0, 0.0, 0.0)
+probe rtv 0 (255, 240) rgba(0.0, 0.0, 0.0, 0.0)
+todo(opengl & llvmpipe | mvk) probe rtv 0 (320, 240) rgba(0.0, 1.0, 1.0, 1.0)
+probe rtv 0 (385, 240) rgba(0.0, 0.0, 0.0, 0.0)
+probe rtv 0 (320, 290) rgba(0.0, 0.0, 0.0, 0.0)

@@ -10831,8 +10831,20 @@ static bool sm4_generate_vsir_instr_resource_store(struct hlsl_ctx *ctx,
 
     if (store->store_type != HLSL_RESOURCE_STORE)
     {
-        hlsl_fixme(ctx, &instr->loc, "Stream output operations.");
-        return false;
+        enum vkd3d_shader_opcode opcode = store->store_type == HLSL_RESOURCE_STREAM_APPEND
+                ? VKD3DSIH_EMIT : VKD3DSIH_CUT;
+
+        VKD3D_ASSERT(!store->value.node && !store->coords.node);
+        VKD3D_ASSERT(store->resource.var->regs[HLSL_REGSET_STREAM_OUTPUTS].allocated);
+
+        if (store->resource.var->regs[HLSL_REGSET_STREAM_OUTPUTS].index)
+        {
+            hlsl_fixme(ctx, &instr->loc, "Stream output operation with a nonzero stream index.");
+            return false;
+        }
+
+        ins = generate_vsir_add_program_instruction(ctx, program, &store->node.loc, opcode, 0, 0);
+        return !!ins;
     }
 
     if (!store->resource.var->is_uniform)

@@ -922,6 +922,9 @@ static GLenum get_topology_gl(D3D_PRIMITIVE_TOPOLOGY topology)
 {
     switch (topology)
     {
+        case D3D_PRIMITIVE_TOPOLOGY_POINTLIST:
+            return GL_POINTS;
+
         case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST:
             return GL_TRIANGLES;
 

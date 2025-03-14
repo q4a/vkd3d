@@ -191,7 +191,7 @@ float4 main(patch_constant_data input, InputPatch<data, 2> patch) : POSITION
     return 0;
 }
 
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct data
 {
     float4 val : VAL;

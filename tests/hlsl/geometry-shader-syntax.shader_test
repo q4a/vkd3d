@@ -598,7 +598,7 @@ void main(point gs_data vin[1], inout TriangleStream<gs_data> vout1, inout Trian
 }
 
 % An output stream is only validated when it is used.
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -650,7 +650,7 @@ void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout PointStr
 }
 
 % Max vertex count * output data component count must be less than or equal to 1024.
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float2 x : X;
@@ -675,7 +675,7 @@ void main(point gs_data vin[1], inout PointStream<gs_data> vout)
 }
 
 % The component count of the output is used, not its allocated register size.
-[geometry shader todo]
+[geometry shader]
 struct gs_data
 {
     float2 x : X;  // Allocates to o0.xy
