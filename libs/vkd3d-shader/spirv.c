@@ -3058,7 +3058,7 @@ struct ssa_register_info
 struct spirv_compiler
 {
     struct vkd3d_spirv_builder spirv_builder;
-    struct vsir_program *program;
+    const struct vsir_program *program;
 
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_location location;
@@ -3189,7 +3189,7 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
     vkd3d_free(compiler);
 }
 
-static struct spirv_compiler *spirv_compiler_create(struct vsir_program *program,
+static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *program,
         const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, uint64_t config_flags)
@@ -11200,8 +11200,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vsir_program *program = compiler->program;
     struct vkd3d_shader_instruction_array instructions;
-    struct vsir_program *program = compiler->program;
     enum vkd3d_shader_spirv_environment environment;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i, max_element_count;
@@ -11253,7 +11253,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     instructions = program->instructions;
-    memset(&program->instructions, 0, sizeof(program->instructions));
 
     compiler->use_vocp = program->use_vocp;
     compiler->block_names = program->block_names;
@@ -11273,8 +11272,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     {
         result = spirv_compiler_handle_instruction(compiler, &instructions.elements[i]);
     }
-
-    shader_instruction_array_destroy(&instructions);
 
     if (result < 0)
         return result;
