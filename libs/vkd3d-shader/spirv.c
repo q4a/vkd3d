@@ -3091,9 +3091,6 @@ struct spirv_compiler
     } *spirv_parameter_info;
 
     bool prolog_emitted;
-    struct shader_signature input_signature;
-    struct shader_signature output_signature;
-    struct shader_signature patch_constant_signature;
     const struct vkd3d_shader_transform_feedback_info *xfb_info;
     struct vkd3d_shader_output_info
     {
@@ -3185,10 +3182,6 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
     vkd3d_free(compiler->spec_constants);
 
     vkd3d_string_buffer_cache_cleanup(&compiler->string_buffers);
-
-    shader_signature_cleanup(&compiler->input_signature);
-    shader_signature_cleanup(&compiler->output_signature);
-    shader_signature_cleanup(&compiler->patch_constant_signature);
 
     vkd3d_free(compiler->ssa_register_info);
     vkd3d_free(compiler->block_label_ids);
@@ -5807,7 +5800,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     unsigned int array_sizes[2];
 
     shader_signature = reg_type == VKD3DSPR_PATCHCONST
-            ? &compiler->patch_constant_signature : &compiler->input_signature;
+            ? &compiler->program->patch_constant_signature : &compiler->program->input_signature;
 
     signature_element = &shader_signature->elements[element_idx];
     sysval = signature_element->sysval_semantic;
@@ -5885,7 +5878,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
         if (reg_type == VKD3DSPR_PATCHCONST)
         {
             vkd3d_spirv_build_op_decorate(builder, input_id, SpvDecorationPatch, NULL, 0);
-            location += shader_signature_next_location(&compiler->input_signature);
+            location += shader_signature_next_location(&compiler->program->input_signature);
         }
         vkd3d_spirv_build_op_decorate1(builder, input_id, SpvDecorationLocation, location);
         if (component_idx)
@@ -6019,7 +6012,7 @@ static void calculate_clip_or_cull_distance_mask(const struct signature_element 
 /* Emits arrayed SPIR-V built-in variables. */
 static void spirv_compiler_emit_shader_signature_outputs(struct spirv_compiler *compiler)
 {
-    const struct shader_signature *output_signature = &compiler->output_signature;
+    const struct shader_signature *output_signature = &compiler->program->output_signature;
     uint32_t clip_distance_mask = 0, clip_distance_id = 0;
     uint32_t cull_distance_mask = 0, cull_distance_id = 0;
     const struct vkd3d_spirv_builtin *builtin;
@@ -6129,7 +6122,8 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
 
     is_patch_constant = (reg_type == VKD3DSPR_PATCHCONST);
 
-    shader_signature = is_patch_constant ? &compiler->patch_constant_signature : &compiler->output_signature;
+    shader_signature = is_patch_constant ? &compiler->program->patch_constant_signature
+            : &compiler->program->output_signature;
 
     signature_element = &shader_signature->elements[element_idx];
     sysval = signature_element->sysval_semantic;
@@ -6203,7 +6197,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
         unsigned int location = signature_element->target_location;
 
         if (is_patch_constant)
-            location += shader_signature_next_location(&compiler->output_signature);
+            location += shader_signature_next_location(&compiler->program->output_signature);
         else if (compiler->shader_type == VKD3D_SHADER_TYPE_PIXEL
                 && signature_element->sysval_semantic == VKD3D_SHADER_SV_TARGET)
             location = signature_element->semantic_index;
@@ -6393,7 +6387,8 @@ static void spirv_compiler_emit_shader_epilogue_function(struct spirv_compiler *
 
     is_patch_constant = is_in_fork_or_join_phase(compiler);
 
-    signature = is_patch_constant ? &compiler->patch_constant_signature : &compiler->output_signature;
+    signature = is_patch_constant ? &compiler->program->patch_constant_signature
+            : &compiler->program->output_signature;
 
     function_id = compiler->epilogue_function_id;
 
@@ -11115,20 +11110,20 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
 {
     struct vkd3d_shader_dst_param dst;
 
-    for (unsigned int i = 0; i < compiler->input_signature.element_count; ++i)
+    for (unsigned int i = 0; i < compiler->program->input_signature.element_count; ++i)
         spirv_compiler_emit_input(compiler, VKD3DSPR_INPUT, i);
 
-    for (unsigned int i = 0; i < compiler->output_signature.element_count; ++i)
+    for (unsigned int i = 0; i < compiler->program->output_signature.element_count; ++i)
     {
         /* PS outputs other than TARGET have dedicated registers and therefore
          * go through spirv_compiler_emit_dcl_output() for now. */
         if (compiler->shader_type == VKD3D_SHADER_TYPE_PIXEL
-                && compiler->output_signature.elements[i].sysval_semantic != VKD3D_SHADER_SV_TARGET)
+                && compiler->program->output_signature.elements[i].sysval_semantic != VKD3D_SHADER_SV_TARGET)
             continue;
         spirv_compiler_emit_output(compiler, VKD3DSPR_OUTPUT, i);
     }
 
-    for (unsigned int i = 0; i < compiler->patch_constant_signature.element_count; ++i)
+    for (unsigned int i = 0; i < compiler->program->patch_constant_signature.element_count; ++i)
     {
         if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL)
             spirv_compiler_emit_output(compiler, VKD3DSPR_PATCHCONST, i);
@@ -11260,12 +11255,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     instructions = program->instructions;
     memset(&program->instructions, 0, sizeof(program->instructions));
 
-    compiler->input_signature = program->input_signature;
-    compiler->output_signature = program->output_signature;
-    compiler->patch_constant_signature = program->patch_constant_signature;
-    memset(&program->input_signature, 0, sizeof(program->input_signature));
-    memset(&program->output_signature, 0, sizeof(program->output_signature));
-    memset(&program->patch_constant_signature, 0, sizeof(program->patch_constant_signature));
     compiler->use_vocp = program->use_vocp;
     compiler->block_names = program->block_names;
     compiler->block_name_count = program->block_name_count;
