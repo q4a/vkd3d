@@ -11209,12 +11209,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i, max_element_count;
 
-    if ((result = vsir_program_transform(program, compiler->config_flags,
-            compile_info, compiler->message_context)) < 0)
-        return result;
-
-    VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_SM6);
-
     max_element_count = max(program->output_signature.element_count, program->patch_constant_signature.element_count);
     if (!(compiler->output_info = vkd3d_calloc(max_element_count, sizeof(*compiler->output_info))))
         return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -11380,6 +11374,11 @@ int spirv_compile(struct vsir_program *program, uint64_t config_flags,
 {
     struct spirv_compiler *spirv_compiler;
     int ret;
+
+    if ((ret = vsir_program_transform(program, config_flags, compile_info, message_context)) < 0)
+        return ret;
+
+    VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_SM6);
 
     if (!(spirv_compiler = spirv_compiler_create(program, compile_info,
             scan_descriptor_info, message_context, config_flags)))
