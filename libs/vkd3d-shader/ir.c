@@ -7782,6 +7782,33 @@ static void vsir_validate_label_register(struct validation_context *ctx,
                 reg->idx[0].offset, ctx->program->block_count);
 }
 
+static void vsir_validate_descriptor_indices(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg, enum vkd3d_shader_descriptor_type type, const char *name)
+{
+    const struct vkd3d_shader_descriptor_info1 *descriptor;
+
+    if (reg->idx[0].rel_addr)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Non-NULL indirect address for the ID of a register of type \"%s\".", name);
+
+    if (!ctx->program->has_descriptor_info)
+        return;
+
+    if (!(descriptor = vkd3d_shader_find_descriptor(&ctx->program->descriptors, type, reg->idx[0].offset)))
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "No matching descriptor found for register %s%u.", name, reg->idx[0].offset);
+        return;
+    }
+
+    if (!reg->idx[1].rel_addr && (reg->idx[1].offset < descriptor->register_index
+            || reg->idx[1].offset - descriptor->register_index >= descriptor->count))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                "Register index %u doesn't belong to the range [%u, %u] for register %s%u.",
+                reg->idx[1].offset, descriptor->register_index,
+                descriptor->register_index + descriptor->count - 1, name, reg->idx[0].offset);
+}
+
 static void vsir_validate_constbuffer_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
@@ -7855,9 +7882,7 @@ static void vsir_validate_resource_register(struct validation_context *ctx,
         return;
     }
 
-    if (reg->idx[0].rel_addr)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
-                "Non-NULL relative address for the descriptor index of a RESOURCE register.");
+    vsir_validate_descriptor_indices(ctx, reg, VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, "t");
 }
 
 static void vsir_validate_uav_register(struct validation_context *ctx,
