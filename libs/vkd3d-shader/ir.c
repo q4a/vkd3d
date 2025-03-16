@@ -7912,9 +7912,7 @@ static void vsir_validate_uav_register(struct validation_context *ctx,
         return;
     }
 
-    if (reg->idx[0].rel_addr)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
-                "Non-NULL relative address for the descriptor index of a UAV register.");
+    vsir_validate_descriptor_indices(ctx, reg, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, "u");
 }
 
 static void vsir_validate_ssa_register(struct validation_context *ctx,
