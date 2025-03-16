@@ -7855,9 +7855,7 @@ static void vsir_validate_sampler_register(struct validation_context *ctx,
         return;
     }
 
-    if (reg->idx[0].rel_addr)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
-                "Non-NULL relative address for the descriptor index of a SAMPLER register.");
+    vsir_validate_descriptor_indices(ctx, reg, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, "s");
 }
 
 static void vsir_validate_resource_register(struct validation_context *ctx,
