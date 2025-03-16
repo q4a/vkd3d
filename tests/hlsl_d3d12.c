@@ -2932,6 +2932,30 @@ static void test_signature_reflection(void)
         {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
     };
 
+    static const char gs1_source[] =
+        "struct gs_data\n"
+        "{\n"
+        "    float4 x : sv_position;\n"
+        "    float4 y : position;\n"
+        "    float4 apple : apple;\n"
+        "};\n"
+        "\n"
+        "[maxvertexcount(4)]\n"
+        "void main(\n"
+        "        in line gs_data vin[2],\n"
+        "        in uint primid : sv_primitiveid,\n"
+        "        in uint gsid : sv_gsinstanceid)\n"
+        "{\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC gs1_inputs[] =
+    {
+        {"sv_position",    0, 0,   D3D_NAME_POSITION,     D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"position",       0, 1,   D3D_NAME_UNDEFINED,    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"apple",          0, 2,   D3D_NAME_UNDEFINED,    D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"sv_primitiveid", 0, ~0u, D3D_NAME_PRIMITIVE_ID, D3D_REGISTER_COMPONENT_UINT32,  0x1},
+    };
+
     static const struct
     {
         const char *source;
@@ -2979,6 +3003,7 @@ static void test_signature_reflection(void)
         {ds2_source,  "ds_5_0", false, NULL, 0, ds2_outputs, ARRAY_SIZE(ds2_outputs), ds2_patch_constants, ARRAY_SIZE(ds2_patch_constants)},
         {ds3_source,  "ds_5_0", false, NULL, 0, ds3_outputs, ARRAY_SIZE(ds3_outputs), ds3_patch_constants, ARRAY_SIZE(ds3_patch_constants)},
         {ds4_source,  "ds_5_0", false, ds4_inputs, ARRAY_SIZE(ds4_inputs), ds4_outputs, ARRAY_SIZE(ds4_outputs), ds4_patch_constants, ARRAY_SIZE(ds4_patch_constants)},
+        {gs1_source,  "gs_4_0", false, gs1_inputs, ARRAY_SIZE(gs1_inputs)},
     };
 
     for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
