@@ -10,8 +10,8 @@ address clamp clamp clamp
 
 [srv 0]
 size (2d, 2, 2)
-1 1 0 1     0 1 1 1
-1 0 0 1     1 0 1 1
+1.0 1.0 0.0 1.0     0.0 1.0 1.0 1.0
+1.0 0.0 0.0 1.0     1.0 0.0 1.0 1.0
 
 [vertex shader]
 float4 main(out float2 t : texcoord) : sv_position

@@ -65,6 +65,7 @@ const char *shader_type_string(enum shader_type type);
 
 enum texture_data_type
 {
+    TEXTURE_DATA_UNSPECIFIED,
     TEXTURE_DATA_FLOAT,
     TEXTURE_DATA_SINT,
     TEXTURE_DATA_UINT,

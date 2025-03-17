@@ -663,6 +663,12 @@ static void parse_resource_directive(struct resource_params *resource, const cha
                 case TEXTURE_DATA_UINT:
                     u.u = strtoul(line, &rest, 0);
                     break;
+
+                case TEXTURE_DATA_UNSPECIFIED:
+                    u.u = strtoul(line, &rest, 0);
+                    if (rest && *rest == '.')
+                        u.f = strtof(line, &rest);
+                    break;
             }
 
             if (rest == line)
@@ -779,7 +785,7 @@ static void set_default_target(struct shader_runner *runner)
     params.desc.type = RESOURCE_TYPE_RENDER_TARGET;
     params.desc.dimension = RESOURCE_DIMENSION_2D;
     params.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-    params.data_type = TEXTURE_DATA_FLOAT;
+    params.data_type = TEXTURE_DATA_UNSPECIFIED;
     params.desc.texel_size = 16;
     params.desc.width = RENDER_TARGET_WIDTH;
     params.desc.height = RENDER_TARGET_HEIGHT;
@@ -2377,7 +2383,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_RENDER_TARGET;
                 current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 16;
                 current_resource.desc.level_count = 1;
             }
@@ -2391,7 +2397,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.type = RESOURCE_TYPE_DEPTH_STENCIL;
                 current_resource.desc.format = DXGI_FORMAT_D32_FLOAT;
                 current_resource.is_shadow = true;
-                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 4;
                 current_resource.desc.level_count = 1;
             }
@@ -2404,7 +2410,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_TEXTURE;
                 current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 16;
                 current_resource.desc.level_count = 1;
             }
@@ -2417,7 +2423,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_UAV;
                 current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 16;
                 current_resource.desc.level_count = 1;
             }
@@ -2430,7 +2436,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_VERTEX_BUFFER;
                 current_resource.desc.dimension = RESOURCE_DIMENSION_BUFFER;
-                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
             }
             else if (!strcmp(line, "[test]\n"))
             {

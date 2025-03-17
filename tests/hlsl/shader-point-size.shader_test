@@ -6,8 +6,8 @@ shader model < 4.0
 0 r32-float psize
 
 [vb 0]
--0.5 0      20
- 0.5 0      40
+-0.5 0.0      20.0
+ 0.5 0.0      40.0
 
 [vertex shader fail]
 void main(inout float4 pos : position, out float2 size : psize)
