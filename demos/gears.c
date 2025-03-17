@@ -849,12 +849,16 @@ static int cxg_main(void)
 {
     unsigned int width = 300, height = 300;
     struct cx_gears cxg;
+    double dpi_x, dpi_y;
 
     memset(&cxg, 0, sizeof(cxg));
     if (!demo_init(&cxg.demo, &cxg))
         return EXIT_FAILURE;
     demo_set_idle_func(&cxg.demo, cxg_idle);
 
+    demo_get_dpi(&cxg.demo, &dpi_x, &dpi_y);
+    width *= dpi_x / 96.0;
+    height *= dpi_y / 96.0;
     cxg.window = demo_window_create(&cxg.demo, "Vkd3d Gears", width, height, &cxg);
     demo_window_set_key_press_func(cxg.window, cxg_key_press);
     demo_window_set_expose_func(cxg.window, cxg_expose);

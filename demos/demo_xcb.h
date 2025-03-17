@@ -198,6 +198,20 @@ static inline xcb_screen_t *demo_get_screen(xcb_connection_t *c, int idx)
     return NULL;
 }
 
+static inline void demo_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
+{
+    xcb_screen_t *screen;
+
+    if (!(screen = demo_get_screen(demo->connection, demo->screen)))
+    {
+        *dpi_x = *dpi_y = 96.0;
+        return;
+    }
+
+    *dpi_x = screen->width_in_pixels * 25.4 / screen->width_in_millimeters;
+    *dpi_y = screen->height_in_pixels * 25.4 / screen->height_in_millimeters;
+}
+
 static inline struct demo_window *demo_window_create(struct demo *demo, const char *title,
         unsigned int width, unsigned int height, void *user_data)
 {

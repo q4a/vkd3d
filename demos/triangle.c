@@ -368,12 +368,16 @@ static int cxt_main(void)
 {
     unsigned int width = 640, height = 480;
     struct cx_triangle cxt;
+    double dpi_x, dpi_y;
 
     memset(&cxt, 0, sizeof(cxt));
 
     if (!demo_init(&cxt.demo, NULL))
         return EXIT_FAILURE;
 
+    demo_get_dpi(&cxt.demo, &dpi_x, &dpi_y);
+    width *= dpi_x / 96.0;
+    height *= dpi_y / 96.0;
     cxt.window = demo_window_create(&cxt.demo, "Vkd3d Triangle", width, height, &cxt);
     demo_window_set_expose_func(cxt.window, cxt_render_frame);
     demo_window_set_key_press_func(cxt.window, cxt_key_press);

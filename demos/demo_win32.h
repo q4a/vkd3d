@@ -31,6 +31,8 @@ struct demo
 
     void *user_data;
     void (*idle_func)(struct demo *demo, void *user_data);
+
+    UINT (*GetDpiForSystem)(void);
 };
 
 struct demo_window
@@ -47,6 +49,11 @@ struct demo_swapchain
 {
     IDXGISwapChain3 *swapchain;
 };
+
+static inline void demo_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
+{
+    *dpi_x = *dpi_y = demo->GetDpiForSystem();
+}
 
 static inline struct demo_window *demo_window_create(struct demo *demo, const char *title,
         unsigned int width, unsigned int height, void *user_data)
@@ -191,6 +198,11 @@ static inline void demo_process_events(struct demo *demo)
     }
 }
 
+static inline UINT demo_GetDpiForSystem(void)
+{
+    return 96;
+}
+
 static inline bool demo_init(struct demo *demo, void *user_data)
 {
     WNDCLASSEXW wc;
@@ -214,6 +226,11 @@ static inline bool demo_init(struct demo *demo, void *user_data)
     demo->quit = false;
     demo->user_data = user_data;
     demo->idle_func = NULL;
+
+    if ((demo->GetDpiForSystem = (void *)GetProcAddress(GetModuleHandleA("user32"), "GetDpiForSystem")))
+        SetProcessDPIAware();
+    else
+        demo->GetDpiForSystem = demo_GetDpiForSystem;
 
     return true;
 }
