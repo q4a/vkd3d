@@ -439,3 +439,39 @@ probe (0, 0) rgba(1, 1, 1, 1)
 uniform 12 float 1
 draw quad
 probe (0, 0) rgba(2, 2, 2, 2)
+
+[vertex shader]
+float xs[2][2];
+float idx;
+
+void main(float4 pos : position, out float t : texcoord, out float4 out_pos : sv_position)
+{
+    float y[2] = {xs[0][1], xs[1][0]};
+    t = y[idx];
+    out_pos = pos;
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   xs           c0       4
+//   idx          c4       1
+//
+
+[pixel shader]
+float4 main(float t : texcoord) : sv_target
+{
+    return t;
+}
+
+[test]
+uniform 0 float 0
+uniform 4 float 1
+uniform 8 float 2
+uniform 12 float 3
+uniform 16 float 0
+draw quad
+todo probe (0, 0) rgba(1, 1, 1, 1)
+uniform 16 float 1
+draw quad
+todo probe (0, 0) rgba(2, 2, 2, 2)
