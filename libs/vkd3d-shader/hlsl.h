@@ -1213,6 +1213,8 @@ struct hlsl_ctx
     unsigned int max_vertex_count;
     /* The input primitive type of a geometry shader. */
     enum vkd3d_primitive_type input_primitive_type;
+    /* The output topology type of a geometry shader. */
+    enum vkd3d_primitive_type output_topology_type;
 
     /* In some cases we generate opcodes by parsing an HLSL function and then
      * invoking it. If not NULL, this field is the name of the function that we

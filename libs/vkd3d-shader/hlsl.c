@@ -4859,6 +4859,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
     ctx->input_control_point_count = UINT_MAX;
     ctx->max_vertex_count = 0;
     ctx->input_primitive_type = VKD3D_PT_UNDEFINED;
+    ctx->output_topology_type = VKD3D_PT_UNDEFINED;
 
     return true;
 }

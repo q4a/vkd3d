@@ -7583,6 +7583,64 @@ static void validate_and_record_prim_type(struct hlsl_ctx *ctx, struct hlsl_ir_v
     ctx->input_primitive_param = var;
 }
 
+static void validate_and_record_stream_outputs(struct hlsl_ctx *ctx)
+{
+    static const enum vkd3d_primitive_type prim_types[] =
+    {
+        [HLSL_STREAM_OUTPUT_POINT_STREAM]    = VKD3D_PT_POINTLIST,
+        [HLSL_STREAM_OUTPUT_LINE_STREAM]     = VKD3D_PT_LINESTRIP,
+        [HLSL_STREAM_OUTPUT_TRIANGLE_STREAM] = VKD3D_PT_TRIANGLESTRIP,
+    };
+
+    bool reported_non_point_multistream = false, reported_nonzero_index = false, reported_invalid_index = false;
+    enum hlsl_so_object_type so_type;
+    const struct hlsl_type *type;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->bind_count[HLSL_REGSET_STREAM_OUTPUTS])
+            continue;
+
+        type = hlsl_get_stream_output_type(var->data_type);
+        so_type = type->e.so.so_type;
+
+        VKD3D_ASSERT(so_type < ARRAY_SIZE(prim_types));
+
+        if (ctx->output_topology_type == VKD3D_PT_UNDEFINED)
+        {
+            ctx->output_topology_type = prim_types[so_type];
+        }
+        else
+        {
+            if ((so_type != HLSL_STREAM_OUTPUT_POINT_STREAM || ctx->output_topology_type != VKD3D_PT_POINTLIST)
+                    && !reported_non_point_multistream)
+            {
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Multiple output streams are only allowed with PointStream objects.");
+                reported_non_point_multistream = true;
+            }
+        }
+
+        if (var->regs[HLSL_REGSET_STREAM_OUTPUTS].index && hlsl_version_lt(ctx, 5, 0) && !reported_nonzero_index)
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                    "Multiple output streams are only supported in shader model 5.0 or higher.");
+            reported_nonzero_index = true;
+        }
+
+        if (var->regs[HLSL_REGSET_STREAM_OUTPUTS].index >= VKD3D_MAX_STREAM_COUNT && !reported_invalid_index)
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                    "Output stream index %u exceeds the maximum index %u.",
+                    var->regs[HLSL_REGSET_STREAM_OUTPUTS].index, VKD3D_MAX_STREAM_COUNT - 1);
+            reported_invalid_index = true;
+        }
+    }
+
+    /* TODO: check that maxvertexcount * outputdatasize <= 1024. */
+}
+
 static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     struct hlsl_ir_node *instr, *next;
@@ -11995,7 +12053,7 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     {
         program->input_control_point_count = ctx->input_control_point_count;
         program->input_primitive = ctx->input_primitive_type;
-        program->output_topology = VKD3D_PT_UNDEFINED; /* TODO: obtain from stream output parameters. */
+        program->output_topology = ctx->output_topology_type;
         program->vertices_out_count = ctx->max_vertex_count;
     }
 
@@ -13285,8 +13343,6 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Stream output parameter \"%s\" must be declared as \"inout\".", var->name);
 
-            /* TODO: check that maxvertexcount * component_count(element_type) <= 1024. */
-
             prepend_uniform_copy(ctx, body, var);
         }
         else
@@ -13402,7 +13458,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         sort_synthetic_separated_samplers_first(ctx);
 
     if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+    {
         allocate_stream_outputs(ctx);
+        validate_and_record_stream_outputs(ctx);
+    }
 
     if (profile->major_version < 4)
     {
