@@ -1730,7 +1730,13 @@ static uint32_t write_fx_2_object_initializer(const struct hlsl_ir_var *var, str
             put_u32(buffer, id);
             put_u32(buffer, size);
             if (size)
+            {
+                static const uint32_t pad;
+
                 bytecode_put_bytes(buffer, data, size);
+                if (size % 4)
+                    bytecode_put_bytes_unaligned(buffer, &pad, 4 - (size % 4));
+            }
         }
     }
 
