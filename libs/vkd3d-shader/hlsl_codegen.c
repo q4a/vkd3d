@@ -1916,12 +1916,6 @@ static bool copy_propagation_replace_with_deref(struct hlsl_ctx *ctx,
     if (!nonconst_index_from_deref(ctx, deref, &nonconst_i, &base, &scale, &count))
         return false;
 
-    if (hlsl_version_lt(ctx, 4, 0))
-    {
-        TRACE("Non-constant index propagation is not yet supported for SM1.\n");
-        return false;
-    }
-
     VKD3D_ASSERT(count);
 
     hlsl_block_init(&block);
@@ -1949,6 +1943,12 @@ static bool copy_propagation_replace_with_deref(struct hlsl_ctx *ctx,
             x = idx->src.var;
         else if (x != idx->src.var)
             goto done;
+
+        if (hlsl_version_lt(ctx, 4, 0) && x->is_uniform && ctx->profile->type != VKD3D_SHADER_TYPE_VERTEX)
+        {
+            TRACE("Skipping propagating non-constant deref to SM1 uniform %s.\n", var->name);
+            goto done;
+        }
 
         if (i == 0)
         {
