@@ -539,3 +539,196 @@ gs_data main(point gs_data vin[1], inout TriangleStream<gs_data> vout)
 {
     return (gs_data)0;
 }
+
+% Output streams with nonzero stream indices are only allowed with point streams, and with SM >= 5.
+[geometry shader fail(sm<5) todo(sm>=5)]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+struct gs_data2
+{
+    float4 apple : APPLE;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout PointStream<gs_data2> vout2)
+{
+    vout1.RestartStrip();
+    vout2.RestartStrip();
+}
+
+[geometry shader fail]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout LineStream<gs_data> vout1, inout LineStream<gs_data> vout2)
+{
+    vout1.RestartStrip();
+    vout2.RestartStrip();
+}
+
+[geometry shader fail]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout TriangleStream<gs_data> vout1, inout TriangleStream<gs_data> vout2)
+{
+    vout1.RestartStrip();
+    vout2.RestartStrip();
+}
+
+[geometry shader fail]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout TriangleStream<gs_data> vout1, inout TriangleStream<gs_data> vout2)
+{
+    vout1.RestartStrip();
+    vout2.RestartStrip();
+}
+
+% An output stream is only validated when it is used.
+[geometry shader todo]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout TriangleStream<gs_data> vout2)
+{
+    vout1.RestartStrip();
+}
+
+[geometry shader fail(sm<5) todo(sm>=5)]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout TriangleStream<gs_data> vout2)
+{
+    vout2.RestartStrip();
+}
+
+% A maximum of 4 streams are allowed.
+[geometry shader fail(sm<5) todo(sm>=5)]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout PointStream<gs_data> vout2,
+        inout PointStream<gs_data> vout3, inout PointStream<gs_data> vout4, inout PointStream<gs_data> vout5)
+{
+    vout4.RestartStrip();
+}
+
+[geometry shader fail]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+};
+
+    [maxvertexcount(4)]
+void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout PointStream<gs_data> vout2,
+        inout PointStream<gs_data> vout3, inout PointStream<gs_data> vout4, inout PointStream<gs_data> vout5)
+{
+    vout5.RestartStrip();
+}
+
+% Max vertex count * output data component count must be less than or equal to 1024.
+[geometry shader todo]
+struct gs_data
+{
+    float2 x : X;
+};
+
+    [maxvertexcount(512)]    // 512 * 2 = 1024.
+void main(point gs_data vin[1], inout PointStream<gs_data> vout)
+{
+    vout.Append(vin[0]);
+}
+
+[geometry shader fail todo]
+struct gs_data
+{
+    float2 x : X;
+};
+
+    [maxvertexcount(513)]
+void main(point gs_data vin[1], inout PointStream<gs_data> vout)
+{
+    vout.Append(vin[0]);
+}
+
+% The component count of the output is used, not its allocated register size.
+[geometry shader todo]
+struct gs_data
+{
+    float2 x : X;  // Allocates to o0.xy
+    float3 y : Y;  // Allocates to o1.xyz
+    float z : Z;   // Allocates to o0.z
+};
+
+    [maxvertexcount(170)]    // 170 * 6 = 1020 < 1024.
+void main(point gs_data vin[1], inout PointStream<gs_data> vout)
+{
+    vout.Append(vin[0]);
+}
+
+% The total component count of all outputs are used. If the allocated registers overlap,
+% the largest allocation size is used for the calculation.
+[geometry shader fail(sm<5) todo(sm>=5)]
+struct gs_data
+{
+    float2 x : X;  // Allocates to o0.xy
+    float3 y : Y;  // Allocates to o1.xyz
+    float z : Z;   // Allocates to o0.z
+};
+
+struct gs_data2
+{
+    float2 x : X;  // Allocates to o0.xy
+    float4 y : Y;  // Allocates to o1.xyzw
+};
+
+    [maxvertexcount(146)]    // 146 * 7 = 1022 < 1024.
+void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout PointStream<gs_data2> vout2)
+{
+    vout1.Append(vin[0]);
+    vout2.Append((gs_data2)0);
+}
+
+[geometry shader fail todo(sm>=5)]
+struct gs_data
+{
+    float2 x : X;  // Allocates to o0.xy
+    float3 y : Y;  // Allocates to o1.xyz
+    float z : Z;   // Allocates to o0.z
+};
+
+struct gs_data2
+{
+    float2 x : X;  // Allocates to o0.xy
+    float4 y : Y;  // Allocates to o1.xyzw
+};
+
+    [maxvertexcount(147)]    // 147 * 7 = 1029 > 1024.
+void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout PointStream<gs_data2> vout2)
+{
+    vout1.Append(vin[0]);
+    vout2.Append((gs_data2)0);
+}
