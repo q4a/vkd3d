@@ -288,7 +288,7 @@ static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hls
 
 static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         struct hlsl_ir_var *var, struct hlsl_type *type, uint32_t modifiers, struct hlsl_semantic *semantic,
-        uint32_t index, bool output, bool force_align, const struct vkd3d_shader_location *loc)
+        uint32_t index, bool output, bool force_align, bool create, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_semantic new_semantic;
     struct hlsl_ir_var *ext_var;
@@ -310,6 +310,11 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
             VKD3D_ASSERT(hlsl_type_is_primitive_array(ext_var->data_type)
                     || ext_var->data_type->class <= HLSL_CLASS_VECTOR);
             VKD3D_ASSERT(hlsl_type_is_primitive_array(type) || type->class <= HLSL_CLASS_VECTOR);
+
+            vkd3d_free(new_name);
+
+            if (!create)
+                return ext_var;
 
             if (output)
             {
@@ -336,10 +341,11 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
                 }
             }
 
-            vkd3d_free(new_name);
             return ext_var;
         }
     }
+
+    VKD3D_ASSERT(create);
 
     if (!(hlsl_clone_semantic(ctx, &new_semantic, semantic)))
     {
@@ -429,7 +435,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
             prim_type_src->modifiers = var->data_type->modifiers & HLSL_PRIMITIVE_MODIFIERS_MASK;
 
             if (!(input = add_semantic_var(ctx, func, var, prim_type_src,
-                    modifiers, semantic, semantic_index + i, false, force_align, loc)))
+                    modifiers, semantic, semantic_index + i, false, force_align, true, loc)))
                 return;
             hlsl_init_simple_deref_from_var(&prim_deref, input);
 
@@ -442,7 +448,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         else
         {
             if (!(input = add_semantic_var(ctx, func, var, vector_type_src,
-                    modifiers, semantic, semantic_index + i, false, force_align, loc)))
+                    modifiers, semantic, semantic_index + i, false, force_align, true, loc)))
                 return;
 
             if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
@@ -551,8 +557,8 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
-         struct hlsl_ir_function_decl *func, struct hlsl_ir_load *rhs, uint32_t modifiers,
-        struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
+        struct hlsl_ir_function_decl *func, struct hlsl_ir_load *rhs, uint32_t modifiers,
+        struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align, bool create)
 {
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
     struct vkd3d_shader_location *loc = &rhs->node.loc;
@@ -582,7 +588,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *load;
 
         if (!(output = add_semantic_var(ctx, func, var, vector_type,
-                modifiers, semantic, semantic_index + i, true, force_align, loc)))
+                modifiers, semantic, semantic_index + i, true, force_align, create, loc)))
             return;
 
         if (type->class == HLSL_CLASS_MATRIX)
@@ -602,29 +608,28 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
 }
 
 static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block,
-        struct hlsl_ir_function_decl *func, struct hlsl_ir_load *rhs, uint32_t modifiers,
-        struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
+        struct hlsl_ir_function_decl *func, const struct hlsl_type *type, struct hlsl_ir_load *rhs, uint32_t modifiers,
+        struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align, bool create)
 {
     struct vkd3d_shader_location *loc = &rhs->node.loc;
-    struct hlsl_type *type = rhs->node.data_type;
     struct hlsl_ir_var *var = rhs->src.var;
     struct hlsl_ir_node *c;
     unsigned int i;
 
     if (type->class == HLSL_CLASS_ARRAY || type->class == HLSL_CLASS_STRUCT)
     {
-        struct hlsl_ir_load *element_load;
-        struct hlsl_struct_field *field;
-        uint32_t elem_semantic_index;
-
         for (i = 0; i < hlsl_type_element_count(type); ++i)
         {
-            uint32_t element_modifiers;
+            uint32_t element_modifiers, elem_semantic_index;
+            const struct hlsl_type *element_type;
+            struct hlsl_ir_load *element_load;
+            struct hlsl_struct_field *field;
 
             if (type->class == HLSL_CLASS_ARRAY)
             {
                 elem_semantic_index = semantic_index
                         + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
+                element_type = type->e.array.type;
                 element_modifiers = modifiers;
                 force_align = true;
             }
@@ -637,6 +642,7 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
                 semantic = &field->semantic;
                 elem_semantic_index = semantic->index;
                 loc = &field->loc;
+                element_type = field->type;
                 element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
                 force_align = (i == 0);
             }
@@ -647,13 +653,13 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
                 return;
             hlsl_block_add_instr(block, &element_load->node);
 
-            append_output_copy_recurse(ctx, block, func, element_load, element_modifiers,
-                    semantic, elem_semantic_index, force_align);
+            append_output_copy_recurse(ctx, block, func, element_type, element_load, element_modifiers, semantic,
+                    elem_semantic_index, force_align, create);
         }
     }
     else
     {
-        append_output_copy(ctx, block, func, rhs, modifiers, semantic, semantic_index, force_align);
+        append_output_copy(ctx, block, func, rhs, modifiers, semantic, semantic_index, force_align, create);
     }
 }
 
@@ -669,8 +675,8 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
         return;
     hlsl_block_add_instr(&func->body, &load->node);
 
-    append_output_copy_recurse(ctx, &func->body, func, load, var->storage_modifiers,
-            &var->semantic, var->semantic.index, false);
+    append_output_copy_recurse(ctx, &func->body, func, var->data_type, load, var->storage_modifiers,
+            &var->semantic, var->semantic.index, false, true);
 }
 
 bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
@@ -3349,6 +3355,59 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     list_remove(&store->node.entry);
     hlsl_free_instr(&store->node);
     return true;
+}
+
+struct stream_append_ctx
+{
+    struct hlsl_ir_function_decl *func;
+    bool created;
+};
+
+static bool lower_stream_appends(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct stream_append_ctx *append_ctx = context;
+    struct hlsl_ir_resource_store *store;
+    const struct hlsl_ir_node *rhs;
+    const struct hlsl_type *type;
+    struct hlsl_ir_var *var;
+    struct hlsl_block block;
+
+    if (instr->type != HLSL_IR_RESOURCE_STORE)
+        return false;
+
+    store = hlsl_ir_resource_store(instr);
+    if (store->store_type != HLSL_RESOURCE_STREAM_APPEND)
+        return false;
+
+    rhs = store->value.node;
+    var = store->resource.var;
+    type = hlsl_get_stream_output_type(var->data_type);
+
+    if (rhs->type != HLSL_IR_LOAD)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Stream append rhs is not HLSL_IR_LOAD. Broadcast may be missing.");
+        return false;
+    }
+
+    VKD3D_ASSERT(var->regs[HLSL_REGSET_STREAM_OUTPUTS].allocated);
+
+    if (var->regs[HLSL_REGSET_STREAM_OUTPUTS].index)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Append to an output stream with a nonzero stream index.");
+        return false;
+    }
+
+    hlsl_block_init(&block);
+
+    append_output_copy_recurse(ctx, &block, append_ctx->func, type->e.so.type, hlsl_ir_load(rhs), var->storage_modifiers,
+            &var->semantic, var->semantic.index, false, !append_ctx->created);
+    append_ctx->created = true;
+
+    list_move_before(&instr->entry, &block.instrs);
+    hlsl_src_remove(&store->value);
+
+    return true;
+
 }
 
 static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -13268,6 +13327,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     struct hlsl_block static_initializers, global_uniforms;
     struct hlsl_block *const body = &entry_func->body;
     struct recursive_call_ctx recursive_call_ctx;
+    struct stream_append_ctx stream_append_ctx;
     struct hlsl_ir_var *var;
     unsigned int i;
     bool progress;
@@ -13493,6 +13553,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     {
         allocate_stream_outputs(ctx);
         validate_and_record_stream_outputs(ctx);
+
+        memset(&stream_append_ctx, 0, sizeof(stream_append_ctx));
+        stream_append_ctx.func = entry_func;
+        hlsl_transform_ir(ctx, lower_stream_appends, body, &stream_append_ctx);
     }
 
     if (profile->major_version < 4)
