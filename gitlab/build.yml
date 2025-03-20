@@ -140,7 +140,6 @@ build-mac:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
   image: winehq-sonoma-pristine
-  allow_failure: true
   interruptible: true
   needs:
     - job: image-mac
@@ -159,7 +158,8 @@ build-mac:
     - mkdir artifacts
     - export PATH="/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/flex/bin:$PATH"
     - export VK_DRIVER_FILES="$PWD/image/moltenvk/MoltenVK_icd.json"
-    - export SONAME_LIBDXCOMPILER="$PWD/image/dxc/libdxcompiler.dylib"
+    # Currently disabled because it has too many failures
+    #- export SONAME_LIBDXCOMPILER="$PWD/image/dxc/libdxcompiler.dylib"
     - system_profiler SPSoftwareDataType SPHardwareDataType > artifacts/systeminfo.txt
     - vulkaninfo > artifacts/vulkaninfo.txt
     - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-mac
