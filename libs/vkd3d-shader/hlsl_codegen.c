@@ -6443,6 +6443,8 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
     bool is_pixel_shader = ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL;
     struct hlsl_ir_var *var;
 
+    in_prim_allocator.prioritize_smaller_writemasks = true;
+    patch_constant_out_patch_allocator.prioritize_smaller_writemasks = true;
     input_allocator.prioritize_smaller_writemasks = true;
     output_allocator.prioritize_smaller_writemasks = true;
 
