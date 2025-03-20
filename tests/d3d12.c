@@ -7795,7 +7795,7 @@ static void test_draw_uav_only(void)
 
     transition_resource_state(command_list, resource,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    bug_if(is_radv_device(context.device))
+    bug_if(is_radv_device(context.device) || is_macos_lt(15, 0, 0))
     check_sub_resource_uint(resource, 0, queue, command_list, 500, 0);
 
     ID3D12DescriptorHeap_Release(cpu_descriptor_heap);
@@ -24071,6 +24071,7 @@ static void test_decrement_uav_counter(void)
         ID3D12GraphicsCommandList_Dispatch(command_list, tests[i].decrement_count, 1, 1);
 
         counter = read_uav_counter(&context, counter_buffer, 0);
+        bug_if(is_macos_lt(15, 0, 0))
         ok(counter == tests[i].expected_value, "Got %u, expected %u.\n",
                 counter, tests[i].expected_value);
 
@@ -24448,8 +24449,8 @@ static void test_atomic_instructions(void)
             unsigned int expected = test->expected_result[j];
             bool is_bug;
 
-            is_bug = test->i.x < 0
-                    && (!strcmp(instructions[j], "atomic_imax") || !strcmp(instructions[j], "atomic_imin"));
+            is_bug = is_macos_lt(15, 0, 0) || (test->i.x < 0
+                    && (!strcmp(instructions[j], "atomic_imax") || !strcmp(instructions[j], "atomic_imin")));
 
             /* Fixed at least on radv with mesa >= 21.3.7. */
             bug_if(is_bug)
@@ -37764,6 +37765,7 @@ static void test_clock_calibration(void)
     hr = ID3D12CommandQueue_GetClockCalibration(context.queue, &gpu_times[1], &cpu_times[1]);
     ok(hr == S_OK, "Failed to retrieve calibrated timestamps, hr %#x.\n", hr);
 
+    bug_if(is_macos_lt(15, 0, 0))
     ok(gpu_times[1] > gpu_times[0], "Inconsistent GPU timestamps %"PRIu64" and %"PRIu64".\n",
             gpu_times[0], gpu_times[1]);
     ok(cpu_times[1] > cpu_times[0], "Inconsistent CPU timestamps %"PRIu64" and %"PRIu64".\n",

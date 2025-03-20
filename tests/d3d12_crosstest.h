@@ -56,6 +56,10 @@ typedef int HRESULT;
 #include <stddef.h>
 #include <time.h>
 
+#ifdef __APPLE__
+# include <sys/sysctl.h>
+#endif
+
 #ifdef VKD3D_CROSSTEST
 # include "vkd3d_dxgi1_4.h"
 #else
@@ -527,6 +531,11 @@ static inline bool is_mvk_device(ID3D12Device *device)
     return false;
 }
 
+static inline bool is_macos_lt(unsigned int major, unsigned int minor, unsigned int patch)
+{
+    return false;
+}
+
 static inline bool is_depth_clip_enable_supported(ID3D12Device *device)
 {
     return true;
@@ -845,6 +854,38 @@ static inline bool is_mvk_device(ID3D12Device *device)
     get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MOLTENVK;
 }
+
+#ifdef __APPLE__
+
+static inline bool is_macos_lt(unsigned int major, unsigned int minor, unsigned int patch)
+{
+    char str[256];
+    size_t size = sizeof(str);
+    unsigned int version[3];
+    int ret;
+
+    ret = sysctlbyname("kern.osproductversion", str, &size, NULL, 0);
+    assert(!ret);
+
+    ret = sscanf(str, "%u.%u.%u", &version[0], &version[1], &version[2]);
+    for (; ret < ARRAY_SIZE(version); ++ret)
+        version[ret] = 0;
+
+    if (version[0] != major)
+        return version[0] < major;
+    if (version[1] != minor)
+        return version[1] < minor;
+    return version[2] < patch;
+}
+
+#else
+
+static inline bool is_macos_lt(unsigned int major, unsigned int minor, unsigned int patch)
+{
+    return false;
+}
+
+#endif
 
 static inline bool is_depth_clip_enable_supported(ID3D12Device *device)
 {
