@@ -2184,6 +2184,9 @@ static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
         return false;
     VKD3D_ASSERT(value->component == 0);
 
+    /* A uniform object should have never been written to. */
+    VKD3D_ASSERT(!deref->var->is_uniform);
+
     /* Only HLSL_IR_LOAD can produce an object. */
     load = hlsl_ir_load(value->node);
 
