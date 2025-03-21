@@ -3261,6 +3261,8 @@ static int signature_element_pointer_compare(const void *x, const void *y)
     const struct signature_element *f = *(const struct signature_element **)y;
     int ret;
 
+    if ((ret = vkd3d_u32_compare(e->stream_index, f->stream_index)))
+        return ret;
     if ((ret = vkd3d_u32_compare(e->register_index, f->register_index)))
         return ret;
     return vkd3d_u32_compare(e->mask, f->mask);
@@ -3269,11 +3271,16 @@ static int signature_element_pointer_compare(const void *x, const void *y)
 static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_signature *signature, uint32_t tag)
 {
     bool has_minimum_precision = tpf->program->global_flags & VKD3DSGF_ENABLE_MINIMUM_PRECISION;
-    bool output = tag == TAG_OSGN || (tag == TAG_PCSG
-            && tpf->program->shader_version.type == VKD3D_SHADER_TYPE_HULL);
+    const struct vkd3d_shader_version *version = &tpf->program->shader_version;
     const struct signature_element **sorted_elements;
     struct vkd3d_bytecode_buffer buffer = {0};
+    bool has_stream_index, output;
     unsigned int i;
+
+    output = tag == TAG_OSGN || (tag == TAG_PCSG && version->type == VKD3D_SHADER_TYPE_HULL);
+    if (output && version->type == VKD3D_SHADER_TYPE_GEOMETRY && version->major >= 5)
+        tag = TAG_OSG5;
+    has_stream_index = tag == TAG_OSG5 || has_minimum_precision;
 
     put_u32(&buffer, signature->element_count);
     put_u32(&buffer, 8); /* unknown */
@@ -3297,8 +3304,8 @@ static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_si
         if (sysval >= VKD3D_SHADER_SV_TARGET)
             sysval = VKD3D_SHADER_SV_NONE;
 
-        if (has_minimum_precision)
-            put_u32(&buffer, 0); /* FIXME: stream index */
+        if (has_stream_index)
+            put_u32(&buffer, element->stream_index);
         put_u32(&buffer, 0); /* name */
         put_u32(&buffer, element->semantic_index);
         put_u32(&buffer, sysval);
@@ -3312,13 +3319,16 @@ static void tpf_write_signature(struct tpf_compiler *tpf, const struct shader_si
     for (i = 0; i < signature->element_count; ++i)
     {
         const struct signature_element *element = sorted_elements[i];
+        size_t name_index = 2 + i * 6;
         size_t string_offset;
 
-        string_offset = put_string(&buffer, element->semantic_name);
+        if (has_stream_index)
+            name_index += i + 1;
         if (has_minimum_precision)
-            set_u32(&buffer, (2 + i * 8 + 1) * sizeof(uint32_t), string_offset);
-        else
-            set_u32(&buffer, (2 + i * 6) * sizeof(uint32_t), string_offset);
+            name_index += i;
+
+        string_offset = put_string(&buffer, element->semantic_name);
+        set_u32(&buffer, name_index * sizeof(uint32_t), string_offset);
     }
 
     if (has_minimum_precision)

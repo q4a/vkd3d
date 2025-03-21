@@ -233,7 +233,7 @@ void main(InputPatch<gs_data, 3> data, InputPatch<gs_data2, 3> data2, InputPatch
 {
 }
 
-[geometry shader fail todo(sm>=5)]
+[geometry shader fail]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -254,7 +254,7 @@ void main(InputPatch<gs_data, 3> data, InputPatch<gs_data2, 4> data2, InputPatch
 {
 }
 
-[geometry shader fail todo(sm>=5)]
+[geometry shader fail]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -691,7 +691,7 @@ void main(point gs_data vin[1], inout PointStream<gs_data> vout)
 
 % The total component count of all outputs are used. If the allocated registers overlap,
 % the largest allocation size is used for the calculation.
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float2 x : X;  // Allocates to o0.xy
@@ -712,7 +712,7 @@ void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout PointStr
     vout2.Append((gs_data2)0);
 }
 
-[geometry shader fail todo(sm>=5)]
+[geometry shader fail]
 struct gs_data
 {
     float2 x : X;  // Allocates to o0.xy
