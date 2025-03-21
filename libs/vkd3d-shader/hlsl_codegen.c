@@ -12763,6 +12763,9 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         hlsl_transform_ir(ctx, lower_resource_load_bias, body, NULL);
     }
 
+    compute_liveness(ctx, entry_func);
+    transform_derefs(ctx, divert_written_uniform_derefs_to_temp, &entry_func->body);
+
     loop_unrolling_execute(ctx, body);
     hlsl_run_const_passes(ctx, body);
 
@@ -12772,9 +12775,6 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     lower_ir(ctx, lower_nonconstant_vector_derefs, body);
     lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
-
-    compute_liveness(ctx, entry_func);
-    transform_derefs(ctx, divert_written_uniform_derefs_to_temp, &entry_func->body);
 
     if (hlsl_version_lt(ctx, 4, 0))
         hlsl_transform_ir(ctx, lower_separate_samples, body, NULL);
