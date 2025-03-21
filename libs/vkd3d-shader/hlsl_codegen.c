@@ -6881,6 +6881,28 @@ static void allocate_objects(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     }
 }
 
+static void allocate_stream_outputs(struct hlsl_ctx *ctx)
+{
+    struct hlsl_ir_var *var;
+    uint32_t index = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->data_type->reg_size[HLSL_REGSET_STREAM_OUTPUTS])
+            continue;
+
+        /* We should have ensured that all stream output objects are single-element. */
+        VKD3D_ASSERT(var->data_type->reg_size[HLSL_REGSET_STREAM_OUTPUTS] == 1);
+
+        var->regs[HLSL_REGSET_STREAM_OUTPUTS].space = 0;
+        var->regs[HLSL_REGSET_STREAM_OUTPUTS].index = index;
+        var->regs[HLSL_REGSET_STREAM_OUTPUTS].id = index;
+        var->regs[HLSL_REGSET_STREAM_OUTPUTS].allocated = true;
+
+        ++index;
+    }
+}
+
 bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         unsigned int *start, unsigned int *count)
 {
@@ -13265,7 +13287,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 
             /* TODO: check that maxvertexcount * component_count(element_type) <= 1024. */
 
-            continue;
+            prepend_uniform_copy(ctx, body, var);
         }
         else
         {
@@ -13378,6 +13400,9 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         sort_synthetic_combined_samplers_first(ctx);
     else
         sort_synthetic_separated_samplers_first(ctx);
+
+    if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+        allocate_stream_outputs(ctx);
 
     if (profile->major_version < 4)
     {
