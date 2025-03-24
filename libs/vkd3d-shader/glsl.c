@@ -1296,7 +1296,7 @@ static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, st
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                         "Internal compiler error: Unhandled SV_POSITION index %u.", idx);
             if (version->type == VKD3D_SHADER_TYPE_PIXEL)
-                vkd3d_string_buffer_printf(buffer, "gl_FragCoord");
+                vkd3d_string_buffer_printf(buffer, "vec4(gl_FragCoord.xyz, 1.0 / gl_FragCoord.w)");
             else
                 vkd3d_string_buffer_printf(buffer, "gl_Position");
             break;

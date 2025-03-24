@@ -200,6 +200,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/object-parameters.shader_test \
 	tests/hlsl/object-references.shader_test \
 	tests/hlsl/patch-syntax.shader_test \
+	tests/hlsl/pixel-position.shader_test \
 	tests/hlsl/point-sprite.shader_test \
 	tests/hlsl/pointer-cast.shader_test \
 	tests/hlsl/pow.shader_test \
