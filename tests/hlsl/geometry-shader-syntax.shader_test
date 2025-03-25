@@ -662,7 +662,7 @@ void main(point gs_data vin[1], inout PointStream<gs_data> vout)
     vout.Append(vin[0]);
 }
 
-[geometry shader fail todo]
+[geometry shader fail]
 struct gs_data
 {
     float2 x : X;

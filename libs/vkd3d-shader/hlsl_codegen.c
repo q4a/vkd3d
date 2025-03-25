@@ -6515,7 +6515,8 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     }
 }
 
-static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        uint32_t *output_reg_count)
 {
     struct register_allocator in_prim_allocator = {0}, patch_constant_out_patch_allocator = {0};
     struct register_allocator input_allocator = {0}, output_allocator = {0};
@@ -6551,6 +6552,8 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
         if (var->is_output_semantic)
             allocate_semantic_register(ctx, var, &output_allocator, true, !is_pixel_shader);
     }
+
+    *output_reg_count = output_allocator.reg_count;
 
     vkd3d_free(in_prim_allocator.allocations);
     vkd3d_free(patch_constant_out_patch_allocator.allocations);
@@ -7713,6 +7716,42 @@ static void validate_and_record_stream_outputs(struct hlsl_ctx *ctx)
     }
 
     /* TODO: check that maxvertexcount * outputdatasize <= 1024. */
+}
+
+static void validate_max_output_size(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        uint32_t output_reg_count)
+{
+    unsigned int max_output_size, comp_count = 0;
+    unsigned int *reg_comp_count;
+    struct hlsl_ir_var *var;
+    uint32_t id;
+
+    if (ctx->result)
+        return;
+
+    if (!(reg_comp_count = hlsl_calloc(ctx, output_reg_count, sizeof(*reg_comp_count))))
+        return;
+
+    LIST_FOR_EACH_ENTRY(var, &entry_func->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->is_output_semantic)
+            continue;
+
+        VKD3D_ASSERT(var->regs[HLSL_REGSET_NUMERIC].allocated);
+        id = var->regs[HLSL_REGSET_NUMERIC].id;
+        reg_comp_count[id] = max(reg_comp_count[id], vkd3d_log2i(var->regs[HLSL_REGSET_NUMERIC].writemask) + 1);
+    }
+
+    for (id = 0; id < output_reg_count; ++id)
+        comp_count += reg_comp_count[id];
+
+    max_output_size = ctx->max_vertex_count * comp_count;
+    if (max_output_size > 1024)
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MAX_VERTEX_COUNT,
+                "Max vertex count (%u) * output data component count (%u) = %u, which is greater than 1024.",
+                ctx->max_vertex_count, comp_count, max_output_size);
+
+    vkd3d_free(reg_comp_count);
 }
 
 static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *body)
@@ -13328,6 +13367,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     struct hlsl_block *const body = &entry_func->body;
     struct recursive_call_ctx recursive_call_ctx;
     struct stream_append_ctx stream_append_ctx;
+    uint32_t output_reg_count;
     struct hlsl_ir_var *var;
     unsigned int i;
     bool progress;
@@ -13615,7 +13655,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 
     allocate_register_reservations(ctx, &ctx->extern_vars);
     allocate_register_reservations(ctx, &entry_func->extern_vars);
-    allocate_semantic_registers(ctx, entry_func);
+    allocate_semantic_registers(ctx, entry_func, &output_reg_count);
+
+    if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+        validate_max_output_size(ctx, entry_func, output_reg_count);
 }
 
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
