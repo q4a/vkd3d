@@ -4957,6 +4957,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
 
     if (target_type == VKD3D_SHADER_TARGET_SPIRV_BINARY
             || target_type == VKD3D_SHADER_TARGET_SPIRV_TEXT
+            || target_type == VKD3D_SHADER_TARGET_GLSL
             || target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
         uint64_t config_flags = vkd3d_shader_init_config_flags();

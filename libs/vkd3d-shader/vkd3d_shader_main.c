@@ -2050,6 +2050,9 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
 #if defined(HAVE_SPIRV_TOOLS) || defined(VKD3D_SHADER_UNSUPPORTED_SPIRV_PARSER)
         VKD3D_SHADER_TARGET_SPIRV_TEXT,
 #endif
+#ifdef VKD3D_SHADER_UNSUPPORTED_GLSL
+        VKD3D_SHADER_TARGET_GLSL,
+#endif
         VKD3D_SHADER_TARGET_D3D_ASM,
         VKD3D_SHADER_TARGET_D3D_BYTECODE,
         VKD3D_SHADER_TARGET_DXBC_TPF,
