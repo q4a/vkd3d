@@ -2799,6 +2799,80 @@ static void test_signature_reflection(void)
         {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
     };
 
+    static const char hs5_source[] =
+        "struct data\n"
+        "{\n"
+        "    uint a : ALPHA;\n"
+        "    float b : BRAVO;\n"
+        "    uint c : SV_RenderTargetArrayIndex; // Locks 'd', 'e', 'f', and 'h' away from the register.\n"
+        "    uint d : DELTA;\n"
+        "    uint e : ECHO;\n"
+        "    uint f : FOXTROT;\n"
+        "    uint g : SV_ViewPortArrayIndex; // Shares register with 'c'.\n"
+        "    uint h : HOTEL;\n"
+        "};\n"
+        "\n"
+        "// Special allocation rules are ignored for patch constant outputs.\n"
+        "struct patch_constant_data : data\n"
+        "{\n"
+        "    float edges[2] : SV_TessFactor;\n"
+        "    uint i : INDIA;\n"
+        "};\n"
+        "\n"
+        "patch_constant_data patch_constant()\n"
+        "{\n"
+        "    return (patch_constant_data)0;\n"
+        "}\n"
+        "\n"
+        "[domain(\"isoline\")]\n"
+        "[outputcontrolpoints(2)]\n"
+        "[partitioning(\"integer\")]\n"
+        "[outputtopology(\"point\")]\n"
+        "[patchconstantfunc(\"patch_constant\")]\n"
+        "data main(InputPatch<data, 2> input)\n"
+        "{\n"
+        "    return (data)0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs5_inputs[] =
+    {
+        {"ALPHA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1},
+        {"SV_RenderTargetArrayIndex", 0, 0, D3D_NAME_RENDER_TARGET_ARRAY_INDEX,     D3D_REGISTER_COMPONENT_UINT32,  0x2},
+        {"SV_ViewPortArrayIndex",     0, 0, D3D_NAME_VIEWPORT_ARRAY_INDEX,          D3D_REGISTER_COMPONENT_UINT32,  0x4},
+        {"BRAVO",                     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"DELTA",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1},
+        {"ECHO",                      0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2},
+        {"FOXTROT",                   0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4},
+        {"HOTEL",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs5_outputs[] =
+    {
+        {"ALPHA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"SV_RenderTargetArrayIndex", 0, 0, D3D_NAME_RENDER_TARGET_ARRAY_INDEX,     D3D_REGISTER_COMPONENT_UINT32,  0x2, 0xd},
+        {"SV_ViewPortArrayIndex",     0, 0, D3D_NAME_VIEWPORT_ARRAY_INDEX,          D3D_REGISTER_COMPONENT_UINT32,  0x4, 0xb},
+        {"BRAVO",                     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"DELTA",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"ECHO",                      0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2, 0xd},
+        {"FOXTROT",                   0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4, 0xb},
+        {"HOTEL",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8, 0x7},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC hs5_patch_constants[] =
+    {
+        {"ALPHA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"BRAVO",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_FLOAT32, 0x2, 0xd},
+        {"SV_RenderTargetArrayIndex", 0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4, 0xb},
+        {"DELTA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8, 0x7},
+        {"ECHO",                      0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"FOXTROT",                   0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2, 0xd},
+        {"SV_ViewPortArrayIndex",     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4, 0xb},
+        {"HOTEL",                     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8, 0x7},
+        {"SV_TessFactor",             0, 2, D3D_NAME_FINAL_LINE_DENSITY_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"INDIA",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2, 0xd},
+        {"SV_TessFactor",             1, 3, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+    };
+
     static const char ds1_source[] =
         "struct hs_data\n"
         "{\n"
@@ -2932,6 +3006,71 @@ static void test_signature_reflection(void)
         {"sv_tessfactor",       1, 1, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
     };
 
+    static const char ds5_source[] =
+        "struct data\n"
+        "{\n"
+        "    uint a : ALPHA;\n"
+        "    float b : BRAVO;\n"
+        "    uint c : SV_RenderTargetArrayIndex; // Locks 'd', 'e', 'f', and 'h' away from the register.\n"
+        "    uint d : DELTA;\n"
+        "    uint e : ECHO;\n"
+        "    uint f : FOXTROT;\n"
+        "    uint g : SV_ViewPortArrayIndex; // Shares register with 'c'.\n"
+        "    uint h : HOTEL;\n"
+        "};\n"
+        "\n"
+        "// Special allocation rules are ignored for domain shader patch constant inputs.\n"
+        "struct ds_input : data\n"
+        "{\n"
+        "    float edges[2] : SV_TessFactor;\n"
+        "    uint i : INDIA;\n"
+        "};\n"
+        "\n"
+        "[domain(\"isoline\")]\n"
+        "data main(struct ds_input s, OutputPatch<data, 2> patch)\n"
+        "{\n"
+        "    return (data)0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds5_inputs[] =
+    {
+        {"ALPHA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1},
+        {"SV_RenderTargetArrayIndex", 0, 0, D3D_NAME_RENDER_TARGET_ARRAY_INDEX,     D3D_REGISTER_COMPONENT_UINT32,  0x2},
+        {"SV_ViewPortArrayIndex",     0, 0, D3D_NAME_VIEWPORT_ARRAY_INDEX,          D3D_REGISTER_COMPONENT_UINT32,  0x4},
+        {"BRAVO",                     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"DELTA",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1},
+        {"ECHO",                      0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2},
+        {"FOXTROT",                   0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4},
+        {"HOTEL",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds5_outputs[] =
+    {
+        {"ALPHA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"SV_RenderTargetArrayIndex", 0, 0, D3D_NAME_RENDER_TARGET_ARRAY_INDEX,     D3D_REGISTER_COMPONENT_UINT32,  0x2, 0xd},
+        {"SV_ViewPortArrayIndex",     0, 0, D3D_NAME_VIEWPORT_ARRAY_INDEX,          D3D_REGISTER_COMPONENT_UINT32,  0x4, 0xb},
+        {"BRAVO",                     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+        {"DELTA",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"ECHO",                      0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2, 0xd},
+        {"FOXTROT",                   0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4, 0xb},
+        {"HOTEL",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8, 0x7},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ds5_patch_constants[] =
+    {
+        {"ALPHA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1},
+        {"BRAVO",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_FLOAT32, 0x2},
+        {"SV_RenderTargetArrayIndex", 0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4},
+        {"DELTA",                     0, 0, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8},
+        {"ECHO",                      0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x1},
+        {"FOXTROT",                   0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2},
+        {"SV_ViewPortArrayIndex",     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x4},
+        {"HOTEL",                     0, 1, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x8},
+        {"SV_TessFactor",             0, 2, D3D_NAME_FINAL_LINE_DENSITY_TESSFACTOR, D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+        {"INDIA",                     0, 2, D3D_NAME_UNDEFINED,                     D3D_REGISTER_COMPONENT_UINT32,  0x2},
+        {"SV_TessFactor",             1, 3, D3D_NAME_FINAL_LINE_DETAIL_TESSFACTOR,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1},
+    };
+
     static const char gs1_source[] =
         "struct gs_data\n"
         "{\n"
@@ -2999,10 +3138,12 @@ static void test_signature_reflection(void)
         {hs2_source,  "hs_5_0", false, NULL, 0, hs2_outputs, ARRAY_SIZE(hs2_outputs), hs2_patch_constants, ARRAY_SIZE(hs2_patch_constants)},
         {hs3_source,  "hs_5_0", false, NULL, 0, hs3_outputs, ARRAY_SIZE(hs3_outputs), hs3_patch_constants, ARRAY_SIZE(hs3_patch_constants)},
         {hs4_source,  "hs_5_0", false, hs4_inputs, ARRAY_SIZE(hs4_inputs), hs4_outputs, ARRAY_SIZE(hs4_outputs), hs4_patch_constants, ARRAY_SIZE(hs4_patch_constants)},
+        {hs5_source,  "hs_5_0", false, hs5_inputs, ARRAY_SIZE(hs5_inputs), hs5_outputs, ARRAY_SIZE(hs5_outputs), hs5_patch_constants, ARRAY_SIZE(hs5_patch_constants), true},
         {ds1_source,  "ds_5_0", false, NULL, 0, ds1_outputs, ARRAY_SIZE(ds1_outputs), ds1_patch_constants, ARRAY_SIZE(ds1_patch_constants)},
         {ds2_source,  "ds_5_0", false, NULL, 0, ds2_outputs, ARRAY_SIZE(ds2_outputs), ds2_patch_constants, ARRAY_SIZE(ds2_patch_constants)},
         {ds3_source,  "ds_5_0", false, NULL, 0, ds3_outputs, ARRAY_SIZE(ds3_outputs), ds3_patch_constants, ARRAY_SIZE(ds3_patch_constants)},
         {ds4_source,  "ds_5_0", false, ds4_inputs, ARRAY_SIZE(ds4_inputs), ds4_outputs, ARRAY_SIZE(ds4_outputs), ds4_patch_constants, ARRAY_SIZE(ds4_patch_constants)},
+        {ds5_source,  "ds_5_0", false, ds5_inputs, ARRAY_SIZE(ds5_inputs), ds5_outputs, ARRAY_SIZE(ds5_outputs), ds5_patch_constants, ARRAY_SIZE(ds5_patch_constants), true},
         {gs1_source,  "gs_4_0", false, gs1_inputs, ARRAY_SIZE(gs1_inputs)},
     };
 
