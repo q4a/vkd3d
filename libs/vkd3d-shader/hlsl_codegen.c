@@ -9770,7 +9770,7 @@ static void sm4_generate_vsir_instr_dcl_semantic(struct hlsl_ctx *ctx, struct vs
     else
     {
         if (semantic == VKD3D_SHADER_SV_NONE || version->type == VKD3D_SHADER_TYPE_PIXEL
-                || version->type == VKD3D_SHADER_TYPE_HULL)
+                || (version->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func))
             opcode = VKD3DSIH_DCL_OUTPUT;
         else
             opcode = VKD3DSIH_DCL_OUTPUT_SIV;
