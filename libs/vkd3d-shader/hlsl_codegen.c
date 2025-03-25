@@ -6470,6 +6470,8 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
             allocate_semantic_register(ctx, var, &output_allocator, true, !is_pixel_shader);
     }
 
+    vkd3d_free(in_prim_allocator.allocations);
+    vkd3d_free(patch_constant_out_patch_allocator.allocations);
     vkd3d_free(input_allocator.allocations);
     vkd3d_free(output_allocator.allocations);
 }
