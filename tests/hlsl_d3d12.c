@@ -3138,12 +3138,12 @@ static void test_signature_reflection(void)
         {hs2_source,  "hs_5_0", false, NULL, 0, hs2_outputs, ARRAY_SIZE(hs2_outputs), hs2_patch_constants, ARRAY_SIZE(hs2_patch_constants)},
         {hs3_source,  "hs_5_0", false, NULL, 0, hs3_outputs, ARRAY_SIZE(hs3_outputs), hs3_patch_constants, ARRAY_SIZE(hs3_patch_constants)},
         {hs4_source,  "hs_5_0", false, hs4_inputs, ARRAY_SIZE(hs4_inputs), hs4_outputs, ARRAY_SIZE(hs4_outputs), hs4_patch_constants, ARRAY_SIZE(hs4_patch_constants)},
-        {hs5_source,  "hs_5_0", false, hs5_inputs, ARRAY_SIZE(hs5_inputs), hs5_outputs, ARRAY_SIZE(hs5_outputs), hs5_patch_constants, ARRAY_SIZE(hs5_patch_constants), true},
+        {hs5_source,  "hs_5_0", false, hs5_inputs, ARRAY_SIZE(hs5_inputs), hs5_outputs, ARRAY_SIZE(hs5_outputs), hs5_patch_constants, ARRAY_SIZE(hs5_patch_constants)},
         {ds1_source,  "ds_5_0", false, NULL, 0, ds1_outputs, ARRAY_SIZE(ds1_outputs), ds1_patch_constants, ARRAY_SIZE(ds1_patch_constants)},
         {ds2_source,  "ds_5_0", false, NULL, 0, ds2_outputs, ARRAY_SIZE(ds2_outputs), ds2_patch_constants, ARRAY_SIZE(ds2_patch_constants)},
         {ds3_source,  "ds_5_0", false, NULL, 0, ds3_outputs, ARRAY_SIZE(ds3_outputs), ds3_patch_constants, ARRAY_SIZE(ds3_patch_constants)},
         {ds4_source,  "ds_5_0", false, ds4_inputs, ARRAY_SIZE(ds4_inputs), ds4_outputs, ARRAY_SIZE(ds4_outputs), ds4_patch_constants, ARRAY_SIZE(ds4_patch_constants)},
-        {ds5_source,  "ds_5_0", false, ds5_inputs, ARRAY_SIZE(ds5_inputs), ds5_outputs, ARRAY_SIZE(ds5_outputs), ds5_patch_constants, ARRAY_SIZE(ds5_patch_constants), true},
+        {ds5_source,  "ds_5_0", false, ds5_inputs, ARRAY_SIZE(ds5_inputs), ds5_outputs, ARRAY_SIZE(ds5_outputs), ds5_patch_constants, ARRAY_SIZE(ds5_patch_constants)},
         {gs1_source,  "gs_4_0", false, gs1_inputs, ARRAY_SIZE(gs1_inputs)},
     };
 

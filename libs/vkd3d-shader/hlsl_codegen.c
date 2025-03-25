@@ -6407,7 +6407,9 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
                 || semantic == VKD3D_SHADER_SV_PRIMITIVE_ID)
             vip_allocation = true;
 
-        if (semantic == VKD3D_SHADER_SV_IS_FRONT_FACE || semantic == VKD3D_SHADER_SV_SAMPLE_INDEX)
+        if (semantic == VKD3D_SHADER_SV_IS_FRONT_FACE || semantic == VKD3D_SHADER_SV_SAMPLE_INDEX
+                || (version.type == VKD3D_SHADER_TYPE_DOMAIN && !output && !is_primitive)
+                || (ctx->is_patch_constant_func && output))
             special_interpolation = true;
     }
 
