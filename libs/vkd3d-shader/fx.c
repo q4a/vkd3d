@@ -2366,6 +2366,7 @@ static inline bool is_object_fx_type(enum state_property_component_type type)
         case FX_BLEND:
         case FX_VERTEXSHADER:
         case FX_PIXELSHADER:
+        case FX_GEOMETRYSHADER:
             return true;
         default:
             return false;
