@@ -8857,6 +8857,21 @@ static void vsir_validate_signature(struct validation_context *ctx, const struct
     }
 }
 
+static void vsir_validate_descriptors(struct validation_context *ctx)
+{
+    const struct vkd3d_shader_scan_descriptor_info1 *descriptors = &ctx->program->descriptors;
+    unsigned int i;
+
+    for (i = 0; i < descriptors->descriptor_count; ++i)
+    {
+        const struct vkd3d_shader_descriptor_info1 *descriptor = &descriptors->descriptors[i];
+
+        if (descriptor->type >= VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DESCRIPTOR_TYPE,
+                    "Descriptor %u has invalid type %#x.", i, descriptor->type);
+    }
+}
+
 static const char *name_from_cf_type(enum vsir_control_flow_type type)
 {
     switch (type)
@@ -9822,6 +9837,8 @@ enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t c
                         "Invalid input/output declaration %u.", i);
         }
     }
+
+    vsir_validate_descriptors(&ctx);
 
     if (!(ctx.temps = vkd3d_calloc(ctx.program->temp_count, sizeof(*ctx.temps))))
         goto fail;
