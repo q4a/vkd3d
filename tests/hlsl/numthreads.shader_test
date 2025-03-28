@@ -177,19 +177,19 @@ size (2d, 2, 2)
 
 % The product must not exceed 1024, and the third dimension cannot exceed 64.
 
-[compute shader fail todo]
+[compute shader fail]
     [numthreads(1025,1,1)]
     void main() {}
 
-[compute shader fail todo]
+[compute shader fail]
     [numthreads(1,1025,1)]
     void main() {}
 
-[compute shader fail todo]
+[compute shader fail]
     [numthreads(1,1,65)]
     void main() {}
 
-[compute shader fail todo]
+[compute shader fail]
     [numthreads(41,25,25)]
     void main() {}
 
