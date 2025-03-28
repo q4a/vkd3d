@@ -531,6 +531,11 @@ static inline bool is_mvk_device(ID3D12Device *device)
     return false;
 }
 
+static inline bool is_mvk_device_lt(ID3D12Device *device, uint32_t major, uint32_t minor, uint32_t patch)
+{
+    return false;
+}
+
 static inline bool is_macos_lt(unsigned int major, unsigned int minor, unsigned int patch)
 {
     return false;
@@ -853,6 +858,22 @@ static inline bool is_mvk_device(ID3D12Device *device)
 
     get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MOLTENVK;
+}
+
+/* MoltenVK uses a different pattern than standard Vulkan. */
+#define MVK_MAKE_API_VERSION(major, minor, patch) \
+    ((((uint32_t)(major)) * 10000) + (((uint32_t)(minor)) * 100) + (uint32_t)(patch))
+
+static inline bool is_mvk_device_lt(ID3D12Device *device, uint32_t major, uint32_t minor, uint32_t patch)
+{
+    VkPhysicalDeviceDriverPropertiesKHR driver_properties;
+    VkPhysicalDeviceProperties device_properties;
+
+    get_driver_properties(device, &device_properties, &driver_properties);
+    if (driver_properties.driverID != VK_DRIVER_ID_MOLTENVK)
+        return false;
+
+    return device_properties.driverVersion < MVK_MAKE_API_VERSION(major, minor, patch);
 }
 
 #ifdef __APPLE__

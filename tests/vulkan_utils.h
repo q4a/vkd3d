@@ -421,7 +421,7 @@ static inline void vulkan_test_context_destroy(const struct vulkan_test_context 
     VK_CALL(vkDestroyInstance(context->instance, NULL));
 }
 
-/* This doesn't work for NVIDIA, because they use a different bit pattern. */
+/* This doesn't work for NVIDIA or MoltenVK, because they use a different bit pattern. */
 static inline bool is_vulkan_driver_version_ge(const VkPhysicalDeviceProperties *device_properties,
         const VkPhysicalDeviceDriverPropertiesKHR *driver_properties,
         uint32_t major, uint32_t minor, uint32_t patch)
