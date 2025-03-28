@@ -1111,7 +1111,7 @@ static void vkd3d_shader_scan_sampler_declaration(struct vkd3d_shader_scan_conte
     struct vkd3d_shader_descriptor_info1 *d;
 
     if (!(d = vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER,
-            &sampler->src.reg, &sampler->range, VKD3D_SHADER_RESOURCE_NONE, VKD3D_DATA_UINT)))
+            &sampler->src.reg, &sampler->range, VKD3D_SHADER_RESOURCE_NONE, VKD3D_DATA_UNUSED)))
         return;
 
     if (instruction->flags & VKD3DSI_SAMPLER_COMPARISON_MODE)
@@ -1122,7 +1122,7 @@ static void vkd3d_shader_scan_combined_sampler_declaration(
         struct vkd3d_shader_scan_context *context, const struct vkd3d_shader_semantic *semantic)
 {
     vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, &semantic->resource.reg.reg,
-            &semantic->resource.range, VKD3D_SHADER_RESOURCE_NONE, VKD3D_DATA_UINT);
+            &semantic->resource.range, VKD3D_SHADER_RESOURCE_NONE, VKD3D_DATA_UNUSED);
     vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, &semantic->resource.reg.reg,
             &semantic->resource.range, semantic->resource_type, VKD3D_DATA_FLOAT);
 }
@@ -1520,6 +1520,8 @@ static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_t
             return VKD3D_SHADER_RESOURCE_DATA_DOUBLE;
         case VKD3D_DATA_CONTINUED:
             return VKD3D_SHADER_RESOURCE_DATA_CONTINUED;
+        case VKD3D_DATA_UNUSED:
+            return VKD3D_SHADER_RESOURCE_DATA_NONE;
         default:
             ERR("Invalid resource data type %#x.\n", data_type);
             return VKD3D_SHADER_RESOURCE_DATA_FLOAT;
@@ -1546,6 +1548,10 @@ static enum vkd3d_result convert_descriptor_info(struct vkd3d_shader_scan_contex
         dst->resource_data_type = vkd3d_resource_data_type_from_data_type(src->resource_data_type);
         dst->flags = src->flags;
         dst->count = src->count;
+
+        if (context->api_version <= VKD3D_SHADER_API_VERSION_1_15
+                && dst->type == VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER)
+            dst->resource_data_type = VKD3D_SHADER_RESOURCE_DATA_UINT;
 
         if (context->api_version < VKD3D_SHADER_API_VERSION_1_3
                 && dst->resource_data_type >= VKD3D_SHADER_RESOURCE_DATA_MIXED)
