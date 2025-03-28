@@ -3189,6 +3189,11 @@ static bool elementwise_intrinsic_uint_convert_args(struct hlsl_ctx *ctx,
 static bool intrinsic_abs(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
+    const struct hlsl_type *type = params->args[0]->data_type;
+
+    if (!hlsl_type_is_floating_point(type) && !hlsl_type_is_signed_integer(type))
+        return true;
+
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, params->args[0], loc);
 }
 

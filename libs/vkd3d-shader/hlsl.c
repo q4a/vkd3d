@@ -372,6 +372,27 @@ bool hlsl_base_type_is_integer(enum hlsl_base_type type)
     vkd3d_unreachable();
 }
 
+bool hlsl_type_is_signed_integer(const struct hlsl_type *type)
+{
+    VKD3D_ASSERT(hlsl_is_numeric_type(type));
+
+    switch (type->e.numeric.type)
+    {
+        case HLSL_TYPE_INT:
+            return true;
+
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_DOUBLE:
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_MIN16UINT:
+        case HLSL_TYPE_UINT:
+            return false;
+    }
+
+    vkd3d_unreachable();
+}
+
 bool hlsl_type_is_integer(const struct hlsl_type *type)
 {
     VKD3D_ASSERT(hlsl_is_numeric_type(type));
