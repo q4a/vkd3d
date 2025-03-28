@@ -10479,7 +10479,7 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
     for (i = 0; i < descriptors->descriptor_count; ++i)
     {
         const struct vkd3d_shader_descriptor_info1 *descriptor = &descriptors->descriptors[i];
-        uint32_t flags_mask = 0;
+        uint32_t flags_mask = 0, uav_flags_mask = 0;
 
         if (descriptor->type >= VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DESCRIPTOR_TYPE,
@@ -10520,6 +10520,9 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
                         | VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ
                         | VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS
                         | VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_RAW_BUFFER;
+                uav_flags_mask = VKD3DSUF_GLOBALLY_COHERENT
+                        | VKD3DSUF_RASTERISER_ORDERED_VIEW
+                        | VKD3DSUF_ORDER_PRESERVING_COUNTER;
                 break;
 
             case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
@@ -10537,6 +10540,11 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_FLAGS,
                     "Descriptor %u of type %#x has invalid flags %#x.",
                     i, descriptor->type, descriptor->flags);
+
+        if (descriptor->uav_flags & ~uav_flags_mask)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_FLAGS,
+                    "Descriptor %u of type %#x has invalid UAV flags %#x.",
+                    i, descriptor->type, descriptor->uav_flags);
     }
 }
 
