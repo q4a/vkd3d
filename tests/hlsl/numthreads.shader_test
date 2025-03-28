@@ -175,6 +175,36 @@ size (2d, 2, 2)
 1.0 1.0
 1.0 1.0
 
+% The product must not exceed 1024, and the third dimension cannot exceed 64.
+
+[compute shader fail todo]
+    [numthreads(1025,1,1)]
+    void main() {}
+
+[compute shader fail todo]
+    [numthreads(1,1025,1)]
+    void main() {}
+
+[compute shader fail todo]
+    [numthreads(1,1,65)]
+    void main() {}
+
+[compute shader fail todo]
+    [numthreads(41,25,25)]
+    void main() {}
+
+[compute shader]
+    [numthreads(1024,1,1)]
+    void main() {}
+
+[compute shader]
+    [numthreads(1,1024,1)]
+    void main() {}
+
+[compute shader]
+    [numthreads(4,4,64)]
+    void main() {}
+
 [compute shader]
 /* In SM < 6.0, attributes are taken from the first function, and dropped from the second. */
 RWTexture2D<float> u;
