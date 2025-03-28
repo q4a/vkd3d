@@ -2462,6 +2462,77 @@ static void trace_signature(const struct shader_signature *signature, const char
     vkd3d_string_buffer_cleanup(&buffer);
 }
 
+static void shader_print_io_declaration(struct vkd3d_string_buffer *buffer, enum vkd3d_shader_register_type type)
+{
+    switch (type)
+    {
+#define X(x) case VKD3DSPR_ ## x: vkd3d_string_buffer_printf(buffer, #x); return;
+        X(TEMP)
+        X(INPUT)
+        X(CONST)
+        X(ADDR)
+        X(TEXTURE)
+        X(RASTOUT)
+        X(ATTROUT)
+        X(TEXCRDOUT)
+        X(OUTPUT)
+        X(CONSTINT)
+        X(COLOROUT)
+        X(DEPTHOUT)
+        X(COMBINED_SAMPLER)
+        X(CONSTBOOL)
+        X(LOOP)
+        X(TEMPFLOAT16)
+        X(MISCTYPE)
+        X(LABEL)
+        X(PREDICATE)
+        X(IMMCONST)
+        X(IMMCONST64)
+        X(CONSTBUFFER)
+        X(IMMCONSTBUFFER)
+        X(PRIMID)
+        X(NULL)
+        X(SAMPLER)
+        X(RESOURCE)
+        X(UAV)
+        X(OUTPOINTID)
+        X(FORKINSTID)
+        X(JOININSTID)
+        X(INCONTROLPOINT)
+        X(OUTCONTROLPOINT)
+        X(PATCHCONST)
+        X(TESSCOORD)
+        X(GROUPSHAREDMEM)
+        X(THREADID)
+        X(THREADGROUPID)
+        X(LOCALTHREADID)
+        X(LOCALTHREADINDEX)
+        X(IDXTEMP)
+        X(STREAM)
+        X(FUNCTIONBODY)
+        X(FUNCTIONPOINTER)
+        X(COVERAGE)
+        X(SAMPLEMASK)
+        X(GSINSTID)
+        X(DEPTHOUTGE)
+        X(DEPTHOUTLE)
+        X(RASTERIZER)
+        X(OUTSTENCILREF)
+        X(UNDEF)
+        X(SSA)
+        X(WAVELANECOUNT)
+        X(WAVELANEINDEX)
+        X(PARAMETER)
+        X(POINT_COORD)
+#undef X
+        case VKD3DSPR_INVALID:
+        case VKD3DSPR_COUNT:
+            break;
+    }
+
+    vkd3d_string_buffer_printf(buffer, "<invalid register type %#x>", type);
+}
+
 static void trace_io_declarations(const struct vsir_program *program)
 {
     struct vkd3d_string_buffer buffer;
@@ -2474,11 +2545,12 @@ static void trace_io_declarations(const struct vsir_program *program)
 
     for (i = 0; i < sizeof(program->io_dcls) * CHAR_BIT; ++i)
     {
-        if (bitmap_is_set(program->io_dcls, i))
-        {
-            empty = false;
-            vkd3d_string_buffer_printf(&buffer, " %u", i);
-        }
+        if (!bitmap_is_set(program->io_dcls, i))
+            continue;
+
+        vkd3d_string_buffer_printf(&buffer, empty ? " " : " | ");
+        shader_print_io_declaration(&buffer, i);
+        empty = false;
     }
 
     if (empty)
