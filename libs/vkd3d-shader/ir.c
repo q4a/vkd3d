@@ -8878,6 +8878,15 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_RESOURCE_TYPE,
                     "Descriptor %u has invalid resource type %#x for descriptor type %#x.",
                     i, descriptor->resource_type, descriptor->type);
+
+        if (descriptor->resource_data_type >= VKD3D_DATA_COUNT)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                    "Descriptor %u has invalid resource data type %#x.", i, descriptor->resource_data_type);
+        else if ((descriptor->resource_data_type == VKD3D_DATA_UNUSED)
+                != (descriptor->type == VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER))
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                    "Descriptor %u has invalid resource data type %#x for descriptor type %#x.",
+                    i, descriptor->resource_data_type, descriptor->type);
     }
 }
 
