@@ -10479,6 +10479,7 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
     for (i = 0; i < descriptors->descriptor_count; ++i)
     {
         const struct vkd3d_shader_descriptor_info1 *descriptor = &descriptors->descriptors[i];
+        uint32_t flags_mask = 0;
 
         if (descriptor->type >= VKD3D_SHADER_DESCRIPTOR_TYPE_COUNT)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DESCRIPTOR_TYPE,
@@ -10507,6 +10508,35 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DESCRIPTOR_COUNT,
                     "Descriptor %u has invalid descriptor count %u starting at index %u.",
                     i, descriptor->count, descriptor->register_index);
+
+        switch (descriptor->type)
+        {
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
+                flags_mask = VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_RAW_BUFFER;
+                break;
+
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
+                flags_mask = VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_COUNTER
+                        | VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ
+                        | VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS
+                        | VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_RAW_BUFFER;
+                break;
+
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
+                break;
+
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER:
+                flags_mask = VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE;
+                break;
+
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_FORCE_32BIT:
+                break;
+        }
+
+        if (descriptor->flags & ~flags_mask)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_FLAGS,
+                    "Descriptor %u of type %#x has invalid flags %#x.",
+                    i, descriptor->type, descriptor->flags);
     }
 }
 
