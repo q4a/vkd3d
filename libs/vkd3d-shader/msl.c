@@ -116,19 +116,19 @@ static void msl_print_indent(struct vkd3d_string_buffer *buffer, unsigned int in
 }
 
 static void msl_print_resource_datatype(struct msl_generator *gen,
-        struct vkd3d_string_buffer *buffer, enum vkd3d_shader_resource_data_type data_type)
+        struct vkd3d_string_buffer *buffer, enum vkd3d_data_type data_type)
 {
     switch (data_type)
     {
-        case VKD3D_SHADER_RESOURCE_DATA_FLOAT:
-        case VKD3D_SHADER_RESOURCE_DATA_UNORM:
-        case VKD3D_SHADER_RESOURCE_DATA_SNORM:
+        case VKD3D_DATA_FLOAT:
+        case VKD3D_DATA_UNORM:
+        case VKD3D_DATA_SNORM:
             vkd3d_string_buffer_printf(buffer, "float");
             break;
-        case VKD3D_SHADER_RESOURCE_DATA_INT:
+        case VKD3D_DATA_INT:
             vkd3d_string_buffer_printf(buffer, "int");
             break;
-        case VKD3D_SHADER_RESOURCE_DATA_UINT:
+        case VKD3D_DATA_UINT:
             vkd3d_string_buffer_printf(buffer, "uint");
             break;
         default:
@@ -258,9 +258,8 @@ static void msl_print_cbv_name(struct vkd3d_string_buffer *buffer, unsigned int 
     vkd3d_string_buffer_printf(buffer, "descriptors[%u].buf<vkd3d_vec4>()", binding);
 }
 
-static void msl_print_srv_name(struct vkd3d_string_buffer *buffer, struct msl_generator *gen,
-        unsigned int binding, const struct msl_resource_type_info *resource_type_info,
-        enum vkd3d_shader_resource_data_type resource_data_type)
+static void msl_print_srv_name(struct vkd3d_string_buffer *buffer, struct msl_generator *gen, unsigned int binding,
+        const struct msl_resource_type_info *resource_type_info, enum vkd3d_data_type resource_data_type)
 {
     vkd3d_string_buffer_printf(buffer, "descriptors[%u].tex<texture%s<",
             binding, resource_type_info->type_suffix);
@@ -707,13 +706,13 @@ static void msl_else(struct msl_generator *gen)
 static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const struct msl_resource_type_info *resource_type_info;
-    enum vkd3d_shader_resource_data_type resource_data_type;
     unsigned int resource_id, resource_idx, resource_space;
     const struct vkd3d_shader_descriptor_info1 *descriptor;
     const struct vkd3d_shader_descriptor_binding *binding;
     enum vkd3d_shader_resource_type resource_type;
     struct msl_src coord, array_index, lod;
     struct vkd3d_string_buffer *read;
+    enum vkd3d_data_type data_type;
     uint32_t coord_mask;
     struct msl_dst dst;
 
@@ -732,7 +731,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     {
         resource_type = descriptor->resource_type;
         resource_space = descriptor->register_space;
-        resource_data_type = descriptor->resource_data_type;
+        data_type = descriptor->resource_data_type;
     }
     else
     {
@@ -740,7 +739,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
                 "Internal compiler error: Undeclared resource descriptor %u.", resource_id);
         resource_space = 0;
         resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
-        resource_data_type = VKD3D_SHADER_RESOURCE_DATA_FLOAT;
+        data_type = VKD3D_DATA_FLOAT;
     }
 
     if ((resource_type_info = msl_get_resource_type_info(resource_type)))
@@ -771,7 +770,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     read = vkd3d_string_buffer_get(&gen->string_buffers);
 
     vkd3d_string_buffer_printf(read, "as_type<uint4>(");
-    msl_print_srv_name(read, gen, binding->binding, resource_type_info, resource_data_type);
+    msl_print_srv_name(read, gen, binding->binding, resource_type_info, data_type);
     vkd3d_string_buffer_printf(read, ".read(");
     if (resource_type_info->read_coord_size > 1)
         vkd3d_string_buffer_printf(read, "as_type<uint%zu>(%s)",

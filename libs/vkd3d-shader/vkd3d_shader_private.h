@@ -1431,7 +1431,7 @@ struct vkd3d_shader_descriptor_info1
     unsigned int register_index;
     unsigned int register_id;
     enum vkd3d_shader_resource_type resource_type;
-    enum vkd3d_shader_resource_data_type resource_data_type;
+    enum vkd3d_data_type resource_data_type;
     unsigned int flags;
     unsigned int sample_count;
     unsigned int buffer_size;
@@ -1764,30 +1764,6 @@ static inline enum vkd3d_data_type vkd3d_data_type_from_component_type(
         default:
             FIXME("Unhandled component type %#x.\n", component_type);
             return VKD3D_DATA_FLOAT;
-    }
-}
-
-static inline enum vkd3d_shader_component_type vkd3d_component_type_from_resource_data_type(
-        enum vkd3d_shader_resource_data_type data_type)
-{
-    switch (data_type)
-    {
-        case VKD3D_SHADER_RESOURCE_DATA_FLOAT:
-        case VKD3D_SHADER_RESOURCE_DATA_UNORM:
-        case VKD3D_SHADER_RESOURCE_DATA_SNORM:
-            return VKD3D_SHADER_COMPONENT_FLOAT;
-        case VKD3D_SHADER_RESOURCE_DATA_UINT:
-            return VKD3D_SHADER_COMPONENT_UINT;
-        case VKD3D_SHADER_RESOURCE_DATA_INT:
-            return VKD3D_SHADER_COMPONENT_INT;
-        case VKD3D_SHADER_RESOURCE_DATA_DOUBLE:
-        case VKD3D_SHADER_RESOURCE_DATA_CONTINUED:
-            return VKD3D_SHADER_COMPONENT_DOUBLE;
-        default:
-            FIXME("Unhandled data type %#x.\n", data_type);
-            /* fall-through */
-        case VKD3D_SHADER_RESOURCE_DATA_MIXED:
-            return VKD3D_SHADER_COMPONENT_UINT;
     }
 }
 
