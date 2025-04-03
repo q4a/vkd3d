@@ -711,7 +711,7 @@ static void shader_print_resource_type(struct vkd3d_d3d_asm_compiler *compiler, 
                 compiler->colours.error, type, compiler->colours.reset);
 }
 
-static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_data_type type)
+static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_data_type type)
 {
     static const char *const data_type_names[] =
     {
@@ -732,14 +732,11 @@ static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum 
         [VKD3D_DATA_HALF     ] = "half",
     };
 
-    const char *name;
-
     if (type < ARRAY_SIZE(data_type_names))
-        name = data_type_names[type];
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s", data_type_names[type]);
     else
-        name = "<unknown>";
-
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s", name);
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s<unhandled data type %#x>%s",
+                compiler->colours.error, type, compiler->colours.reset);
 }
 
 static void shader_dump_resource_data_type(struct vkd3d_d3d_asm_compiler *compiler, const enum vkd3d_data_type *type)
@@ -751,7 +748,7 @@ static void shader_dump_resource_data_type(struct vkd3d_d3d_asm_compiler *compil
     for (i = 0; i < 4; i++)
     {
         vkd3d_string_buffer_printf(&compiler->buffer, "%s", i == 0 ? "" : ",");
-        shader_dump_data_type(compiler, type[i]);
+        shader_print_data_type(compiler, type[i]);
     }
 
     vkd3d_string_buffer_printf(&compiler->buffer, ")");
@@ -1295,7 +1292,7 @@ static void shader_print_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
         dimension = "??";
 
     vkd3d_string_buffer_printf(buffer, "%s <%s", prefix, dimension);
-    shader_dump_data_type(compiler, reg->data_type);
+    shader_print_data_type(compiler, reg->data_type);
     vkd3d_string_buffer_printf(buffer, ">%s", suffix);
 }
 
