@@ -687,7 +687,7 @@ static void shader_print_input_sysval_semantic(struct vkd3d_d3d_asm_compiler *co
             prefix, compiler->colours.error, semantic, compiler->colours.reset, suffix);
 }
 
-static void shader_dump_resource_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_shader_resource_type type)
+static void shader_print_resource_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_shader_resource_type type)
 {
     static const char *const resource_type_names[] =
     {
@@ -707,7 +707,8 @@ static void shader_dump_resource_type(struct vkd3d_d3d_asm_compiler *compiler, e
     if (type < ARRAY_SIZE(resource_type_names))
         vkd3d_string_buffer_printf(&compiler->buffer, "%s", resource_type_names[type]);
     else
-        vkd3d_string_buffer_printf(&compiler->buffer, "unknown");
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s<unhandled resource type %#x>%s",
+                compiler->colours.error, type, compiler->colours.reset);
 }
 
 static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_data_type type)
@@ -793,7 +794,7 @@ static void shader_print_dcl_usage(struct vkd3d_d3d_asm_compiler *compiler,
         if (semantic->resource.reg.reg.type == VKD3DSPR_RESOURCE)
             vkd3d_string_buffer_printf(buffer, "resource_");
 
-        shader_dump_resource_type(compiler, semantic->resource_type);
+        shader_print_resource_type(compiler, semantic->resource_type);
         if (semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
                 || semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
         {
@@ -1998,7 +1999,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
                     vkd3d_string_buffer_printf(buffer, "raw_");
                 if (ins->structured)
                     vkd3d_string_buffer_printf(buffer, "structured_");
-                shader_dump_resource_type(compiler, ins->resource_type);
+                shader_print_resource_type(compiler, ins->resource_type);
                 if (ins->resource_stride)
                     shader_print_uint_literal(compiler, ", stride=", ins->resource_stride, "");
                 vkd3d_string_buffer_printf(buffer, ")");
