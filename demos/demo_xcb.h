@@ -26,11 +26,8 @@
 #include <xcb/xcb_event.h>
 #include <xcb/xcb_icccm.h>
 #include <xcb/xcb_keysyms.h>
-#include <sys/stat.h>
 #include <dlfcn.h>
 #include <limits.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 
