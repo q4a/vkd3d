@@ -6322,6 +6322,66 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
     }
 }
 
+static bool add_object_property_access(struct hlsl_ctx *ctx,
+        struct hlsl_block *block, struct hlsl_ir_node *object, const char *name,
+        const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    struct hlsl_resource_load_params load_params;
+    struct hlsl_ir_node *zero;
+    unsigned int sampler_dim;
+
+    if (!strcmp(name, "Length"))
+    {
+        if (object_type->class != HLSL_CLASS_TEXTURE && object_type->class != HLSL_CLASS_UAV)
+            return false;
+
+        sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+
+        switch (object_type->sampler_dim)
+        {
+            case HLSL_SAMPLER_DIM_1D:
+            case HLSL_SAMPLER_DIM_2D:
+            case HLSL_SAMPLER_DIM_3D:
+            case HLSL_SAMPLER_DIM_1DARRAY:
+            case HLSL_SAMPLER_DIM_2DARRAY:
+            case HLSL_SAMPLER_DIM_2DMS:
+            case HLSL_SAMPLER_DIM_2DMSARRAY:
+                break;
+
+            case HLSL_SAMPLER_DIM_BUFFER:
+            case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
+                hlsl_fixme(ctx, loc, "'Length' property for buffers.");
+                block->value = ctx->error_instr;
+                return true;
+
+            default:
+                return false;
+        }
+
+        if (hlsl_version_lt(ctx, 4, 0))
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                    "'Length' property can only be used on profiles 4.0 or higher.");
+            block->value = ctx->error_instr;
+            return true;
+        }
+
+        zero = hlsl_block_add_uint_constant(ctx, block, 0, loc);
+
+        memset(&load_params, 0, sizeof(load_params));
+        load_params.type = HLSL_RESOURCE_RESINFO;
+        load_params.resource = object;
+        load_params.lod = zero;
+        load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, sampler_dim);
+        hlsl_block_add_resource_load(ctx, block, &load_params, loc);
+
+        return true;
+    }
+
+    return false;
+}
+
 static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type *format,
         const struct vkd3d_shader_location *loc)
 {
@@ -9121,6 +9181,9 @@ postfix_expr:
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid swizzle \"%s\".", $3);
                     $1->value = ctx->error_instr;
                 }
+            }
+            else if (add_object_property_access(ctx, $1, node, $3, &@2))
+            {
             }
             else if (node->data_type->class != HLSL_CLASS_ERROR)
             {

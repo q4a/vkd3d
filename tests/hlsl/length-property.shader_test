@@ -1,4 +1,4 @@
-[pixel shader fail(sm<4 | sm>=6) todo(sm>=4)]
+[pixel shader fail(sm<4 | sm>=6)]
 Texture1D tex1d;
 Texture1DArray tex1da;
 Texture2D tex2d;
@@ -26,7 +26,7 @@ size (2d, 2, 3)
 0.0 0.0 0.0 0.0  0.0 0.0 0.0 0.0
 0.0 0.0 0.0 0.0  0.0 0.0 0.0 0.0
 
-[pixel shader fail(sm<4 | sm>=6) todo(sm>=4)]
+[pixel shader fail(sm<4 | sm>=6)]
 Texture2D t;
 
 float4 main() : sv_target
@@ -35,10 +35,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(glsl | msl) draw quad
 probe (0, 0) rgba(2, 3, 0, 0)
 
-[pixel shader fail(sm<4 | sm>=6) todo(sm>=4)]
+[pixel shader fail(sm<4 | sm>=6)]
 Texture2D t;
 
 float4 fun(float2 x) { return 1; }
@@ -50,7 +50,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe (0, 0) rgba(2, 2, 2, 2)
 
 [pixel shader fail]
@@ -72,7 +72,7 @@ float4 main() : sv_target
 [require]
 shader model >= 5.0
 
-[pixel shader fail(sm<4 | sm>=6) todo(sm>=4)]
+[pixel shader fail(sm<4 | sm>=6)]
 RWTexture1D<float> tex1d;
 RWTexture1DArray<float> tex1da;
 RWTexture2D<float> tex2d;
@@ -115,7 +115,7 @@ size (2d, 2, 4)
 0.0  0.0
 0.0  0.0
 
-[pixel shader fail(sm>=6) todo]
+[pixel shader fail(sm>=6)]
 RWTexture2D<float> t : register(u1);
 
 float4 main() : sv_target
@@ -124,7 +124,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(glsl | msl) draw quad
 probe (0, 0) rgba(2, 4, 0, 0)
 
 [uav 1]
