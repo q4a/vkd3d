@@ -1782,6 +1782,39 @@ static enum vkd3d_result vsir_program_ensure_ret(struct vsir_program *program,
     return VKD3D_OK;
 }
 
+/* ps_1_* outputs color in r0. Add an instruction to copy that to oC0.
+ * We don't need to modify the signature since it already contains COLOR. */
+static enum vkd3d_result vsir_program_normalise_ps1_output(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_location loc;
+
+    if (!(ins = vsir_program_iterator_tail(&it)))
+        return VKD3D_OK;
+    loc = ins->location;
+
+    if (!(ins = vsir_program_append(program)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    if (!vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1))
+    {
+        vsir_instruction_init(ins, &loc, VSIR_OP_NOP);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    src_param_init_temp_float4(&ins->src[0], 0);
+    ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
+    /* Note we run before I/O normalization. */
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_COLOROUT, VSIR_DATA_F32, 1);
+    ins->dst[0].reg.idx[0].offset = 0;
+    ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+    ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL;
+    ins->dst[0].modifiers = VKD3DSPDM_SATURATE;
+
+    return VKD3D_OK;
+}
+
 static struct signature_element *add_signature_element(struct shader_signature *signature,
         const char *semantic_name, uint32_t semantic_index, uint32_t mask, uint32_t register_index,
         enum vkd3d_shader_interpolation_mode interpolation_mode)
@@ -12077,6 +12110,8 @@ enum vkd3d_result vsir_program_lower_d3dbc(struct vsir_program *program, uint64_
     };
 
     vsir_transform(&ctx, vsir_program_lower_d3dbc_instructions);
+    if (program->shader_version.major == 1 && program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL)
+        vsir_transform(&ctx, vsir_program_normalise_ps1_output);
 
     if (TRACE_ON())
         vsir_program_trace(program);
