@@ -63,14 +63,6 @@ enum shader_type
 
 const char *shader_type_string(enum shader_type type);
 
-enum texture_data_type
-{
-    TEXTURE_DATA_UNSPECIFIED,
-    TEXTURE_DATA_FLOAT,
-    TEXTURE_DATA_SINT,
-    TEXTURE_DATA_UINT,
-};
-
 struct sampler
 {
     unsigned int slot;
@@ -116,7 +108,6 @@ struct resource_params
     bool is_raw;
     bool is_uav_counter;
     bool explicit_format;
-    enum texture_data_type data_type;
     unsigned int stride;
 
     uint8_t *data;

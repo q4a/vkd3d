@@ -317,31 +317,29 @@ static const char *close_parentheses(const char *line)
     return line;
 }
 
-static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_type, unsigned int *texel_size,
-        bool *is_shadow, const char **rest)
+static DXGI_FORMAT parse_format(const char *line, unsigned int *texel_size, bool *is_shadow, const char **rest)
 {
     static const struct
     {
         const char *string;
-        enum texture_data_type data_type;
         unsigned int texel_size;
         DXGI_FORMAT format;
         bool is_shadow;
     }
     formats[] =
     {
-        {"r32g32b32a32-float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
-        {"r32g32b32a32-sint",   TEXTURE_DATA_SINT,  16, DXGI_FORMAT_R32G32B32A32_SINT},
-        {"r32g32b32a32-uint",   TEXTURE_DATA_UINT,  16, DXGI_FORMAT_R32G32B32A32_UINT},
-        {"r32g32-float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
-        {"r32g32-sint",         TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
-        {"r32g32-uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
-        {"r32-float-shadow",    TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT, true},
-        {"r32-float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
-        {"r32-sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
-        {"r32-uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
-        {"r32-typeless",        TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_TYPELESS},
-        {"unknown",             TEXTURE_DATA_UINT,   0, DXGI_FORMAT_UNKNOWN},
+        {"r32g32b32a32-float",  16, DXGI_FORMAT_R32G32B32A32_FLOAT},
+        {"r32g32b32a32-sint",   16, DXGI_FORMAT_R32G32B32A32_SINT},
+        {"r32g32b32a32-uint",   16, DXGI_FORMAT_R32G32B32A32_UINT},
+        {"r32g32-float",         8, DXGI_FORMAT_R32G32_FLOAT},
+        {"r32g32-sint",          8, DXGI_FORMAT_R32G32_SINT},
+        {"r32g32-uint",          8, DXGI_FORMAT_R32G32_UINT},
+        {"r32-float-shadow",     4, DXGI_FORMAT_R32_FLOAT, true},
+        {"r32-float",            4, DXGI_FORMAT_R32_FLOAT},
+        {"r32-sint",             4, DXGI_FORMAT_R32_SINT},
+        {"r32-uint",             4, DXGI_FORMAT_R32_UINT},
+        {"r32-typeless",         4, DXGI_FORMAT_R32_TYPELESS},
+        {"unknown",              0, DXGI_FORMAT_UNKNOWN},
     };
     unsigned int i;
 
@@ -349,8 +347,6 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     {
         if (match_string(line, formats[i].string, rest))
         {
-            if (data_type)
-                *data_type = formats[i].data_type;
             if (texel_size)
                 *texel_size = formats[i].texel_size;
             if (is_shadow)
@@ -444,7 +440,7 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     }
     else if (match_string(line, "format", &line))
     {
-        DXGI_FORMAT format = parse_format(line, NULL, NULL, NULL, &line);
+        DXGI_FORMAT format = parse_format(line, NULL, NULL, &line);
 
         while (line[0] != '\0')
         {
@@ -566,8 +562,7 @@ static void parse_resource_directive(struct resource_params *resource, const cha
 {
     if (match_string(line, "format", &line))
     {
-        resource->desc.format = parse_format(line, &resource->data_type,
-                &resource->desc.texel_size, &resource->is_shadow, &line);
+        resource->desc.format = parse_format(line, &resource->desc.texel_size, &resource->is_shadow, &line);
         assert_that(!resource->explicit_format, "Resource format already specified.\n");
         resource->explicit_format = true;
     }
@@ -641,35 +636,15 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         union
         {
             float f;
-            int32_t i;
             uint32_t u;
         } u;
         char *rest;
 
-        u.u = 0;
-
         for (;;)
         {
-            switch (resource->data_type)
-            {
-                case TEXTURE_DATA_FLOAT:
-                    u.f = strtof(line, &rest);
-                    break;
-
-                case TEXTURE_DATA_SINT:
-                    u.i = strtol(line, &rest, 0);
-                    break;
-
-                case TEXTURE_DATA_UINT:
-                    u.u = strtoul(line, &rest, 0);
-                    break;
-
-                case TEXTURE_DATA_UNSPECIFIED:
-                    u.u = strtoul(line, &rest, 0);
-                    if (rest && *rest == '.')
-                        u.f = strtof(line, &rest);
-                    break;
-            }
+            u.u = strtoul(line, &rest, 0);
+            if (rest && *rest == '.')
+                u.f = strtof(line, &rest);
 
             if (rest == line)
                 break;
@@ -699,7 +674,7 @@ static void parse_input_layout_directive(struct shader_runner *runner, const cha
         fatal_error("Malformed input layout directive '%s'.\n", line);
     line = rest;
 
-    element->format = parse_format(line, NULL, &element->texel_size, NULL, &line);
+    element->format = parse_format(line, &element->texel_size, NULL, &line);
 
     if (!(rest = strpbrk(line, " \n")))
         rest = line + strlen(line);
@@ -785,7 +760,6 @@ static void set_default_target(struct shader_runner *runner)
     params.desc.type = RESOURCE_TYPE_RENDER_TARGET;
     params.desc.dimension = RESOURCE_DIMENSION_2D;
     params.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-    params.data_type = TEXTURE_DATA_UNSPECIFIED;
     params.desc.texel_size = 16;
     params.desc.width = RENDER_TARGET_WIDTH;
     params.desc.height = RENDER_TARGET_HEIGHT;
@@ -2383,7 +2357,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_RENDER_TARGET;
                 current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 16;
                 current_resource.desc.level_count = 1;
             }
@@ -2397,7 +2370,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.type = RESOURCE_TYPE_DEPTH_STENCIL;
                 current_resource.desc.format = DXGI_FORMAT_D32_FLOAT;
                 current_resource.is_shadow = true;
-                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 4;
                 current_resource.desc.level_count = 1;
             }
@@ -2410,7 +2382,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_TEXTURE;
                 current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 16;
                 current_resource.desc.level_count = 1;
             }
@@ -2423,7 +2394,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_UAV;
                 current_resource.desc.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
                 current_resource.desc.texel_size = 16;
                 current_resource.desc.level_count = 1;
             }
@@ -2436,7 +2406,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.desc.slot = index;
                 current_resource.desc.type = RESOURCE_TYPE_VERTEX_BUFFER;
                 current_resource.desc.dimension = RESOURCE_DIMENSION_BUFFER;
-                current_resource.data_type = TEXTURE_DATA_UNSPECIFIED;
             }
             else if (!strcmp(line, "[test]\n"))
             {
