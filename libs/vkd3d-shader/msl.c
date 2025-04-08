@@ -1292,7 +1292,7 @@ static int msl_generator_init(struct msl_generator *gen, struct vsir_program *pr
     {
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                 "Internal compiler error: Unhandled shader type %#x.", type);
-        return VKD3D_ERROR_INVALID_SHADER;
+        gen->prefix = "unknown";
     }
     gen->interface_info = vkd3d_find_struct(compile_info->next, INTERFACE_INFO);
 
