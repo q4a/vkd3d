@@ -22184,6 +22184,7 @@ static void test_typed_buffer_uav(void)
 
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &descriptor_heap);
     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, 0, gpu_descriptor_handle);
     ID3D12GraphicsCommandList_Dispatch(command_list, 2, 1, 1);
 
@@ -22203,6 +22204,7 @@ static void test_typed_buffer_uav(void)
 
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &descriptor_heap);
     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, 0, gpu_descriptor_handle);
     ID3D12GraphicsCommandList_Dispatch(command_list, 2, 1, 1);
 
@@ -36519,6 +36521,7 @@ static void test_register_space(void)
 
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &heap);
     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
             0, get_gpu_descriptor_handle(&context, heap, 0));
     ID3D12GraphicsCommandList_SetComputeRoot32BitConstant(command_list, 1, 700, 0);
@@ -37320,6 +37323,7 @@ static void test_resource_arrays(void)
 
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &heap);
     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
             0, get_gpu_descriptor_handle(&context, heap, 0));
     ID3D12GraphicsCommandList_SetComputeRoot32BitConstants(command_list, 1, ARRAY_SIZE(cb_data) * 4, cb_data, 0);
@@ -37567,6 +37571,7 @@ static void test_unbounded_resource_arrays(void)
 
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &heap);
     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
             0, get_gpu_descriptor_handle(&context, heap, 0));
 
