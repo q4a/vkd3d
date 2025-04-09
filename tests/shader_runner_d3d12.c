@@ -396,6 +396,7 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     add_pso(test_context, pso);
 
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &runner->heap);
     if (runner->r.uniform_count)
         ID3D12GraphicsCommandList_SetComputeRoot32BitConstants(command_list, uniform_index,
                 runner->r.uniform_count, runner->r.uniforms, 0);
