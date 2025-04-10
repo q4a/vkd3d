@@ -6734,6 +6734,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <list> variables_def_typed
 %type <list> switch_cases
 %destructor { destroy_parse_variable_defs($$); } type_specs variables_def variables_def_typed;
+%destructor { destroy_switch_cases($$); } switch_cases;
 
 %token <name> VAR_IDENTIFIER
 %token <name> NEW_IDENTIFIER
@@ -6830,6 +6831,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <state_block_index> state_block_index_opt
 
 %type <switch_case> switch_case
+%destructor { hlsl_free_ir_switch_case($$); } <switch_case>
 
 %type <type> base_optional
 %type <type> field_type
