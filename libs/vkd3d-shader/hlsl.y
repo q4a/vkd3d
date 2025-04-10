@@ -6768,6 +6768,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <block> statement_list
 %type <block> switch_statement
 %type <block> unary_expr
+%destructor { destroy_block($$); } <block>
 
 %type <boolval> boolean
 
