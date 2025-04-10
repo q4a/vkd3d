@@ -6561,7 +6561,6 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
     bool boolval;
     char *name;
     uint32_t modifiers;
-    struct hlsl_ir_node *instr;
     struct hlsl_block *block;
     struct list *list;
     struct parse_fields fields;
