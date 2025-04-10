@@ -997,8 +997,22 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v->arrays.sizes);
     vkd3d_free(v->name);
     hlsl_cleanup_semantic(&v->semantic);
-    VKD3D_ASSERT(!v->state_blocks);
+    if (v->state_block_count)
+    {
+        for (unsigned int i = 0; i < v->state_block_count; ++i)
+            hlsl_free_state_block(v->state_blocks[i]);
+        vkd3d_free(v->state_blocks);
+    }
     vkd3d_free(v);
+}
+
+static void destroy_parse_variable_defs(struct list *defs)
+{
+    struct parse_variable_def *v, *v_next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(v, v_next, defs, struct parse_variable_def, entry)
+        free_parse_variable_def(v);
+    vkd3d_free(defs);
 }
 
 static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
@@ -2618,11 +2632,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
 
     if (!(initializers = make_empty_block(ctx)))
     {
-        LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
-        {
-            free_parse_variable_def(v);
-        }
-        vkd3d_free(var_list);
+        destroy_parse_variable_defs(var_list);
         return NULL;
     }
 
@@ -6723,6 +6733,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <list> variables_def
 %type <list> variables_def_typed
 %type <list> switch_cases
+%destructor { destroy_parse_variable_defs($$); } type_specs variables_def variables_def_typed;
 
 %token <name> VAR_IDENTIFIER
 %token <name> NEW_IDENTIFIER
@@ -6835,6 +6846,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <variable_def> variable_decl
 %type <variable_def> variable_def
 %type <variable_def> variable_def_typed
+%destructor { free_parse_variable_def($$); } <variable_def>
 
 %%
 
@@ -8161,15 +8173,12 @@ typedef_type:
 typedef:
       KW_TYPEDEF var_modifiers typedef_type type_specs ';'
         {
-            struct parse_variable_def *v, *v_next;
             uint32_t modifiers = $2;
             struct hlsl_type *type;
 
             if (!(type = apply_type_modifiers(ctx, $3, &modifiers, false, &@2)))
             {
-                LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $4, struct parse_variable_def, entry)
-                    free_parse_variable_def(v);
-                vkd3d_free($4);
+                destroy_parse_variable_defs($4);
                 YYABORT;
             }
 
