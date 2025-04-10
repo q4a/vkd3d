@@ -980,6 +980,7 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
                 if (is_ms)
                 {
                     texture_desc.Usage = D3D11_USAGE_DEFAULT;
+                    texture_desc.CPUAccessFlags = 0;
                     hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL,
                             (ID3D11Texture2D **)&resolved_resource);
                     ok(hr == S_OK, "Failed to create multisampled texture, hr %#lx.\n", hr);
