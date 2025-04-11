@@ -6766,7 +6766,6 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <block> selection_statement
 %type <block> statement
 %type <block> statement_list
-%type <block> struct_declaration_without_vars
 %type <block> switch_statement
 %type <block> unary_expr
 
@@ -7021,9 +7020,6 @@ struct_declaration_without_vars:
             if ($1)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers are not allowed on struct type declarations.");
-
-            if (!($$ = make_empty_block(ctx)))
-                YYABORT;
         }
 
 struct_spec:
@@ -8144,6 +8140,10 @@ type:
 declaration_statement:
       declaration
     | struct_declaration_without_vars
+        {
+            if (!($$ = make_empty_block(ctx)))
+                YYABORT;
+        }
     | typedef
         {
             if (!($$ = make_empty_block(ctx)))
