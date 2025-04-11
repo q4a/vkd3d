@@ -44,8 +44,14 @@ float4 main() : SV_TARGET
 }
 
 [test]
-todo(sm>=6) draw quad
-probe (0, 0) rgba (1.0, 80.0, 3.0, 80.0)
+% DXC generates very strange code here, the first component is emitted with:
+%    call void @dx.op.storeOutput.f32(i32 5, i32 0, i32 0, i8 0,
+%            float sitofp (ppc_fp128 0xM3FF00000000000000000000000000000 to float))
+% I don't know what's going on here, but the downstream compilers clearly don't
+% like it: NVIDIA fails to create the PSO, AMD returns zero (instead of expected
+% one) and WARP loses the device; it's not our bug, we can ignore it.
+if(sm<6) draw quad
+if(sm<6) probe (0, 0) rgba(1.0, 80.0, 3.0, 80.0)
 
 [pixel shader]
 float4 main() : SV_TARGET
