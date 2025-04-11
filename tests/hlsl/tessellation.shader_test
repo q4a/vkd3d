@@ -130,8 +130,9 @@ void main(InputPatch<data, 3> input)
 }
 
 [test]
-if(!llvmpipe) todo(sm<6) draw 3 control point patch list 3
-if(!llvmpipe) todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
+% DXC doesn't generate a passthrough control point phase like FXC does
+if(!llvmpipe & sm<6) todo draw 3 control point patch list 3
+if(!llvmpipe & sm<6) todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
 
 [require]
 shader model >= 5.0
