@@ -276,9 +276,11 @@ void main()
 }
 
 [test]
-uniform 0 uint4 0xfff4000b 0xefff3 0 0
+% Even if everything is defined as unsigned, implementations differ: WARP and
+% NVIDIA zero-extend, while AMD sign-extends; therefore we test neither.
+uniform 0 uint4 0x7ff4000b 0xe7ff3 0 0
 dispatch 1 1 1
-probe uav 1 (0) rgbaui(0xb, 0xfff4, 0xfff3, 0xe)
+probe uav 1 (0) rgbaui(0xb, 0x7ff4, 0x7ff3, 0xe)
 
 [uav 1]
 format r32g32b32a32-sint
@@ -296,14 +298,15 @@ void main()
 }
 
 [test]
-uniform 0 uint4 0xfff4000b 0xefff3 0 0
+% Again, implementations behave inconsistently for negative numbers.
+uniform 0 uint4 0x7ff4000b 0xe7ff3 0 0
 dispatch 1 1 1
-probe uav 1 (0) rgbai(11, -12, -13, 14)
+probe uav 1 (0) rgbai(11, 0x7ff4, 0x7ff3, 14)
 
 [uav 1]
 format r32g32b32a32-sint
 size (buffer, 1)
--65536 -1 1 65536
+-100 -1 1 100
 
 [pixel shader]
 RWBuffer<int16_t4> u : register(u1);
@@ -315,12 +318,12 @@ int4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgbai(-32768, -1, 1, 32767)
+probe (0, 0) rgbai(-100, -1, 1, 100)
 
 [uav 1]
 format r32g32b32a32-uint
 size (buffer, 1)
-0 1 0x10000 0xfffffffe
+0 1 10 100
 
 [pixel shader]
 RWBuffer<uint16_t4> u : register(u1);
@@ -332,4 +335,4 @@ uint4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgbaui(0, 1, 0xffff, 0xffff)
+probe (0, 0) rgbaui(0, 1, 10, 100)
