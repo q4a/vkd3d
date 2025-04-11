@@ -6987,6 +6987,9 @@ buffer_type:
 declaration_statement_list:
       %empty
     | declaration_statement_list declaration_statement
+        {
+            destroy_block($2);
+        }
 
 preproc_directive:
       PRE_LINE STRING
