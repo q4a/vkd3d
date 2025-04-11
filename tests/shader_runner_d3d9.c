@@ -121,7 +121,7 @@ static bool init_test_context(struct d3d9_shader_runner *runner)
 
     present_parameters.hDeviceWindow = runner->window;
 
-    hr = IDirect3D9_CreateDevice(d3d, D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, runner->window,
+    hr = IDirect3D9_CreateDevice(d3d, test_options.adapter_idx, D3DDEVTYPE_HAL, runner->window,
             D3DCREATE_HARDWARE_VERTEXPROCESSING, &present_parameters, &runner->device);
     IDirect3D9_Release(d3d);
     if (FAILED(hr))
