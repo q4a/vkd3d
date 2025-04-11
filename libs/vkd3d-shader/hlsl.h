@@ -898,6 +898,7 @@ enum hlsl_resource_store_type
 {
     HLSL_RESOURCE_STORE,
     HLSL_RESOURCE_STREAM_APPEND,
+    HLSL_RESOURCE_STREAM_RESTART,
 };
 
 struct hlsl_ir_resource_store

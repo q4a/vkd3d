@@ -6251,6 +6251,27 @@ static bool add_so_append_method_call(struct hlsl_ctx *ctx, struct hlsl_block *b
     return true;
 }
 
+static bool add_so_restartstrip_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_deref so_deref;
+
+    if (params->args_count)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method '%s': expected 0.", name);
+        return false;
+    }
+
+    if (!hlsl_init_deref_from_index_chain(ctx, &so_deref, object))
+        return false;
+
+    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STREAM_RESTART, &so_deref, NULL, NULL, loc);
+    hlsl_cleanup_deref(&so_deref);
+
+    return true;
+}
+
 static const struct method_function
 {
     const char *name;
@@ -6297,6 +6318,7 @@ static const struct method_function uav_methods[] =
 static const struct method_function so_methods[] =
 {
     { "Append",       add_so_append_method_call,       "" },
+    { "RestartStrip", add_so_restartstrip_method_call, "" },
 };
 
 static int object_method_function_name_compare(const void *a, const void *b)

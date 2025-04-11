@@ -3733,6 +3733,7 @@ static void dump_ir_resource_store(struct vkd3d_string_buffer *buffer, const str
     {
         [HLSL_RESOURCE_STORE]          = "store_resource",
         [HLSL_RESOURCE_STREAM_APPEND]  = "stream_append",
+        [HLSL_RESOURCE_STREAM_RESTART] = "stream_restart",
     };
 
     VKD3D_ASSERT(store->store_type < ARRAY_SIZE(type_names));
