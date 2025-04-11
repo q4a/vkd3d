@@ -34,6 +34,7 @@ struct d3d9_resource
     IDirect3DSurface9 *surface;
     IDirect3DTexture9 *texture;
     IDirect3DVertexBuffer9 *vb;
+    IDirect3DVolumeTexture9 *volume;
 };
 
 static struct d3d9_resource *d3d9_resource(struct resource *r)
@@ -189,7 +190,6 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
     struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
     IDirect3DDevice9 *device = runner->device;
     struct d3d9_resource *resource;
-    D3DLOCKED_RECT map_desc;
     D3DFORMAT format;
     HRESULT hr;
     void *data;
@@ -226,36 +226,71 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
 
         case RESOURCE_TYPE_TEXTURE:
         {
+            unsigned int src_buffer_offset = 0;
+
             if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
             {
                 fatal_error("Buffer resources are not supported.\n");
                 break;
             }
-
-            unsigned int src_buffer_offset = 0;
-
-            hr = IDirect3DDevice9_CreateTexture(device, params->desc.width, params->desc.height,
-                    params->desc.level_count, 0, format, D3DPOOL_MANAGED, &resource->texture, NULL);
-            ok(hr == D3D_OK, "Failed to create texture, hr %#lx.\n", hr);
-
-            for (unsigned int level = 0; level < params->desc.level_count; ++level)
+            else if (params->desc.dimension == RESOURCE_DIMENSION_2D)
             {
-                unsigned int level_width = get_level_dimension(params->desc.width, level);
-                unsigned int level_height = get_level_dimension(params->desc.height, level);
-                unsigned int src_row_pitch = level_width * params->desc.texel_size;
-                unsigned int src_slice_pitch = level_height * src_row_pitch;
+                hr = IDirect3DDevice9_CreateTexture(device, params->desc.width, params->desc.height,
+                        params->desc.level_count, 0, format, D3DPOOL_MANAGED, &resource->texture, NULL);
+                ok(hr == D3D_OK, "Failed to create texture, hr %#lx.\n", hr);
 
-                hr = IDirect3DTexture9_LockRect(resource->texture, level, &map_desc, NULL, 0);
-                ok(hr == D3D_OK, "Failed to map texture, hr %#lx.\n", hr);
-                for (unsigned int y = 0; y < level_height; ++y)
-                    memcpy(&((char *)map_desc.pBits)[y * map_desc.Pitch],
-                            &params->data[src_buffer_offset + y * src_row_pitch], src_row_pitch);
-                hr = IDirect3DTexture9_UnlockRect(resource->texture, level);
-                ok(hr == D3D_OK, "Failed to unmap texture, hr %#lx.\n", hr);
+                for (unsigned int level = 0; level < params->desc.level_count; ++level)
+                {
+                    unsigned int level_width = get_level_dimension(params->desc.width, level);
+                    unsigned int level_height = get_level_dimension(params->desc.height, level);
+                    unsigned int src_row_pitch = level_width * params->desc.texel_size;
+                    unsigned int src_slice_pitch = level_height * src_row_pitch;
+                    D3DLOCKED_RECT map_desc;
 
-                src_buffer_offset += src_slice_pitch;
+                    hr = IDirect3DTexture9_LockRect(resource->texture, level, &map_desc, NULL, 0);
+                    ok(hr == D3D_OK, "Failed to map texture, hr %#lx.\n", hr);
+                    for (unsigned int y = 0; y < level_height; ++y)
+                        memcpy(&((uint8_t *)map_desc.pBits)[y * map_desc.Pitch],
+                                &params->data[src_buffer_offset + y * src_row_pitch], src_row_pitch);
+                    hr = IDirect3DTexture9_UnlockRect(resource->texture, level);
+                    ok(hr == D3D_OK, "Failed to unmap texture, hr %#lx.\n", hr);
+
+                    src_buffer_offset += src_slice_pitch;
+                }
+                break;
             }
-            break;
+            else if (params->desc.dimension == RESOURCE_DIMENSION_3D)
+            {
+                hr = IDirect3DDevice9_CreateVolumeTexture(device,
+                        params->desc.width, params->desc.height, params->desc.depth,
+                        params->desc.level_count, 0, format, D3DPOOL_MANAGED, &resource->volume, NULL);
+                ok(hr == D3D_OK, "Failed to create texture, hr %#lx.\n", hr);
+
+                for (unsigned int level = 0; level < params->desc.level_count; ++level)
+                {
+                    unsigned int level_width = get_level_dimension(params->desc.width, level);
+                    unsigned int level_height = get_level_dimension(params->desc.height, level);
+                    unsigned int level_depth = get_level_dimension(params->desc.depth, level);
+                    unsigned int src_row_pitch = level_width * params->desc.texel_size;
+                    unsigned int src_slice_pitch = level_height * src_row_pitch;
+                    D3DLOCKED_BOX map_desc;
+
+                    hr = IDirect3DVolumeTexture9_LockBox(resource->volume, level, &map_desc, NULL, 0);
+                    ok(hr == D3D_OK, "Failed to map texture, hr %#lx.\n", hr);
+                    for (unsigned int z = 0; z < level_depth; ++z)
+                    {
+                        for (unsigned int y = 0; y < level_height; ++y)
+                            memcpy(&((uint8_t *)map_desc.pBits)[z * map_desc.SlicePitch + y * map_desc.RowPitch],
+                                    &params->data[src_buffer_offset + z * src_slice_pitch + y * src_row_pitch],
+                                    src_row_pitch);
+                    }
+                    hr = IDirect3DVolumeTexture9_UnlockBox(resource->volume, level);
+                    ok(hr == D3D_OK, "Failed to unmap texture, hr %#lx.\n", hr);
+
+                    src_buffer_offset += (src_slice_pitch * level_depth);
+                }
+                break;
+            }
         }
 
         case RESOURCE_TYPE_UAV:
@@ -288,6 +323,8 @@ static void d3d9_runner_destroy_resource(struct shader_runner *r, struct resourc
         IDirect3DTexture9_Release(resource->texture);
     if (resource->vb)
         IDirect3DVertexBuffer9_Release(resource->vb);
+    if (resource->volume)
+        IDirect3DVolumeTexture9_Release(resource->volume);
     free(resource);
 }
 
@@ -421,7 +458,12 @@ static bool d3d9_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_TEXTURE:
                 assert(resource->r.desc.dimension != RESOURCE_DIMENSION_BUFFER);
 
-                hr = IDirect3DDevice9_SetTexture(device, resource->r.desc.slot, (IDirect3DBaseTexture9 *)resource->texture);
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_2D)
+                    hr = IDirect3DDevice9_SetTexture(device, resource->r.desc.slot,
+                            (IDirect3DBaseTexture9 *)resource->texture);
+                else
+                    hr = IDirect3DDevice9_SetTexture(device, resource->r.desc.slot,
+                            (IDirect3DBaseTexture9 *)resource->volume);
                 ok(hr == D3D_OK, "Failed to set texture, hr %#lx.\n", hr);
                 break;
 

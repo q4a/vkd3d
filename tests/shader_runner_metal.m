@@ -258,16 +258,27 @@ static void init_resource_texture(struct metal_runner *runner,
     }
 
     desc = [[MTLTextureDescriptor alloc] init];
-    if (params->desc.sample_count > 1)
-        desc.textureType = params->desc.depth > 1 ? MTLTextureType2DMultisampleArray
-                : MTLTextureType2DMultisample;
-    else
-        desc.textureType = params->desc.depth > 1 ? MTLTextureType2DArray : MTLTextureType2D;
+    switch (params->desc.dimension)
+    {
+        case RESOURCE_DIMENSION_2D:
+            if (params->desc.sample_count > 1)
+                desc.textureType = params->desc.layer_count > 1 ? MTLTextureType2DMultisampleArray
+                        : MTLTextureType2DMultisample;
+            else
+                desc.textureType = params->desc.layer_count > 1 ? MTLTextureType2DArray : MTLTextureType2D;
+            break;
+        case RESOURCE_DIMENSION_3D:
+            desc.textureType = MTLTextureType3D;
+            break;
+        default:
+            fatal_error("Unhandled resource dimension %#x.\n", params->desc.dimension);
+    }
     desc.pixelFormat = get_metal_pixel_format(params->desc.format);
     ok(desc.pixelFormat != MTLPixelFormatInvalid, "Unhandled pixel format %#x.\n", params->desc.format);
     desc.width = params->desc.width;
     desc.height = params->desc.height;
-    desc.arrayLength = params->desc.depth;
+    desc.depth = params->desc.depth;
+    desc.arrayLength = params->desc.layer_count;
     desc.mipmapLevelCount = params->desc.level_count;
     desc.sampleCount = max(params->desc.sample_count, 1);
     desc.storageMode = MTLStorageModePrivate;
@@ -293,15 +304,13 @@ static void init_resource_texture(struct metal_runner *runner,
 
     if (params->data)
     {
-        unsigned int buffer_offset = 0, level, level_width, level_height;
+        unsigned int buffer_offset = 0, level, level_width, level_height, level_depth;
         id<MTLCommandBuffer> command_buffer;
         id<MTLBlitCommandEncoder> blit;
         id<MTLTexture> upload_texture;
 
         if (params->desc.sample_count > 1)
             fatal_error("Cannot upload data to a multisampled texture.\n");
-        if (params->desc.depth > 1)
-            fatal_error("Uploading data to a texture array is not supported.\n");
 
         desc.storageMode = MTLStorageModeManaged;
         upload_texture = [[device newTextureWithDescriptor:desc] autorelease];
@@ -310,13 +319,14 @@ static void init_resource_texture(struct metal_runner *runner,
         {
             level_width  = get_level_dimension(params->desc.width, level);
             level_height = get_level_dimension(params->desc.height, level);
-            [upload_texture replaceRegion:MTLRegionMake2D(0, 0, level_width, level_height)
+            level_depth = get_level_dimension(params->desc.depth, level);
+            [upload_texture replaceRegion:MTLRegionMake3D(0, 0, 0, level_width, level_height, level_depth)
                     mipmapLevel:level
                     slice:0
                     withBytes:&params->data[buffer_offset]
                     bytesPerRow:level_width * params->desc.texel_size
                     bytesPerImage:level_height * level_width * params->desc.texel_size];
-            buffer_offset += level_height * level_width * params->desc.texel_size;
+            buffer_offset += level_depth * level_height * level_width * params->desc.texel_size;
         }
 
         command_buffer = [runner->queue commandBuffer];
@@ -896,7 +906,7 @@ static struct resource_readback *metal_runner_get_resource_readback(struct shade
     rb = malloc(sizeof(*rb));
     rb->rb.width = resource->r.desc.width;
     rb->rb.height = resource->r.desc.height;
-    rb->rb.depth = 1;
+    rb->rb.depth = resource->r.desc.depth;
     rb->rb.row_pitch = rb->rb.width * resource->r.desc.texel_size;
     rb->buffer = [runner->device newBufferWithLength:rb->rb.row_pitch * rb->rb.height
             options:DEFAULT_BUFFER_RESOURCE_OPTIONS | MTLResourceStorageModeManaged];

@@ -167,19 +167,19 @@ static inline VkBufferView create_vulkan_buffer_view(const struct vulkan_test_co
     return view;
 }
 
-static inline VkImage create_vulkan_2d_image(const struct vulkan_test_context *context, unsigned int width,
-        unsigned int height, unsigned int level_count, unsigned int layer_count, unsigned int sample_count,
-        VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
+static inline VkImage create_vulkan_image(const struct vulkan_test_context *context, VkImageType image_type,
+        unsigned int width, unsigned int height, unsigned int depth, unsigned int level_count, unsigned int layer_count,
+        unsigned int sample_count, VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
 {
     VkImageCreateInfo image_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     VkMemoryRequirements memory_reqs;
     VkImage image;
 
-    image_info.imageType = VK_IMAGE_TYPE_2D;
+    image_info.imageType = image_type;
     image_info.format = format;
     image_info.extent.width = width;
     image_info.extent.height = height;
-    image_info.extent.depth = 1;
+    image_info.extent.depth = depth;
     image_info.mipLevels = level_count;
     image_info.arrayLayers = layer_count;
     image_info.samples = max(sample_count, 1);
@@ -197,14 +197,17 @@ static inline VkImage create_vulkan_2d_image(const struct vulkan_test_context *c
     return image;
 }
 
-static inline VkImageView create_vulkan_2d_image_view(const struct vulkan_test_context *context,
-        VkImage image, VkFormat format, VkImageAspectFlags aspect_mask, unsigned int layer_count)
+static inline VkImageView create_vulkan_image_view(const struct vulkan_test_context *context, VkImage image,
+        VkFormat format, VkImageAspectFlags aspect_mask, VkImageType image_type, unsigned int layer_count)
 {
     VkImageViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     VkImageView view;
 
     view_info.image = image;
-    view_info.viewType = (layer_count > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    if (image_type == VK_IMAGE_TYPE_2D)
+        view_info.viewType = (layer_count > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    else if (image_type == VK_IMAGE_TYPE_3D)
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_3D;
     view_info.format = format;
     view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;

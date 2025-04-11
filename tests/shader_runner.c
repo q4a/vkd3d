@@ -581,24 +581,20 @@ static void parse_resource_directive(struct resource_params *resource, const cha
     }
     else if (match_string(line, "size", &line))
     {
+        resource->desc.height = resource->desc.depth = resource->desc.layer_count = 1;
+
         if (sscanf(line, "( buffer , %u ) ", &resource->desc.width) == 1)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
-            resource->desc.height = 1;
-            resource->desc.depth = 1;
         }
         else if (sscanf(line, "( raw_buffer , %u ) ", &resource->desc.width) == 1)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
-            resource->desc.height = 1;
-            resource->desc.depth = 1;
             resource->is_raw = true;
         }
         else if (sscanf(line, "( counter_buffer , %u ) ", &resource->desc.width) == 1)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_BUFFER;
-            resource->desc.height = 1;
-            resource->desc.depth = 1;
             resource->is_uav_counter = true;
             resource->stride = sizeof(uint32_t);
             resource->desc.texel_size = resource->stride;
@@ -609,18 +605,21 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         else if (sscanf(line, "( 2d , %u , %u ) ", &resource->desc.width, &resource->desc.height) == 2)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_2D;
-            resource->desc.depth = 1;
         }
         else if (sscanf(line, "( 2dms , %u , %u , %u ) ",
                 &resource->desc.sample_count, &resource->desc.width, &resource->desc.height) == 3)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_2D;
-            resource->desc.depth = 1;
         }
         else if (sscanf(line, "( 2darray , %u , %u , %u ) ", &resource->desc.width, &resource->desc.height,
-                &resource->desc.depth) == 3)
+                &resource->desc.layer_count) == 3)
         {
             resource->desc.dimension = RESOURCE_DIMENSION_2D;
+        }
+        else if (sscanf(line, "( 3d , %u , %u , %u ) ", &resource->desc.width, &resource->desc.height,
+                &resource->desc.depth) == 3)
+        {
+            resource->desc.dimension = RESOURCE_DIMENSION_3D;
         }
         else
         {
@@ -653,7 +652,7 @@ static void parse_resource_directive(struct resource_params *resource, const cha
             if (rest == line)
                 break;
 
-            if (resource->desc.depth > 1)
+            if (resource->desc.layer_count > 1)
                 fatal_error("Upload not implemented for 2d arrays.\n");
 
             vkd3d_array_reserve((void **)&resource->data, &resource->data_capacity, resource->data_size + sizeof(u), 1);
@@ -768,6 +767,7 @@ static void set_default_target(struct shader_runner *runner)
     params.desc.width = RENDER_TARGET_WIDTH;
     params.desc.height = RENDER_TARGET_HEIGHT;
     params.desc.depth = 1;
+    params.desc.layer_count = 1;
     params.desc.level_count = 1;
 
     set_resource(runner, &params);

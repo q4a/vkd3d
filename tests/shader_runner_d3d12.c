@@ -98,11 +98,12 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     {
         unsigned int level_width = get_level_dimension(params->desc.width, level);
         unsigned int level_height = get_level_dimension(params->desc.height, level);
+        unsigned int level_depth = get_level_dimension(params->desc.depth, level);
 
         resource_data[level].pData = &params->data[buffer_offset];
         resource_data[level].RowPitch = level_width * params->desc.texel_size;
         resource_data[level].SlicePitch = level_height * resource_data[level].RowPitch;
-        buffer_offset += resource_data[level].SlicePitch;
+        buffer_offset += level_depth * resource_data[level].SlicePitch;
     }
 
     state = resource_get_state(&resource->r);
@@ -122,7 +123,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
 
             resource->resource = create_default_texture_(__FILE__, __LINE__, device,
                     D3D12_RESOURCE_DIMENSION_TEXTURE2D, params->desc.width, params->desc.height,
-                    params->desc.depth, params->desc.level_count, params->desc.sample_count,
+                    params->desc.layer_count, params->desc.level_count, params->desc.sample_count,
                     params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, initial_state);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
                     NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.desc.slot));
@@ -168,12 +169,26 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             }
             else
             {
+                D3D12_RESOURCE_DIMENSION dimension;
+                unsigned int depth;
+
                 if (params->desc.sample_count > 1 && params->desc.level_count > 1)
                     fatal_error("Multisampled texture has multiple levels.\n");
 
+                if (params->desc.dimension == RESOURCE_DIMENSION_2D)
+                {
+                    dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                    depth = params->desc.layer_count;
+                }
+                else
+                {
+                    dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+                    depth = params->desc.depth;
+                }
+
                 resource->resource = create_default_texture_(__FILE__, __LINE__, device,
-                        D3D12_RESOURCE_DIMENSION_TEXTURE2D, params->desc.width, params->desc.height,
-                        params->desc.depth, params->desc.level_count, params->desc.sample_count, params->desc.format,
+                        dimension, params->desc.width, params->desc.height, depth,
+                        params->desc.level_count, params->desc.sample_count, params->desc.format,
                         /* Multisampled textures must have ALLOW_RENDER_TARGET set. */
                         (params->desc.sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0, initial_state);
                 if (params->data)
@@ -220,9 +235,25 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             }
             else
             {
-                resource->resource = create_default_texture2d(device, params->desc.width,
-                        params->desc.height, params->desc.depth, params->desc.level_count,
-                        params->desc.format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, initial_state);
+                D3D12_RESOURCE_DIMENSION dimension;
+                unsigned int depth;
+
+                if (params->desc.dimension == RESOURCE_DIMENSION_2D)
+                {
+                    dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                    depth = params->desc.layer_count;
+                }
+                else
+                {
+                    dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+                    depth = params->desc.depth;
+                }
+
+                resource->resource = create_default_texture_(__FILE__, __LINE__, device,
+                        dimension, params->desc.width, params->desc.height, depth,
+                        params->desc.level_count, 1, params->desc.format,
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, initial_state);
+
                 if (params->data)
                 {
                     upload_texture_data_with_states(resource->resource, resource_data, params->desc.level_count,

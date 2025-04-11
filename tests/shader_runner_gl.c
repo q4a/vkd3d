@@ -441,17 +441,24 @@ static void gl_runner_cleanup(struct gl_runner *runner)
     ok(ret, "Failed to terminate EGL display connection.\n");
 }
 
-static bool init_resource_2d(struct gl_resource *resource, const struct resource_params *params)
+static bool init_resource_texture(struct gl_resource *resource, const struct resource_params *params)
 {
-    unsigned int offset, w, h, i;
+    unsigned int offset, w, h, d, i;
     GLenum target;
 
-    if (params->desc.sample_count > 1)
-        target = GL_TEXTURE_2D_MULTISAMPLE;
-    else if (params->desc.depth > 1)
-        target = GL_TEXTURE_2D_ARRAY;
+    if (params->desc.dimension == RESOURCE_DIMENSION_2D)
+    {
+        if (params->desc.sample_count > 1)
+            target = GL_TEXTURE_2D_MULTISAMPLE;
+        else if (params->desc.layer_count > 1)
+            target = GL_TEXTURE_2D_ARRAY;
+        else
+            target = GL_TEXTURE_2D;
+    }
     else
-        target = GL_TEXTURE_2D;
+    {
+        target = GL_TEXTURE_3D;
+    }
     resource->target = target;
 
     resource->format = get_format_info(params->desc.format, params->is_shadow);
@@ -477,9 +484,12 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
     }
     else
     {
-        if (params->desc.depth > 1)
+        if (params->desc.dimension == RESOURCE_DIMENSION_3D)
             glTexStorage3D(target, params->desc.level_count, resource->format->internal_format,
                     params->desc.width, params->desc.height, params->desc.depth);
+        else if (params->desc.layer_count > 1)
+            glTexStorage3D(target, params->desc.level_count, resource->format->internal_format,
+                    params->desc.width, params->desc.height, params->desc.layer_count);
         else
             glTexStorage2D(target, params->desc.level_count, resource->format->internal_format,
                     params->desc.width, params->desc.height);
@@ -493,9 +503,26 @@ static bool init_resource_2d(struct gl_resource *resource, const struct resource
     {
         w = get_level_dimension(params->desc.width, i);
         h = get_level_dimension(params->desc.height, i);
-        glTexSubImage2D(target, i, 0, 0, w, h, resource->format->format,
-                resource->format->type, params->data + offset);
-        offset += w * h * params->desc.texel_size;
+        d = get_level_dimension(params->desc.depth, i);
+
+        if (params->desc.dimension == RESOURCE_DIMENSION_3D)
+        {
+            glTexSubImage3D(target, i, 0, 0, 0, w, h, d, resource->format->format,
+                    resource->format->type, params->data + offset);
+            offset += w * h * d * params->desc.texel_size;
+        }
+        else if (params->desc.layer_count > 1)
+        {
+            glTexSubImage3D(target, i, 0, 0, 0, w, h, params->desc.layer_count, resource->format->format,
+                    resource->format->type, params->data + offset);
+            offset += w * h * params->desc.layer_count * params->desc.texel_size;
+        }
+        else
+        {
+            glTexSubImage2D(target, i, 0, 0, w, h, resource->format->format,
+                    resource->format->type, params->data + offset);
+            offset += w * h * params->desc.texel_size;
+        }
     }
 
     return true;
@@ -532,7 +559,7 @@ static struct resource *gl_runner_create_resource(struct shader_runner *r, const
         case RESOURCE_TYPE_UAV:
             if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_buffer(resource, params);
-            else if (!init_resource_2d(resource, params))
+            else if (!init_resource_texture(resource, params))
                 return NULL;
             break;
 
@@ -1349,16 +1376,17 @@ static bool gl_runner_copy(struct shader_runner *r, struct resource *src, struct
 {
     struct gl_resource *s = gl_resource(src);
     struct gl_resource *d = gl_resource(dst);
-    unsigned int l, w, h;
+    unsigned int l, w, h, z;
 
-    if (src->desc.dimension == RESOURCE_DIMENSION_BUFFER || src->desc.depth > 1)
+    if (src->desc.dimension == RESOURCE_DIMENSION_BUFFER || src->desc.layer_count > 1)
         return false;
 
     for (l = 0; l < src->desc.level_count; ++l)
     {
         w = get_level_dimension(src->desc.width, l);
         h = get_level_dimension(src->desc.height, l);
-        glCopyImageSubData(s->id, s->target, l, 0, 0, 0, d->id, d->target, l, 0, 0, 0, w, h, 1);
+        z = get_level_dimension(src->desc.depth, l);
+        glCopyImageSubData(s->id, s->target, l, 0, 0, 0, d->id, d->target, l, 0, 0, 0, w, h, z);
     }
 
     return true;
@@ -1386,7 +1414,7 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
 
     rb->width = resource->r.desc.width;
     rb->height = resource->r.desc.height;
-    rb->depth = 1;
+    rb->depth = resource->r.desc.depth;
 
     rb->row_pitch = rb->width * resource->r.desc.texel_size;
     slice_pitch = rb->row_pitch * rb->height;

@@ -85,6 +85,7 @@ enum resource_dimension
 {
     RESOURCE_DIMENSION_BUFFER,
     RESOURCE_DIMENSION_2D,
+    RESOURCE_DIMENSION_3D,
 };
 
 struct resource_desc
@@ -96,7 +97,7 @@ struct resource_desc
     DXGI_FORMAT format;
     unsigned int texel_size;
     unsigned int width, height, depth;
-    unsigned int level_count;
+    unsigned int layer_count, level_count;
     unsigned int sample_count;
 };
 

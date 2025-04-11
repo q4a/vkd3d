@@ -46,6 +46,7 @@ struct d3d11_resource
     ID3D11Resource *resource;
     ID3D11Buffer *buffer;
     ID3D11Texture2D *texture;
+    ID3D11Texture3D *texture_3d;
     ID3D11RenderTargetView *rtv;
     ID3D11DepthStencilView *dsv;
     ID3D11ShaderResourceView *srv;
@@ -394,6 +395,51 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
     return buffer;
 }
 
+static unsigned int get_bind_flags(const struct resource_params *params)
+{
+    if (params->desc.type == RESOURCE_TYPE_UAV)
+        return D3D11_BIND_UNORDERED_ACCESS;
+    else if (params->desc.type == RESOURCE_TYPE_RENDER_TARGET)
+        return D3D11_BIND_RENDER_TARGET;
+    else if (params->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        return D3D11_BIND_DEPTH_STENCIL;
+    else
+        return D3D11_BIND_SHADER_RESOURCE;
+}
+
+static void init_subresource_data(D3D11_SUBRESOURCE_DATA *resource_data, const struct resource_params *params)
+{
+    unsigned int buffer_offset = 0;
+
+    for (unsigned int level = 0; level < params->desc.level_count; ++level)
+    {
+        unsigned int level_width = get_level_dimension(params->desc.width, level);
+        unsigned int level_height = get_level_dimension(params->desc.height, level);
+        unsigned int level_depth = get_level_dimension(params->desc.depth, level);
+
+        resource_data[level].pSysMem = &params->data[buffer_offset];
+        resource_data[level].SysMemPitch = level_width * params->desc.texel_size;
+        resource_data[level].SysMemSlicePitch = level_height * resource_data[level].SysMemPitch;
+        buffer_offset += level_depth * resource_data[level].SysMemSlicePitch;
+    }
+}
+
+static void create_identity_view(ID3D11Device *device,
+        struct d3d11_resource *resource, const struct resource_params *params)
+{
+    HRESULT hr;
+
+    if (params->desc.type == RESOURCE_TYPE_UAV)
+        hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, NULL, &resource->uav);
+    else if (params->desc.type == RESOURCE_TYPE_RENDER_TARGET)
+        hr = ID3D11Device_CreateRenderTargetView(device, resource->resource, NULL, &resource->rtv);
+    else if (params->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        hr = ID3D11Device_CreateDepthStencilView(device, resource->resource, NULL, &resource->dsv);
+    else
+        hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, NULL, &resource->srv);
+    ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
+}
+
 static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
         const struct resource_params *params)
 {
@@ -423,36 +469,18 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     desc.Width = params->desc.width;
     desc.Height = params->desc.height;
     desc.MipLevels = params->desc.level_count;
-    desc.ArraySize = params->desc.depth;
+    desc.ArraySize = params->desc.layer_count;
     desc.Format = params->desc.format;
     desc.SampleDesc.Count = max(params->desc.sample_count, 1);
     desc.Usage = D3D11_USAGE_DEFAULT;
-    if (params->desc.type == RESOURCE_TYPE_UAV)
-        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-    else if (params->desc.type == RESOURCE_TYPE_RENDER_TARGET)
-        desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-    else if (params->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
-        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-    else
-        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    desc.BindFlags = get_bind_flags(params);
 
     if (params->data)
     {
-        unsigned int buffer_offset = 0;
-
         if (params->desc.sample_count > 1)
             fatal_error("Cannot upload data to a multisampled texture.\n");
 
-        for (unsigned int level = 0; level < params->desc.level_count; ++level)
-        {
-            unsigned int level_width = get_level_dimension(params->desc.width, level);
-            unsigned int level_height = get_level_dimension(params->desc.height, level);
-
-            resource_data[level].pSysMem = &params->data[buffer_offset];
-            resource_data[level].SysMemPitch = level_width * params->desc.texel_size;
-            resource_data[level].SysMemSlicePitch = level_height * resource_data[level].SysMemPitch;
-            buffer_offset += resource_data[level].SysMemSlicePitch;
-        }
+        init_subresource_data(resource_data, params);
         hr = ID3D11Device_CreateTexture2D(device, &desc, resource_data, &resource->texture);
     }
     else
@@ -462,16 +490,42 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
     resource->resource = (ID3D11Resource *)resource->texture;
-    if (params->desc.type == RESOURCE_TYPE_UAV)
-        hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, NULL, &resource->uav);
-    else if (params->desc.type == RESOURCE_TYPE_RENDER_TARGET)
-        hr = ID3D11Device_CreateRenderTargetView(device, resource->resource, NULL, &resource->rtv);
-    else if (params->desc.type == RESOURCE_TYPE_DEPTH_STENCIL)
-        hr = ID3D11Device_CreateDepthStencilView(device, resource->resource, NULL, &resource->dsv);
-    else
-        hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, NULL, &resource->srv);
-    ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
+    create_identity_view(device, resource, params);
+    return true;
+}
 
+static bool init_resource_3d(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
+        const struct resource_params *params)
+{
+    D3D11_SUBRESOURCE_DATA resource_data[3];
+    ID3D11Device *device = runner->device;
+    D3D11_TEXTURE3D_DESC desc = {0};
+    HRESULT hr;
+
+    if (params->desc.level_count > ARRAY_SIZE(resource_data))
+        fatal_error("Level count %u is too high.\n", params->desc.level_count);
+
+    desc.Width = params->desc.width;
+    desc.Height = params->desc.height;
+    desc.Depth = params->desc.depth;
+    desc.MipLevels = params->desc.level_count;
+    desc.Format = params->desc.format;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = get_bind_flags(params);
+
+    if (params->data)
+    {
+        init_subresource_data(resource_data, params);
+        hr = ID3D11Device_CreateTexture3D(device, &desc, resource_data, &resource->texture_3d);
+    }
+    else
+    {
+        hr = ID3D11Device_CreateTexture3D(device, &desc, NULL, &resource->texture_3d);
+    }
+    ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
+
+    resource->resource = (ID3D11Resource *)resource->texture_3d;
+    create_identity_view(device, resource, params);
     return true;
 }
 
@@ -546,14 +600,18 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
         case RESOURCE_TYPE_TEXTURE:
             if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_srv_buffer(runner, resource, params);
-            else if (!init_resource_2d(runner, resource, params))
+            else if (params->desc.dimension == RESOURCE_DIMENSION_2D && !init_resource_2d(runner, resource, params))
+                return NULL;
+            else if (params->desc.dimension == RESOURCE_DIMENSION_3D && !init_resource_3d(runner, resource, params))
                 return NULL;
             break;
 
         case RESOURCE_TYPE_UAV:
             if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_uav_buffer(runner, resource, params);
-            else if (!init_resource_2d(runner, resource, params))
+            else if (params->desc.dimension == RESOURCE_DIMENSION_2D && !init_resource_2d(runner, resource, params))
+                return NULL;
+            else if (params->desc.dimension == RESOURCE_DIMENSION_3D && !init_resource_3d(runner, resource, params))
                 return NULL;
             break;
 
@@ -945,7 +1003,6 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
     struct d3d11_resource_readback *rb = malloc(sizeof(*rb));
     ID3D11Resource *resolved_resource = NULL, *src_resource;
     struct d3d11_resource *resource = d3d11_resource(res);
-    D3D11_TEXTURE2D_DESC texture_desc;
     D3D11_MAPPED_SUBRESOURCE map_desc;
     D3D11_BUFFER_DESC buffer_desc;
     bool is_ms = false;
@@ -967,8 +1024,10 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
                 hr = ID3D11Device_CreateBuffer(runner->device, &buffer_desc, NULL, (ID3D11Buffer **)&rb->resource);
                 ok(hr == S_OK, "Failed to create buffer, hr %#lx.\n", hr);
             }
-            else
+            else if (resource->r.desc.dimension == RESOURCE_DIMENSION_2D)
             {
+                D3D11_TEXTURE2D_DESC texture_desc;
+
                 ID3D11Texture2D_GetDesc(resource->texture, &texture_desc);
                 is_ms = texture_desc.SampleDesc.Count > 1;
                 texture_desc.SampleDesc.Count = 1;
@@ -990,6 +1049,19 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
                             resource->resource, 0, texture_desc.Format);
                     src_resource = resolved_resource;
                 }
+            }
+            else if (resource->r.desc.dimension == RESOURCE_DIMENSION_3D)
+            {
+                D3D11_TEXTURE3D_DESC texture_desc;
+
+                ID3D11Texture3D_GetDesc(resource->texture_3d, &texture_desc);
+                texture_desc.Usage = D3D11_USAGE_STAGING;
+                texture_desc.BindFlags = 0;
+                texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+                texture_desc.MiscFlags = 0;
+                hr = ID3D11Device_CreateTexture3D(runner->device, &texture_desc,
+                        NULL, (ID3D11Texture3D **)&rb->resource);
+                ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
             }
             break;
 
@@ -1013,7 +1085,7 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
     rb->rb.row_pitch = map_desc.RowPitch;
     rb->rb.width = resource->r.desc.width;
     rb->rb.height = resource->r.desc.height;
-    rb->rb.depth = 1;
+    rb->rb.depth = resource->r.desc.depth;
     rb->sub_resource_idx = sub_resource_idx;
 
     return &rb->rb;
