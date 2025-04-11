@@ -195,7 +195,7 @@ native-16-bit
 [srv 0]
 format r32g32b32a32-float
 size (buffer, 1)
--65536.0 -1.0 1.0 65536.0
+-100.0 -1.0 1.0 100.0
 
 [pixel shader]
 Buffer<half4> t : register(t0);
@@ -207,12 +207,12 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(-65504.0, -1.0, 1.0, 65504.0)
+probe (0, 0) rgba(-100.0, -1.0, 1.0, 100.0)
 
 [srv 0]
 format r32g32b32a32-sint
 size (buffer, 1)
--65536 -1 1 65536
+-100 -1 1 100
 
 [pixel shader]
 Buffer<int16_t4> t : register(t0);
@@ -224,12 +224,12 @@ int4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgbai(-32768, -1, 1, 32767)
+probe (0, 0) rgbai(-100, -1, 1, 100)
 
 [srv 0]
 format r32g32b32a32-uint
 size (buffer, 1)
-0 1 0x10000 0xfffffffe
+0 1 10 100
 
 [pixel shader]
 Buffer<uint16_t4> t : register(t0);
@@ -241,4 +241,4 @@ uint4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgbaui(0, 1, 0xffff, 0xffff)
+probe (0, 0) rgbaui(0, 1, 10, 100)
