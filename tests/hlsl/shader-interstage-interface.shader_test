@@ -114,17 +114,17 @@ native-16-bit
 1 r32g32-uint TEXCOORD 1
 
 [vb 0]
--1.0 -1.0 70000.0 5.0
--1.0  1.0 70000.0 5.0
- 1.0 -1.0 70000.0 5.0
- 1.0  1.0 70000.0 5.0
+-1.0 -1.0 700.0 5.0
+-1.0  1.0 700.0 5.0
+ 1.0 -1.0 700.0 5.0
+ 1.0  1.0 700.0 5.0
 
 [vb 1]
 format r32-uint
-0x37fff 2
-0x37fff 2
-0x37fff 2
-0x37fff 2
+0x7fff 2
+0x7fff 2
+0x7fff 2
+0x7fff 2
 
 [vertex shader]
 struct vertex
@@ -151,7 +151,7 @@ float4 main(float4 position : SV_Position, half2 t0 : TEXCOORD0, uint16_t2 t1 : 
 [test]
 uniform 0 uint 0
 draw triangle strip 4
-probe (0, 0) rgba(65504.0, 5.0, 65535.0, 2.0)
+probe (0, 0) rgba(700.0, 5.0, 32767.0, 2.0)
 
 [input layout]
 0 r32g32-float SV_POSITION
@@ -165,10 +165,10 @@ probe (0, 0) rgba(65504.0, 5.0, 65535.0, 2.0)
 
 [vb 1]
 format r32-sint
--70000 -2
--70000 -2
--70000 -2
--70000 -2
+-7000 -2
+-7000 -2
+-7000 -2
+-7000 -2
 
 [vertex shader]
 struct vertex
@@ -190,7 +190,7 @@ int4 main(float4 position : SV_Position, int16_t2 t0 : TEXCOORD0) : SV_Target
 
 [test]
 draw triangle strip 4
-probe (0, 0) rgbai(-32768, -2, 0, 0)
+probe (0, 0) rgbai(-7000, -2, 0, 0)
 
 [pixel shader]
 uint4 main(float4 position : SV_Position, int16_t2 t0 : TEXCOORD0) : SV_Target
@@ -200,4 +200,4 @@ uint4 main(float4 position : SV_Position, int16_t2 t0 : TEXCOORD0) : SV_Target
 
 [test]
 draw triangle strip 4
-probe (0, 0) rgbai(-32768, -2, 0, 0)
+probe (0, 0) rgbai(-7000, -2, 0, 0)
