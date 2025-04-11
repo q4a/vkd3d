@@ -2057,24 +2057,28 @@ struct hlsl_ir_node *hlsl_block_add_resource_load(struct hlsl_ctx *ctx, struct h
     return append_new_instr(ctx, block, hlsl_new_resource_load(ctx, params, loc));
 }
 
-static struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,
-        struct hlsl_ir_node *coords, struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc)
+static struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, enum hlsl_resource_store_type type,
+        const struct hlsl_deref *resource, struct hlsl_ir_node *coords, struct hlsl_ir_node *value,
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_resource_store *store;
 
     if (!(store = hlsl_alloc(ctx, sizeof(*store))))
         return NULL;
     init_node(&store->node, HLSL_IR_RESOURCE_STORE, NULL, loc);
+    store->store_type = type;
+
     hlsl_copy_deref(ctx, &store->resource, resource);
     hlsl_src_from_node(&store->coords, coords);
     hlsl_src_from_node(&store->value, value);
     return &store->node;
 }
 
-void hlsl_block_add_resource_store(struct hlsl_ctx *ctx, struct hlsl_block *block, const struct hlsl_deref *resource,
-        struct hlsl_ir_node *coords, struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc)
+void hlsl_block_add_resource_store(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        enum hlsl_resource_store_type type, const struct hlsl_deref *resource, struct hlsl_ir_node *coords,
+        struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc)
 {
-    append_new_instr(ctx, block, hlsl_new_resource_store(ctx, resource, coords, value, loc));
+    append_new_instr(ctx, block, hlsl_new_resource_store(ctx, type, resource, coords, value, loc));
 }
 
 struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned int component_count,
@@ -2593,6 +2597,7 @@ static struct hlsl_ir_node *clone_resource_store(struct hlsl_ctx *ctx,
     if (!(dst = hlsl_alloc(ctx, sizeof(*dst))))
         return NULL;
     init_node(&dst->node, HLSL_IR_RESOURCE_STORE, NULL, &src->node.loc);
+    dst->store_type = src->store_type;
     if (!clone_deref(ctx, map, &dst->resource, &src->resource))
     {
         vkd3d_free(dst);
@@ -3724,12 +3729,25 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
 
 static void dump_ir_resource_store(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_resource_store *store)
 {
-    vkd3d_string_buffer_printf(buffer, "store_resource(resource = ");
+    static const char *const type_names[] =
+    {
+        [HLSL_RESOURCE_STORE]          = "store_resource",
+        [HLSL_RESOURCE_STREAM_APPEND]  = "stream_append",
+    };
+
+    VKD3D_ASSERT(store->store_type < ARRAY_SIZE(type_names));
+    vkd3d_string_buffer_printf(buffer, "%s(resource = ", type_names[store->store_type]);
     dump_deref(buffer, &store->resource);
-    vkd3d_string_buffer_printf(buffer, ", coords = ");
-    dump_src(buffer, &store->coords);
-    vkd3d_string_buffer_printf(buffer, ", value = ");
-    dump_src(buffer, &store->value);
+    if (store->coords.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", coords = ");
+        dump_src(buffer, &store->coords);
+    }
+    if (store->value.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", value = ");
+        dump_src(buffer, &store->value);
+    }
     vkd3d_string_buffer_printf(buffer, ")");
 }
 

@@ -5359,8 +5359,10 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             var = store->resource.var;
             var->last_read = max(var->last_read, last_read);
             deref_mark_last_read(&store->resource, last_read);
-            store->coords.node->last_read = last_read;
-            store->value.node->last_read = last_read;
+            if (store->coords.node)
+                store->coords.node->last_read = last_read;
+            if (store->value.node)
+                store->value.node->last_read = last_read;
             break;
         }
         case HLSL_IR_SWIZZLE:
@@ -10631,6 +10633,12 @@ static bool sm4_generate_vsir_instr_resource_store(struct hlsl_ctx *ctx,
     struct hlsl_ir_node *instr = &store->node;
     struct vkd3d_shader_instruction *ins;
     unsigned int writemask;
+
+    if (store->store_type != HLSL_RESOURCE_STORE)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Stream output operations.");
+        return false;
+    }
 
     if (!store->resource.var->is_uniform)
     {

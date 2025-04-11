@@ -894,9 +894,16 @@ struct hlsl_ir_resource_load
     enum hlsl_sampler_dim sampling_dim;
 };
 
+enum hlsl_resource_store_type
+{
+    HLSL_RESOURCE_STORE,
+    HLSL_RESOURCE_STREAM_APPEND,
+};
+
 struct hlsl_ir_resource_store
 {
     struct hlsl_ir_node node;
+    enum hlsl_resource_store_type store_type;
     struct hlsl_deref resource;
     struct hlsl_src coords, value;
 };
@@ -1554,8 +1561,9 @@ void hlsl_block_add_loop(struct hlsl_ctx *ctx, struct hlsl_block *block,
         unsigned int unroll_limit, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_resource_load(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);
-void hlsl_block_add_resource_store(struct hlsl_ctx *ctx, struct hlsl_block *block, const struct hlsl_deref *resource,
-        struct hlsl_ir_node *coords, struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc);
+void hlsl_block_add_resource_store(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        enum hlsl_resource_store_type type, const struct hlsl_deref *resource, struct hlsl_ir_node *coords,
+        struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_simple_load(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_var *var, const struct vkd3d_shader_location *loc);
 void hlsl_block_add_simple_store(struct hlsl_ctx *ctx, struct hlsl_block *block,
