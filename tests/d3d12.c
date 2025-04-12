@@ -5996,14 +5996,10 @@ static void test_clear_unordered_access_view_image(void)
             resource_desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
             resource_desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-            if (FAILED(hr = ID3D12Device_CreateCommittedResource(device, &heap_properties,
+            hr = ID3D12Device_CreateCommittedResource(device, &heap_properties,
                     D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                    NULL, &IID_ID3D12Resource, (void **)&texture)))
-            {
-                skip("Failed to create texture, hr %#x.\n", hr);
-                vkd3d_test_pop_context();
-                continue;
-            }
+                    NULL, &IID_ID3D12Resource, (void **)&texture);
+            ok(hr == S_OK, "Got hr %#x.\n", hr);
 
             uav_desc.Format = tests[i].format;
             uav_desc.ViewDimension = uav_dimensions[d].view_dim;
