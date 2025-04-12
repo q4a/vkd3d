@@ -5912,8 +5912,8 @@ static void test_clear_unordered_access_view_image(void)
         {DXGI_FORMAT_R8G8B8A8_UINT,   1, 1, 0, 0, 1, 0, {}, {0x123,   0, 0, 0}, 0x00000023, false, true},
         {DXGI_FORMAT_R8G8B8A8_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x04030201},
         {DXGI_FORMAT_R11G11B10_FLOAT, 1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00c01001},
-        {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00000843},
-        {DXGI_FORMAT_B5G5R5A1_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00008443},
+        {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00000843, false, false, true},
+        {DXGI_FORMAT_B5G5R5A1_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00008443, false, false, true},
         {DXGI_FORMAT_B4G4R4A4_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00001123, false, false, true},
         /* Test float clears with formats. */
         {DXGI_FORMAT_R16G16_UNORM,    1, 1, 0, 0, 1, 0, {},
