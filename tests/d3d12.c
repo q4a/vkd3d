@@ -5730,6 +5730,8 @@ static void test_clear_unordered_access_view_buffer(void)
         ID3D12Device_CreateUnorderedAccessView(device, buffer, NULL, &uav_desc,
                 get_cpu_descriptor_handle(&context, gpu_heap, 0));
 
+        ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &gpu_heap);
+
         ID3D12GraphicsCommandList_ClearUnorderedAccessViewUint(command_list,
                 get_gpu_descriptor_handle(&context, gpu_heap, 1),
                 get_cpu_descriptor_handle(&context, cpu_heap, 1),
@@ -6052,6 +6054,8 @@ static void test_clear_unordered_access_view_image(void)
                 ID3D12Device_CreateUnorderedAccessView(device, texture, NULL,
                         &uav_desc, get_cpu_descriptor_handle(&context, gpu_heap, j));
             }
+
+            ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &gpu_heap);
 
             for (j = 0; j < 4; ++j)
             {
