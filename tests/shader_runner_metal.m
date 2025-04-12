@@ -27,7 +27,6 @@
 #undef BOOL
 
 static const MTLResourceOptions DEFAULT_BUFFER_RESOURCE_OPTIONS = MTLResourceCPUCacheModeDefaultCache
-        | MTLResourceStorageModeShared
         | MTLResourceHazardTrackingModeDefault;
 
 struct metal_resource
@@ -164,12 +163,29 @@ static void init_resource_buffer(struct metal_runner *runner,
 {
     id<MTLDevice> device = runner->device;
 
+    resource->buffer = [device newBufferWithLength:params->data_size
+            options:DEFAULT_BUFFER_RESOURCE_OPTIONS | MTLResourceStorageModePrivate];
+
     if (params->data)
-        resource->buffer = [device newBufferWithBytes:params->data
+    {
+        id<MTLCommandBuffer> command_buffer;
+        id<MTLBlitCommandEncoder> blit;
+        id<MTLBuffer> upload_buffer;
+
+        upload_buffer = [[device newBufferWithBytes:params->data
                 length:params->data_size
-                options:DEFAULT_BUFFER_RESOURCE_OPTIONS];
-    else
-        resource->buffer = [device newBufferWithLength:params->data_size options:DEFAULT_BUFFER_RESOURCE_OPTIONS];
+                options:DEFAULT_BUFFER_RESOURCE_OPTIONS | MTLResourceStorageModeManaged] autorelease];
+
+        command_buffer = [runner->queue commandBuffer];
+
+        blit = [command_buffer blitCommandEncoder];
+        [blit copyFromBuffer:upload_buffer sourceOffset:0 toBuffer:resource->buffer
+                destinationOffset:0 size:params->data_size];
+        [blit endEncoding];
+
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+    }
 }
 
 static void init_resource_texture(struct metal_runner *runner,
@@ -344,7 +360,7 @@ static void encode_argument_buffer(struct metal_runner *runner,
 
     encoder = [[device newArgumentEncoderWithArguments:argument_descriptors] autorelease];
     argument_buffer = [[device newBufferWithLength:encoder.encodedLength
-            options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
+            options:DEFAULT_BUFFER_RESOURCE_OPTIONS | MTLResourceStorageModeManaged] autorelease];
     [encoder setArgumentBuffer:argument_buffer offset:0];
 
     if (runner->r.uniform_count)
@@ -353,12 +369,14 @@ static void encode_argument_buffer(struct metal_runner *runner,
 
         cb = [[device newBufferWithBytes:runner->r.uniforms
                 length:runner->r.uniform_count * sizeof(*runner->r.uniforms)
-                options:DEFAULT_BUFFER_RESOURCE_OPTIONS] autorelease];
+                options:DEFAULT_BUFFER_RESOURCE_OPTIONS | MTLResourceStorageModeManaged] autorelease];
         [encoder setBuffer:cb offset:0 atIndex:0];
         [command_encoder useResource:cb
                 usage:MTLResourceUsageRead
                 stages:MTLRenderStageVertex | MTLRenderStageFragment];
     }
+
+    [argument_buffer didModifyRange:NSMakeRange(0, encoder.encodedLength)];
 
     [command_encoder setVertexBuffer:argument_buffer offset:0 atIndex:0];
     [command_encoder setFragmentBuffer:argument_buffer offset:0 atIndex:0];
@@ -618,7 +636,7 @@ static struct resource_readback *metal_runner_get_resource_readback(struct shade
     rb->rb.depth = 1;
     rb->rb.row_pitch = rb->rb.width * resource->r.desc.texel_size;
     rb->buffer = [runner->device newBufferWithLength:rb->rb.row_pitch * rb->rb.height
-            options:DEFAULT_BUFFER_RESOURCE_OPTIONS];
+            options:DEFAULT_BUFFER_RESOURCE_OPTIONS | MTLResourceStorageModeManaged];
 
     level = sub_resource_idx % resource->r.desc.level_count;
     layer = sub_resource_idx / resource->r.desc.level_count;
@@ -637,6 +655,7 @@ static struct resource_readback *metal_runner_get_resource_readback(struct shade
                 destinationOffset:0
                 destinationBytesPerRow:rb->rb.row_pitch
                 destinationBytesPerImage:0];
+        [blit synchronizeResource:rb->buffer];
         [blit endEncoding];
 
         [command_buffer commit];
