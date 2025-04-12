@@ -20242,6 +20242,13 @@ static void test_null_vbv(void)
     command_list = context.list;
     queue = context.queue;
 
+    if (is_nvidia_windows_device(context.device))
+    {
+        skip("Setting NULL VBVs is broken on NVIDIA devices, skipping.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
     context.root_signature = create_empty_root_signature(context.device,
             D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
     input_layout.pInputElementDescs = layout_desc;
