@@ -8220,7 +8220,7 @@ type_no_void:
         {
             $$ = hlsl_get_type(ctx->cur_scope, $2, true, true);
             if ($$->class != HLSL_CLASS_STRUCT)
-                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" redefined as a structure.", $2);
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" is not a structure.", $2);
             vkd3d_free($2);
         }
     | KW_RENDERTARGETVIEW
