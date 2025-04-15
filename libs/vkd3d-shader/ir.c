@@ -8358,6 +8358,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
 
         case VKD3DSPR_NULL:
         case VKD3DSPR_DEPTHOUT:
+        case VKD3DSPR_DEPTHOUTGE:
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
                     "Invalid register of type %#x used as source parameter.", src->reg.type);
             break;
