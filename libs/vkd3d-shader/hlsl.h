@@ -329,7 +329,9 @@ enum hlsl_ir_node_type
     HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
     HLSL_IR_SWITCH,
+
     HLSL_IR_INTERLOCKED,
+    HLSL_IR_SYNC,
 
     HLSL_IR_COMPILE,
     HLSL_IR_SAMPLER_STATE,
@@ -1006,6 +1008,15 @@ struct hlsl_ir_interlocked
     struct hlsl_src coords, cmp_value, value;
 };
 
+/* Represents a thread synchronization instruction such as GroupMemoryBarrier().*/
+struct hlsl_ir_sync
+{
+    struct hlsl_ir_node node;
+
+    /* Flags from enum vkd3d_shader_sync_flags. */
+    uint32_t sync_flags;
+};
+
 struct hlsl_scope
 {
     /* Item entry for hlsl_ctx.scopes. */
@@ -1343,6 +1354,12 @@ static inline struct hlsl_ir_interlocked *hlsl_ir_interlocked(const struct hlsl_
     return CONTAINING_RECORD(node, struct hlsl_ir_interlocked, node);
 }
 
+static inline struct hlsl_ir_sync *hlsl_ir_sync(const struct hlsl_ir_node *node)
+{
+    VKD3D_ASSERT(node->type == HLSL_IR_SYNC);
+    return CONTAINING_RECORD(node, struct hlsl_ir_sync, node);
+}
+
 static inline struct hlsl_ir_compile *hlsl_ir_compile(const struct hlsl_ir_node *node)
 {
     VKD3D_ASSERT(node->type == HLSL_IR_COMPILE);
@@ -1582,6 +1599,8 @@ void hlsl_block_add_store_parent(struct hlsl_ctx *ctx, struct hlsl_block *block,
         unsigned int writemask, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_swizzle(struct hlsl_ctx *ctx, struct hlsl_block *block, uint32_t s,
         unsigned int width, struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_block_add_sync(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        uint32_t sync_flags, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_uint_constant(struct hlsl_ctx *ctx, struct hlsl_block *block,
         unsigned int n, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_block_add_unary_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,

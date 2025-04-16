@@ -64,6 +64,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/asint.shader_test \
 	tests/hlsl/asuint.shader_test \
 	tests/hlsl/attributes.shader_test \
+	tests/hlsl/barriers.shader_test \
 	tests/hlsl/bitwise-assignment.shader_test \
 	tests/hlsl/bitwise.shader_test \
 	tests/hlsl/bool-cast.shader_test \

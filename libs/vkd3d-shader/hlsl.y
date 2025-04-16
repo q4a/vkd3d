@@ -574,13 +574,14 @@ static struct hlsl_default_value evaluate_static_expression(struct hlsl_ctx *ctx
                 /* fall-through */
             case HLSL_IR_CALL:
             case HLSL_IR_IF:
+            case HLSL_IR_INTERLOCKED:
             case HLSL_IR_LOOP:
             case HLSL_IR_JUMP:
             case HLSL_IR_RESOURCE_LOAD:
             case HLSL_IR_RESOURCE_STORE:
             case HLSL_IR_SWITCH:
-            case HLSL_IR_INTERLOCKED:
             case HLSL_IR_STATEBLOCK_CONSTANT:
+            case HLSL_IR_SYNC:
                 hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "Expected literal expression.");
                 break;
@@ -5110,6 +5111,67 @@ static bool intrinsic_InterlockedXor(struct hlsl_ctx *ctx,
     return intrinsic_interlocked(ctx, HLSL_INTERLOCKED_XOR, params, loc, "InterlockedXor");
 }
 
+static void validate_group_barrier_profile(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
+{
+    if (ctx->profile->type != VKD3D_SHADER_TYPE_COMPUTE || hlsl_version_lt(ctx, 5, 0))
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "Group barriers can only be used in compute shaders 5.0 or higher.");
+    }
+}
+
+static bool intrinsic_AllMemoryBarrier(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    validate_group_barrier_profile(ctx, loc);
+    return !!hlsl_block_add_sync(ctx, params->instrs, VKD3DSSF_GLOBAL_UAV
+            | VKD3DSSF_GROUP_SHARED_MEMORY, loc);
+}
+
+static bool intrinsic_AllMemoryBarrierWithGroupSync(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    validate_group_barrier_profile(ctx, loc);
+    return !!hlsl_block_add_sync(ctx, params->instrs, VKD3DSSF_GLOBAL_UAV
+            | VKD3DSSF_GROUP_SHARED_MEMORY | VKD3DSSF_THREAD_GROUP, loc);
+}
+
+static bool intrinsic_DeviceMemoryBarrier(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    if ((ctx->profile->type != VKD3D_SHADER_TYPE_COMPUTE && ctx->profile->type != VKD3D_SHADER_TYPE_PIXEL)
+            || hlsl_version_lt(ctx, 5, 0))
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "DeviceMemoryBarrier() can only be used in pixel and compute shaders 5.0 or higher.");
+    }
+    return !!hlsl_block_add_sync(ctx, params->instrs, VKD3DSSF_GLOBAL_UAV, loc);
+}
+
+static bool intrinsic_DeviceMemoryBarrierWithGroupSync(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    validate_group_barrier_profile(ctx, loc);
+    return !!hlsl_block_add_sync(ctx, params->instrs, VKD3DSSF_GLOBAL_UAV
+            | VKD3DSSF_THREAD_GROUP, loc);
+}
+
+static bool intrinsic_GroupMemoryBarrier(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    validate_group_barrier_profile(ctx, loc);
+    return !!hlsl_block_add_sync(ctx, params->instrs,
+            VKD3DSSF_GROUP_SHARED_MEMORY, loc);
+}
+
+static bool intrinsic_GroupMemoryBarrierWithGroupSync(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    validate_group_barrier_profile(ctx, loc);
+    return !!hlsl_block_add_sync(ctx, params->instrs,
+            VKD3DSSF_GROUP_SHARED_MEMORY | VKD3DSSF_THREAD_GROUP, loc);
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -5121,8 +5183,14 @@ static const struct intrinsic_function
 intrinsic_functions[] =
 {
     /* Note: these entries should be kept in alphabetical order. */
+    {"AllMemoryBarrier",                    0, true,  intrinsic_AllMemoryBarrier},
+    {"AllMemoryBarrierWithGroupSync",       0, true,  intrinsic_AllMemoryBarrierWithGroupSync},
     {"D3DCOLORtoUBYTE4",                    1, true,  intrinsic_d3dcolor_to_ubyte4},
+    {"DeviceMemoryBarrier",                 0, true,  intrinsic_DeviceMemoryBarrier},
+    {"DeviceMemoryBarrierWithGroupSync",    0, true,  intrinsic_DeviceMemoryBarrierWithGroupSync},
     {"GetRenderTargetSampleCount",          0, true,  intrinsic_GetRenderTargetSampleCount},
+    {"GroupMemoryBarrier",                  0, true,  intrinsic_GroupMemoryBarrier},
+    {"GroupMemoryBarrierWithGroupSync",     0, true,  intrinsic_GroupMemoryBarrierWithGroupSync},
     {"InterlockedAdd",                     -1, true,  intrinsic_InterlockedAdd},
     {"InterlockedAnd",                     -1, true,  intrinsic_InterlockedAnd},
     {"InterlockedCompareExchange",          4, true,  intrinsic_InterlockedCompareExchange},

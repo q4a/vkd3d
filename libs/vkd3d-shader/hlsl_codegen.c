@@ -2453,6 +2453,7 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
 
             case HLSL_IR_INTERLOCKED:
                 progress |= copy_propagation_transform_interlocked(ctx, hlsl_ir_interlocked(instr), state);
+                break;
 
             default:
                 break;
@@ -5127,11 +5128,12 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 
         case HLSL_IR_CALL:
         case HLSL_IR_IF:
+        case HLSL_IR_INTERLOCKED:
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
         case HLSL_IR_RESOURCE_STORE:
         case HLSL_IR_SWITCH:
-        case HLSL_IR_INTERLOCKED:
+        case HLSL_IR_SYNC:
             break;
         case HLSL_IR_STATEBLOCK_CONSTANT:
             /* Stateblock constants should not appear in the shader program. */
@@ -5415,6 +5417,7 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
         }
         case HLSL_IR_CONSTANT:
         case HLSL_IR_STRING_CONSTANT:
+        case HLSL_IR_SYNC:
             break;
         case HLSL_IR_COMPILE:
         case HLSL_IR_SAMPLER_STATE:
@@ -11412,6 +11415,10 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
 
             case HLSL_IR_INTERLOCKED:
                 sm4_generate_vsir_instr_interlocked(ctx, program, hlsl_ir_interlocked(instr));
+                break;
+
+            case HLSL_IR_SYNC:
+                hlsl_fixme(ctx, &instr->loc, "Sync instructions.");
                 break;
 
             default:
