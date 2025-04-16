@@ -54,3 +54,25 @@ probe (0, 0) rgbaui(0x1, 0x2, 0x3, 0x4)
 uniform 0 uint4 4 4 0 0
 todo(msl | glsl) draw quad
 probe (0, 0) rgbaui(0x2, 0x3, 0x4, 0x0)
+
+% Test correct emission of resource declarations in SM 5.1 format.
+[require]
+shader model >= 5.1
+
+[srv 1]
+format r32-typeless
+size (raw_buffer, 4)
+
+4 3 2 1
+
+[pixel shader]
+ByteAddressBuffer t : register(t1);
+
+uint4 main() : sv_target
+{
+    return t.Load4(0);
+}
+
+[test]
+todo(msl | glsl) draw quad
+probe (0, 0) rgbaui(0x4, 0x3, 0x2, 0x1)
