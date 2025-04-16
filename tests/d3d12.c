@@ -446,6 +446,22 @@ static bool is_memory_pool_L1_supported(ID3D12Device *device)
     return !architecture.UMA;
 }
 
+static bool is_gpu_upload_heap_supported(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS16 options;
+    HRESULT hr;
+
+    memset(&options, 0, sizeof(options));
+    if (FAILED(hr = ID3D12Device_CheckFeatureSupport(device,
+            D3D12_FEATURE_D3D12_OPTIONS16, &options, sizeof(options))))
+    {
+        trace("Failed to check feature support, hr %#x.\n", hr);
+        return false;
+    }
+
+    return options.GPUUploadHeapSupported;
+}
+
 static bool is_shader_float64_supported(ID3D12Device *device)
 {
     D3D12_FEATURE_DATA_D3D12_OPTIONS options;
@@ -1948,11 +1964,11 @@ static void test_create_committed_resource(void)
 
 static void test_create_heap(void)
 {
+    bool is_pool_L1_supported, gpu_upload_heap_supported;
     D3D12_FEATURE_DATA_ARCHITECTURE architecture;
     D3D12_FEATURE_DATA_D3D12_OPTIONS options;
     D3D12_HEAP_DESC desc, result_desc;
     ID3D12Device *device, *tmp_device;
-    bool is_pool_L1_supported;
     HRESULT hr, expected_hr;
     ID3D12Device4 *device4;
     unsigned int i, j;
@@ -2001,7 +2017,7 @@ static void test_create_heap(void)
         {D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0, S_OK},
         {D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_L1, E_INVALIDARG},
         {D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE, D3D12_MEMORY_POOL_L1, S_OK},
-        {D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE, D3D12_MEMORY_POOL_L1, E_INVALIDARG},
+        {D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE, D3D12_MEMORY_POOL_L1, S_OK},
         {D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L1, E_INVALIDARG},
     };
 
@@ -2145,6 +2161,7 @@ static void test_create_heap(void)
     }
 
     is_pool_L1_supported = is_memory_pool_L1_supported(device);
+    gpu_upload_heap_supported = is_gpu_upload_heap_supported(device);
     desc.Properties.Type = D3D12_HEAP_TYPE_CUSTOM;
     desc.Properties.CreationNodeMask = 1;
     desc.Properties.VisibleNodeMask = 1;
@@ -2155,7 +2172,13 @@ static void test_create_heap(void)
         desc.Properties.CPUPageProperty = custom_tests[i].page_property;
         desc.Properties.MemoryPoolPreference = custom_tests[i].pool_preference;
         hr = ID3D12Device_CreateHeap(device, &desc, &IID_ID3D12Heap, (void **)&heap);
-        expected_hr = (custom_tests[i].pool_preference != D3D12_MEMORY_POOL_L1 || is_pool_L1_supported) ? custom_tests[i].expected_hr : E_INVALIDARG;
+        expected_hr = custom_tests[i].expected_hr;
+        if (custom_tests[i].pool_preference == D3D12_MEMORY_POOL_L1 && !is_pool_L1_supported)
+            expected_hr = E_INVALIDARG;
+        if (custom_tests[i].pool_preference == D3D12_MEMORY_POOL_L1
+                && custom_tests[i].page_property == D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE
+                && !gpu_upload_heap_supported)
+            expected_hr = E_INVALIDARG;
         ok(hr == expected_hr, "Got hr %#x, expected %#x.\n", hr, expected_hr);
         if (SUCCEEDED(hr))
         {
