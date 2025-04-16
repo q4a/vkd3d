@@ -2895,6 +2895,16 @@ static void record_vectorizable_store(struct hlsl_ctx *ctx, struct hlsl_block *b
     ++state->count;
 }
 
+static void mark_store_groups_dirty(struct hlsl_ctx *ctx,
+        struct vectorize_stores_state *state, struct hlsl_ir_var *var)
+{
+    for (unsigned int i = 0; i < state->count; ++i)
+    {
+        if (state->groups[i].stores[0]->lhs.var == var)
+            state->groups[i].dirty = true;
+    }
+}
+
 static void find_vectorizable_store_groups(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct vectorize_stores_state *state)
 {
@@ -2908,20 +2918,21 @@ static void find_vectorizable_store_groups(struct hlsl_ctx *ctx, struct hlsl_blo
         }
         else if (instr->type == HLSL_IR_LOAD)
         {
-            struct hlsl_ir_var *var = hlsl_ir_load(instr)->src.var;
-
             /* By vectorizing store A with store B, we are effectively moving
              * store A down to happen at the same time as store B.
              * If there was a load of the same variable between the two, this
              * would be incorrect.
              * Therefore invalidate all stores to this variable. As above, we
              * could be more granular if necessary. */
-
-            for (unsigned int i = 0; i < state->count; ++i)
-            {
-                if (state->groups[i].stores[0]->lhs.var == var)
-                    state->groups[i].dirty = true;
-            }
+            mark_store_groups_dirty(ctx, state, hlsl_ir_load(instr)->src.var);
+        }
+        else if (instr->type == HLSL_IR_INTERLOCKED)
+        {
+            /* An interlocked operation can be used on shared memory variables,
+             * and it is at the same time both a store and a load, thus, we
+             * should also mark all stores to this variable as dirty once we
+             * find one.*/
+            mark_store_groups_dirty(ctx, state, hlsl_ir_interlocked(instr)->dst.var);
         }
         else if (instr->type == HLSL_IR_IF)
         {
