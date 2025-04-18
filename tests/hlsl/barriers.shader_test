@@ -2,7 +2,7 @@
 shader model >= 5.0
 
 % This is just a parsing test.
-[compute shader todo]
+[compute shader]
     [numthreads(1024, 1, 1)]
 void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 {

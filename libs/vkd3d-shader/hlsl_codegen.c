@@ -11278,6 +11278,19 @@ static bool sm4_generate_vsir_instr_jump(struct hlsl_ctx *ctx,
     }
 }
 
+static bool sm4_generate_vsir_instr_sync(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_ir_sync *sync)
+{
+    const struct hlsl_ir_node *instr = &sync->node;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VKD3DSIH_SYNC, 0, 0)))
+        return false;
+    ins->flags = sync->sync_flags;
+
+    return true;
+}
+
 static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *block, struct vsir_program *program);
 
 static void sm4_generate_vsir_instr_if(struct hlsl_ctx *ctx, struct vsir_program *program, struct hlsl_ir_if *iff)
@@ -11429,7 +11442,7 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
                 break;
 
             case HLSL_IR_SYNC:
-                hlsl_fixme(ctx, &instr->loc, "Sync instructions.");
+                sm4_generate_vsir_instr_sync(ctx, program, hlsl_ir_sync(instr));
                 break;
 
             default:
