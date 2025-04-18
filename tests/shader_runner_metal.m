@@ -270,6 +270,9 @@ static void init_resource_texture(struct metal_runner *runner,
         case RESOURCE_DIMENSION_3D:
             desc.textureType = MTLTextureType3D;
             break;
+        case RESOURCE_DIMENSION_CUBE:
+            desc.textureType = MTLTextureTypeCube;
+            break;
         default:
             fatal_error("Unhandled resource dimension %#x.\n", params->desc.dimension);
     }
@@ -278,7 +281,10 @@ static void init_resource_texture(struct metal_runner *runner,
     desc.width = params->desc.width;
     desc.height = params->desc.height;
     desc.depth = params->desc.depth;
-    desc.arrayLength = params->desc.layer_count;
+    if (params->desc.dimension == RESOURCE_DIMENSION_CUBE)
+        desc.arrayLength = params->desc.layer_count / 6;
+    else
+        desc.arrayLength = params->desc.layer_count;
     desc.mipmapLevelCount = params->desc.level_count;
     desc.sampleCount = max(params->desc.sample_count, 1);
     desc.storageMode = MTLStorageModePrivate;
@@ -304,7 +310,7 @@ static void init_resource_texture(struct metal_runner *runner,
 
     if (params->data)
     {
-        unsigned int buffer_offset = 0, level, level_width, level_height, level_depth;
+        unsigned int buffer_offset = 0, layer, level, level_width, level_height, level_depth;
         id<MTLCommandBuffer> command_buffer;
         id<MTLBlitCommandEncoder> blit;
         id<MTLTexture> upload_texture;
@@ -320,13 +326,17 @@ static void init_resource_texture(struct metal_runner *runner,
             level_width  = get_level_dimension(params->desc.width, level);
             level_height = get_level_dimension(params->desc.height, level);
             level_depth = get_level_dimension(params->desc.depth, level);
-            [upload_texture replaceRegion:MTLRegionMake3D(0, 0, 0, level_width, level_height, level_depth)
-                    mipmapLevel:level
-                    slice:0
-                    withBytes:&params->data[buffer_offset]
-                    bytesPerRow:level_width * params->desc.texel_size
-                    bytesPerImage:level_height * level_width * params->desc.texel_size];
-            buffer_offset += level_depth * level_height * level_width * params->desc.texel_size;
+
+            for (layer = 0; layer < params->desc.layer_count; ++layer)
+            {
+                [upload_texture replaceRegion:MTLRegionMake3D(0, 0, 0, level_width, level_height, level_depth)
+                        mipmapLevel:level
+                        slice:layer
+                        withBytes:&params->data[buffer_offset]
+                        bytesPerRow:level_width * params->desc.texel_size
+                        bytesPerImage:level_height * level_width * params->desc.texel_size];
+                buffer_offset += level_depth * level_height * level_width * params->desc.texel_size;
+            }
         }
 
         command_buffer = [runner->queue commandBuffer];

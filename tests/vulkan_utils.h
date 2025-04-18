@@ -169,12 +169,14 @@ static inline VkBufferView create_vulkan_buffer_view(const struct vulkan_test_co
 
 static inline VkImage create_vulkan_image(const struct vulkan_test_context *context, VkImageType image_type,
         unsigned int width, unsigned int height, unsigned int depth, unsigned int level_count, unsigned int layer_count,
-        unsigned int sample_count, VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
+        unsigned int sample_count, VkImageUsageFlags usage, VkFormat format,
+        VkImageCreateFlags flags, VkDeviceMemory *memory)
 {
     VkImageCreateInfo image_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     VkMemoryRequirements memory_reqs;
     VkImage image;
 
+    image_info.flags = flags;
     image_info.imageType = image_type;
     image_info.format = format;
     image_info.extent.width = width;
@@ -198,13 +200,15 @@ static inline VkImage create_vulkan_image(const struct vulkan_test_context *cont
 }
 
 static inline VkImageView create_vulkan_image_view(const struct vulkan_test_context *context, VkImage image,
-        VkFormat format, VkImageAspectFlags aspect_mask, VkImageType image_type, unsigned int layer_count)
+        VkFormat format, VkImageAspectFlags aspect_mask, VkImageType image_type, bool cube, unsigned int layer_count)
 {
     VkImageViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     VkImageView view;
 
     view_info.image = image;
-    if (image_type == VK_IMAGE_TYPE_2D)
+    if (cube)
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    else if (image_type == VK_IMAGE_TYPE_2D)
         view_info.viewType = (layer_count > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
     else if (image_type == VK_IMAGE_TYPE_3D)
         view_info.viewType = VK_IMAGE_VIEW_TYPE_3D;

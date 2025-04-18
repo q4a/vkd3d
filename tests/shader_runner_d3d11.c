@@ -417,10 +417,14 @@ static void init_subresource_data(D3D11_SUBRESOURCE_DATA *resource_data, const s
         unsigned int level_height = get_level_dimension(params->desc.height, level);
         unsigned int level_depth = get_level_dimension(params->desc.depth, level);
 
-        resource_data[level].pSysMem = &params->data[buffer_offset];
-        resource_data[level].SysMemPitch = level_width * params->desc.texel_size;
-        resource_data[level].SysMemSlicePitch = level_height * resource_data[level].SysMemPitch;
-        buffer_offset += level_depth * resource_data[level].SysMemSlicePitch;
+        for (unsigned int layer = 0; layer < params->desc.layer_count; ++layer)
+        {
+            D3D11_SUBRESOURCE_DATA *subresource = &resource_data[level * params->desc.layer_count + layer];
+            subresource->pSysMem = &params->data[buffer_offset];
+            subresource->SysMemPitch = level_width * params->desc.texel_size;
+            subresource->SysMemSlicePitch = level_height * subresource->SysMemPitch;
+            buffer_offset += level_depth * subresource->SysMemSlicePitch;
+        }
     }
 }
 
@@ -443,7 +447,7 @@ static void create_identity_view(ID3D11Device *device,
 static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
         const struct resource_params *params)
 {
-    D3D11_SUBRESOURCE_DATA resource_data[3];
+    D3D11_SUBRESOURCE_DATA resource_data[6];
     ID3D11Device *device = runner->device;
     D3D11_TEXTURE2D_DESC desc = {0};
     UINT quality_levels;
@@ -475,6 +479,9 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = get_bind_flags(params);
 
+    if (params->desc.dimension == RESOURCE_DIMENSION_CUBE)
+        desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+
     if (params->data)
     {
         if (params->desc.sample_count > 1)
@@ -497,7 +504,7 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
 static bool init_resource_3d(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
         const struct resource_params *params)
 {
-    D3D11_SUBRESOURCE_DATA resource_data[3];
+    D3D11_SUBRESOURCE_DATA resource_data[6];
     ID3D11Device *device = runner->device;
     D3D11_TEXTURE3D_DESC desc = {0};
     HRESULT hr;
@@ -600,7 +607,9 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
         case RESOURCE_TYPE_TEXTURE:
             if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_srv_buffer(runner, resource, params);
-            else if (params->desc.dimension == RESOURCE_DIMENSION_2D && !init_resource_2d(runner, resource, params))
+            else if ((params->desc.dimension == RESOURCE_DIMENSION_2D
+                    || params->desc.dimension == RESOURCE_DIMENSION_CUBE)
+                    && !init_resource_2d(runner, resource, params))
                 return NULL;
             else if (params->desc.dimension == RESOURCE_DIMENSION_3D && !init_resource_3d(runner, resource, params))
                 return NULL;

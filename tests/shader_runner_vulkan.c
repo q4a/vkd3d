@@ -97,6 +97,7 @@ static void resource_init_texture(struct vulkan_shader_runner *runner, struct vu
     VkDevice device = context->device;
     unsigned int buffer_offset = 0;
     VkDeviceMemory staging_memory;
+    VkImageCreateFlags flags = 0;
     VkBuffer staging_buffer;
     VkImageType image_type;
     void *data;
@@ -112,10 +113,14 @@ static void resource_init_texture(struct vulkan_shader_runner *runner, struct vu
     else
         image_type = VK_IMAGE_TYPE_2D;
 
+    if (params->desc.dimension == RESOURCE_DIMENSION_CUBE)
+        flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
     resource->image = create_vulkan_image(context, image_type, desc->width, desc->height, desc->depth,
-            desc->level_count, desc->layer_count, desc->sample_count, usage, format, &resource->memory);
+            desc->level_count, desc->layer_count, desc->sample_count, usage, format, flags, &resource->memory);
     resource->image_view = create_vulkan_image_view(context,
-            resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT, image_type, layer_count);
+            resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT, image_type,
+            (params->desc.dimension == RESOURCE_DIMENSION_CUBE), layer_count);
 
     if (!params->data)
     {
@@ -142,19 +147,24 @@ static void resource_init_texture(struct vulkan_shader_runner *runner, struct vu
         unsigned int level_width = get_level_dimension(params->desc.width, level);
         unsigned int level_height = get_level_dimension(params->desc.height, level);
         unsigned int level_depth = get_level_dimension(params->desc.depth, level);
-        VkBufferImageCopy region = {0};
 
-        region.bufferOffset = buffer_offset;
-        region.imageSubresource.mipLevel = level;
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.layerCount = 1;
-        region.imageExtent.width = level_width;
-        region.imageExtent.height = level_height;
-        region.imageExtent.depth = level_depth;
-        VK_CALL(vkCmdCopyBufferToImage(context->cmd_buffer, staging_buffer, resource->image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+        for (unsigned int layer = 0; layer < params->desc.layer_count; ++layer)
+        {
+            VkBufferImageCopy region = {0};
 
-        buffer_offset += level_depth * level_width * level_height * params->desc.texel_size;
+            region.bufferOffset = buffer_offset;
+            region.imageSubresource.mipLevel = level;
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.baseArrayLayer = layer;
+            region.imageSubresource.layerCount = 1;
+            region.imageExtent.width = level_width;
+            region.imageExtent.height = level_height;
+            region.imageExtent.depth = level_depth;
+            VK_CALL(vkCmdCopyBufferToImage(context->cmd_buffer, staging_buffer, resource->image,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+
+            buffer_offset += level_depth * level_width * level_height * params->desc.texel_size;
+        }
     }
 
     transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -214,9 +224,10 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 
             resource->image = create_vulkan_image(context, VK_IMAGE_TYPE_2D,
                     desc->width, desc->height, 1, desc->level_count, desc->layer_count, desc->sample_count,
-                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
+                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                    format, 0, &resource->memory);
             resource->image_view = create_vulkan_image_view(context,
-                    resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_TYPE_2D, layer_count);
+                    resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_TYPE_2D, false, layer_count);
 
             begin_command_buffer(context);
             transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_COLOR_BIT, 0,
@@ -230,9 +241,9 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             resource->image = create_vulkan_image(context, VK_IMAGE_TYPE_2D,
                     desc->width, desc->height, 1, desc->level_count, desc->layer_count, desc->sample_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                    format, &resource->memory);
+                    format, 0, &resource->memory);
             resource->image_view = create_vulkan_image_view(context,
-                    resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_TYPE_2D, layer_count);
+                    resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_TYPE_2D, false, layer_count);
 
             begin_command_buffer(context);
             transition_image_layout(context, resource->image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, layer_count,
@@ -1503,7 +1514,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
                     resolved_desc.width, resolved_desc.height, resolved_desc.depth,
                     resolved_desc.level_count, resolved_desc.layer_count, resolved_desc.sample_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                    vkd3d_get_vk_format(resource->r.desc.format), &resolved_memory);
+                    vkd3d_get_vk_format(resource->r.desc.format), 0, &resolved_memory);
             transition_image_layout(context, resolved_image, VK_IMAGE_ASPECT_COLOR_BIT, layer,
                     1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 

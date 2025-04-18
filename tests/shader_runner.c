@@ -621,6 +621,12 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         {
             resource->desc.dimension = RESOURCE_DIMENSION_3D;
         }
+        else if (sscanf(line, "( cube , %u ) ", &resource->desc.width) == 1)
+        {
+            resource->desc.dimension = RESOURCE_DIMENSION_CUBE;
+            resource->desc.height = resource->desc.width;
+            resource->desc.layer_count = 6;
+        }
         else
         {
             fatal_error("Malformed resource size '%s'.\n", line);
@@ -651,9 +657,6 @@ static void parse_resource_directive(struct resource_params *resource, const cha
 
             if (rest == line)
                 break;
-
-            if (resource->desc.layer_count > 1)
-                fatal_error("Upload not implemented for 2d arrays.\n");
 
             vkd3d_array_reserve((void **)&resource->data, &resource->data_capacity, resource->data_size + sizeof(u), 1);
             memcpy(resource->data + resource->data_size, &u, sizeof(u));

@@ -83,7 +83,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
     ID3D12Device *device = test_context->device;
-    D3D12_SUBRESOURCE_DATA resource_data[3] = {0};
+    D3D12_SUBRESOURCE_DATA resource_data[6] = {0};
     D3D12_RESOURCE_STATES initial_state, state;
     struct d3d12_resource *resource;
     unsigned int buffer_offset = 0;
@@ -100,10 +100,14 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
         unsigned int level_height = get_level_dimension(params->desc.height, level);
         unsigned int level_depth = get_level_dimension(params->desc.depth, level);
 
-        resource_data[level].pData = &params->data[buffer_offset];
-        resource_data[level].RowPitch = level_width * params->desc.texel_size;
-        resource_data[level].SlicePitch = level_height * resource_data[level].RowPitch;
-        buffer_offset += level_depth * resource_data[level].SlicePitch;
+        for (unsigned int layer = 0; layer < params->desc.layer_count; ++layer)
+        {
+            D3D12_SUBRESOURCE_DATA *subresource = &resource_data[level * params->desc.layer_count + layer];
+            subresource->pData = &params->data[buffer_offset];
+            subresource->RowPitch = level_width * params->desc.texel_size;
+            subresource->SlicePitch = level_height * subresource->RowPitch;
+            buffer_offset += level_depth * subresource->SlicePitch;
+        }
     }
 
     state = resource_get_state(&resource->r);
@@ -175,15 +179,15 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 if (params->desc.sample_count > 1 && params->desc.level_count > 1)
                     fatal_error("Multisampled texture has multiple levels.\n");
 
-                if (params->desc.dimension == RESOURCE_DIMENSION_2D)
-                {
-                    dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-                    depth = params->desc.layer_count;
-                }
-                else
+                if (params->desc.dimension == RESOURCE_DIMENSION_3D)
                 {
                     dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
                     depth = params->desc.depth;
+                }
+                else
+                {
+                    dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                    depth = params->desc.layer_count;
                 }
 
                 resource->resource = create_default_texture_(__FILE__, __LINE__, device,
@@ -195,13 +199,32 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 {
                     if (params->desc.sample_count > 1)
                         fatal_error("Cannot upload data to a multisampled texture.\n");
-                    upload_texture_data_with_states(resource->resource, resource_data, params->desc.level_count,
+                    upload_texture_data_with_states(resource->resource, resource_data,
+                            params->desc.level_count * params->desc.layer_count,
                             test_context->queue, test_context->list, RESOURCE_STATE_DO_NOT_CHANGE, state);
                     reset_command_list(test_context->list, test_context->allocator);
                 }
 
-                ID3D12Device_CreateShaderResourceView(device, resource->resource,
-                        NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot));
+                if (params->desc.dimension == RESOURCE_DIMENSION_CUBE)
+                {
+                    D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc =
+                    {
+                        .Format = params->desc.format,
+                        .ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE,
+                        .Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                        .TextureCube.MostDetailedMip = 0,
+                        .TextureCube.MipLevels = params->desc.level_count,
+                        .TextureCube.ResourceMinLODClamp = 0.0f,
+                    };
+
+                    ID3D12Device_CreateShaderResourceView(device, resource->resource,
+                            &srv_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot));
+                }
+                else
+                {
+                    ID3D12Device_CreateShaderResourceView(device, resource->resource,
+                            NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.desc.slot));
+                }
             }
             break;
 
@@ -256,7 +279,8 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
 
                 if (params->data)
                 {
-                    upload_texture_data_with_states(resource->resource, resource_data, params->desc.level_count,
+                    upload_texture_data_with_states(resource->resource, resource_data,
+                            params->desc.level_count * params->desc.layer_count,
                             test_context->queue, test_context->list, RESOURCE_STATE_DO_NOT_CHANGE, state);
                     reset_command_list(test_context->list, test_context->allocator);
                 }

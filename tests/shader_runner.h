@@ -86,6 +86,7 @@ enum resource_dimension
     RESOURCE_DIMENSION_BUFFER,
     RESOURCE_DIMENSION_2D,
     RESOURCE_DIMENSION_3D,
+    RESOURCE_DIMENSION_CUBE,
 };
 
 struct resource_desc

@@ -31,6 +31,7 @@ struct d3d9_resource
 {
     struct resource r;
 
+    IDirect3DCubeTexture9 *cube;
     IDirect3DSurface9 *surface;
     IDirect3DTexture9 *texture;
     IDirect3DVertexBuffer9 *vb;
@@ -291,6 +292,34 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
                 }
                 break;
             }
+            else if (params->desc.dimension == RESOURCE_DIMENSION_CUBE)
+            {
+                hr = IDirect3DDevice9_CreateCubeTexture(device, params->desc.width,
+                        params->desc.level_count, 0, format, D3DPOOL_MANAGED, &resource->cube, NULL);
+                ok(hr == D3D_OK, "Failed to create texture, hr %#lx.\n", hr);
+
+                for (unsigned int level = 0; level < params->desc.level_count; ++level)
+                {
+                    unsigned int level_width = get_level_dimension(params->desc.width, level);
+                    unsigned int src_row_pitch = level_width * params->desc.texel_size;
+                    unsigned int src_slice_pitch = level_width * src_row_pitch;
+                    D3DLOCKED_RECT map_desc;
+
+                    for (unsigned int face = 0; face < 6; ++face)
+                    {
+                        hr = IDirect3DCubeTexture9_LockRect(resource->cube, face, level, &map_desc, NULL, 0);
+                        ok(hr == D3D_OK, "Failed to map texture, hr %#lx.\n", hr);
+                        for (unsigned int y = 0; y < level_width; ++y)
+                            memcpy(&((uint8_t *)map_desc.pBits)[y * map_desc.Pitch],
+                                    &params->data[src_buffer_offset + y * src_row_pitch], src_row_pitch);
+                        hr = IDirect3DCubeTexture9_UnlockRect(resource->cube, face, level);
+                        ok(hr == D3D_OK, "Failed to unmap texture, hr %#lx.\n", hr);
+
+                        src_buffer_offset += src_slice_pitch;
+                    }
+                }
+                break;
+            }
         }
 
         case RESOURCE_TYPE_UAV:
@@ -317,6 +346,8 @@ static void d3d9_runner_destroy_resource(struct shader_runner *r, struct resourc
 {
     struct d3d9_resource *resource = d3d9_resource(res);
 
+    if (resource->cube)
+        IDirect3DCubeTexture9_Release(resource->cube);
     if (resource->surface)
         IDirect3DSurface9_Release(resource->surface);
     if (resource->texture)
@@ -461,9 +492,12 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 if (resource->r.desc.dimension == RESOURCE_DIMENSION_2D)
                     hr = IDirect3DDevice9_SetTexture(device, resource->r.desc.slot,
                             (IDirect3DBaseTexture9 *)resource->texture);
-                else
+                else if (resource->r.desc.dimension == RESOURCE_DIMENSION_3D)
                     hr = IDirect3DDevice9_SetTexture(device, resource->r.desc.slot,
                             (IDirect3DBaseTexture9 *)resource->volume);
+                else
+                    hr = IDirect3DDevice9_SetTexture(device, resource->r.desc.slot,
+                            (IDirect3DBaseTexture9 *)resource->cube);
                 ok(hr == D3D_OK, "Failed to set texture, hr %#lx.\n", hr);
                 break;
 

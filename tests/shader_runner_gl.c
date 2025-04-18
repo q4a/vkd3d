@@ -455,9 +455,13 @@ static bool init_resource_texture(struct gl_resource *resource, const struct res
         else
             target = GL_TEXTURE_2D;
     }
-    else
+    else if (params->desc.dimension == RESOURCE_DIMENSION_3D)
     {
         target = GL_TEXTURE_3D;
+    }
+    else
+    {
+        target = GL_TEXTURE_CUBE_MAP;
     }
     resource->target = target;
 
@@ -487,7 +491,7 @@ static bool init_resource_texture(struct gl_resource *resource, const struct res
         if (params->desc.dimension == RESOURCE_DIMENSION_3D)
             glTexStorage3D(target, params->desc.level_count, resource->format->internal_format,
                     params->desc.width, params->desc.height, params->desc.depth);
-        else if (params->desc.layer_count > 1)
+        else if (params->desc.layer_count > 1 && params->desc.dimension != RESOURCE_DIMENSION_CUBE)
             glTexStorage3D(target, params->desc.level_count, resource->format->internal_format,
                     params->desc.width, params->desc.height, params->desc.layer_count);
         else
@@ -510,6 +514,25 @@ static bool init_resource_texture(struct gl_resource *resource, const struct res
             glTexSubImage3D(target, i, 0, 0, 0, w, h, d, resource->format->format,
                     resource->format->type, params->data + offset);
             offset += w * h * d * params->desc.texel_size;
+        }
+        else if (params->desc.dimension == RESOURCE_DIMENSION_CUBE)
+        {
+            static const GLenum faces[] =
+            {
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+                GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+                GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+                GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
+                GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
+                GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
+            };
+
+            for (unsigned int face = 0; face < 6; ++face)
+            {
+                glTexSubImage2D(faces[face], i, 0, 0, w, h, resource->format->format,
+                        resource->format->type, params->data + offset);
+                offset += w * h * params->desc.texel_size;
+            }
         }
         else if (params->desc.layer_count > 1)
         {
