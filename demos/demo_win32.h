@@ -17,92 +17,84 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include <vkd3d_dxgi1_4.h>
-#include <vkd3d_d3dcompiler.h>
-#include <stdbool.h>
-#include <stdio.h>
+#define DEMO_WIN32_WINDOW_CLASS_NAME L"demo_wc"
 
-#define DEMO_WINDOW_CLASS_NAME L"demo_wc"
-
-struct demo
+struct demo_window_win32
 {
-    size_t window_count;
-    bool quit;
+    struct demo_window w;
 
-    void *user_data;
-    void (*idle_func)(struct demo *demo, void *user_data);
-
-    UINT (*GetDpiForSystem)(void);
-};
-
-struct demo_window
-{
     HINSTANCE instance;
-    HWND hwnd;
-    struct demo *demo;
-    void *user_data;
-    void (*expose_func)(struct demo_window *window, void *user_data);
-    void (*key_press_func)(struct demo_window *window, demo_key key, void *user_data);
+    HWND window;
 };
 
-struct demo_swapchain
+static void demo_window_win32_destroy(struct demo_window *window)
 {
-    IDXGISwapChain3 *swapchain;
-};
+    struct demo_window_win32 *window_win32 = CONTAINING_RECORD(window, struct demo_window_win32, w);
 
-static inline void demo_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
-{
-    *dpi_x = *dpi_y = demo->GetDpiForSystem();
+    DestroyWindow(window_win32->window);
 }
 
-static inline struct demo_window *demo_window_create(struct demo *demo, const char *title,
+static void demo_window_win32_destroyed(struct demo_window *window)
+{
+    struct demo_window_win32 *window_win32 = CONTAINING_RECORD(window, struct demo_window_win32, w);
+
+    demo_window_cleanup(&window_win32->w);
+    free(window_win32);
+}
+
+static struct demo_window *demo_window_win32_create(struct demo *demo, const char *title,
         unsigned int width, unsigned int height, void *user_data)
 {
+    struct demo_window_win32 *window_win32;
     RECT rect = {0, 0, width, height};
-    struct demo_window *window;
     int title_size;
     WCHAR *title_w;
     DWORD style;
 
-    if (!(window = malloc(sizeof(*window))))
+    if (!(window_win32 = malloc(sizeof(*window_win32))))
         return NULL;
+
+    if (!demo_window_init(&window_win32->w, demo, user_data))
+    {
+        free(window_win32);
+        return NULL;
+    }
 
     title_size = MultiByteToWideChar(CP_UTF8, 0, title, -1, NULL, 0);
     if (!(title_w = calloc(title_size, sizeof(*title_w))))
     {
-        free(window);
+        demo_window_cleanup(&window_win32->w);
+        free(window_win32);
         return NULL;
     }
     MultiByteToWideChar(CP_UTF8, 0, title, -1, title_w, title_size);
 
-    window->instance = GetModuleHandle(NULL);
-    window->user_data = user_data;
-    window->expose_func = NULL;
-    window->key_press_func = NULL;
+    window_win32->instance = GetModuleHandle(NULL);
 
     style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
     AdjustWindowRect(&rect, style, FALSE);
-    window->hwnd = CreateWindowExW(0, DEMO_WINDOW_CLASS_NAME, title_w, style, CW_USEDEFAULT, CW_USEDEFAULT,
-            rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, window->instance, NULL);
+    window_win32->window = CreateWindowExW(0, DEMO_WIN32_WINDOW_CLASS_NAME, title_w, style, CW_USEDEFAULT,
+            CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, window_win32->instance, NULL);
     free(title_w);
-    if (!window->hwnd)
+    if (!window_win32->window)
     {
-        free(window);
+        demo_window_cleanup(&window_win32->w);
+        free(window_win32);
         return NULL;
     }
-    SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, (LONG_PTR)window);
-    window->demo = demo;
-    ++demo->window_count;
+    SetWindowLongPtrW(window_win32->window, GWLP_USERDATA, (LONG_PTR)window_win32);
 
-    return window;
+    return &window_win32->w;
 }
 
-static inline void demo_window_destroy(struct demo_window *window)
+static void demo_win32_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
 {
-    DestroyWindow(window->hwnd);
+    struct demo_win32 *win32 = &demo->win32;
+
+    *dpi_x = *dpi_y = win32->GetDpiForSystem();
 }
 
-static inline demo_key demo_key_from_vkey(DWORD vkey)
+static demo_key demo_key_from_win32_vkey(DWORD vkey)
 {
     static const struct
     {
@@ -133,46 +125,33 @@ static inline demo_key demo_key_from_vkey(DWORD vkey)
     return DEMO_KEY_UNKNOWN;
 }
 
-static inline LRESULT CALLBACK demo_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+static LRESULT CALLBACK demo_win32_window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
-    struct demo_window *window = (void *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    struct demo_window_win32 *window_win32 = (void *)GetWindowLongPtrW(window, GWLP_USERDATA);
 
     switch (message)
     {
         case WM_PAINT:
-            if (window && window->expose_func)
-                window->expose_func(window, window->user_data);
+            if (window_win32 && window_win32->w.expose_func)
+                window_win32->w.expose_func(&window_win32->w, window_win32->w.user_data);
             return 0;
 
         case WM_KEYDOWN:
-            if (!window->key_press_func)
+            if (!window_win32->w.key_press_func)
                 break;
-            window->key_press_func(window, demo_key_from_vkey(wparam), window->user_data);
+            window_win32->w.key_press_func(&window_win32->w,
+                    demo_key_from_win32_vkey(wparam), window_win32->w.user_data);
             return 0;
 
         case WM_DESTROY:
-            if (!--window->demo->window_count)
-                window->demo->quit = true;
-            free(window);
+            demo_window_win32_destroyed(&window_win32->w);
             return 0;
     }
 
-    return DefWindowProcW(hwnd, message, wparam, lparam);
+    return DefWindowProcW(window, message, wparam, lparam);
 }
 
-static inline void demo_window_set_key_press_func(struct demo_window *window,
-        void (*key_press_func)(struct demo_window *window, demo_key key, void *user_data))
-{
-    window->key_press_func = key_press_func;
-}
-
-static inline void demo_window_set_expose_func(struct demo_window *window,
-        void (*expose_func)(struct demo_window *window, void *user_data))
-{
-    window->expose_func = expose_func;
-}
-
-static inline void demo_process_events(struct demo *demo)
+static void demo_win32_process_events(struct demo *demo)
 {
     MSG msg = {0};
 
@@ -193,23 +172,28 @@ static inline void demo_process_events(struct demo *demo)
             break;
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
-        if (demo->quit)
+        if (!demo->window_count)
             PostQuitMessage(0);
     }
 }
 
-static inline UINT demo_GetDpiForSystem(void)
+static void demo_win32_cleanup(struct demo *demo)
+{
+    UnregisterClassW(DEMO_WIN32_WINDOW_CLASS_NAME, GetModuleHandle(NULL));
+}
+
+static inline UINT demo_win32_GetDpiForSystem(void)
 {
     return 96;
 }
 
-static inline bool demo_init(struct demo *demo, void *user_data)
+static bool demo_win32_init(struct demo_win32 *win32)
 {
     WNDCLASSEXW wc;
 
     wc.cbSize = sizeof(wc);
     wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = demo_window_proc;
+    wc.lpfnWndProc = demo_win32_window_proc;
     wc.cbClsExtra = 0;
     wc.cbWndExtra = 0;
     wc.hInstance = GetModuleHandle(NULL);
@@ -217,115 +201,15 @@ static inline bool demo_init(struct demo *demo, void *user_data)
     wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
     wc.lpszMenuName = NULL;
-    wc.lpszClassName = DEMO_WINDOW_CLASS_NAME;
+    wc.lpszClassName = DEMO_WIN32_WINDOW_CLASS_NAME;
     wc.hIconSm = LoadIconW(NULL, IDI_WINLOGO);
     if (!RegisterClassExW(&wc))
         return false;
 
-    demo->window_count = 0;
-    demo->quit = false;
-    demo->user_data = user_data;
-    demo->idle_func = NULL;
-
-    if ((demo->GetDpiForSystem = (void *)GetProcAddress(GetModuleHandleA("user32"), "GetDpiForSystem")))
+    if ((win32->GetDpiForSystem = (void *)GetProcAddress(GetModuleHandleA("user32"), "GetDpiForSystem")))
         SetProcessDPIAware();
     else
-        demo->GetDpiForSystem = demo_GetDpiForSystem;
+        win32->GetDpiForSystem = demo_win32_GetDpiForSystem;
 
     return true;
-}
-
-static inline void demo_cleanup(struct demo *demo)
-{
-    UnregisterClassW(DEMO_WINDOW_CLASS_NAME, GetModuleHandle(NULL));
-}
-
-static inline void demo_set_idle_func(struct demo *demo,
-        void (*idle_func)(struct demo *demo, void *user_data))
-{
-    demo->idle_func = idle_func;
-}
-
-static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *command_queue,
-        struct demo_window *window, const struct demo_swapchain_desc *desc)
-{
-    DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
-    struct demo_swapchain *swapchain;
-    IDXGISwapChain1 *swapchain1;
-    IDXGIFactory2 *factory;
-    HRESULT hr;
-
-    if (!(swapchain = malloc(sizeof(*swapchain))))
-        return NULL;
-
-    if (FAILED(CreateDXGIFactory1(&IID_IDXGIFactory2, (void **)&factory)))
-        goto fail;
-
-    memset(&swapchain_desc, 0, sizeof(swapchain_desc));
-    swapchain_desc.BufferCount = desc->buffer_count;
-    swapchain_desc.Width = desc->width;
-    swapchain_desc.Height = desc->height;
-    swapchain_desc.Format = desc->format;
-    swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapchain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapchain_desc.SampleDesc.Count = 1;
-
-    hr = IDXGIFactory2_CreateSwapChainForHwnd(factory, (IUnknown *)command_queue,
-            window->hwnd, &swapchain_desc, NULL, NULL, &swapchain1);
-    IDXGIFactory2_Release(factory);
-    if (FAILED(hr))
-        goto fail;
-
-    hr = IDXGISwapChain1_QueryInterface(swapchain1, &IID_IDXGISwapChain3, (void **)&swapchain->swapchain);
-    IDXGISwapChain1_Release(swapchain1);
-    if (FAILED(hr))
-        goto fail;
-
-    return swapchain;
-
-fail:
-    free(swapchain);
-    return NULL;
-}
-
-static inline unsigned int demo_swapchain_get_current_back_buffer_index(struct demo_swapchain *swapchain)
-{
-    return IDXGISwapChain3_GetCurrentBackBufferIndex(swapchain->swapchain);
-}
-
-static inline ID3D12Resource *demo_swapchain_get_back_buffer(struct demo_swapchain *swapchain, unsigned int index)
-{
-    ID3D12Resource *buffer;
-
-    if (FAILED(IDXGISwapChain3_GetBuffer(swapchain->swapchain, index,
-            &IID_ID3D12Resource, (void **)&buffer)))
-        return NULL;
-
-    return buffer;
-}
-
-static inline void demo_swapchain_present(struct demo_swapchain *swapchain)
-{
-    IDXGISwapChain3_Present(swapchain->swapchain, 1, 0);
-}
-
-static inline void demo_swapchain_destroy(struct demo_swapchain *swapchain)
-{
-    IDXGISwapChain3_Release(swapchain->swapchain);
-    free(swapchain);
-}
-
-static inline HANDLE demo_create_event(void)
-{
-    return CreateEventA(NULL, FALSE, FALSE, NULL);
-}
-
-static inline unsigned int demo_wait_event(HANDLE event, unsigned int ms)
-{
-    return WaitForSingleObject(event, ms);
-}
-
-static inline void demo_destroy_event(HANDLE event)
-{
-    CloseHandle(event);
 }

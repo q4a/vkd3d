@@ -321,6 +321,7 @@ vkd3d_demos = \
 
 vkd3d_demos_headers = \
 	demos/demo.h \
+	demos/demo_d3d12.h \
 	demos/demo_vkd3d.h \
 	demos/demo_win32.h \
 	demos/demo_xcb.h
