@@ -17,16 +17,25 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#define VK_NO_PROTOTYPES
-#define VK_USE_PLATFORM_XCB_KHR
-#define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_15
 #include "config.h"
+#define VK_NO_PROTOTYPES
+#ifdef _WIN32
+# define VK_USE_PLATFORM_WIN32_KHR
+#endif
+#ifdef HAVE_XCB
+# define VK_USE_PLATFORM_XCB_KHR
+#endif
+#define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_15
 #include <vkd3d.h>
 #include <vkd3d_utils.h>
-#include <xcb/xcb_event.h>
-#include <xcb/xcb_icccm.h>
-#include <xcb/xcb_keysyms.h>
-#include <dlfcn.h>
+#ifdef HAVE_XCB
+# include <xcb/xcb_event.h>
+# include <xcb/xcb_icccm.h>
+# include <xcb/xcb_keysyms.h>
+#endif
+#ifndef _WIN32
+# include <dlfcn.h>
+#endif
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -35,7 +44,12 @@
 DECLARE_VK_PFN(vkAcquireNextImageKHR)
 DECLARE_VK_PFN(vkCreateFence)
 DECLARE_VK_PFN(vkCreateSwapchainKHR)
+#ifdef _WIN32
+DECLARE_VK_PFN(vkCreateWin32SurfaceKHR)
+#endif
+#ifdef HAVE_XCB
 DECLARE_VK_PFN(vkCreateXcbSurfaceKHR)
+#endif
 DECLARE_VK_PFN(vkDestroyFence)
 DECLARE_VK_PFN(vkDestroySurfaceKHR)
 DECLARE_VK_PFN(vkDestroySwapchainKHR)
@@ -47,18 +61,31 @@ DECLARE_VK_PFN(vkQueuePresentKHR)
 DECLARE_VK_PFN(vkResetFences)
 DECLARE_VK_PFN(vkWaitForFences)
 
+struct demo_win32
+{
+#ifdef _WIN32
+    UINT (*GetDpiForSystem)(void);
+#endif
+};
+
 struct demo_xcb
 {
+#ifdef HAVE_XCB
     xcb_connection_t *connection;
     xcb_atom_t wm_protocols_atom;
     xcb_atom_t wm_delete_window_atom;
     xcb_key_symbols_t *xcb_keysyms;
     int screen;
+#endif
 };
 
 struct demo
 {
-    struct demo_xcb xcb;
+    union
+    {
+        struct demo_win32 win32;
+        struct demo_xcb xcb;
+    } u;
 
     struct demo_window **windows;
     size_t windows_size;
@@ -66,6 +93,11 @@ struct demo
 
     void *user_data;
     void (*idle_func)(struct demo *demo, void *user_data);
+    struct demo_window *(*create_window)(struct demo *demo, const char *title,
+            unsigned int width, unsigned int height, void *user_data);
+    void (*get_dpi)(struct demo *demo, double *dpi_x, double *dpi_y);
+    void (*process_events)(struct demo *demo);
+    void (*cleanup)(struct demo *demo);
 };
 
 struct demo_window
@@ -75,6 +107,8 @@ struct demo_window
     void *user_data;
     void (*expose_func)(struct demo_window *window, void *user_data);
     void (*key_press_func)(struct demo_window *window, demo_key key, void *user_data);
+    VkSurfaceKHR (*create_vk_surface)(struct demo_window *window, VkInstance vk_instance);
+    void (*destroy)(struct demo_window *window);
 };
 
 static inline bool demo_add_window(struct demo *demo, struct demo_window *window)
@@ -111,7 +145,9 @@ static inline void demo_remove_window(struct demo *demo, const struct demo_windo
     }
 }
 
-static inline bool demo_window_init(struct demo_window *window, struct demo *demo, void *user_data)
+static inline bool demo_window_init(struct demo_window *window, struct demo *demo, void *user_data,
+        VkSurfaceKHR (*create_vk_surface)(struct demo_window *window, VkInstance vk_instance),
+        void (*destroy)(struct demo_window *window))
 {
     if (!demo_add_window(demo, window))
         return false;
@@ -120,6 +156,8 @@ static inline bool demo_window_init(struct demo_window *window, struct demo *dem
     window->user_data = user_data;
     window->expose_func = NULL;
     window->key_press_func = NULL;
+    window->create_vk_surface = create_vk_surface;
+    window->destroy = destroy;
 
     return true;
 }
@@ -129,23 +167,45 @@ static inline void demo_window_cleanup(struct demo_window *window)
     demo_remove_window(window->demo, window);
 }
 
-#include "demo_xcb.h"
+#ifdef _WIN32
+# include "demo_win32.h"
+#endif
+#ifdef HAVE_XCB
+# include "demo_xcb.h"
+#endif
 
 static void load_vulkan_procs(void)
 {
     void *libvulkan;
 
+#ifdef _WIN32
+    if (!(libvulkan = LoadLibraryA(SONAME_LIBVULKAN)))
+    {
+        fprintf(stderr, "Failed to load %s.\n", SONAME_LIBVULKAN);
+        exit(1);
+    }
+#else
     if (!(libvulkan = dlopen(SONAME_LIBVULKAN, RTLD_NOW)))
     {
         fprintf(stderr, "Failed to load %s: %s.\n", SONAME_LIBVULKAN, dlerror());
         exit(1);
     }
+#endif
 
-#define LOAD_VK_PFN(name) name = (void *)dlsym(libvulkan, #name);
+#ifdef _WIN32
+# define LOAD_VK_PFN(name) name = (void *)GetProcAddress(libvulkan, #name);
+#else
+# define LOAD_VK_PFN(name) name = (void *)dlsym(libvulkan, #name);
+#endif
     LOAD_VK_PFN(vkAcquireNextImageKHR)
     LOAD_VK_PFN(vkCreateFence)
     LOAD_VK_PFN(vkCreateSwapchainKHR)
+#ifdef _WIN32
+    LOAD_VK_PFN(vkCreateWin32SurfaceKHR)
+#endif
+#ifdef HAVE_XCB
     LOAD_VK_PFN(vkCreateXcbSurfaceKHR)
+#endif
     LOAD_VK_PFN(vkDestroyFence)
     LOAD_VK_PFN(vkDestroySurfaceKHR)
     LOAD_VK_PFN(vkDestroySwapchainKHR)
@@ -179,13 +239,34 @@ struct demo_swapchain
 static inline void demo_cleanup(struct demo *demo)
 {
     free(demo->windows);
-    demo_xcb_cleanup(demo);
+    demo->cleanup(demo);
 }
 
 static inline bool demo_init(struct demo *demo, void *user_data)
 {
-    if (!demo_xcb_init(&demo->xcb))
+#ifdef _WIN32
+    if (demo_win32_init(&demo->u.win32))
+    {
+        demo->create_window = demo_window_win32_create;
+        demo->get_dpi = demo_win32_get_dpi;
+        demo->process_events = demo_win32_process_events;
+        demo->cleanup = demo_win32_cleanup;
+    }
+#endif
+#ifdef HAVE_XCB
+    if (demo_xcb_init(&demo->u.xcb))
+    {
+        demo->create_window = demo_window_xcb_create;
+        demo->get_dpi = demo_xcb_get_dpi;
+        demo->process_events = demo_xcb_process_events;
+        demo->cleanup = demo_xcb_cleanup;
+    }
+#endif
+    else
+    {
+        fprintf(stderr, "Failed to initialise demo.\n");
         return false;
+    }
 
     demo->windows = NULL;
     demo->windows_size = 0;
@@ -198,12 +279,12 @@ static inline bool demo_init(struct demo *demo, void *user_data)
 
 static inline void demo_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
 {
-    demo_xcb_get_dpi(demo, dpi_x, dpi_y);
+    demo->get_dpi(demo, dpi_x, dpi_y);
 }
 
 static inline void demo_process_events(struct demo *demo)
 {
-    demo_xcb_process_events(demo);
+    demo->process_events(demo);
 }
 
 static inline void demo_set_idle_func(struct demo *demo,
@@ -214,13 +295,13 @@ static inline void demo_set_idle_func(struct demo *demo,
 
 static inline void demo_window_destroy(struct demo_window *window)
 {
-    demo_window_xcb_destroy(window);
+    window->destroy(window);
 }
 
 static inline struct demo_window *demo_window_create(struct demo *demo, const char *title,
         unsigned int width, unsigned int height, void *user_data)
 {
-    return demo_window_xcb_create(demo, title, width, height, user_data);
+    return demo->create_window(demo, title, width, height, user_data);
 }
 
 static inline void demo_window_set_expose_func(struct demo_window *window,
@@ -269,7 +350,7 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
     vk_physical_device = vkd3d_get_vk_physical_device(d3d12_device);
     vk_device = vkd3d_get_vk_device(d3d12_device);
 
-    if (!(vk_surface = demo_window_xcb_create_vk_surface(window, vk_instance)))
+    if (!(vk_surface = window->create_vk_surface(window, vk_instance)))
     {
         ID3D12Device_Release(d3d12_device);
         return NULL;

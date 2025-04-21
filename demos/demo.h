@@ -174,9 +174,11 @@ static inline HRESULT demo_create_root_signature(ID3D12Device *device,
     return hr;
 }
 
-#ifdef _WIN32
+#ifdef VKD3D_CROSSTEST
 #include "demo_d3d12.h"
 #else
-#define INFINITE VKD3D_INFINITE
+# ifndef _WIN32
+#  define INFINITE VKD3D_INFINITE
+# endif
 #include "demo_vkd3d.h"
 #endif

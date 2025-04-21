@@ -184,7 +184,7 @@ AC_CHECK_FUNCS([pthread_threadid_np])
 dnl Makefiles
 case $host_os in
   mingw32*)
-      AC_SUBST([DEMO_LIBS],["-ld3d12 -ldxgi -lgdi32"])
+      AC_SUBST([DEMO_LIBS],["-lgdi32"])
       AC_SUBST([DEMO_CFLAGS],["-municode"])
       ;;
   *) AS_IF([test "x$enable_demos" = "xyes" -a "x$HAVE_XCB" != "xyes"],

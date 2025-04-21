@@ -29,7 +29,10 @@ struct demo_win32
 
 struct demo
 {
-    struct demo_win32 win32;
+    union
+    {
+        struct demo_win32 win32;
+    } u;
 
     size_t window_count;
 
@@ -76,7 +79,7 @@ static inline void demo_cleanup(struct demo *demo)
 
 static inline bool demo_init(struct demo *demo, void *user_data)
 {
-    if (!demo_win32_init(&demo->win32))
+    if (!demo_win32_init(&demo->u.win32))
     {
         fprintf(stderr, "Failed to initialise demo.\n");
         return false;

@@ -27,6 +27,25 @@ struct demo_window_win32
     HWND window;
 };
 
+#ifndef VKD3D_CROSSTEST
+static VkSurfaceKHR demo_window_win32_create_vk_surface(struct demo_window *window, VkInstance vk_instance)
+{
+    struct demo_window_win32 *window_win32 = CONTAINING_RECORD(window, struct demo_window_win32, w);
+    struct VkWin32SurfaceCreateInfoKHR surface_desc;
+    VkSurfaceKHR vk_surface;
+
+    surface_desc.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    surface_desc.pNext = NULL;
+    surface_desc.flags = 0;
+    surface_desc.hinstance = window_win32->instance;
+    surface_desc.hwnd = window_win32->window;
+    if (vkCreateWin32SurfaceKHR(vk_instance, &surface_desc, NULL, &vk_surface) < 0)
+        return VK_NULL_HANDLE;
+
+    return vk_surface;
+}
+#endif
+
 static void demo_window_win32_destroy(struct demo_window *window)
 {
     struct demo_window_win32 *window_win32 = CONTAINING_RECORD(window, struct demo_window_win32, w);
@@ -54,7 +73,12 @@ static struct demo_window *demo_window_win32_create(struct demo *demo, const cha
     if (!(window_win32 = malloc(sizeof(*window_win32))))
         return NULL;
 
+#ifdef VKD3D_CROSSTEST
     if (!demo_window_init(&window_win32->w, demo, user_data))
+#else
+    if (!demo_window_init(&window_win32->w, demo, user_data,
+            demo_window_win32_create_vk_surface, demo_window_win32_destroy))
+#endif
     {
         free(window_win32);
         return NULL;
@@ -89,7 +113,7 @@ static struct demo_window *demo_window_win32_create(struct demo *demo, const cha
 
 static void demo_win32_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
 {
-    struct demo_win32 *win32 = &demo->win32;
+    struct demo_win32 *win32 = &demo->u.win32;
 
     *dpi_x = *dpi_y = win32->GetDpiForSystem();
 }

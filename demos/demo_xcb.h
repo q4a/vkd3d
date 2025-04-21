@@ -78,7 +78,7 @@ static VkSurfaceKHR demo_window_xcb_create_vk_surface(struct demo_window *window
     surface_desc.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
     surface_desc.pNext = NULL;
     surface_desc.flags = 0;
-    surface_desc.connection = window->demo->xcb.connection;
+    surface_desc.connection = window->demo->u.xcb.connection;
     surface_desc.window = window_xcb->window;
     if (vkCreateXcbSurfaceKHR(vk_instance, &surface_desc, NULL, &vk_surface) < 0)
         return VK_NULL_HANDLE;
@@ -89,7 +89,7 @@ static VkSurfaceKHR demo_window_xcb_create_vk_surface(struct demo_window *window
 static void demo_window_xcb_destroy(struct demo_window *window)
 {
     struct demo_window_xcb *window_xcb = CONTAINING_RECORD(window, struct demo_window_xcb, w);
-    struct demo_xcb *xcb = &window->demo->xcb;
+    struct demo_xcb *xcb = &window->demo->u.xcb;
 
     xcb_destroy_window(xcb->connection, window_xcb->window);
     xcb_flush(xcb->connection);
@@ -100,8 +100,8 @@ static void demo_window_xcb_destroy(struct demo_window *window)
 static struct demo_window *demo_window_xcb_create(struct demo *demo, const char *title,
         unsigned int width, unsigned int height, void *user_data)
 {
+    struct demo_xcb *xcb = &demo->u.xcb;
     struct demo_window_xcb *window_xcb;
-    struct demo_xcb *xcb = &demo->xcb;
     xcb_size_hints_t hints;
     xcb_screen_t *screen;
 
@@ -113,7 +113,8 @@ static struct demo_window *demo_window_xcb_create(struct demo *demo, const char 
     if (!(window_xcb = malloc(sizeof(*window_xcb))))
         return NULL;
 
-    if (!demo_window_init(&window_xcb->w, demo, user_data))
+    if (!demo_window_init(&window_xcb->w, demo, user_data,
+            demo_window_xcb_create_vk_surface, demo_window_xcb_destroy))
     {
         free(window_xcb);
         return NULL;
@@ -144,7 +145,7 @@ static struct demo_window *demo_window_xcb_create(struct demo *demo, const char 
 
 static void demo_xcb_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
 {
-    struct demo_xcb *xcb = &demo->xcb;
+    struct demo_xcb *xcb = &demo->u.xcb;
     xcb_screen_t *screen;
 
     if (!(screen = demo_xcb_get_screen(xcb->connection, xcb->screen)))
@@ -161,8 +162,8 @@ static void demo_xcb_process_events(struct demo *demo)
 {
     const struct xcb_client_message_event_t *client_message;
     struct xcb_key_press_event_t *key_press;
+    struct demo_xcb *xcb = &demo->u.xcb;
     struct demo_window_xcb *window_xcb;
-    struct demo_xcb *xcb = &demo->xcb;
     xcb_generic_event_t *event;
     xcb_keysym_t sym;
 
@@ -212,7 +213,7 @@ static void demo_xcb_process_events(struct demo *demo)
 
 static void demo_xcb_cleanup(struct demo *demo)
 {
-    struct demo_xcb *xcb = &demo->xcb;
+    struct demo_xcb *xcb = &demo->u.xcb;
 
     xcb_key_symbols_free(xcb->xcb_keysyms);
     xcb_disconnect(xcb->connection);
