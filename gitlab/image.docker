@@ -27,7 +27,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     apt-get update && \
     apt-get dist-upgrade -y && \
     apt-get install -y build-essential pkg-config gcc-mingw-w64 crossbuild-essential-i386 \
-                       autoconf automake libtool flex bison curl \
+                       mingw-w64-tools autoconf automake libtool flex bison curl \
                        git ca-certificates rsync \
                        llvm-15-dev meson ninja-build python3-mako \
                        zlib1g-dev libexpat-dev libdrm-dev libglvnd-dev \
