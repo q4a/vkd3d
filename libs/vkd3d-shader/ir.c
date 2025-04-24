@@ -2064,7 +2064,7 @@ static enum vkd3d_result shader_signature_map_patch_constant_index_ranges(struct
             continue;
 
         if ((ret = range_map_set_register_range(normaliser, range_map,
-                e->register_index, register_count, e->mask, e->used_mask, false) < 0))
+                e->register_index, register_count, e->mask, e->used_mask, false)) < 0)
             return ret;
     }
 
