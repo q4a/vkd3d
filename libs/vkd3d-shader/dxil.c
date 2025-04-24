@@ -9689,7 +9689,7 @@ static enum vkd3d_result sm6_parser_signatures_init(struct sm6_parser *sm6, cons
     if ((ret = sm6_parser_init_input_signature(sm6, &program->input_signature)) < 0)
         return ret;
 
-    if ((ret = sm6_parser_init_output_signature(sm6, &program->output_signature) < 0))
+    if ((ret = sm6_parser_init_output_signature(sm6, &program->output_signature)) < 0)
         return ret;
 
     if ((ret = sm6_parser_init_patch_constant_signature(sm6, &program->patch_constant_signature)) < 0)
