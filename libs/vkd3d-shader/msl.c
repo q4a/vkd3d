@@ -451,20 +451,18 @@ static void msl_src_cleanup(struct msl_src *src, struct vkd3d_string_buffer_cach
     vkd3d_string_buffer_release(cache, src->str);
 }
 
-static void msl_src_init(struct msl_src *msl_src, struct msl_generator *gen,
-        const struct vkd3d_shader_src_param *vsir_src, uint32_t mask)
+static void msl_print_src(struct vkd3d_string_buffer *buffer, struct msl_generator *gen,
+    const struct vkd3d_shader_src_param *vsir_src, uint32_t mask)
 {
     const struct vkd3d_shader_register *reg = &vsir_src->reg;
     struct vkd3d_string_buffer *str;
-
-    msl_src->str = vkd3d_string_buffer_get(&gen->string_buffers);
 
     if (reg->non_uniform)
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                 "Internal compiler error: Unhandled 'non-uniform' modifier.");
 
     if (!vsir_src->modifiers)
-        str = msl_src->str;
+        str = buffer;
     else
         str = vkd3d_string_buffer_get(&gen->string_buffers);
 
@@ -477,21 +475,28 @@ static void msl_src_init(struct msl_src *msl_src, struct msl_generator *gen,
         case VKD3DSPSM_NONE:
             break;
         case VKD3DSPSM_NEG:
-            vkd3d_string_buffer_printf(msl_src->str, "-%s", str->buffer);
+            vkd3d_string_buffer_printf(buffer, "-%s", str->buffer);
             break;
         case VKD3DSPSM_ABS:
-            vkd3d_string_buffer_printf(msl_src->str, "abs(%s)", str->buffer);
+            vkd3d_string_buffer_printf(buffer, "abs(%s)", str->buffer);
             break;
         default:
-            vkd3d_string_buffer_printf(msl_src->str, "<unhandled modifier %#x>(%s)",
+            vkd3d_string_buffer_printf(buffer, "<unhandled modifier %#x>(%s)",
                     vsir_src->modifiers, str->buffer);
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                     "Internal compiler error: Unhandled source modifier(s) %#x.", vsir_src->modifiers);
             break;
     }
 
-    if (str != msl_src->str)
+    if (str != buffer)
         vkd3d_string_buffer_release(&gen->string_buffers, str);
+}
+
+static void msl_src_init(struct msl_src *msl_src, struct msl_generator *gen,
+        const struct vkd3d_shader_src_param *vsir_src, uint32_t mask)
+{
+    msl_src->str = vkd3d_string_buffer_get(&gen->string_buffers);
+    msl_print_src(msl_src->str, gen, vsir_src, mask);
 }
 
 static void msl_dst_cleanup(struct msl_dst *dst, struct vkd3d_string_buffer_cache *cache)
