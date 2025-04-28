@@ -726,7 +726,6 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     const struct vkd3d_shader_descriptor_info1 *descriptor;
     const struct vkd3d_shader_descriptor_binding *binding;
     enum vkd3d_shader_resource_type resource_type;
-    struct msl_src coord, array_index, lod;
     struct vkd3d_string_buffer *read;
     enum vkd3d_data_type data_type;
     uint32_t coord_mask;
@@ -778,34 +777,28 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     }
 
     msl_dst_init(&dst, gen, ins, &ins->dst[0]);
-    msl_src_init(&coord, gen, &ins->src[0], coord_mask);
-    /* `coord_mask + 1` gives exactly the array index component mask if it is an array resource */
-    /* Or it's simply unused, saving some branches */
-    msl_src_init(&array_index, gen, &ins->src[0], coord_mask + 1);
-    msl_src_init(&lod, gen, &ins->src[0], VKD3DSP_WRITEMASK_3);
     read = vkd3d_string_buffer_get(&gen->string_buffers);
 
     vkd3d_string_buffer_printf(read, "as_type<uint4>(");
     msl_print_srv_name(read, gen, binding->binding, resource_type_info, data_type);
     vkd3d_string_buffer_printf(read, ".read(");
-    if (resource_type_info->read_coord_size > 1)
-        vkd3d_string_buffer_printf(read, "as_type<uint%zu>(%s)",
-                resource_type_info->read_coord_size, coord.str->buffer);
-    else
-        vkd3d_string_buffer_printf(read, "as_type<uint>(%s)", coord.str->buffer);
+    msl_print_src_with_type(read, gen, &ins->src[0], coord_mask, VKD3D_DATA_UINT);
     if (resource_type_info->array)
-        vkd3d_string_buffer_printf(read, ", as_type<uint>(%s)", array_index.str->buffer);
+    {
+        vkd3d_string_buffer_printf(read, ", ");
+        msl_print_src_with_type(read, gen, &ins->src[0], coord_mask + 1, VKD3D_DATA_UINT);
+    }
     if (resource_type_info->lod)
-        vkd3d_string_buffer_printf(read, ", as_type<uint>(%s)", lod.str->buffer);
+    {
+        vkd3d_string_buffer_printf(read, ", ");
+        msl_print_src_with_type(read, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, VKD3D_DATA_UINT);
+    }
     vkd3d_string_buffer_printf(read, "))");
     msl_print_swizzle(read, ins->src[1].swizzle, ins->dst[0].write_mask);
 
     msl_print_assignment(gen, &dst, "%s", read->buffer);
 
     vkd3d_string_buffer_release(&gen->string_buffers, read);
-    msl_src_cleanup(&lod, &gen->string_buffers);
-    msl_src_cleanup(&array_index, &gen->string_buffers);
-    msl_src_cleanup(&coord, &gen->string_buffers);
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
