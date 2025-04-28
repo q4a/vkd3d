@@ -3095,6 +3095,43 @@ static void test_signature_reflection(void)
         {"sv_primitiveid", 0, ~0u, D3D_NAME_PRIMITIVE_ID, D3D_REGISTER_COMPONENT_UINT32,  0x1},
     };
 
+    static const char gs2_source[] =
+        "struct gs_data\n"
+        "{\n"
+        "    float4 pos : sv_position;\n"
+        "};\n"
+        "\n"
+        "struct data\n"
+        "{\n"
+        "    float4 pos : sv_position;\n"
+        "    float2 apple : apple;\n"
+        "    uint id : sv_primitiveid;\n"
+        "    uint rtidx : sv_rendertargetarrayindex;\n"
+        "    uint vaidx : sv_viewportarrayindex;\n"
+        "    uint ff : sv_isfrontface;\n"
+        "};\n"
+        "\n"
+        "[maxvertexcount(4)]\n"
+        "void main(in line gs_data vin[2], inout TriangleStream<data> vout)\n"
+        "{\n"
+        "    vout.Append((data)0);\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC gs2_inputs[] =
+    {
+        {"sv_position", 0, 0, D3D_NAME_POSITION, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC gs2_outputs[] =
+    {
+        {"sv_position",               0, 0, D3D_NAME_POSITION,                  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"apple",                     0, 1, D3D_NAME_UNDEFINED,                 D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+        {"sv_primitiveid",            0, 2, D3D_NAME_PRIMITIVE_ID,              D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+        {"sv_rendertargetarrayindex", 0, 2, D3D_NAME_RENDER_TARGET_ARRAY_INDEX, D3D_REGISTER_COMPONENT_UINT32,  0x2, 0xd},
+        {"sv_viewportarrayindex",     0, 2, D3D_NAME_VIEWPORT_ARRAY_INDEX,      D3D_REGISTER_COMPONENT_UINT32,  0x4, 0xb},
+        {"sv_isfrontface",            0, 3, D3D_NAME_IS_FRONT_FACE,             D3D_REGISTER_COMPONENT_UINT32,  0x1, 0xe},
+    };
+
     static const struct
     {
         const char *source;
@@ -3145,6 +3182,7 @@ static void test_signature_reflection(void)
         {ds4_source,  "ds_5_0", false, ds4_inputs, ARRAY_SIZE(ds4_inputs), ds4_outputs, ARRAY_SIZE(ds4_outputs), ds4_patch_constants, ARRAY_SIZE(ds4_patch_constants)},
         {ds5_source,  "ds_5_0", false, ds5_inputs, ARRAY_SIZE(ds5_inputs), ds5_outputs, ARRAY_SIZE(ds5_outputs), ds5_patch_constants, ARRAY_SIZE(ds5_patch_constants)},
         {gs1_source,  "gs_4_0", false, gs1_inputs, ARRAY_SIZE(gs1_inputs)},
+        {gs2_source,  "gs_4_0", false, gs2_inputs, ARRAY_SIZE(gs2_inputs), gs2_outputs, ARRAY_SIZE(gs2_outputs)},
     };
 
     for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
