@@ -39055,9 +39055,9 @@ static void test_multi_fence_event(void)
     ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
     hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
             fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, event);
-    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = wait_event(event, 0);
-    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
     hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
             fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, NULL);
     todo ok(hr == S_OK, "Got hr %#x.\n", hr);
@@ -39075,7 +39075,7 @@ static void test_multi_fence_event(void)
     fence_values[2] = 34;
     hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
             fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, event);
-    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = wait_event(event, 0);
     ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
     hr = ID3D12Fence_Signal(fences[2], 34);
@@ -39089,7 +39089,7 @@ static void test_multi_fence_event(void)
     hr = ID3D12Fence_Signal(fences[1], 33);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = wait_event(event, 0);
-    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
 
     fence_values[0] = 40;
     fence_values[1] = 41;
@@ -39175,13 +39175,13 @@ static void test_multi_fence_event(void)
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
             fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, event);
-    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = wait_event(event, 0);
     ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
     hr = ID3D12Fence_Signal(fences[1], 65);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = wait_event(event, 0);
-    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
 
     fence_values[1] = 67;
     thread_data.flags = D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL;

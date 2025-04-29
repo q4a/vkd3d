@@ -1076,7 +1076,7 @@ static UINT64 STDMETHODCALLTYPE d3d12_fence_GetCompletedValue(ID3D12Fence1 *ifac
     return completed_value;
 }
 
-static bool d3d12_fence_add_waiting_event(struct d3d12_fence *fence,
+bool d3d12_fence_add_waiting_event(struct d3d12_fence *fence,
         HANDLE event, PFN_vkd3d_signal_event signal, uint64_t value)
 {
     struct vkd3d_waiting_event *e;
@@ -1205,7 +1205,7 @@ static const struct ID3D12Fence1Vtbl d3d12_fence_vtbl =
     d3d12_fence_GetCreationFlags,
 };
 
-static struct d3d12_fence *unsafe_impl_from_ID3D12Fence(ID3D12Fence *iface)
+struct d3d12_fence *unsafe_impl_from_ID3D12Fence(ID3D12Fence *iface)
 {
     ID3D12Fence1 *iface1;
 

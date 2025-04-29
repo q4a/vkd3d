@@ -410,8 +410,11 @@ struct d3d12_fence
     struct vkd3d_private_store private_store;
 };
 
+bool d3d12_fence_add_waiting_event(struct d3d12_fence *fence,
+        HANDLE event, PFN_vkd3d_signal_event signal, uint64_t value);
 HRESULT d3d12_fence_create(struct d3d12_device *device, uint64_t initial_value,
         D3D12_FENCE_FLAGS flags, struct d3d12_fence **fence);
+struct d3d12_fence *unsafe_impl_from_ID3D12Fence(ID3D12Fence *iface);
 
 VkResult vkd3d_create_timeline_semaphore(const struct d3d12_device *device, uint64_t initial_value,
         VkSemaphore *timeline_semaphore);

@@ -4901,11 +4901,38 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePipelineLibrary(ID3D12Device
     return DXGI_ERROR_UNSUPPORTED;
 }
 
+struct waiting_event_semaphore
+{
+    HANDLE event;
+    PFN_vkd3d_signal_event signal;
+    uint32_t value;
+};
+
+static HRESULT waiting_event_semaphore_signal(HANDLE h)
+{
+    struct waiting_event_semaphore *s = h;
+
+    if (vkd3d_atomic_decrement_u32(&s->value))
+        return S_OK;
+
+    if (s->event)
+        s->signal(s->event);
+    vkd3d_free(s);
+
+    return S_OK;
+}
+
 static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(ID3D12Device9 *iface,
         ID3D12Fence *const *fences, const UINT64 *values, UINT fence_count,
         D3D12_MULTIPLE_FENCE_WAIT_FLAGS flags, HANDLE event)
 {
-    FIXME("iface %p, fences %p, values %p, fence_count %u, flags %#x, event %p partial stub!\n",
+    struct d3d12_device *device = impl_from_ID3D12Device9(iface);
+    struct waiting_event_semaphore *s;
+    struct d3d12_fence *fence;
+    HRESULT hr = S_OK;
+    unsigned int i;
+
+    TRACE("iface %p, fences %p, values %p, fence_count %u, flags %#x, event %p.\n",
             iface, fences, values, fence_count, flags, event);
 
     if (flags & ~D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY)
@@ -4920,7 +4947,53 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
     if (fence_count == 1)
         return ID3D12Fence_SetEventOnCompletion(fences[0], values[0], event);
 
-    return E_NOTIMPL;
+    if (flags)
+    {
+        FIXME("Unhandled flags %#x.\n", flags);
+        return E_NOTIMPL;
+    }
+
+    if (!event)
+    {
+        FIXME("Unhandled NULL event.\n");
+        return E_NOTIMPL;
+    }
+
+    if (!(s = vkd3d_malloc(sizeof(*s))))
+    {
+        WARN("Failed to allocate semaphore memory.\n");
+        return E_OUTOFMEMORY;
+    }
+
+    s->event = event;
+    s->signal = device->signal_event;
+    s->value = fence_count;
+
+    for (i = 0; i < fence_count; ++i)
+    {
+        fence = unsafe_impl_from_ID3D12Fence(fences[i]);
+
+        vkd3d_mutex_lock(&fence->mutex);
+
+        if (values[i] <= fence->value)
+        {
+            vkd3d_mutex_unlock(&fence->mutex);
+            waiting_event_semaphore_signal(s);
+            continue;
+        }
+
+        if (!d3d12_fence_add_waiting_event(fence, s, waiting_event_semaphore_signal, values[i]))
+        {
+            WARN("Failed to add event.\n");
+            s->event = NULL;
+            waiting_event_semaphore_signal(s);
+            hr = E_OUTOFMEMORY;
+        }
+
+        vkd3d_mutex_unlock(&fence->mutex);
+    }
+
+    return hr;
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_SetResidencyPriority(ID3D12Device9 *iface,
