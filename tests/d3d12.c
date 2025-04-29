@@ -38896,6 +38896,342 @@ static void test_shader_cache(void)
     destroy_test_context(&context);
 }
 
+struct multi_fence_event_wait_data
+{
+    ID3D12Device1 *device;
+    ID3D12Fence **fences;
+    uint64_t *values;
+    unsigned int fence_count;
+    D3D12_MULTIPLE_FENCE_WAIT_FLAGS flags;
+    HANDLE started, completed;
+};
+
+static void multi_fence_event_wait_main(void *ctx)
+{
+    struct multi_fence_event_wait_data *data = ctx;
+    HRESULT hr;
+
+    signal_event(data->started);
+
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(data->device,
+            data->fences, data->values, data->fence_count, data->flags, NULL);
+    if (vkd3d_test_platform_is_windows())
+        ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    signal_event(data->completed);
+}
+
+static void test_multi_fence_event(void)
+{
+    struct multi_fence_event_wait_data thread_data;
+    uint64_t fence_values[3];
+    ID3D12Device1 *device1;
+    ID3D12Fence *fences[3];
+    unsigned int refcount;
+    ID3D12Device *device;
+    HANDLE event, thread;
+    unsigned int i, ret;
+    HRESULT hr;
+
+    if (!(device = create_device()))
+    {
+        skip("Failed to create device.\n");
+        return;
+    }
+
+    if (FAILED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device1, (void **)&device1)))
+    {
+        skip("ID3D12Device1 not available; skipping tests.\n");
+        ID3D12Device_Release(device);
+        return;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(fences); ++i)
+    {
+        hr = ID3D12Device_CreateFence(device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, (void **)&fences[i]);
+        ok(hr == S_OK, "Got hr %#x.\n", hr);
+    }
+    event = create_event();
+    ok(event, "Failed to create event.\n");
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+
+    thread_data.device = device1;
+    thread_data.fences = fences;
+    thread_data.values = fence_values;
+    thread_data.fence_count = 0;
+    thread_data.flags = 0;
+    thread_data.started = create_event();
+    ok(thread_data.started, "Failed to create event.\n");
+    thread_data.completed = create_event();
+    ok(thread_data.completed, "Failed to create event.\n");
+
+    /* 0 fence count. */
+
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, NULL, NULL, 0, 0, NULL);
+    todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1,
+            NULL, NULL, 0, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, NULL);
+    todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences, fence_values, 0, 0, event);
+    todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+
+    /* Single fences. */
+
+    fence_values[0] = 1;
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 1, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[0], 1);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 1, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, NULL);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    fence_values[0] = 2;
+    thread_data.fence_count = 1;
+    thread = create_thread(multi_fence_event_wait_main, &thread_data);
+    ok(thread, "Failed to create thread.\n");
+    ret = wait_event(thread_data.started, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    if (vkd3d_test_platform_is_windows())
+    {
+        ret = wait_event(thread_data.completed, 0);
+        ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    }
+    hr = ID3D12Fence_Signal(fences[0], 2);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(thread_data.completed, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(join_thread(thread), "Failed to join thread.\n");
+
+    fence_values[0] = 4;
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 1, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[0], 4);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 1, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, NULL);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    fence_values[0] = 8;
+    thread_data.flags = D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY;
+    thread = create_thread(multi_fence_event_wait_main, &thread_data);
+    ok(thread, "Failed to create thread.\n");
+    ret = wait_event(thread_data.started, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    if (vkd3d_test_platform_is_windows())
+    {
+        ret = wait_event(thread_data.completed, 0);
+        ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    }
+    hr = ID3D12Fence_Signal(fences[0], 8);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(thread_data.completed, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(join_thread(thread), "Failed to join thread.\n");
+
+    /* Multiple fences. */
+
+    /* All fences already signalled. */
+    fence_values[0] = 16;
+    fence_values[1] = 17;
+    fence_values[2] = 18;
+    hr = ID3D12Fence_Signal(fences[0], 16);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    hr = ID3D12Fence_Signal(fences[1], 17);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    hr = ID3D12Fence_Signal(fences[2], 18);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, NULL);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, NULL);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+
+    /* No fences signalled yet. */
+    fence_values[0] = 32;
+    fence_values[1] = 33;
+    fence_values[2] = 34;
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[2], 34);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[0], 32);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[1], 33);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+
+    fence_values[0] = 40;
+    fence_values[1] = 41;
+    fence_values[2] = 42;
+    thread_data.fence_count = 3;
+    thread_data.flags = D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL;
+    thread = create_thread(multi_fence_event_wait_main, &thread_data);
+    ok(thread, "Failed to create thread.\n");
+    ret = wait_event(thread_data.started, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    if (vkd3d_test_platform_is_windows())
+    {
+        ret = wait_event(thread_data.completed, 0);
+        ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    }
+    hr = ID3D12Fence_Signal(fences[1], 41);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    if (vkd3d_test_platform_is_windows())
+    {
+        ret = wait_event(thread_data.completed, 0);
+        ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    }
+    hr = ID3D12Fence_Signal(fences[0], 40);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    if (vkd3d_test_platform_is_windows())
+    {
+        ret = wait_event(thread_data.completed, 0);
+        ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    }
+    hr = ID3D12Fence_Signal(fences[2], 42);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(thread_data.completed, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(join_thread(thread), "Failed to join thread.\n");
+
+    fence_values[0] = 48;
+    fence_values[1] = 49;
+    fence_values[2] = 50;
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[2], 50);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[0], 48);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[1], 49);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+
+    fence_values[0] = 56;
+    fence_values[1] = 57;
+    fence_values[2] = 58;
+    thread_data.flags = D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY;
+    thread = create_thread(multi_fence_event_wait_main, &thread_data);
+    ok(thread, "Failed to create thread.\n");
+    ret = wait_event(thread_data.started, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    if (vkd3d_test_platform_is_windows())
+    {
+        ret = wait_event(thread_data.completed, 0);
+        ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    }
+    hr = ID3D12Fence_Signal(fences[1], 57);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(thread_data.completed, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(join_thread(thread), "Failed to join thread.\n");
+
+    /* Some fences already signalled. */
+    fence_values[0] = 64;
+    fence_values[1] = 65;
+    fence_values[2] = 66;
+    hr = ID3D12Fence_Signal(fences[0], 64);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    hr = ID3D12Fence_Signal(fences[2], 66);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Fence_Signal(fences[1], 65);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+
+    fence_values[1] = 67;
+    thread_data.flags = D3D12_MULTIPLE_FENCE_WAIT_FLAG_ALL;
+    thread = create_thread(multi_fence_event_wait_main, &thread_data);
+    ok(thread, "Failed to create thread.\n");
+    ret = wait_event(thread_data.started, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    if (vkd3d_test_platform_is_windows())
+    {
+        ret = wait_event(thread_data.completed, 0);
+        ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    }
+    hr = ID3D12Fence_Signal(fences[1], 67);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(thread_data.completed, INFINITE);
+    ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+    ok(join_thread(thread), "Failed to join thread.\n");
+
+    fence_values[1] = 68;
+    ret = wait_event(event, 0);
+    ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, event);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ret = wait_event(event, 0);
+    todo ok(ret == WAIT_OBJECT_0, "Got ret %#x.\n", ret);
+
+    hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences,
+            fence_values, 3, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, NULL);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    destroy_event(thread_data.completed);
+    destroy_event(thread_data.started);
+    destroy_event(event);
+    for (i = 0; i < ARRAY_SIZE(fences); ++i)
+    {
+        ID3D12Fence_Release(fences[i]);
+    }
+
+    ID3D12Device1_Release(device1);
+    refcount = ID3D12Device_Release(device);
+    ok(!refcount, "ID3D12Device has %u references left.\n", refcount);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -39081,4 +39417,5 @@ START_TEST(d3d12)
     run_test(test_hull_shader_punned_array);
     run_test(test_unused_interpolated_input);
     run_test(test_shader_cache);
+    run_test(test_multi_fence_event);
 }
