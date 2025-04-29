@@ -385,13 +385,12 @@ struct d3d12_fence
     uint64_t value;
     uint64_t max_pending_value;
     struct vkd3d_mutex mutex;
-    struct vkd3d_cond null_event_cond;
 
     struct vkd3d_waiting_event
     {
-        uint64_t value;
         HANDLE event;
-        bool *latch;
+        PFN_vkd3d_signal_event signal;
+        uint64_t value;
     } *events;
     size_t events_size;
     size_t event_count;
