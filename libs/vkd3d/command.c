@@ -31,13 +31,6 @@ static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue)
 static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any);
 static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *queue, bool *flushed_any);
 
-struct vkd3d_null_event
-{
-    struct vkd3d_mutex mutex;
-    struct vkd3d_cond cond;
-    bool signalled;
-};
-
 static void vkd3d_null_event_signal(struct vkd3d_null_event *e)
 {
     vkd3d_mutex_lock(&e->mutex);
@@ -46,7 +39,7 @@ static void vkd3d_null_event_signal(struct vkd3d_null_event *e)
     vkd3d_mutex_unlock(&e->mutex);
 }
 
-static void vkd3d_null_event_wait(struct vkd3d_null_event *e)
+void vkd3d_null_event_wait(struct vkd3d_null_event *e)
 {
     vkd3d_mutex_lock(&e->mutex);
     while (!e->signalled)
@@ -55,20 +48,20 @@ static void vkd3d_null_event_wait(struct vkd3d_null_event *e)
     vkd3d_mutex_unlock(&e->mutex);
 }
 
-static void vkd3d_null_event_cleanup(struct vkd3d_null_event *e)
+void vkd3d_null_event_cleanup(struct vkd3d_null_event *e)
 {
     vkd3d_cond_destroy(&e->cond);
     vkd3d_mutex_destroy(&e->mutex);
 }
 
-static void vkd3d_null_event_init(struct vkd3d_null_event *e)
+void vkd3d_null_event_init(struct vkd3d_null_event *e)
 {
     vkd3d_mutex_init(&e->mutex);
     vkd3d_cond_init(&e->cond);
     e->signalled = false;
 }
 
-static HRESULT vkd3d_signal_null_event(HANDLE h)
+HRESULT vkd3d_signal_null_event(HANDLE h)
 {
     vkd3d_null_event_signal(h);
 

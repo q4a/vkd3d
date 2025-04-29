@@ -357,6 +357,18 @@ HRESULT vkd3d_set_private_data(struct vkd3d_private_store *store,
         const GUID *tag, unsigned int data_size, const void *data);
 HRESULT vkd3d_set_private_data_interface(struct vkd3d_private_store *store, const GUID *tag, const IUnknown *object);
 
+struct vkd3d_null_event
+{
+    struct vkd3d_mutex mutex;
+    struct vkd3d_cond cond;
+    bool signalled;
+};
+
+void vkd3d_null_event_cleanup(struct vkd3d_null_event *e);
+void vkd3d_null_event_init(struct vkd3d_null_event *e);
+void vkd3d_null_event_wait(struct vkd3d_null_event *e);
+HRESULT vkd3d_signal_null_event(HANDLE h);
+
 struct vkd3d_signaled_semaphore
 {
     uint64_t value;

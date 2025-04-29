@@ -4948,6 +4948,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
         D3D12_MULTIPLE_FENCE_WAIT_FLAGS flags, HANDLE event)
 {
     struct d3d12_device *device = impl_from_ID3D12Device9(iface);
+    struct vkd3d_null_event null_event;
     struct waiting_event_semaphore *s;
     PFN_vkd3d_signal_event signal;
     struct d3d12_fence *fence;
@@ -4969,20 +4970,21 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
     if (fence_count == 1)
         return ID3D12Fence_SetEventOnCompletion(fences[0], values[0], event);
 
-    if (!event)
-    {
-        FIXME("Unhandled NULL event.\n");
-        return E_NOTIMPL;
-    }
-
     if (!(s = vkd3d_malloc(sizeof(*s))))
     {
         WARN("Failed to allocate semaphore memory.\n");
         return E_OUTOFMEMORY;
     }
 
+    signal = device->signal_event;
+    if (!event)
+    {
+        vkd3d_null_event_init(&null_event);
+        event = &null_event;
+        signal = vkd3d_signal_null_event;
+    }
     s->event = event;
-    s->signal = device->signal_event;
+    s->signal = signal;
     s->value = fence_count;
 
     if (flags & D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY)
@@ -5015,6 +5017,12 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
         }
 
         vkd3d_mutex_unlock(&fence->mutex);
+    }
+
+    if (event == &null_event)
+    {
+        vkd3d_null_event_wait(&null_event);
+        vkd3d_null_event_cleanup(&null_event);
     }
 
     return hr;
