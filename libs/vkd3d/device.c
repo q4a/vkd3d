@@ -4922,12 +4922,34 @@ static HRESULT waiting_event_semaphore_signal(HANDLE h)
     return S_OK;
 }
 
+static HRESULT waiting_event_semaphore_signal_first(HANDLE h)
+{
+    struct waiting_event_semaphore *s = h;
+    HANDLE event;
+
+    if ((event = vkd3d_atomic_exchange_ptr(&s->event, NULL)))
+        s->signal(event);
+
+    return waiting_event_semaphore_signal(h);
+}
+
+static bool waiting_event_semaphore_cancel(struct waiting_event_semaphore *s)
+{
+    bool ret;
+
+    ret = !vkd3d_atomic_exchange_ptr(&s->event, NULL);
+    waiting_event_semaphore_signal(s);
+
+    return ret;
+}
+
 static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(ID3D12Device9 *iface,
         ID3D12Fence *const *fences, const UINT64 *values, UINT fence_count,
         D3D12_MULTIPLE_FENCE_WAIT_FLAGS flags, HANDLE event)
 {
     struct d3d12_device *device = impl_from_ID3D12Device9(iface);
     struct waiting_event_semaphore *s;
+    PFN_vkd3d_signal_event signal;
     struct d3d12_fence *fence;
     HRESULT hr = S_OK;
     unsigned int i;
@@ -4947,12 +4969,6 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
     if (fence_count == 1)
         return ID3D12Fence_SetEventOnCompletion(fences[0], values[0], event);
 
-    if (flags)
-    {
-        FIXME("Unhandled flags %#x.\n", flags);
-        return E_NOTIMPL;
-    }
-
     if (!event)
     {
         FIXME("Unhandled NULL event.\n");
@@ -4969,6 +4985,11 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
     s->signal = device->signal_event;
     s->value = fence_count;
 
+    if (flags & D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY)
+        signal = waiting_event_semaphore_signal_first;
+    else
+        signal = waiting_event_semaphore_signal;
+
     for (i = 0; i < fence_count; ++i)
     {
         fence = unsafe_impl_from_ID3D12Fence(fences[i]);
@@ -4978,16 +4999,19 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
         if (values[i] <= fence->value)
         {
             vkd3d_mutex_unlock(&fence->mutex);
-            waiting_event_semaphore_signal(s);
+            signal(s);
             continue;
         }
 
-        if (!d3d12_fence_add_waiting_event(fence, s, waiting_event_semaphore_signal, values[i]))
+        if (!d3d12_fence_add_waiting_event(fence, s, signal, values[i]))
         {
             WARN("Failed to add event.\n");
-            s->event = NULL;
-            waiting_event_semaphore_signal(s);
-            hr = E_OUTOFMEMORY;
+            /* If the event was already signalled, we don't need to fail here.
+             * Note that cancel() will also return "true" for any subsequent
+             * cancel() calls; that's fine, because we already failed in that
+             * case. */
+            if (!waiting_event_semaphore_cancel(s))
+                hr = E_OUTOFMEMORY;
         }
 
         vkd3d_mutex_unlock(&fence->mutex);
