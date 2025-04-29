@@ -4908,6 +4908,9 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetEventOnMultipleFenceCompletion(
     FIXME("iface %p, fences %p, values %p, fence_count %u, flags %#x, event %p stub!\n",
             iface, fences, values, fence_count, flags, event);
 
+    if (!fence_count)
+        return E_INVALIDARG;
+
     return E_NOTIMPL;
 }
 

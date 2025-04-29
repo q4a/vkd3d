@@ -38969,12 +38969,12 @@ static void test_multi_fence_event(void)
     /* 0 fence count. */
 
     hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, NULL, NULL, 0, 0, NULL);
-    todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+    ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
     hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1,
             NULL, NULL, 0, D3D12_MULTIPLE_FENCE_WAIT_FLAG_ANY, NULL);
-    todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+    ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
     hr = ID3D12Device1_SetEventOnMultipleFenceCompletion(device1, fences, fence_values, 0, 0, event);
-    todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+    ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
     ret = wait_event(event, 0);
     ok(ret == WAIT_TIMEOUT, "Got ret %#x.\n", ret);
 
