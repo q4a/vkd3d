@@ -227,7 +227,7 @@ probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
 
 
 % Output semantics cannot be mapped to more than one value.
-[vertex shader fail(sm<6)]
+[vertex shader fail]
 struct apple
 {
     float2 tex : TEXCOORD0;

@@ -41,11 +41,12 @@ image-mac:
     - mkdir image/dxc
     - mkdir image/moltenvk
 
-    # The specified commit includes the open sourced libdxil.dylib,
-    # which is not available yet in any released version
-    - git clone --recursive https://github.com/microsoft/DirectXShaderCompiler.git
+    # The specified commit includes an update to the DirectXShaderCompiler's
+    # CMakeList.txt which makes it compatible with cmake (4+).
+    - git clone https://github.com/microsoft/DirectXShaderCompiler.git
     - cd DirectXShaderCompiler
-    - git checkout dfa1c814cc4c912ba982854b72f64527baa3e7e5
+    - git checkout 3035d316c35289b68e8fc9d8cf21d86a204fb0e2
+    - git submodule update --init --recursive
     - mkdir build
     - cd build
     - cmake .. -C ../cmake/caches/PredefinedParams.cmake -D CMAKE_BUILD_TYPE=Release
