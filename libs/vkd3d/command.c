@@ -1076,6 +1076,23 @@ static UINT64 STDMETHODCALLTYPE d3d12_fence_GetCompletedValue(ID3D12Fence1 *ifac
     return completed_value;
 }
 
+static bool d3d12_fence_add_waiting_event(struct d3d12_fence *fence,
+        HANDLE event, PFN_vkd3d_signal_event signal, uint64_t value)
+{
+    struct vkd3d_waiting_event *e;
+
+    if (!vkd3d_array_reserve((void **)&fence->events, &fence->events_size,
+            fence->event_count + 1, sizeof(*fence->events)))
+        return false;
+
+    e = &fence->events[fence->event_count++];
+    e->event = event;
+    e->signal = signal;
+    e->value = value;
+
+    return true;
+}
+
 static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence1 *iface,
         UINT64 value, HANDLE event)
 {
@@ -1116,18 +1133,12 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence1 *
         signal = vkd3d_signal_null_event;
     }
 
-    if (!vkd3d_array_reserve((void **)&fence->events, &fence->events_size,
-            fence->event_count + 1, sizeof(*fence->events)))
+    if (!d3d12_fence_add_waiting_event(fence, event, signal, value))
     {
         WARN("Failed to add event.\n");
         vkd3d_mutex_unlock(&fence->mutex);
         return E_OUTOFMEMORY;
     }
-
-    fence->events[fence->event_count].event = event;
-    fence->events[fence->event_count].signal = signal;
-    fence->events[fence->event_count].value = value;
-    ++fence->event_count;
 
     vkd3d_mutex_unlock(&fence->mutex);
 
