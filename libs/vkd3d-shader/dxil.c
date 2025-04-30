@@ -647,6 +647,7 @@ enum sm6_value_type
     VALUE_TYPE_REG,
     VALUE_TYPE_ICB,
     VALUE_TYPE_HANDLE,
+    VALUE_TYPE_SSA,
 };
 
 struct sm6_function_data
@@ -663,6 +664,11 @@ struct sm6_handle_data
     bool non_uniform;
 };
 
+struct sm6_ssa_data
+{
+    unsigned int id;
+};
+
 struct sm6_value
 {
     const struct sm6_type *type;
@@ -675,6 +681,7 @@ struct sm6_value
         struct sm6_function_data function;
         const struct vkd3d_shader_immediate_constant_buffer *icb;
         struct sm6_handle_data handle;
+        struct sm6_ssa_data ssa;
     } u;
     struct vkd3d_shader_register reg;
 };
@@ -2232,7 +2239,15 @@ static inline struct sm6_value *sm6_parser_get_current_value(const struct sm6_pa
 
 static inline bool sm6_value_is_register(const struct sm6_value *value)
 {
-    return value->value_type == VALUE_TYPE_REG;
+    switch (value->value_type)
+    {
+        case VALUE_TYPE_REG:
+        case VALUE_TYPE_SSA:
+            return true;
+
+        default:
+            return false;
+    }
 }
 
 static bool sm6_value_is_handle(const struct sm6_value *value)
@@ -2479,7 +2494,23 @@ static void src_param_init_vector(struct vkd3d_shader_src_param *param, unsigned
 
 static void sm6_register_from_value(struct vkd3d_shader_register *reg, const struct sm6_value *value)
 {
-    *reg = value->reg;
+    switch (value->value_type)
+    {
+        case VALUE_TYPE_REG:
+            *reg = value->reg;
+            break;
+
+        case VALUE_TYPE_SSA:
+            register_init_with_id(reg, VKD3DSPR_SSA, vkd3d_data_type_from_sm6_type(
+                    sm6_type_get_scalar_type(value->type, 0)), value->u.ssa.id);
+            reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
+            break;
+
+        case VALUE_TYPE_FUNCTION:
+        case VALUE_TYPE_HANDLE:
+        case VALUE_TYPE_ICB:
+            vkd3d_unreachable();
+    }
 }
 
 static void src_param_init_from_value(struct vkd3d_shader_src_param *param, const struct sm6_value *src)
@@ -2861,11 +2892,9 @@ static size_t sm6_parser_get_value_idx_by_ref(struct sm6_parser *sm6, const stru
         else
         {
             value->type = fwd_type;
-            value->value_type = VALUE_TYPE_REG;
-            register_init_with_id(&value->reg, VKD3DSPR_SSA, vkd3d_data_type_from_sm6_type(
-                    sm6_type_get_scalar_type(fwd_type, 0)), sm6_parser_alloc_ssa_id(sm6));
-            value->reg.dimension = sm6_type_is_scalar(fwd_type) ? VSIR_DIMENSION_SCALAR
-                    : VSIR_DIMENSION_VEC4;
+            value->value_type = VALUE_TYPE_SSA;
+            value->u.ssa.id = sm6_parser_alloc_ssa_id(sm6);
+            sm6_register_from_value(&value->reg, value);
         }
     }
 
