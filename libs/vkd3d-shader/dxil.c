@@ -4027,8 +4027,9 @@ struct function_emission_state
     unsigned int temp_idx;
 };
 
-static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, const struct vkd3d_shader_register **operand_regs,
-        unsigned int component_count, struct function_emission_state *state, struct vkd3d_shader_register *reg);
+static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6,
+        const struct vkd3d_shader_register *operand_regs, unsigned int component_count,
+        struct function_emission_state *state, struct vkd3d_shader_register *reg);
 
 static void sm6_parser_emit_alloca(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
@@ -4136,11 +4137,11 @@ static enum vkd3d_shader_opcode map_dx_atomicrmw_op(uint64_t code)
 static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_record *record,
         struct function_emission_state *state, struct sm6_value *dst)
 {
-    struct vkd3d_shader_register coord, const_offset, const_zero;
-    const struct vkd3d_shader_register *regs[2];
     struct vkd3d_shader_dst_param *dst_params;
     struct vkd3d_shader_src_param *src_params;
     struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_register regs[2];
+    struct vkd3d_shader_register coord;
     const struct sm6_value *ptr, *src;
     enum vkd3d_shader_opcode op;
     unsigned int i = 0;
@@ -4188,16 +4189,10 @@ static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_
     if (ptr->structure_stride)
     {
         if (ptr->u.reg.idx[1].rel_addr)
-        {
-            regs[0] = &ptr->u.reg.idx[1].rel_addr->reg;
-        }
+            regs[0] = ptr->u.reg.idx[1].rel_addr->reg;
         else
-        {
-            register_make_constant_uint(&const_offset, ptr->u.reg.idx[1].offset);
-            regs[0] = &const_offset;
-        }
-        register_make_constant_uint(&const_zero, 0);
-        regs[1] = &const_zero;
+            register_make_constant_uint(&regs[0], ptr->u.reg.idx[1].offset);
+        register_make_constant_uint(&regs[1], 0);
         if (!sm6_parser_emit_reg_composite_construct(sm6, regs, 2, state, &coord))
             return;
     }
@@ -4472,8 +4467,9 @@ static void sm6_parser_emit_br(struct sm6_parser *sm6, const struct dxil_record 
     ins->opcode = VKD3DSIH_NOP;
 }
 
-static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, const struct vkd3d_shader_register **operand_regs,
-        unsigned int component_count, struct function_emission_state *state, struct vkd3d_shader_register *reg)
+static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6,
+        const struct vkd3d_shader_register *operand_regs, unsigned int component_count,
+        struct function_emission_state *state, struct vkd3d_shader_register *reg)
 {
     struct vkd3d_shader_instruction *ins = state->ins;
     struct vkd3d_shader_src_param *src_params;
@@ -4483,25 +4479,25 @@ static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, cons
 
     if (component_count == 1)
     {
-        *reg = *operand_regs[0];
+        *reg = operand_regs[0];
         return true;
     }
 
     for (i = 0; i < component_count; ++i)
-        all_constant &= register_is_constant(operand_regs[i]);
+        all_constant &= register_is_constant(&operand_regs[i]);
 
     if (all_constant)
     {
-        vsir_register_init(reg, VKD3DSPR_IMMCONST, operand_regs[0]->data_type, 0);
+        vsir_register_init(reg, VKD3DSPR_IMMCONST, operand_regs[0].data_type, 0);
         reg->dimension = VSIR_DIMENSION_VEC4;
         for (i = 0; i < component_count; ++i)
-            reg->u.immconst_u32[i] = operand_regs[i]->u.immconst_u32[0];
+            reg->u.immconst_u32[i] = operand_regs[i].u.immconst_u32[0];
         for (; i < VKD3D_VEC4_SIZE; ++i)
             reg->u.immconst_u32[i] = 0;
         return true;
     }
 
-    register_init_with_id(reg, VKD3DSPR_TEMP, operand_regs[0]->data_type, state->temp_idx++);
+    register_init_with_id(reg, VKD3DSPR_TEMP, operand_regs[0].data_type, state->temp_idx++);
     reg->dimension = VSIR_DIMENSION_VEC4;
 
     for (i = 0; i < component_count; ++i, ++ins)
@@ -4512,7 +4508,7 @@ static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, cons
             return false;
 
         src_param_init(&src_params[0]);
-        src_params[0].reg = *operand_regs[i];
+        src_params[0].reg = operand_regs[i];
 
         if (!(dst_param = instruction_dst_params_alloc(ins, 1, sm6)))
             return false;
@@ -4530,11 +4526,11 @@ static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, cons
 static bool sm6_parser_emit_composite_construct(struct sm6_parser *sm6, const struct sm6_value **operands,
         unsigned int component_count, struct function_emission_state *state, struct vkd3d_shader_register *reg)
 {
-    const struct vkd3d_shader_register *operand_regs[VKD3D_VEC4_SIZE];
+    struct vkd3d_shader_register operand_regs[VKD3D_VEC4_SIZE];
     unsigned int i;
 
     for (i = 0; i < component_count; ++i)
-        operand_regs[i] = &operands[i]->u.reg;
+        operand_regs[i] = operands[i]->u.reg;
 
     return sm6_parser_emit_reg_composite_construct(sm6, operand_regs, component_count, state, reg);
 }
@@ -4543,18 +4539,18 @@ static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const s
         unsigned int max_operands, const struct sm6_value *z_operand, struct function_emission_state *state,
         struct vkd3d_shader_register *reg)
 {
-    const struct vkd3d_shader_register *operand_regs[VKD3D_VEC4_SIZE];
+    struct vkd3d_shader_register operand_regs[VKD3D_VEC4_SIZE];
     unsigned int component_count;
 
     for (component_count = 0; component_count < max_operands; ++component_count)
     {
         if (!z_operand && operands[component_count]->is_undefined)
             break;
-        operand_regs[component_count] = &operands[component_count]->u.reg;
+        operand_regs[component_count] = operands[component_count]->u.reg;
     }
     if (z_operand)
     {
-        operand_regs[component_count++] = &z_operand->u.reg;
+        operand_regs[component_count++] = z_operand->u.reg;
     }
 
     return sm6_parser_emit_reg_composite_construct(sm6, operand_regs, component_count, state, reg);
