@@ -2505,13 +2505,6 @@ static void dst_param_init_vector(struct vkd3d_shader_dst_param *param, unsigned
     param->shift = 0;
 }
 
-static void dst_param_init_ssa_scalar(struct vkd3d_shader_dst_param *param, const struct sm6_type *type,
-        struct sm6_value *value, struct sm6_parser *sm6)
-{
-    dst_param_init(param);
-    register_init_ssa_scalar(&param->reg, type, value, sm6);
-}
-
 static inline void src_param_init(struct vkd3d_shader_src_param *param)
 {
     param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
@@ -2602,9 +2595,9 @@ static bool instruction_dst_param_init_ssa_scalar(struct vkd3d_shader_instructio
     if (!(param = instruction_dst_params_alloc(ins, 1, sm6)))
         return false;
 
-    dst_param_init_ssa_scalar(param, dst->type, dst, sm6);
-    param->write_mask = VKD3DSP_WRITEMASK_0;
-    dst->reg = param->reg;
+    dst_param_init(param);
+    sm6_parser_init_ssa_value(sm6, dst);
+    sm6_register_from_value(&param->reg, dst);
     return true;
 }
 
