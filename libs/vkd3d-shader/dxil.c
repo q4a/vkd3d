@@ -2405,6 +2405,46 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
     return VKD3D_DATA_UINT;
 }
 
+static void sm6_register_from_value(struct vkd3d_shader_register *reg, const struct sm6_value *value)
+{
+    switch (value->value_type)
+    {
+        case VALUE_TYPE_REG:
+            *reg = value->reg;
+            break;
+
+        case VALUE_TYPE_SSA:
+            register_init_with_id(reg, VKD3DSPR_SSA, vkd3d_data_type_from_sm6_type(
+                    sm6_type_get_scalar_type(value->type, 0)), value->u.ssa.id);
+            reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
+            break;
+
+        case VALUE_TYPE_FUNCTION:
+        case VALUE_TYPE_HANDLE:
+        case VALUE_TYPE_ICB:
+            vkd3d_unreachable();
+    }
+}
+
+static void sm6_parser_init_ssa_value(struct sm6_parser *sm6, struct sm6_value *value)
+{
+    unsigned int id;
+
+    if (register_is_ssa(&value->reg) && value->reg.idx[0].offset)
+    {
+        id = value->reg.idx[0].offset;
+        TRACE("Using forward-allocated id %u.\n", id);
+    }
+    else
+    {
+        id = sm6_parser_alloc_ssa_id(sm6);
+    }
+
+    value->value_type = VALUE_TYPE_SSA;
+    value->u.ssa.id = id;
+    sm6_register_from_value(&value->reg, value);
+}
+
 static void register_init_ssa_vector(struct vkd3d_shader_register *reg, const struct sm6_type *type,
         unsigned int component_count, struct sm6_value *value, struct sm6_parser *sm6)
 {
@@ -2492,27 +2532,6 @@ static void src_param_init_vector(struct vkd3d_shader_src_param *param, unsigned
     param->modifiers = VKD3DSPSM_NONE;
 }
 
-static void sm6_register_from_value(struct vkd3d_shader_register *reg, const struct sm6_value *value)
-{
-    switch (value->value_type)
-    {
-        case VALUE_TYPE_REG:
-            *reg = value->reg;
-            break;
-
-        case VALUE_TYPE_SSA:
-            register_init_with_id(reg, VKD3DSPR_SSA, vkd3d_data_type_from_sm6_type(
-                    sm6_type_get_scalar_type(value->type, 0)), value->u.ssa.id);
-            reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
-            break;
-
-        case VALUE_TYPE_FUNCTION:
-        case VALUE_TYPE_HANDLE:
-        case VALUE_TYPE_ICB:
-            vkd3d_unreachable();
-    }
-}
-
 static void src_param_init_from_value(struct vkd3d_shader_src_param *param, const struct sm6_value *src)
 {
     src_param_init(param);
@@ -2596,8 +2615,8 @@ static void instruction_dst_param_init_ssa_vector(struct vkd3d_shader_instructio
     struct sm6_value *dst = sm6_parser_get_current_value(sm6);
 
     dst_param_init_vector(param, component_count);
-    register_init_ssa_vector(&param->reg, sm6_type_get_scalar_type(dst->type, 0), component_count, dst, sm6);
-    dst->reg = param->reg;
+    sm6_parser_init_ssa_value(sm6, dst);
+    sm6_register_from_value(&param->reg, dst);
 }
 
 static bool instruction_dst_param_init_temp_vector(struct vkd3d_shader_instruction *ins, struct sm6_parser *sm6)
