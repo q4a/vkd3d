@@ -648,6 +648,7 @@ enum sm6_value_type
     VALUE_TYPE_DATA,
     VALUE_TYPE_HANDLE,
     VALUE_TYPE_SSA,
+    VALUE_TYPE_ICB,
     VALUE_TYPE_UNDEFINED,
     VALUE_TYPE_INVALID,
 };
@@ -671,6 +672,12 @@ struct sm6_ssa_data
     unsigned int id;
 };
 
+struct sm6_icb_data
+{
+    unsigned int data_id;
+    unsigned int id;
+};
+
 struct sm6_value
 {
     const struct sm6_type *type;
@@ -683,6 +690,7 @@ struct sm6_value
         const struct vkd3d_shader_immediate_constant_buffer *data;
         struct sm6_handle_data handle;
         struct sm6_ssa_data ssa;
+        struct sm6_icb_data icb;
     } u;
     struct vkd3d_shader_register reg;
 };
@@ -2244,6 +2252,7 @@ static inline bool sm6_value_is_register(const struct sm6_value *value)
     {
         case VALUE_TYPE_REG:
         case VALUE_TYPE_SSA:
+        case VALUE_TYPE_ICB:
         case VALUE_TYPE_UNDEFINED:
         case VALUE_TYPE_INVALID:
             return true;
@@ -2423,6 +2432,10 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
         case VALUE_TYPE_SSA:
             register_init_with_id(reg, VKD3DSPR_SSA, data_type, value->u.ssa.id);
             reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
+            break;
+
+        case VALUE_TYPE_ICB:
+            register_init_with_id(reg, VKD3DSPR_IMMCONSTBUFFER, data_type, value->u.icb.id);
             break;
 
         case VALUE_TYPE_UNDEFINED:
@@ -3477,13 +3490,13 @@ static struct vkd3d_shader_instruction *sm6_parser_add_instruction(struct sm6_pa
 static void sm6_parser_declare_icb(struct sm6_parser *sm6, const struct sm6_type *elem_type, unsigned int count,
         unsigned int alignment, unsigned int init, struct sm6_value *dst)
 {
-    enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
     struct vkd3d_shader_instruction *ins;
 
     ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER);
     /* The icb value index will be resolved later so forward references can be handled. */
     ins->declaration.icb = (void *)(intptr_t)init;
-    register_init_with_id(&dst->reg, VKD3DSPR_IMMCONSTBUFFER, data_type, init);
+    dst->value_type = VALUE_TYPE_ICB;
+    dst->u.icb.data_id = init;
 }
 
 static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const struct sm6_type *elem_type,
@@ -3853,11 +3866,14 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
         const struct vkd3d_shader_immediate_constant_buffer *icb;
         struct sm6_value *value = &sm6->values[i];
 
-        if (!sm6_value_is_register(value) || value->reg.type != VKD3DSPR_IMMCONSTBUFFER)
+        if (value->value_type != VALUE_TYPE_ICB)
             continue;
 
-        if ((icb = resolve_forward_initialiser(value->reg.idx[0].offset, sm6)))
-            value->reg.idx[0].offset = icb->register_idx;
+        if ((icb = resolve_forward_initialiser(value->u.icb.data_id, sm6)))
+            value->u.icb.id = icb->register_idx;
+        else
+            value->u.icb.id = 0;
+        sm6_register_from_value(&value->reg, value);
     }
 
     return VKD3D_OK;
