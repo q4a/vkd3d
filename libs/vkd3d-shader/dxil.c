@@ -3576,25 +3576,23 @@ static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6
 static void sm6_parser_declare_tgsm_structured(struct sm6_parser *sm6, const struct sm6_type *elem_type,
         unsigned int count, unsigned int alignment, unsigned int init, struct sm6_value *dst)
 {
-    enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
     struct vkd3d_shader_instruction *ins;
-    unsigned int structure_stride;
 
     ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_TGSM_STRUCTURED);
     dst_param_init(&ins->declaration.tgsm_structured.reg);
-    register_init_with_id(&ins->declaration.tgsm_structured.reg.reg, VKD3DSPR_GROUPSHAREDMEM,
-            data_type, sm6->tgsm_count++);
-    dst->reg = ins->declaration.tgsm_structured.reg.reg;
-    structure_stride = elem_type->u.width / 8u;
-    if (structure_stride != 4)
+    dst->value_type = VALUE_TYPE_GROUPSHAREDMEM;
+    dst->u.groupsharedmem.id = sm6->tgsm_count++;
+    dst->structure_stride = elem_type->u.width / 8u;
+    sm6_register_from_value(&dst->reg, dst);
+    sm6_register_from_value(&ins->declaration.tgsm_structured.reg.reg, dst);
+    if (dst->structure_stride != 4)
     {
-        FIXME("Unsupported structure stride %u.\n", structure_stride);
+        FIXME("Unsupported structure stride %u.\n", dst->structure_stride);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                "Structured TGSM byte stride %u is not supported.", structure_stride);
+                "Structured TGSM byte stride %u is not supported.", dst->structure_stride);
     }
-    dst->structure_stride = structure_stride;
     ins->declaration.tgsm_structured.alignment = alignment;
-    ins->declaration.tgsm_structured.byte_stride = structure_stride;
+    ins->declaration.tgsm_structured.byte_stride = dst->structure_stride;
     ins->declaration.tgsm_structured.structure_count = count;
     /* The initialiser value index will be resolved later when forward references can be handled. */
     ins->flags = init;
