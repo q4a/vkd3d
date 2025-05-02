@@ -6605,16 +6605,13 @@ static bool sm6_parser_validate_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_
 static void sm6_parser_emit_unhandled(struct sm6_parser *sm6, struct vkd3d_shader_instruction *ins,
         struct sm6_value *dst)
 {
-    const struct sm6_type *type;
-
     ins->opcode = VKD3DSIH_NOP;
 
     if (!dst->type)
         return;
 
-    type = sm6_type_get_scalar_type(dst->type, 0);
-    vsir_register_init(&dst->reg, VKD3DSPR_UNDEF, vkd3d_data_type_from_sm6_type(type), 0);
-    /* dst->is_undefined is not set here because it flags only explicitly undefined values. */
+    dst->value_type = VALUE_TYPE_INVALID;
+    sm6_register_from_value(&dst->reg, dst);
 }
 
 static void sm6_parser_decode_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
