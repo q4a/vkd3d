@@ -7348,6 +7348,8 @@ static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_recor
         src_param_make_constant_uint(&src_params[1], 0);
         src_param_init_from_value(&src_params[2], ptr);
         src_params[2].reg.alignment = alignment;
+        /* The offset is already in src_params[0]. */
+        src_params[2].reg.idx_count = 1;
     }
     else
     {
