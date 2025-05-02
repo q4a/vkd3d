@@ -6004,13 +6004,14 @@ static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_
         return;
     src_param_init_from_value(src_param, operands[0]);
 
+    sm6_parser_init_ssa_value(sm6, dst);
+
     index = op == DX_COS;
     dst_params = instruction_dst_params_alloc(ins, 2, sm6);
     dst_param_init(&dst_params[0]);
     dst_param_init(&dst_params[1]);
-    register_init_ssa_scalar(&dst_params[index].reg, dst->type, dst, sm6);
+    sm6_register_from_value(&dst_params[index].reg, dst);
     vsir_dst_param_init_null(&dst_params[index ^ 1]);
-    dst->reg = dst_params[index].reg;
 }
 
 static void sm6_parser_emit_dx_split_double(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
