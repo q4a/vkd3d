@@ -645,7 +645,7 @@ enum sm6_value_type
 {
     VALUE_TYPE_FUNCTION,
     VALUE_TYPE_REG,
-    VALUE_TYPE_ICB,
+    VALUE_TYPE_DATA,
     VALUE_TYPE_HANDLE,
     VALUE_TYPE_SSA,
     VALUE_TYPE_UNDEFINED,
@@ -680,7 +680,7 @@ struct sm6_value
     union
     {
         struct sm6_function_data function;
-        const struct vkd3d_shader_immediate_constant_buffer *icb;
+        const struct vkd3d_shader_immediate_constant_buffer *data;
         struct sm6_handle_data handle;
         struct sm6_ssa_data ssa;
     } u;
@@ -2283,9 +2283,9 @@ static bool sm6_value_vector_is_constant_or_undef(const struct sm6_value **value
     return true;
 }
 
-static bool sm6_value_is_icb(const struct sm6_value *value)
+static bool sm6_value_is_data(const struct sm6_value *value)
 {
-    return value->value_type == VALUE_TYPE_ICB;
+    return value->value_type == VALUE_TYPE_DATA;
 }
 
 static bool sm6_value_is_ssa(const struct sm6_value *value)
@@ -2432,7 +2432,7 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
 
         case VALUE_TYPE_FUNCTION:
         case VALUE_TYPE_HANDLE:
-        case VALUE_TYPE_ICB:
+        case VALUE_TYPE_DATA:
             vkd3d_unreachable();
     }
 }
@@ -3072,8 +3072,8 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
-    dst->value_type = VALUE_TYPE_ICB;
-    dst->u.icb = icb;
+    dst->value_type = VALUE_TYPE_DATA;
+    dst->u.data = icb;
 
     icb->register_idx = sm6->icb_count++;
     icb->data_type = vkd3d_data_type_from_sm6_type(elem_type);
@@ -3717,16 +3717,16 @@ static const struct vkd3d_shader_immediate_constant_buffer *resolve_forward_init
 
     VKD3D_ASSERT(index);
     --index;
-    if (!(value = sm6_parser_get_value_safe(sm6, index)) || (!sm6_value_is_icb(value) && !sm6_value_is_undef(value)))
+    if (!(value = sm6_parser_get_value_safe(sm6, index)) || (!sm6_value_is_data(value) && !sm6_value_is_undef(value)))
     {
         WARN("Invalid initialiser index %zu.\n", index);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
                 "Global variable initialiser value index %zu is invalid.", index);
         return NULL;
     }
-    else if (sm6_value_is_icb(value))
+    else if (sm6_value_is_data(value))
     {
-        return value->u.icb;
+        return value->u.data;
     }
     /* In VSIR, initialisation with undefined values of objects is implied, not explicit. */
     return NULL;
@@ -3741,14 +3741,14 @@ static bool resolve_forward_zero_initialiser(size_t index, struct sm6_parser *sm
 
     --index;
     if (!(value = sm6_parser_get_value_safe(sm6, index))
-            || (!sm6_value_is_icb(value) && !sm6_value_is_constant(value) && !sm6_value_is_undef(value)))
+            || (!sm6_value_is_data(value) && !sm6_value_is_constant(value) && !sm6_value_is_undef(value)))
     {
         WARN("Invalid initialiser index %zu.\n", index);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
                 "TGSM initialiser value index %zu is invalid.", index);
         return false;
     }
-    else if ((sm6_value_is_icb(value) && value->u.icb->is_null) || sm6_value_is_constant_zero(value))
+    else if ((sm6_value_is_data(value) && value->u.data->is_null) || sm6_value_is_constant_zero(value))
     {
         return true;
     }
@@ -8610,7 +8610,7 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
                 if (!(value = sm6_parser_get_value_safe(sm6, value_idx)))
                     return VKD3D_ERROR_INVALID_SHADER;
 
-                if (!sm6_value_is_constant(value) && !sm6_value_is_undef(value) && !sm6_value_is_icb(value)
+                if (!sm6_value_is_constant(value) && !sm6_value_is_undef(value) && !sm6_value_is_data(value)
                         && !sm6_value_is_function_dcl(value))
                 {
                     WARN("Value at index %u is not a constant or a function declaration.\n", value_idx);
