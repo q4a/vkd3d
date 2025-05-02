@@ -649,6 +649,7 @@ enum sm6_value_type
     VALUE_TYPE_HANDLE,
     VALUE_TYPE_SSA,
     VALUE_TYPE_ICB,
+    VALUE_TYPE_IDXTEMP,
     VALUE_TYPE_UNDEFINED,
     VALUE_TYPE_INVALID,
 };
@@ -678,6 +679,11 @@ struct sm6_icb_data
     unsigned int id;
 };
 
+struct sm6_idxtemp_data
+{
+    unsigned int id;
+};
+
 struct sm6_value
 {
     const struct sm6_type *type;
@@ -691,6 +697,7 @@ struct sm6_value
         struct sm6_handle_data handle;
         struct sm6_ssa_data ssa;
         struct sm6_icb_data icb;
+        struct sm6_idxtemp_data idxtemp;
     } u;
     struct vkd3d_shader_register reg;
 };
@@ -2253,6 +2260,7 @@ static inline bool sm6_value_is_register(const struct sm6_value *value)
         case VALUE_TYPE_REG:
         case VALUE_TYPE_SSA:
         case VALUE_TYPE_ICB:
+        case VALUE_TYPE_IDXTEMP:
         case VALUE_TYPE_UNDEFINED:
         case VALUE_TYPE_INVALID:
             return true;
@@ -2436,6 +2444,10 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
 
         case VALUE_TYPE_ICB:
             register_init_with_id(reg, VKD3DSPR_IMMCONSTBUFFER, data_type, value->u.icb.id);
+            break;
+
+        case VALUE_TYPE_IDXTEMP:
+            register_init_with_id(reg, VKD3DSPR_IDXTEMP, data_type, value->u.idxtemp.id);
             break;
 
         case VALUE_TYPE_UNDEFINED:
@@ -3518,7 +3530,9 @@ static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const stru
     /* The initialiser value index will be resolved later so forward references can be handled. */
     ins->declaration.indexable_temp.initialiser = (void *)(uintptr_t)init;
 
-    register_init_with_id(&dst->reg, VKD3DSPR_IDXTEMP, data_type, ins->declaration.indexable_temp.register_idx);
+    dst->value_type = VALUE_TYPE_IDXTEMP;
+    dst->u.idxtemp.id = ins->declaration.indexable_temp.register_idx;
+    sm6_register_from_value(&dst->reg, dst);
 }
 
 static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6_type *elem_type,
