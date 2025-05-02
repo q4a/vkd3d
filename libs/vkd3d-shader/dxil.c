@@ -4267,8 +4267,10 @@ static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_
         src_param_make_constant_uint(&src_params[0], 0);
     src_param_init_from_value(&src_params[1], src);
 
+    sm6_parser_init_ssa_value(sm6, dst);
+
     dst_params = instruction_dst_params_alloc(ins, 2, sm6);
-    register_init_ssa_scalar(&dst_params[0].reg, dst->type, dst, sm6);
+    sm6_register_from_value(&dst_params[0].reg, dst);
     dst_param_init(&dst_params[0]);
 
     dst_params[1].reg = reg;
@@ -4277,8 +4279,6 @@ static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_
     dst_params[1].reg.idx[1].offset = ~0u;
     dst_params[1].reg.idx_count = 1;
     dst_param_init(&dst_params[1]);
-
-    dst->reg = dst_params[0].reg;
 }
 
 static enum vkd3d_shader_opcode map_binary_op(uint64_t code, const struct sm6_type *type_a,
