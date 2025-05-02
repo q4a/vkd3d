@@ -3912,7 +3912,7 @@ static void dst_param_io_init(struct vkd3d_shader_dst_param *param,
 }
 
 static void src_params_init_from_operands(struct vkd3d_shader_src_param *src_params,
-        const struct sm6_value **operands, unsigned int count)
+        const struct sm6_value **operands, unsigned int count, struct sm6_parser *sm6)
 {
     unsigned int i;
 
@@ -5631,7 +5631,7 @@ static void sm6_parser_emit_dx_raw_buffer_load(struct sm6_parser *sm6, enum dx_i
     operand_count = 2 + !raw;
     if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
         return;
-    src_params_init_from_operands(src_params, &operands[1], operand_count - 1);
+    src_params_init_from_operands(src_params, &operands[1], operand_count - 1, sm6);
     src_param_init_vector_from_handle(sm6, &src_params[operand_count - 1], &resource->u.handle);
 
     instruction_dst_param_init_ssa_vector(ins, component_count, sm6);
@@ -5697,7 +5697,7 @@ static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_
 
     if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
         return;
-    src_params_init_from_operands(src_params, &operands[1], operand_count - 1);
+    src_params_init_from_operands(src_params, &operands[1], operand_count - 1, sm6);
     data.data_type = VKD3D_DATA_UINT;
     src_param_init_vector_from_reg(&src_params[operand_count - 1], &data);
 
