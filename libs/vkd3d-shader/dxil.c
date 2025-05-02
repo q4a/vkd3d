@@ -648,6 +648,7 @@ enum sm6_value_type
     VALUE_TYPE_ICB,
     VALUE_TYPE_HANDLE,
     VALUE_TYPE_SSA,
+    VALUE_TYPE_UNDEFINED,
 };
 
 struct sm6_function_data
@@ -674,7 +675,6 @@ struct sm6_value
     const struct sm6_type *type;
     enum sm6_value_type value_type;
     unsigned int structure_stride;
-    bool is_undefined;
     bool is_back_ref;
     union
     {
@@ -2243,6 +2243,7 @@ static inline bool sm6_value_is_register(const struct sm6_value *value)
     {
         case VALUE_TYPE_REG:
         case VALUE_TYPE_SSA:
+        case VALUE_TYPE_UNDEFINED:
             return true;
 
         default:
@@ -2407,6 +2408,10 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
 
 static void sm6_register_from_value(struct vkd3d_shader_register *reg, const struct sm6_value *value)
 {
+    enum vkd3d_data_type data_type;
+
+    data_type = vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(value->type, 0));
+
     switch (value->value_type)
     {
         case VALUE_TYPE_REG:
@@ -2414,9 +2419,12 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             break;
 
         case VALUE_TYPE_SSA:
-            register_init_with_id(reg, VKD3DSPR_SSA, vkd3d_data_type_from_sm6_type(
-                    sm6_type_get_scalar_type(value->type, 0)), value->u.ssa.id);
+            register_init_with_id(reg, VKD3DSPR_SSA, data_type, value->u.ssa.id);
             reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
+            break;
+
+        case VALUE_TYPE_UNDEFINED:
+            vsir_register_init(reg, VKD3DSPR_UNDEF, data_type, 0);
             break;
 
         case VALUE_TYPE_FUNCTION:
@@ -3380,9 +3388,8 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
 
             case CST_CODE_UNDEF:
                 dxil_record_validate_operand_max_count(record, 0, sm6);
-                dst->reg.type = VKD3DSPR_UNDEF;
-                /* Mark as explicitly undefined, not the result of a missing constant code or instruction. */
-                dst->is_undefined = true;
+                dst->value_type = VALUE_TYPE_UNDEFINED;
+                sm6_register_from_value(&dst->reg, dst);
                 break;
 
             default:
@@ -4576,7 +4583,7 @@ static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const s
 
     for (component_count = 0; component_count < max_operands; ++component_count)
     {
-        if (!z_operand && operands[component_count]->is_undefined)
+        if (!z_operand && operands[component_count]->value_type == VALUE_TYPE_UNDEFINED)
             break;
         sm6_register_from_value(&operand_regs[component_count], operands[component_count]);
     }
@@ -4812,7 +4819,7 @@ static void sm6_parser_emit_dx_atomic_binop(struct sm6_parser *sm6, enum dx_intr
 
     for (i = coord_idx + coord_count; i < coord_idx + 3; ++i)
     {
-        if (!operands[i]->is_undefined)
+        if (operands[i]->value_type != VALUE_TYPE_UNDEFINED)
         {
             WARN("Ignoring unexpected operand.\n");
             vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
@@ -5367,7 +5374,7 @@ static void sm6_parser_emit_dx_get_dimensions(struct sm6_parser *sm6, enum dx_in
     }
     else
     {
-        if (!operands[1]->is_undefined)
+        if (operands[1]->value_type != VALUE_TYPE_UNDEFINED)
         {
             WARN("Ignoring unexpected operand.\n");
             vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
@@ -5424,7 +5431,7 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
     row_index = sm6_value_get_constant_uint(operands[0]);
     column_index = sm6_value_get_constant_uint(operands[2]);
 
-    if (is_control_point && operands[3]->is_undefined)
+    if (is_control_point && operands[3]->value_type == VALUE_TYPE_UNDEFINED)
     {
         /* dxcompiler will compile source which does this, so let it pass. */
         WARN("Control point id is undefined.\n");
@@ -5467,7 +5474,7 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
     if (e->register_count > 1)
         register_index_address_init(&src_param->reg.idx[count++], operands[1], sm6);
 
-    if (!is_patch_constant && !operands[3]->is_undefined)
+    if (!is_patch_constant && operands[3]->value_type != VALUE_TYPE_UNDEFINED)
     {
         VKD3D_ASSERT(src_param->reg.idx_count > count);
         register_index_address_init(&src_param->reg.idx[count], operands[3], sm6);
