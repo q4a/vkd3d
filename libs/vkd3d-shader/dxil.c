@@ -4454,9 +4454,9 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
 
         dst_param_init(&dst_params[0]);
         dst_param_init(&dst_params[1]);
-        register_init_ssa_scalar(&dst_params[index].reg, a->type, dst, sm6);
+        sm6_parser_init_ssa_value(sm6, dst);
+        sm6_register_from_value(&dst_params[index].reg, dst);
         vsir_dst_param_init_null(&dst_params[index ^ 1]);
-        dst->reg = dst_params[index].reg;
     }
     else
     {
