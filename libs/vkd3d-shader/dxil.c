@@ -650,6 +650,7 @@ enum sm6_value_type
     VALUE_TYPE_SSA,
     VALUE_TYPE_ICB,
     VALUE_TYPE_IDXTEMP,
+    VALUE_TYPE_GROUPSHAREDMEM,
     VALUE_TYPE_UNDEFINED,
     VALUE_TYPE_INVALID,
 };
@@ -684,6 +685,11 @@ struct sm6_idxtemp_data
     unsigned int id;
 };
 
+struct sm6_groupsharedmem_data
+{
+    unsigned int id;
+};
+
 struct sm6_value
 {
     const struct sm6_type *type;
@@ -698,6 +704,7 @@ struct sm6_value
         struct sm6_ssa_data ssa;
         struct sm6_icb_data icb;
         struct sm6_idxtemp_data idxtemp;
+        struct sm6_groupsharedmem_data groupsharedmem;
     } u;
     struct vkd3d_shader_register reg;
 };
@@ -2261,6 +2268,7 @@ static inline bool sm6_value_is_register(const struct sm6_value *value)
         case VALUE_TYPE_SSA:
         case VALUE_TYPE_ICB:
         case VALUE_TYPE_IDXTEMP:
+        case VALUE_TYPE_GROUPSHAREDMEM:
         case VALUE_TYPE_UNDEFINED:
         case VALUE_TYPE_INVALID:
             return true;
@@ -2448,6 +2456,10 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
 
         case VALUE_TYPE_IDXTEMP:
             register_init_with_id(reg, VKD3DSPR_IDXTEMP, data_type, value->u.idxtemp.id);
+            break;
+
+        case VALUE_TYPE_GROUPSHAREDMEM:
+            register_init_with_id(reg, VKD3DSPR_GROUPSHAREDMEM, data_type, value->u.groupsharedmem.id);
             break;
 
         case VALUE_TYPE_UNDEFINED:
@@ -3538,15 +3550,16 @@ static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const stru
 static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6_type *elem_type,
         unsigned int alignment, unsigned int init, struct sm6_value *dst)
 {
-    enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
     struct vkd3d_shader_instruction *ins;
     unsigned int byte_count;
 
     ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_TGSM_RAW);
     dst_param_init(&ins->declaration.tgsm_raw.reg);
-    register_init_with_id(&ins->declaration.tgsm_raw.reg.reg, VKD3DSPR_GROUPSHAREDMEM, data_type, sm6->tgsm_count++);
-    dst->reg = ins->declaration.tgsm_raw.reg.reg;
+    dst->value_type = VALUE_TYPE_GROUPSHAREDMEM;
+    dst->u.groupsharedmem.id = sm6->tgsm_count++;
     dst->structure_stride = 0;
+    sm6_register_from_value(&dst->reg, dst);
+    sm6_register_from_value(&ins->declaration.tgsm_raw.reg.reg, dst);
     ins->declaration.tgsm_raw.alignment = alignment;
     byte_count = elem_type->u.width / 8u;
     if (byte_count != 4)
