@@ -2657,19 +2657,17 @@ static void instruction_dst_param_init_ssa_vector(struct vkd3d_shader_instructio
     sm6_register_from_value(&param->reg, dst, sm6);
 }
 
-static bool instruction_dst_param_init_temp_vector(struct vkd3d_shader_instruction *ins, struct sm6_parser *sm6)
+static bool instruction_dst_param_init_uint_temp_vector(struct vkd3d_shader_instruction *ins, struct sm6_parser *sm6)
 {
-    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
     struct vkd3d_shader_dst_param *param;
 
     if (!(param = instruction_dst_params_alloc(ins, 1, sm6)))
         return false;
 
-    vsir_dst_param_init(param, VKD3DSPR_TEMP, vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(dst->type, 0)), 1);
+    vsir_dst_param_init(param, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
     param->write_mask = VKD3DSP_WRITEMASK_ALL;
     param->reg.idx[0].offset = 0;
     param->reg.dimension = VSIR_DIMENSION_VEC4;
-    dst->reg = param->reg;
 
     return true;
 }
@@ -5427,7 +5425,7 @@ static void sm6_parser_emit_dx_get_dimensions(struct sm6_parser *sm6, enum dx_in
 
         if (resource_kind_is_multisampled(resource_kind))
         {
-            instruction_dst_param_init_temp_vector(ins++, sm6);
+            instruction_dst_param_init_uint_temp_vector(ins++, sm6);
             state->temp_idx = 1;
 
             /* DXIL does not have an intrinsic for sample info, and resinfo is expected to return
@@ -5440,7 +5438,7 @@ static void sm6_parser_emit_dx_get_dimensions(struct sm6_parser *sm6, enum dx_in
             src_param_init_vector_from_handle(sm6, &src_params[0], &resource->u.handle);
             src_params[0].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
 
-            if (!instruction_dst_param_init_temp_vector(ins, sm6))
+            if (!instruction_dst_param_init_uint_temp_vector(ins, sm6))
                 return;
             dst = ins->dst;
             dst->write_mask = VKD3DSP_WRITEMASK_3;
