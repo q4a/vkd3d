@@ -649,6 +649,7 @@ enum sm6_value_type
     VALUE_TYPE_HANDLE,
     VALUE_TYPE_SSA,
     VALUE_TYPE_UNDEFINED,
+    VALUE_TYPE_INVALID,
 };
 
 struct sm6_function_data
@@ -2244,6 +2245,7 @@ static inline bool sm6_value_is_register(const struct sm6_value *value)
         case VALUE_TYPE_REG:
         case VALUE_TYPE_SSA:
         case VALUE_TYPE_UNDEFINED:
+        case VALUE_TYPE_INVALID:
             return true;
 
         default:
@@ -2424,6 +2426,7 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             break;
 
         case VALUE_TYPE_UNDEFINED:
+        case VALUE_TYPE_INVALID:
             vsir_register_init(reg, VKD3DSPR_UNDEF, data_type, 0);
             break;
 
@@ -3396,7 +3399,8 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 FIXME("Unhandled constant code %u.\n", record->code);
                 vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
                         "Constant code %u is unhandled.", record->code);
-                dst->reg.type = VKD3DSPR_UNDEF;
+                dst->value_type = VALUE_TYPE_INVALID;
+                sm6_register_from_value(&dst->reg, dst);
                 break;
         }
 
