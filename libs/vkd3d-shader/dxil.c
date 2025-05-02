@@ -7116,14 +7116,14 @@ static void sm6_parser_emit_cmpxchg(struct sm6_parser *sm6, const struct dxil_re
     src_param_init_from_value(&src_params[1], cmp);
     src_param_init_from_value(&src_params[2], new);
 
+    sm6_parser_init_ssa_value(sm6, dst);
+
     if (!(dst_params = instruction_dst_params_alloc(ins, 2, sm6)))
         return;
-    register_init_ssa_scalar(&dst_params[0].reg, dst->type, dst, sm6);
+    sm6_register_from_value(&dst_params[0].reg, dst);
     dst_param_init(&dst_params[0]);
     dst_params[1].reg = reg;
     dst_param_init(&dst_params[1]);
-
-    dst->reg = dst_params[0].reg;
 }
 
 static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil_record *record,
