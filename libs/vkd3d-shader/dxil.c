@@ -2445,32 +2445,6 @@ static void sm6_parser_init_ssa_value(struct sm6_parser *sm6, struct sm6_value *
     sm6_register_from_value(&value->reg, value);
 }
 
-static void register_init_ssa_vector(struct vkd3d_shader_register *reg, const struct sm6_type *type,
-        unsigned int component_count, struct sm6_value *value, struct sm6_parser *sm6)
-{
-    enum vkd3d_data_type data_type;
-    unsigned int id;
-
-    if (value && register_is_ssa(&value->reg) && value->reg.idx[0].offset)
-    {
-        id = value->reg.idx[0].offset;
-        TRACE("Using forward-allocated id %u.\n", id);
-    }
-    else
-    {
-        id = sm6_parser_alloc_ssa_id(sm6);
-    }
-    data_type = vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(type, 0));
-    register_init_with_id(reg, VKD3DSPR_SSA, data_type, id);
-    reg->dimension = component_count > 1 ? VSIR_DIMENSION_VEC4 : VSIR_DIMENSION_SCALAR;
-}
-
-static void register_init_ssa_scalar(struct vkd3d_shader_register *reg, const struct sm6_type *type,
-        struct sm6_value *value, struct sm6_parser *sm6)
-{
-    register_init_ssa_vector(reg, sm6_type_get_scalar_type(type, 0), 1, value, sm6);
-}
-
 static void register_make_constant_uint(struct vkd3d_shader_register *reg, unsigned int value)
 {
     vsir_register_init(reg, VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
@@ -7405,7 +7379,7 @@ static void sm6_parser_emit_phi(struct sm6_parser *sm6, const struct dxil_record
     }
 
     dst->type = type;
-    register_init_ssa_scalar(&dst->reg, type, dst, sm6);
+    sm6_parser_init_ssa_value(sm6, dst);
 
     if (!(phi = sm6_block_phi_require_space(code_block, sm6)))
         return;
