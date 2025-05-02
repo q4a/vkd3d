@@ -655,6 +655,12 @@ enum sm6_value_type
     VALUE_TYPE_INVALID,
 };
 
+struct sm6_index
+{
+    const struct sm6_value *index;
+    bool is_in_bounds;
+};
+
 struct sm6_function_data
 {
     const char *name;
@@ -678,16 +684,19 @@ struct sm6_icb_data
 {
     unsigned int data_id;
     unsigned int id;
+    struct sm6_index index;
 };
 
 struct sm6_idxtemp_data
 {
     unsigned int id;
+    struct sm6_index index;
 };
 
 struct sm6_groupsharedmem_data
 {
     unsigned int id;
+    struct sm6_index index;
 };
 
 struct sm6_value
@@ -2433,6 +2442,9 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
     return VKD3D_DATA_UINT;
 }
 
+static void register_index_address_init(struct vkd3d_shader_register_index *idx, const struct sm6_value *address,
+        struct sm6_parser *sm6);
+
 static void sm6_register_from_value(struct vkd3d_shader_register *reg, const struct sm6_value *value,
         struct sm6_parser *sm6)
 {
@@ -2452,15 +2464,24 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             break;
 
         case VALUE_TYPE_ICB:
-            register_init_with_id(reg, VKD3DSPR_IMMCONSTBUFFER, data_type, value->u.icb.id);
+            vsir_register_init(reg, VKD3DSPR_IMMCONSTBUFFER, data_type, 2);
+            reg->idx[0].offset = value->u.icb.id;
+            register_index_address_init(&reg->idx[1], value->u.icb.index.index, sm6);
+            reg->idx[1].is_in_bounds = value->u.icb.index.is_in_bounds;
             break;
 
         case VALUE_TYPE_IDXTEMP:
-            register_init_with_id(reg, VKD3DSPR_IDXTEMP, data_type, value->u.idxtemp.id);
+            vsir_register_init(reg, VKD3DSPR_IDXTEMP, data_type, 2);
+            reg->idx[0].offset = value->u.idxtemp.id;
+            register_index_address_init(&reg->idx[1], value->u.idxtemp.index.index, sm6);
+            reg->idx[1].is_in_bounds = value->u.idxtemp.index.is_in_bounds;
             break;
 
         case VALUE_TYPE_GROUPSHAREDMEM:
-            register_init_with_id(reg, VKD3DSPR_GROUPSHAREDMEM, data_type, value->u.groupsharedmem.id);
+            vsir_register_init(reg, VKD3DSPR_GROUPSHAREDMEM, data_type, 2);
+            reg->idx[0].offset = value->u.groupsharedmem.id;
+            register_index_address_init(&reg->idx[1], value->u.groupsharedmem.index.index, sm6);
+            reg->idx[1].is_in_bounds = value->u.groupsharedmem.index.is_in_bounds;
             break;
 
         case VALUE_TYPE_UNDEFINED:
@@ -2572,12 +2593,12 @@ static void src_param_make_constant_uint(struct vkd3d_shader_src_param *param, u
 static void register_index_address_init(struct vkd3d_shader_register_index *idx, const struct sm6_value *address,
         struct sm6_parser *sm6)
 {
-    if (sm6_value_is_constant(address))
+    if (address && sm6_value_is_constant(address))
     {
         idx->offset = sm6_value_get_constant_uint(address);
         idx->rel_addr = NULL;
     }
-    else if (sm6_value_is_undef(address))
+    else if (!address || sm6_value_is_undef(address))
     {
         idx->offset = 0;
         idx->rel_addr = NULL;
@@ -3132,13 +3153,34 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
     return VKD3D_OK;
 }
 
+static struct sm6_index *sm6_get_value_index(struct sm6_parser *sm6, struct sm6_value *value)
+{
+    switch (value->value_type)
+    {
+        case VALUE_TYPE_ICB:
+            return &value->u.icb.index;
+
+        case VALUE_TYPE_IDXTEMP:
+            return &value->u.idxtemp.index;
+
+        case VALUE_TYPE_GROUPSHAREDMEM:
+            return &value->u.groupsharedmem.index;
+
+        default:
+            WARN("Cannot index into value of type %#x.\n", value->value_type);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Cannot index into value of type %#x.", value->value_type);
+            return NULL;
+    }
+}
+
 static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, const struct dxil_record *record,
         struct sm6_value *dst)
 {
     const struct sm6_type *elem_type, *pointee_type, *gep_type, *ptr_type;
-    struct vkd3d_shader_register reg;
     struct sm6_value *operands[3];
     unsigned int i, j, offset;
+    struct sm6_index *index;
     uint64_t value;
 
     i = 0;
@@ -3180,9 +3222,13 @@ static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, c
         }
     }
 
-    sm6_register_from_value(&reg, operands[0], sm6);
+    *dst = *operands[0];
+    index = sm6_get_value_index(sm6, dst);
 
-    if (reg.idx_count > 1)
+    if (!index)
+        return VKD3D_ERROR_INVALID_SHADER;
+
+    if (index->index)
     {
         WARN("Unsupported stacked GEP.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
@@ -3204,8 +3250,6 @@ static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, c
                 "A constexpr GEP element index is not a constant integer.");
         return VKD3D_ERROR_INVALID_SHADER;
     }
-
-    dst->structure_stride = operands[0]->structure_stride;
 
     ptr_type = operands[0]->type;
     if (!sm6_type_is_pointer(ptr_type))
@@ -3243,10 +3287,11 @@ static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, c
                 "Module does not define a pointer type for a constexpr GEP result.");
         return VKD3D_ERROR_INVALID_SHADER;
     }
-    dst->reg = reg;
-    dst->reg.idx[1].offset = offset;
-    dst->reg.idx[1].is_in_bounds = record->code == CST_CODE_CE_INBOUNDS_GEP;
-    dst->reg.idx_count = 2;
+
+    index->index = operands[2];
+    index->is_in_bounds = record->code == CST_CODE_CE_INBOUNDS_GEP;
+
+    sm6_register_from_value(&dst->reg, dst, sm6);
 
     return VKD3D_OK;
 }
@@ -7210,9 +7255,8 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
     unsigned int elem_idx, operand_idx = 2;
     enum bitcode_address_space addr_space;
     const struct sm6_value *elem_value;
-    struct vkd3d_shader_register reg;
     const struct sm6_value *src;
-    bool is_in_bounds;
+    struct sm6_index *index;
 
     if (!dxil_record_validate_operand_min_count(record, 5, sm6)
             || !(type = sm6_parser_get_type(sm6, record->operands[1]))
@@ -7224,17 +7268,19 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
         return;
     }
 
-    sm6_register_from_value(&reg, src, sm6);
+    *dst = *src;
+    index = sm6_get_value_index(sm6, dst);
 
-    if (reg.idx_count > 1)
+    if (!index)
+        return;
+
+    if (index->index)
     {
         WARN("Unsupported stacked GEP.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
                 "A GEP instruction on the result of a previous GEP is unsupported.");
         return;
     }
-
-    is_in_bounds = record->operands[0];
 
     if ((pointee_type = src->type->u.pointer.type) != type)
     {
@@ -7295,13 +7341,10 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
         return;
     }
 
-    reg.idx[1].offset = 0;
-    register_index_address_init(&reg.idx[1], elem_value, sm6);
-    reg.idx[1].is_in_bounds = is_in_bounds;
-    reg.idx_count = 2;
+    index->index = elem_value;
+    index->is_in_bounds = record->operands[0];
 
-    dst->reg = reg;
-    dst->structure_stride = src->structure_stride;
+    sm6_register_from_value(&dst->reg, dst, sm6);
 
     ins->opcode = VKD3DSIH_NOP;
 }
