@@ -4857,13 +4857,13 @@ static void sm6_parser_emit_dx_atomic_binop(struct sm6_parser *sm6, enum dx_intr
         src_param_init_from_value(&src_params[1], operands[4]);
     src_param_init_from_value(&src_params[1 + is_cmp_xchg], operands[5]);
 
+    sm6_parser_init_ssa_value(sm6, dst);
+
     dst_params = instruction_dst_params_alloc(ins, 2, sm6);
     dst_param_init(&dst_params[0]);
-    register_init_ssa_scalar(&dst_params[0].reg, dst->type, dst, sm6);
+    sm6_register_from_value(&dst_params[0].reg, dst);
     dst_param_init(&dst_params[1]);
     sm6_register_from_handle(sm6, &resource->u.handle, &dst_params[1].reg);
-
-    dst->reg = dst_params[0].reg;
 }
 
 static void sm6_parser_emit_dx_barrier(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
