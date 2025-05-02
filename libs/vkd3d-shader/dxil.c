@@ -2547,7 +2547,8 @@ static void src_param_init_vector(struct vkd3d_shader_src_param *param, unsigned
     param->modifiers = VKD3DSPSM_NONE;
 }
 
-static void src_param_init_from_value(struct vkd3d_shader_src_param *param, const struct sm6_value *src)
+static void src_param_init_from_value(struct vkd3d_shader_src_param *param, const struct sm6_value *src,
+        struct sm6_parser *sm6)
 {
     src_param_init(param);
     sm6_register_from_value(&param->reg, src);
@@ -2584,7 +2585,7 @@ static void register_index_address_init(struct vkd3d_shader_register_index *idx,
     {
         struct vkd3d_shader_src_param *rel_addr = vsir_program_get_src_params(sm6->p.program, 1);
         if (rel_addr)
-            src_param_init_from_value(rel_addr, address);
+            src_param_init_from_value(rel_addr, address, sm6);
         idx->offset = 0;
         idx->rel_addr = rel_addr;
     }
@@ -3917,7 +3918,7 @@ static void src_params_init_from_operands(struct vkd3d_shader_src_param *src_par
     unsigned int i;
 
     for (i = 0; i < count; ++i)
-        src_param_init_from_value(&src_params[i], operands[i]);
+        src_param_init_from_value(&src_params[i], operands[i], sm6);
 }
 
 static enum vkd3d_shader_register_type register_type_from_dxil_semantic_kind(
@@ -4284,7 +4285,7 @@ static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_
         src_param_init_vector_from_reg(&src_params[0], &coord);
     else
         src_param_make_constant_uint(&src_params[0], 0);
-    src_param_init_from_value(&src_params[1], src);
+    src_param_init_from_value(&src_params[1], src, sm6);
 
     sm6_parser_init_ssa_value(sm6, dst);
 
@@ -4459,8 +4460,8 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
 
     if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
         return;
-    src_param_init_from_value(&src_params[0], a);
-    src_param_init_from_value(&src_params[1], b);
+    src_param_init_from_value(&src_params[0], a, sm6);
+    src_param_init_from_value(&src_params[1], b, sm6);
     if (code == BINOP_SUB)
         src_params[1].modifiers = VKD3DSPSM_NEG;
 
@@ -4741,7 +4742,7 @@ static void sm6_parser_emit_dx_unary(struct sm6_parser *sm6, enum dx_intrinsic_o
     vsir_instruction_init(ins, &sm6->p.location, map_dx_unary_op(op));
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -4780,8 +4781,8 @@ static void sm6_parser_emit_dx_binary(struct sm6_parser *sm6, enum dx_intrinsic_
     vsir_instruction_init(ins, &sm6->p.location, map_dx_binary_op(op, operands[0]->type));
     if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
         return;
-    src_param_init_from_value(&src_params[0], operands[0]);
-    src_param_init_from_value(&src_params[1], operands[1]);
+    src_param_init_from_value(&src_params[0], operands[0], sm6);
+    src_param_init_from_value(&src_params[1], operands[1], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -4873,8 +4874,8 @@ static void sm6_parser_emit_dx_atomic_binop(struct sm6_parser *sm6, enum dx_intr
         return;
     src_param_init_vector_from_reg(&src_params[0], &reg);
     if (is_cmp_xchg)
-        src_param_init_from_value(&src_params[1], operands[4]);
-    src_param_init_from_value(&src_params[1 + is_cmp_xchg], operands[5]);
+        src_param_init_from_value(&src_params[1], operands[4], sm6);
+    src_param_init_from_value(&src_params[1 + is_cmp_xchg], operands[5], sm6);
 
     sm6_parser_init_ssa_value(sm6, dst);
 
@@ -5142,7 +5143,7 @@ static void sm6_parser_emit_dx_discard(struct sm6_parser *sm6, enum dx_intrinsic
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_DISCARD);
 
     if ((src_param = instruction_src_params_alloc(ins, 1, sm6)))
-        src_param_init_from_value(src_param, operands[0]);
+        src_param_init_from_value(src_param, operands[0], sm6);
 }
 
 static void sm6_parser_emit_dx_domain_location(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -5256,7 +5257,7 @@ static void sm6_parser_emit_dx_eval_attrib(struct sm6_parser *sm6, enum dx_intri
         register_index_address_init(&src_params[0].reg.idx[0], operands[1], sm6);
 
     if (op == DX_EVAL_SAMPLE_INDEX)
-        src_param_init_from_value(&src_params[1], operands[3]);
+        src_param_init_from_value(&src_params[1], operands[3], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -5270,7 +5271,7 @@ static void sm6_parser_emit_dx_fabs(struct sm6_parser *sm6, enum dx_intrinsic_op
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
     src_param->modifiers = VKD3DSPSM_ABS;
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
@@ -5345,7 +5346,7 @@ static void sm6_parser_emit_dx_ma(struct sm6_parser *sm6, enum dx_intrinsic_opco
     if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
         return;
     for (i = 0; i < 3; ++i)
-        src_param_init_from_value(&src_params[i], operands[i]);
+        src_param_init_from_value(&src_params[i], operands[i], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -5375,7 +5376,7 @@ static void sm6_parser_emit_dx_get_dimensions(struct sm6_parser *sm6, enum dx_in
     if (is_texture)
     {
         ins->flags = VKD3DSI_RESINFO_UINT;
-        src_param_init_from_value(&src_params[0], operands[1]);
+        src_param_init_from_value(&src_params[0], operands[1], sm6);
         component_count = VKD3D_VEC4_SIZE;
 
         if (resource_kind_is_multisampled(resource_kind))
@@ -5448,7 +5449,7 @@ static void sm6_parser_emit_dx_tertiary(struct sm6_parser *sm6, enum dx_intrinsi
     if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
         return;
     for (i = 0; i < 3; ++i)
-        src_param_init_from_value(&src_params[i], operands[i]);
+        src_param_init_from_value(&src_params[i], operands[i], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -5589,7 +5590,7 @@ static void sm6_parser_emit_dx_quad_op(struct sm6_parser *sm6, enum dx_intrinsic
 
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -5736,7 +5737,7 @@ static void sm6_parser_emit_dx_buffer_load(struct sm6_parser *sm6, enum dx_intri
 
     if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
         return;
-    src_param_init_from_value(&src_params[0], operands[1]);
+    src_param_init_from_value(&src_params[0], operands[1], sm6);
     if (!sm6_value_is_undef(operands[2]))
     {
         /* Constant zero would be ok, but is not worth checking for unless it shows up. */
@@ -5801,7 +5802,7 @@ static void sm6_parser_emit_dx_buffer_store(struct sm6_parser *sm6, enum dx_intr
 
     if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
         return;
-    src_param_init_from_value(&src_params[0], operands[1]);
+    src_param_init_from_value(&src_params[0], operands[1], sm6);
     if (!sm6_value_is_undef(operands[2]))
     {
         /* Constant zero would have no effect, but is not worth checking for unless it shows up. */
@@ -5856,14 +5857,14 @@ static void sm6_parser_emit_dx_get_sample_pos(struct sm6_parser *sm6, enum dx_in
     if (op == DX_TEX2DMS_GET_SAMPLE_POS)
     {
         src_param_init_vector_from_handle(sm6, &src_params[0], &resource->u.handle);
-        src_param_init_from_value(&src_params[1], operands[1]);
+        src_param_init_from_value(&src_params[1], operands[1], sm6);
     }
     else
     {
         src_param_init_vector(&src_params[0], 2);
         vsir_register_init(&src_params[0].reg, VKD3DSPR_RASTERIZER, VKD3D_DATA_FLOAT, 0);
         src_params[0].reg.dimension = VSIR_DIMENSION_VEC4;
-        src_param_init_from_value(&src_params[1], operands[0]);
+        src_param_init_from_value(&src_params[1], operands[0], sm6);
     }
 
     instruction_dst_param_init_ssa_vector(ins, 2, sm6);
@@ -5925,7 +5926,7 @@ static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_
             instruction_init_with_resource(ins, (op == DX_SAMPLE_B) ? VKD3DSIH_SAMPLE_B : VKD3DSIH_SAMPLE_LOD,
                     resource, sm6);
             src_params = instruction_src_params_alloc(ins, 4, sm6);
-            src_param_init_from_value(&src_params[3], operands[9]);
+            src_param_init_from_value(&src_params[3], operands[9], sm6);
             break;
         case DX_SAMPLE_C:
             clamp_idx = 10;
@@ -5934,7 +5935,7 @@ static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_
             instruction_init_with_resource(ins, (op == DX_SAMPLE_C_LZ) ? VKD3DSIH_SAMPLE_C_LZ : VKD3DSIH_SAMPLE_C,
                     resource, sm6);
             src_params = instruction_src_params_alloc(ins, 4, sm6);
-            src_param_init_from_value(&src_params[3], operands[9]);
+            src_param_init_from_value(&src_params[3], operands[9], sm6);
             component_count = 1;
             break;
         case DX_SAMPLE_GRAD:
@@ -6003,7 +6004,7 @@ static void sm6_parser_emit_dx_saturate(struct sm6_parser *sm6, enum dx_intrinsi
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     if (instruction_dst_param_init_ssa_scalar(ins, sm6))
         ins->dst->modifiers = VKD3DSPDM_SATURATE;
@@ -6021,7 +6022,7 @@ static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SINCOS);
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     sm6_parser_init_ssa_value(sm6, dst);
 
@@ -6042,7 +6043,7 @@ static void sm6_parser_emit_dx_split_double(struct sm6_parser *sm6, enum dx_intr
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     instruction_dst_param_init_ssa_vector(ins, 2, sm6);
 }
@@ -6108,7 +6109,7 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intr
     }
 
     if ((src_param = instruction_src_params_alloc(ins, 1, sm6)))
-        src_param_init_from_value(src_param, value);
+        src_param_init_from_value(src_param, value, sm6);
 }
 
 static void sm6_parser_emit_dx_texture_gather(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -6150,7 +6151,7 @@ static void sm6_parser_emit_dx_texture_gather(struct sm6_parser *sm6, enum dx_in
         instruction_init_with_resource(ins, extended_offset ? VKD3DSIH_GATHER4_PO_C : VKD3DSIH_GATHER4_C, resource, sm6);
         if (!(src_params = instruction_src_params_alloc(ins, 4 + extended_offset, sm6)))
             return;
-        src_param_init_from_value(&src_params[3 + extended_offset], operands[9]);
+        src_param_init_from_value(&src_params[3 + extended_offset], operands[9], sm6);
     }
 
     src_param_init_vector_from_reg(&src_params[0], &coord);
@@ -6213,7 +6214,7 @@ static void sm6_parser_emit_dx_texture_load(struct sm6_parser *sm6, enum dx_intr
     src_param_init_vector_from_reg(&src_params[0], &coord);
     src_param_init_vector_from_handle(sm6, &src_params[1], &resource->u.handle);
     if (is_multisample)
-        src_param_init_from_value(&src_params[2], mip_level_or_sample_count);
+        src_param_init_from_value(&src_params[2], mip_level_or_sample_count, sm6);
 
     instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
 }
@@ -6277,7 +6278,7 @@ static void sm6_parser_emit_dx_wave_active_ballot(struct sm6_parser *sm6, enum d
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_WAVE_ACTIVE_BALLOT);
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
 }
@@ -6317,7 +6318,7 @@ static void sm6_parser_emit_dx_wave_active_bit(struct sm6_parser *sm6, enum dx_i
 
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -6368,7 +6369,7 @@ static void sm6_parser_emit_dx_wave_op(struct sm6_parser *sm6, enum dx_intrinsic
 
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, operands[0]);
+    src_param_init_from_value(src_param, operands[0], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -6905,7 +6906,7 @@ static void sm6_parser_emit_cast(struct sm6_parser *sm6, const struct dxil_recor
 
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param_init_from_value(src_param, value);
+    src_param_init_from_value(src_param, value, sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 
@@ -7051,8 +7052,8 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
 
     if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
         return;
-    src_param_init_from_value(&src_params[0 ^ cmp->src_swap], a);
-    src_param_init_from_value(&src_params[1 ^ cmp->src_swap], b);
+    src_param_init_from_value(&src_params[0 ^ cmp->src_swap], a, sm6);
+    src_param_init_from_value(&src_params[1 ^ cmp->src_swap], b, sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -7129,8 +7130,8 @@ static void sm6_parser_emit_cmpxchg(struct sm6_parser *sm6, const struct dxil_re
     if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
         return;
     src_param_make_constant_uint(&src_params[0], 0);
-    src_param_init_from_value(&src_params[1], cmp);
-    src_param_init_from_value(&src_params[2], new);
+    src_param_init_from_value(&src_params[1], cmp, sm6);
+    src_param_init_from_value(&src_params[2], new, sm6);
 
     sm6_parser_init_ssa_value(sm6, dst);
 
@@ -7363,7 +7364,7 @@ static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_recor
             src_param_make_constant_uint(&src_params[0], reg.idx[1].offset);
         /* Struct offset is always zero as there is no struct, just an array. */
         src_param_make_constant_uint(&src_params[1], 0);
-        src_param_init_from_value(&src_params[2], ptr);
+        src_param_init_from_value(&src_params[2], ptr, sm6);
         src_params[2].reg.alignment = alignment;
         /* The offset is already in src_params[0]. */
         src_params[2].reg.idx_count = 1;
@@ -7377,7 +7378,7 @@ static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_recor
             return;
         if (operand_count > 1)
             src_param_make_constant_uint(&src_params[0], 0);
-        src_param_init_from_value(&src_params[operand_count - 1], ptr);
+        src_param_init_from_value(&src_params[operand_count - 1], ptr, sm6);
         src_params[operand_count - 1].reg.alignment = alignment;
     }
 
@@ -7551,7 +7552,7 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
             src_param_make_constant_uint(&src_params[0], reg.idx[1].offset);
         /* Struct offset is always zero as there is no struct, just an array. */
         src_param_make_constant_uint(&src_params[1], 0);
-        src_param_init_from_value(&src_params[2], src);
+        src_param_init_from_value(&src_params[2], src, sm6);
     }
     else
     {
@@ -7562,7 +7563,7 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
             return;
         if (operand_count > 1)
             src_param_make_constant_uint(&src_params[0], 0);
-        src_param_init_from_value(&src_params[operand_count - 1], src);
+        src_param_init_from_value(&src_params[operand_count - 1], src, sm6);
     }
 
     dst_param = instruction_dst_params_alloc(ins, 1, sm6);
@@ -7688,7 +7689,7 @@ static void sm6_parser_emit_vselect(struct sm6_parser *sm6, const struct dxil_re
     if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
         return;
     for (i = 0; i < 3; ++i)
-        src_param_init_from_value(&src_params[i], src[i]);
+        src_param_init_from_value(&src_params[i], src[i], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
