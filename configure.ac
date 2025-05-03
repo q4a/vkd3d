@@ -187,6 +187,10 @@ case $host_os in
       AC_SUBST([DEMO_LIBS],["-lgdi32"])
       AC_SUBST([DEMO_CFLAGS],["-municode"])
       ;;
+  darwin*)
+      AC_SUBST([DEMO_LIBS],["-framework Foundation -framework AppKit -framework QuartzCore"])
+      AC_SUBST([DEMO_CFLAGS],[""])
+      ;;
   *) AS_IF([test "x$enable_demos" = "xyes" -a "x$HAVE_XCB" != "xyes"],
       [AC_MSG_ERROR([libxcb is required for demos.])])
       AC_SUBST([DEMO_LIBS],[$XCB_LIBS])

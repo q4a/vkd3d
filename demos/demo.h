@@ -43,13 +43,17 @@
 #define DEMO_ASM_PUSHSECTION ".section rdata\n\t"
 #define DEMO_ASM_POPSECTION ".text\n\t"
 #define DEMO_ASM_OBJECT_TYPE(name)
+#elif defined(__APPLE__)
+#define DEMO_ASM_PUSHSECTION ".pushsection __TEXT,__const\n\t"
+#define DEMO_ASM_POPSECTION ".popsection\n\t"
+#define DEMO_ASM_OBJECT_TYPE(name)
 #else
 #define DEMO_ASM_PUSHSECTION ".pushsection .rodata\n\t"
 #define DEMO_ASM_POPSECTION ".popsection\n\t"
 #define DEMO_ASM_OBJECT_TYPE(name) ".type "name", @object\n\t"
 #endif
 
-#if defined(__WIN32__) && defined(__i386__)
+#if (defined(__WIN32__) && defined(__i386__)) || defined(__APPLE__)
 #define DEMO_ASM_NAME(name) "_"#name
 #else
 #define DEMO_ASM_NAME(name) #name

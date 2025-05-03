@@ -4,6 +4,11 @@ AM_CPPFLAGS = -I$(srcdir)/include -I$(srcdir)/include/private -I$(builddir)/incl
 AM_LDFLAGS = -no-undefined
 VKD3D_PERL = $(PERL) -w
 
+objc_headers = \
+	include/private/appkit.h \
+	include/private/foundation.h \
+	include/private/quartzcore.h
+
 widl_headers = \
 	include/vkd3d_d3d12.h \
 	include/vkd3d_d3d12sdklayers.h \
@@ -323,11 +328,12 @@ vkd3d_demos = \
 vkd3d_demos_headers = \
 	demos/demo.h \
 	demos/demo_d3d12.h \
+	demos/demo_macos.h \
 	demos/demo_vkd3d.h \
 	demos/demo_win32.h \
 	demos/demo_xcb.h
 
-BUILT_SOURCES = $(widl_headers) \
+BUILT_SOURCES = $(objc_headers) $(widl_headers) \
 	include/private/spirv_grammar.h \
 	include/private/vkd3d_version.h
 
@@ -549,6 +555,16 @@ endif
 
 noinst_HEADERS = $(vkd3d_test_headers) $(vkd3d_demos_headers)
 
+VKD3D_V_PERL = $(vkd3d_v_perl_@AM_V@)
+vkd3d_v_perl_ = $(vkd3d_v_perl_@AM_DEFAULT_V@)
+vkd3d_v_perl_0 = @echo "  PERL    " $@;
+vkd3d_v_perl_1 =
+
+CLEANFILES += $(objc_headers)
+${objc_headers}: %.h: demos/make_objc %.json
+	@$(MKDIR_P) $(@D)
+	$(VKD3D_V_PERL)$(VKD3D_PERL) $^ > $@.tmp && mv $@.tmp $@
+
 VKD3D_V_WIDL = $(vkd3d_v_widl_@AM_V@)
 vkd3d_v_widl_ = $(vkd3d_v_widl_@AM_DEFAULT_V@)
 vkd3d_v_widl_0 = @echo "  WIDL    " $@;
@@ -588,11 +604,6 @@ libvkd3d.pc: $(srcdir)/libs/vkd3d/libvkd3d.pc.in Makefile
 		-e 's![@]libdir[@]!$(libdir)!g' \
 		-e 's![@]PACKAGE_VERSION[@]!$(PACKAGE_VERSION)!g' \
 		$< > $@
-
-VKD3D_V_PERL = $(vkd3d_v_perl_@AM_V@)
-vkd3d_v_perl_ = $(vkd3d_v_perl_@AM_DEFAULT_V@)
-vkd3d_v_perl_0 = @echo "  PERL    " $@;
-vkd3d_v_perl_1 =
 
 include/private/spirv_grammar.h: libs/vkd3d-shader/make_spirv include/private/spirv.core.grammar.json
 	@$(MKDIR_P) $(@D)

@@ -19,6 +19,9 @@
 
 #include "config.h"
 #define VK_NO_PROTOTYPES
+#ifdef __APPLE__
+# define VK_USE_PLATFORM_METAL_EXT
+#endif
 #ifdef _WIN32
 # define VK_USE_PLATFORM_WIN32_KHR
 #endif
@@ -44,6 +47,9 @@
 DECLARE_VK_PFN(vkAcquireNextImageKHR)
 DECLARE_VK_PFN(vkCreateFence)
 DECLARE_VK_PFN(vkCreateSwapchainKHR)
+#ifdef __APPLE__
+DECLARE_VK_PFN(vkCreateMetalSurfaceEXT)
+#endif
 #ifdef _WIN32
 DECLARE_VK_PFN(vkCreateWin32SurfaceKHR)
 #endif
@@ -60,6 +66,12 @@ DECLARE_VK_PFN(vkGetSwapchainImagesKHR)
 DECLARE_VK_PFN(vkQueuePresentKHR)
 DECLARE_VK_PFN(vkResetFences)
 DECLARE_VK_PFN(vkWaitForFences)
+
+struct demo_macos
+{
+#ifdef __APPLE__
+#endif
+};
 
 struct demo_win32
 {
@@ -83,6 +95,7 @@ struct demo
 {
     union
     {
+        struct demo_macos macos;
         struct demo_win32 win32;
         struct demo_xcb xcb;
     } u;
@@ -167,6 +180,9 @@ static inline void demo_window_cleanup(struct demo_window *window)
     demo_remove_window(window->demo, window);
 }
 
+#ifdef __APPLE__
+# include "demo_macos.h"
+#endif
 #ifdef _WIN32
 # include "demo_win32.h"
 #endif
@@ -200,6 +216,9 @@ static void load_vulkan_procs(void)
     LOAD_VK_PFN(vkAcquireNextImageKHR)
     LOAD_VK_PFN(vkCreateFence)
     LOAD_VK_PFN(vkCreateSwapchainKHR)
+#ifdef __APPLE__
+    LOAD_VK_PFN(vkCreateMetalSurfaceEXT)
+#endif
 #ifdef _WIN32
     LOAD_VK_PFN(vkCreateWin32SurfaceKHR)
 #endif
@@ -244,6 +263,15 @@ static inline void demo_cleanup(struct demo *demo)
 
 static inline bool demo_init(struct demo *demo, void *user_data)
 {
+#ifdef __APPLE__
+    if (demo_macos_init(&demo->u.macos))
+    {
+        demo->create_window = demo_window_macos_create;
+        demo->get_dpi = demo_macos_get_dpi;
+        demo->process_events = demo_macos_process_events;
+        demo->cleanup = demo_macos_cleanup;
+    }
+#endif
 #ifdef _WIN32
     if (demo_win32_init(&demo->u.win32))
     {
