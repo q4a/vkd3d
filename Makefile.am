@@ -124,6 +124,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/effect-technique-fx_5.shader_test \
 	tests/hlsl/effect-variables-fx_2.shader_test \
 	tests/hlsl/effect-variables-fx_4.shader_test \
+	tests/hlsl/effect-variables-fx_4_1.shader_test \
 	tests/hlsl/effect-variables-fx_5.shader_test \
 	tests/hlsl/entry-point-semantics.shader_test \
 	tests/hlsl/eval-attrib.shader_test \
