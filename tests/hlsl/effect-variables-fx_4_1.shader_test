@@ -2,7 +2,7 @@
 shader model >= 4.1
 shader model < 6.0
 
-[effect todo]
+[effect]
 BlendState bs
 {
     SrcBlend[0] = one;
@@ -13,7 +13,7 @@ BlendState bs
     BlendOpAlpha[5] = add;
 };
 
-[effect todo]
+[effect]
 BlendState bs
 {
     SrcBlend = one;

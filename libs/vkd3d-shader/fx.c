@@ -2686,7 +2686,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var, struct hlsl
     struct hlsl_ir_node *node;
     unsigned int i;
 
-    if (type->class == HLSL_CLASS_BLEND_STATE && ctx->profile->major_version == 5)
+    if (type->class == HLSL_CLASS_BLEND_STATE && hlsl_version_ge(ctx, 4, 1))
     {
         table.ptr = fx_5_blend_states;
         table.count = ARRAY_SIZE(fx_5_blend_states);
