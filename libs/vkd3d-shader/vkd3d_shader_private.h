@@ -966,7 +966,7 @@ struct vkd3d_shader_register
     enum vsir_dimension dimension;
     /* known address alignment for optimisation, or zero */
     unsigned int alignment;
-    union
+    union vsir_immediate_constant
     {
         uint32_t immconst_u32[VKD3D_VEC4_SIZE];
         float immconst_f32[VKD3D_VEC4_SIZE];

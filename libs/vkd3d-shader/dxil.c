@@ -651,6 +651,7 @@ enum sm6_value_type
     VALUE_TYPE_ICB,
     VALUE_TYPE_IDXTEMP,
     VALUE_TYPE_GROUPSHAREDMEM,
+    VALUE_TYPE_CONSTANT,
     VALUE_TYPE_UNDEFINED,
     VALUE_TYPE_INVALID,
 };
@@ -699,6 +700,11 @@ struct sm6_groupsharedmem_data
     struct sm6_index index;
 };
 
+struct sm6_constant_data
+{
+    union vsir_immediate_constant immconst;
+};
+
 struct sm6_value
 {
     const struct sm6_type *type;
@@ -714,6 +720,7 @@ struct sm6_value
         struct sm6_icb_data icb;
         struct sm6_idxtemp_data idxtemp;
         struct sm6_groupsharedmem_data groupsharedmem;
+        struct sm6_constant_data constant;
     } u;
     struct vkd3d_shader_register reg;
 };
@@ -2278,6 +2285,7 @@ static inline bool sm6_value_is_register(const struct sm6_value *value)
         case VALUE_TYPE_ICB:
         case VALUE_TYPE_IDXTEMP:
         case VALUE_TYPE_GROUPSHAREDMEM:
+        case VALUE_TYPE_CONSTANT:
         case VALUE_TYPE_UNDEFINED:
         case VALUE_TYPE_INVALID:
             return true;
@@ -2448,9 +2456,11 @@ static void register_index_address_init(struct vkd3d_shader_register_index *idx,
 static void sm6_register_from_value(struct vkd3d_shader_register *reg, const struct sm6_value *value,
         struct sm6_parser *sm6)
 {
+    const struct sm6_type *scalar_type;
     enum vkd3d_data_type data_type;
 
-    data_type = vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(value->type, 0));
+    scalar_type = sm6_type_get_scalar_type(value->type, 0);
+    data_type = vkd3d_data_type_from_sm6_type(scalar_type);
 
     switch (value->value_type)
     {
@@ -2482,6 +2492,12 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             reg->idx[0].offset = value->u.groupsharedmem.id;
             register_index_address_init(&reg->idx[1], value->u.groupsharedmem.index.index, sm6);
             reg->idx[1].is_in_bounds = value->u.groupsharedmem.index.is_in_bounds;
+            break;
+
+        case VALUE_TYPE_CONSTANT:
+            vsir_register_init(reg, scalar_type->u.width == 64 ? VKD3DSPR_IMMCONST64 : VKD3DSPR_IMMCONST,
+                    data_type, 0);
+            reg->u = value->u.constant.immconst;
             break;
 
         case VALUE_TYPE_UNDEFINED:
@@ -3371,11 +3387,15 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                     return VKD3D_ERROR_INVALID_SHADER;
                 }
 
+                dst->value_type = VALUE_TYPE_CONSTANT;
+
                 value = decode_rotated_signed_value(record->operands[0]);
                 if (type->u.width <= 32)
-                    dst->reg.u.immconst_u32[0] = value & ((1ull << type->u.width) - 1);
+                    dst->u.constant.immconst.immconst_u32[0] = value & ((1ull << type->u.width) - 1);
                 else
-                    dst->reg.u.immconst_u64[0] = value;
+                    dst->u.constant.immconst.immconst_u64[0] = value;
+
+                sm6_register_from_value(&dst->reg, dst, sm6);
 
                 break;
 
