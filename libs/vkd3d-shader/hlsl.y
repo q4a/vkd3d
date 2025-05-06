@@ -4932,7 +4932,7 @@ static bool intrinsic_GetRenderTargetSampleCount(struct hlsl_ctx *ctx,
                 "GetRenderTargetSampleCount() can only be used from a pixel shader using version 4.1 or higher.");
 
     hlsl_block_add_expr(ctx, params->instrs, HLSL_OP0_RASTERIZER_SAMPLE_COUNT,
-            operands, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
+            operands, hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, 1), loc);
     return true;
 }
 
