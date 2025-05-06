@@ -16,6 +16,13 @@ float4 main() : sv_target
 todo(glsl | msl) draw quad
 probe (0, 0) rgba (4.0, 0.0, 0.0, 0.0)
 
+% Curiously GetRenderTargetSampleCount() returns a uint1, not a uint.
+% In sm6 it is altered to return a uint.
+[pixel shader fail(sm>=6) todo]
+float4 main() : sv_target
+{
+    return GetRenderTargetSampleCount()[0];
+}
 
 [pixel shader todo]
 uniform uint u;
