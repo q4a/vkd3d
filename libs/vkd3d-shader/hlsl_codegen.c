@@ -12114,14 +12114,11 @@ static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
         bool uav)
 {
     enum hlsl_regset regset = uav ? HLSL_REGSET_UAVS : HLSL_REGSET_TEXTURES;
-    struct vkd3d_shader_structured_resource *structured_resource;
-    struct vkd3d_shader_dst_param *dst_param;
-    struct vkd3d_shader_semantic *semantic;
     struct vkd3d_shader_instruction *ins;
     struct hlsl_type *component_type;
     enum vkd3d_shader_opcode opcode;
     bool multisampled;
-    unsigned int i, j;
+    unsigned int i;
 
     VKD3D_ASSERT(resource->regset == regset);
     VKD3D_ASSERT(hlsl_version_lt(ctx, 5, 1) || resource->bind_count == 1);
@@ -12132,6 +12129,7 @@ static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
     {
         unsigned int array_first = resource->index + i;
         unsigned int array_last = resource->index + i; /* FIXME: array end. */
+        struct vkd3d_shader_resource *vsir_resource;
 
         if (resource->var && !resource->var->objects_usage[regset][i].used)
             continue;
@@ -12169,13 +12167,16 @@ static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
             ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
             return;
         }
-        semantic = &ins->declaration.semantic;
-        structured_resource = &ins->declaration.structured_resource;
-        dst_param = &semantic->resource.reg;
-        vsir_dst_param_init(dst_param, uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VKD3D_DATA_UNUSED, 0);
 
-        if (uav && component_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
-            structured_resource->byte_stride = 4 * component_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC];
+        if (component_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+            vsir_resource = &ins->declaration.raw_resource.resource;
+        else if (component_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+            vsir_resource = &ins->declaration.structured_resource.resource;
+        else
+            vsir_resource = &ins->declaration.semantic.resource;
+
+        vsir_dst_param_init(&vsir_resource->reg, uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VKD3D_DATA_UNUSED, 0);
+
         if (uav && component_type->e.resource.rasteriser_ordered)
             ins->flags = VKD3DSUF_RASTERISER_ORDERED_VIEW;
 
@@ -12189,29 +12190,35 @@ static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
                     ctx->profile->major_version, ctx->profile->minor_version);
         }
 
-        for (j = 0; j < 4; ++j)
-            semantic->resource_data_type[j] = sm4_generate_vsir_get_format_type(component_type);
+        vsir_resource->range.first = array_first;
+        vsir_resource->range.last = array_last;
+        vsir_resource->range.space = resource->space;
 
-        semantic->resource.range.first = array_first;
-        semantic->resource.range.last = array_last;
-        semantic->resource.range.space = resource->space;
-
-        dst_param->reg.idx[0].offset = resource->id;
-        dst_param->reg.idx[1].offset = array_first;
-        dst_param->reg.idx[2].offset = array_last;
-        dst_param->reg.idx_count = 3;
+        vsir_resource->reg.reg.idx[0].offset = resource->id;
+        vsir_resource->reg.reg.idx[1].offset = array_first;
+        vsir_resource->reg.reg.idx[2].offset = array_last;
+        vsir_resource->reg.reg.idx_count = 3;
 
         ins->resource_type = sm4_generate_vsir_get_resource_type(resource->component_type);
-        if (resource->component_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+
+        if (component_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+        {
             ins->raw = true;
-        if (resource->component_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+        }
+        else if (component_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
         {
             ins->structured = true;
             ins->resource_stride = 4 * component_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC];
+            ins->declaration.structured_resource.byte_stride = ins->resource_stride;
         }
+        else
+        {
+            for (unsigned int j = 0; j < 4; ++j)
+                ins->declaration.semantic.resource_data_type[j] = sm4_generate_vsir_get_format_type(component_type);
 
-        if (multisampled)
-            semantic->sample_count = component_type->sample_count;
+            if (multisampled)
+                ins->declaration.semantic.sample_count = component_type->sample_count;
+        }
     }
 }
 
