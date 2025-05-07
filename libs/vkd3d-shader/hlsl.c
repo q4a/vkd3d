@@ -2687,7 +2687,7 @@ static struct hlsl_ir_node *clone_interlocked(struct hlsl_ctx *ctx,
 
     if (!(dst = hlsl_alloc(ctx, sizeof(*dst))))
         return NULL;
-    init_node(&dst->node, HLSL_IR_INTERLOCKED, NULL, &src->node.loc);
+    init_node(&dst->node, HLSL_IR_INTERLOCKED, src->node.data_type, &src->node.loc);
     dst->op = src->op;
 
     if (!clone_deref(ctx, map, &dst->dst, &src->dst))
