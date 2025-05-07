@@ -13920,6 +13920,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
                 "Entry point \"%s\" is missing a [maxvertexcount] attribute.", entry_func->func->name);
 
+    list_init(&ctx->extern_vars);
     hlsl_block_init(&global_uniform_block);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
