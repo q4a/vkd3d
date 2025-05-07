@@ -576,7 +576,8 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
 
 /* Split inputs into two variables representing the semantic and temp registers,
  * and copy the former to the latter, so that writes to input variables work. */
-static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func, struct hlsl_ir_var *var)
+static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_block *body,
+        struct hlsl_ir_function_decl *func, struct hlsl_ir_var *var)
 {
     struct hlsl_semantic semantic_copy;
     struct hlsl_ir_load *load;
@@ -597,7 +598,7 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
     prepend_input_copy_recurse(ctx, func, &block, 0, load, var->storage_modifiers, &semantic_copy, false);
     hlsl_cleanup_semantic(&semantic_copy);
 
-    list_move_head(&func->body.instrs, &block.instrs);
+    list_move_head(&body->instrs, &block.instrs);
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -727,7 +728,8 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
 /* Split outputs into two variables representing the temp and semantic
  * registers, and copy the former to the latter, so that reads from output
  * variables work. */
-static void append_output_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func, struct hlsl_ir_var *var)
+static void append_output_var_copy(struct hlsl_ctx *ctx, struct hlsl_block *body,
+        struct hlsl_ir_function_decl *func, struct hlsl_ir_var *var)
 {
     struct hlsl_semantic semantic_copy;
     struct hlsl_ir_load *load;
@@ -735,11 +737,11 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
     /* This redundant load is expected to be deleted later by DCE. */
     if (!(load = hlsl_new_var_load(ctx, var, &var->loc)))
         return;
-    hlsl_block_add_instr(&func->body, &load->node);
+    hlsl_block_add_instr(body, &load->node);
 
     if (!hlsl_clone_semantic(ctx, &semantic_copy, &var->semantic))
         return;
-    append_output_copy_recurse(ctx, &func->body, func, var->data_type,
+    append_output_copy_recurse(ctx, body, func, var->data_type,
             load, var->storage_modifiers, &semantic_copy, 0, false, true);
     hlsl_cleanup_semantic(&semantic_copy);
 }
@@ -5309,7 +5311,7 @@ static bool mark_indexable_var(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
     return true;
 }
 
-static void mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static void mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
@@ -5320,7 +5322,7 @@ static void mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_ir_function_de
             var->indexable = false;
     }
 
-    transform_derefs(ctx, mark_indexable_var, &entry_func->body);
+    transform_derefs(ctx, mark_indexable_var, body);
 }
 
 static char get_regset_name(enum hlsl_regset regset)
@@ -5567,7 +5569,7 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
     }
 }
 
-static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
@@ -5575,7 +5577,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     if (ctx->result)
         return;
 
-    index_instructions(&entry_func->body, 1);
+    index_instructions(body, 1);
 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
     {
@@ -5583,7 +5585,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
             var->first_write = var->last_read = 0;
     }
 
-    compute_liveness_recurse(&entry_func->body, 0, 0);
+    compute_liveness_recurse(body, 0, 0);
 }
 
 static void mark_vars_usage(struct hlsl_ctx *ctx)
@@ -6366,7 +6368,7 @@ static void allocate_sincos_const_registers(struct hlsl_ctx *ctx, struct hlsl_bl
     }
 }
 
-static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     struct register_allocator allocator_used = {0};
     struct register_allocator allocator = {0};
@@ -6431,9 +6433,9 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
         }
     }
 
-    allocate_const_registers_recurse(ctx, &entry_func->body, &allocator);
+    allocate_const_registers_recurse(ctx, body, &allocator);
 
-    allocate_sincos_const_registers(ctx, &entry_func->body, &allocator);
+    allocate_sincos_const_registers(ctx, body, &allocator);
 
     vkd3d_free(allocator.allocations);
 }
@@ -6442,7 +6444,8 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
  * index to all (simultaneously live) variables or intermediate values. Agnostic
  * as to how many registers are actually available for the current backend, and
  * does not handle constants. */
-static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx,
+        struct hlsl_block *body, struct hlsl_ir_function_decl *entry_func)
 {
     struct register_allocator allocator = {0};
     struct hlsl_scope *scope;
@@ -6472,7 +6475,7 @@ static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_fun
         }
     }
 
-    allocate_temp_registers_recurse(ctx, &entry_func->body, &allocator);
+    allocate_temp_registers_recurse(ctx, body, &allocator);
     vkd3d_free(allocator.allocations);
 
     if (allocator.indexable_count)
@@ -9597,7 +9600,7 @@ static void sm1_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
 }
 
 static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
-        uint64_t config_flags, struct vsir_program *program)
+        struct hlsl_block *body, uint64_t config_flags, struct vsir_program *program)
 {
     struct vkd3d_shader_version version = {0};
     struct hlsl_block block;
@@ -9612,7 +9615,7 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     }
 
     program->ssa_count = 0;
-    program->temp_count = allocate_temp_registers(ctx, entry_func);
+    program->temp_count = allocate_temp_registers(ctx, body, entry_func);
     if (ctx->result)
         return;
 
@@ -9621,9 +9624,9 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     hlsl_block_init(&block);
     sm1_generate_vsir_constant_defs(ctx, program, &block);
     sm1_generate_vsir_sampler_dcls(ctx, program, &block);
-    list_move_head(&entry_func->body.instrs, &block.instrs);
+    list_move_head(&body->instrs, &block.instrs);
 
-    sm1_generate_vsir_block(ctx, &entry_func->body, program);
+    sm1_generate_vsir_block(ctx, body, program);
 
     program->ssa_count = ctx->ssa_count;
 }
@@ -11738,8 +11741,8 @@ static void sm4_generate_vsir_block(struct hlsl_ctx *ctx, struct hlsl_block *blo
     }
 }
 
-static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
-        struct hlsl_ir_function_decl *func, uint64_t config_flags, struct vsir_program *program)
+static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+        struct hlsl_block *body, uint64_t config_flags, struct vsir_program *program)
 {
     struct hlsl_block block = {0};
     struct hlsl_scope *scope;
@@ -11748,9 +11751,9 @@ static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
 
     ctx->is_patch_constant_func = func == ctx->patch_constant_func;
 
-    compute_liveness(ctx, func);
-    mark_indexable_vars(ctx, func);
-    temp_count = allocate_temp_registers(ctx, func);
+    compute_liveness(ctx, body);
+    mark_indexable_vars(ctx, body);
+    temp_count = allocate_temp_registers(ctx, body, func);
     if (ctx->result)
         return;
     program->temp_count = max(program->temp_count, temp_count);
@@ -11786,11 +11789,11 @@ static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx,
         }
     }
 
-    list_move_head(&func->body.instrs, &block.instrs);
+    list_move_head(&body->instrs, &block.instrs);
 
     hlsl_block_cleanup(&block);
 
-    sm4_generate_vsir_block(ctx, &func->body, program);
+    sm4_generate_vsir_block(ctx, body, program);
 
     generate_vsir_add_program_instruction(ctx, program, &func->loc, VSIR_OP_RET, 0, 0);
 }
@@ -12329,7 +12332,7 @@ static void sm4_generate_vsir_add_dcl_stream(struct hlsl_ctx *ctx,
  * vsir_program, so it can be used as input to tpf_compile() without relying
  * on ctx and entry_func. */
 static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
-        uint64_t config_flags, struct vsir_program *program)
+        struct hlsl_block *body, struct hlsl_block *patch_body, uint64_t config_flags, struct vsir_program *program)
 {
     struct vkd3d_shader_version version = {0};
     struct extern_resource *extern_resources;
@@ -12415,12 +12418,12 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
     if (version.type == VKD3D_SHADER_TYPE_HULL)
         generate_vsir_add_program_instruction(ctx, program,
                 &ctx->patch_constant_func->loc, VSIR_OP_HS_CONTROL_POINT_PHASE, 0, 0);
-    sm4_generate_vsir_add_function(ctx, func, config_flags, program);
+    sm4_generate_vsir_add_function(ctx, func, body, config_flags, program);
     if (version.type == VKD3D_SHADER_TYPE_HULL)
     {
         generate_vsir_add_program_instruction(ctx, program,
                 &ctx->patch_constant_func->loc, VSIR_OP_HS_FORK_PHASE, 0, 0);
-        sm4_generate_vsir_add_function(ctx, ctx->patch_constant_func, config_flags, program);
+        sm4_generate_vsir_add_function(ctx, ctx->patch_constant_func, patch_body, config_flags, program);
     }
 
     generate_vsir_scan_required_features(ctx, program);
@@ -13565,13 +13568,12 @@ static bool lower_isinf(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct 
     return true;
 }
 
-static void process_entry_function(struct hlsl_ctx *ctx,
+static void process_entry_function(struct hlsl_ctx *ctx, struct hlsl_block *body,
         const struct hlsl_block *global_uniform_block, struct hlsl_ir_function_decl *entry_func)
 {
     const struct hlsl_ir_var *input_patch = NULL, *output_patch = NULL;
     const struct hlsl_profile_info *profile = ctx->profile;
     struct hlsl_block static_initializers, global_uniforms;
-    struct hlsl_block *const body = &entry_func->body;
     struct recursive_call_ctx recursive_call_ctx;
     struct stream_append_ctx stream_append_ctx;
     uint32_t output_reg_count;
@@ -13580,6 +13582,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     bool progress;
 
     ctx->is_patch_constant_func = entry_func == ctx->patch_constant_func;
+
+    list_init(&entry_func->extern_vars);
+
+    hlsl_clone_block(ctx, body, &entry_func->body);
 
     if (!hlsl_clone_block(ctx, &static_initializers, &ctx->static_initializers))
         return;
@@ -13624,7 +13630,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
-        append_output_var_copy(ctx, entry_func, entry_func->return_var);
+        append_output_var_copy(ctx, body, entry_func, entry_func->return_var);
     }
 
     for (i = 0; i < entry_func->parameters.count; ++i)
@@ -13680,7 +13686,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             }
 
             validate_and_record_prim_type(ctx, var);
-            prepend_input_var_copy(ctx, entry_func, var);
+            prepend_input_var_copy(ctx, body, entry_func, var);
         }
         else if (var->data_type->reg_size[HLSL_REGSET_STREAM_OUTPUTS])
         {
@@ -13716,7 +13722,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                     continue;
                 }
 
-                prepend_input_var_copy(ctx, entry_func, var);
+                prepend_input_var_copy(ctx, body, entry_func, var);
             }
             if (var->storage_modifiers & HLSL_STORAGE_OUT)
             {
@@ -13727,7 +13733,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                             "Output parameters are not allowed in geometry shaders.");
                 else
-                    append_output_var_copy(ctx, entry_func, var);
+                    append_output_var_copy(ctx, body, entry_func, var);
             }
         }
     }
@@ -13776,8 +13782,8 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         hlsl_transform_ir(ctx, lower_resource_load_bias, body, NULL);
     }
 
-    compute_liveness(ctx, entry_func);
-    transform_derefs(ctx, divert_written_uniform_derefs_to_temp, &entry_func->body);
+    compute_liveness(ctx, body);
+    transform_derefs(ctx, divert_written_uniform_derefs_to_temp, body);
 
     loop_unrolling_execute(ctx, body);
     hlsl_run_const_passes(ctx, body);
@@ -13797,7 +13803,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     do
     {
         progress = vectorize_exprs(ctx, body);
-        compute_liveness(ctx, entry_func);
+        compute_liveness(ctx, body);
         progress |= hlsl_transform_ir(ctx, dce, body, NULL);
         progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);
         progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
@@ -13810,7 +13816,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
         hlsl_transform_ir(ctx, lower_combined_samples, body, NULL);
 
     do
-        compute_liveness(ctx, entry_func);
+        compute_liveness(ctx, body);
     while (hlsl_transform_ir(ctx, dce, body, NULL));
 
     hlsl_transform_ir(ctx, track_components_usage, body, NULL);
@@ -13866,7 +13872,7 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     hlsl_run_folding_passes(ctx, body);
 
     do
-        compute_liveness(ctx, entry_func);
+        compute_liveness(ctx, body);
     while (hlsl_transform_ir(ctx, dce, body, NULL));
 
     /* TODO: move forward, remove when no longer needed */
@@ -13875,10 +13881,10 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     transform_derefs(ctx, clean_constant_deref_offset_srcs, body);
 
     do
-        compute_liveness(ctx, entry_func);
+        compute_liveness(ctx, body);
     while (hlsl_transform_ir(ctx, dce, body, NULL));
 
-    compute_liveness(ctx, entry_func);
+    compute_liveness(ctx, body);
     mark_vars_usage(ctx);
 
     calculate_resource_register_counts(ctx);
@@ -13894,8 +13900,8 @@ static void process_entry_function(struct hlsl_ctx *ctx,
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
+    struct hlsl_block global_uniform_block, body, patch_body;
     const struct hlsl_profile_info *profile = ctx->profile;
-    struct hlsl_block global_uniform_block;
     struct hlsl_ir_var *var;
 
     parse_entry_function_attributes(ctx, entry_func);
@@ -13922,13 +13928,13 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             prepend_uniform_copy(ctx, &global_uniform_block, var);
     }
 
-    process_entry_function(ctx, &global_uniform_block, entry_func);
+    process_entry_function(ctx, &body, &global_uniform_block, entry_func);
     if (ctx->result)
         return ctx->result;
 
     if (profile->type == VKD3D_SHADER_TYPE_HULL)
     {
-        process_entry_function(ctx, &global_uniform_block, ctx->patch_constant_func);
+        process_entry_function(ctx, &patch_body, &global_uniform_block, ctx->patch_constant_func);
         if (ctx->result)
             return ctx->result;
     }
@@ -13937,8 +13943,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     if (profile->major_version < 4)
     {
-        mark_indexable_vars(ctx, entry_func);
-        allocate_const_registers(ctx, entry_func);
+        mark_indexable_vars(ctx, &body);
+        allocate_const_registers(ctx, &body);
         sort_uniforms_by_bind_count(ctx, HLSL_REGSET_SAMPLERS);
         allocate_objects(ctx, entry_func, HLSL_REGSET_SAMPLERS);
     }
@@ -13969,7 +13975,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             if (ctx->result)
                 return ctx->result;
 
-            sm1_generate_vsir(ctx, entry_func, config_flags, &program);
+            sm1_generate_vsir(ctx, entry_func, &body, config_flags, &program);
             if (ctx->result)
             {
                 vsir_program_cleanup(&program);
@@ -13996,7 +14002,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             if (ctx->result)
                 return ctx->result;
 
-            sm4_generate_vsir(ctx, entry_func, config_flags, &program);
+            sm4_generate_vsir(ctx, entry_func, &body, &patch_body, config_flags, &program);
             if (ctx->result)
             {
                 vsir_program_cleanup(&program);
