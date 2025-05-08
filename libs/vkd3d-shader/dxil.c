@@ -3058,13 +3058,6 @@ static float register_get_float_value(const struct vkd3d_shader_register *reg)
     return bitcast_uint_to_float(reg->u.immconst_u32[0]);
 }
 
-static inline float sm6_value_get_constant_float(const struct sm6_value *value)
-{
-    if (!sm6_value_is_constant(value))
-        return UINT_MAX;
-    return register_get_float_value(&value->reg);
-}
-
 static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, const struct sm6_type *type,
         const uint64_t *operands, struct sm6_parser *sm6)
 {
@@ -7773,7 +7766,7 @@ static bool sm6_metadata_get_float_value(const struct sm6_parser *sm6,
     if (!sm6_type_is_floating_point(value->type))
         return false;
 
-    *f = sm6_value_get_constant_float(value);
+    *f = register_get_float_value(&value->reg);
 
     return true;
 }
