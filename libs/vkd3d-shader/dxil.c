@@ -3409,14 +3409,15 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                     return VKD3D_ERROR_INVALID_SHADER;
                 }
 
-                if (type->u.width == 16)
-                    dst->reg.u.immconst_u32[0] = record->operands[0];
-                else if (type->u.width == 32)
-                    dst->reg.u.immconst_f32[0] = bitcast_uint_to_float(record->operands[0]);
-                else if (type->u.width == 64)
-                    dst->reg.u.immconst_f64[0] = bitcast_uint64_to_double(record->operands[0]);
+                dst->value_type = VALUE_TYPE_CONSTANT;
+
+                value = record->operands[0];
+                if (type->u.width <= 32)
+                    dst->u.constant.immconst.immconst_u32[0] = value & ((1ull << type->u.width) - 1);
                 else
-                    vkd3d_unreachable();
+                    dst->u.constant.immconst.immconst_u64[0] = value;
+
+                sm6_register_from_value(&dst->reg, dst, sm6);
 
                 break;
 
