@@ -2337,7 +2337,16 @@ static bool sm6_value_is_ssa(const struct sm6_value *value)
 
 static bool sm6_value_is_numeric_array(const struct sm6_value *value)
 {
-    return sm6_value_is_register(value) && register_is_numeric_array(&value->reg);
+    switch (value->value_type)
+    {
+        case VALUE_TYPE_ICB:
+        case VALUE_TYPE_IDXTEMP:
+        case VALUE_TYPE_GROUPSHAREDMEM:
+            return true;
+
+        default:
+            return false;
+    }
 }
 
 static inline unsigned int sm6_value_get_constant_uint(const struct sm6_value *value)
@@ -3444,6 +3453,48 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 break;
 
             case CST_CODE_CE_CAST:
+                /* Resolve later in case forward refs exist. */
+                dst->type = type;
+                dst->value_type = VALUE_TYPE_INVALID;
+                break;
+
+            case CST_CODE_UNDEF:
+                dxil_record_validate_operand_max_count(record, 0, sm6);
+                dst->value_type = VALUE_TYPE_UNDEFINED;
+                sm6_register_from_value(&dst->reg, dst, sm6);
+                break;
+
+            default:
+                vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                        "Constant code %u is unhandled.", record->code);
+                dst->value_type = VALUE_TYPE_INVALID;
+                sm6_register_from_value(&dst->reg, dst, sm6);
+                break;
+        }
+
+        if (record->attachment)
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                    "Ignoring a metadata attachment for a constant.");
+
+        ++sm6->value_count;
+    }
+
+    value_idx = base_value_idx;
+
+    for (i = 0; i < block->record_count; ++i)
+    {
+        sm6->p.location.column = i;
+        record = block->records[i];
+
+        switch (record->code)
+        {
+            case CST_CODE_SETTYPE:
+                continue;
+
+            default:
+                break;
+
+            case CST_CODE_CE_CAST:
                 if (!dxil_record_validate_operand_count(record, 3, 3, sm6))
                     return VKD3D_ERROR_INVALID_SHADER;
 
@@ -3479,59 +3530,28 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                     return VKD3D_ERROR_INVALID_SHADER;
                 }
 
-                /* Resolve later in case forward refs exist. */
+                dst = &sm6->values[value_idx];
+                src = &sm6->values[value];
+
+                if (!sm6_value_is_numeric_array(src))
+                {
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                            "Constexpr cast source value is not a global array element.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                type = dst->type;
+                *dst = *src;
                 dst->type = type;
-                dst->reg.type = VKD3DSPR_COUNT;
-                dst->reg.idx[0].offset = value;
-                break;
 
-            case CST_CODE_UNDEF:
-                dxil_record_validate_operand_max_count(record, 0, sm6);
-                dst->value_type = VALUE_TYPE_UNDEFINED;
-                sm6_register_from_value(&dst->reg, dst, sm6);
-                break;
-
-            default:
-                FIXME("Unhandled constant code %u.\n", record->code);
-                vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                        "Constant code %u is unhandled.", record->code);
-                dst->value_type = VALUE_TYPE_INVALID;
                 sm6_register_from_value(&dst->reg, dst, sm6);
                 break;
         }
 
-        if (record->attachment)
-        {
-            WARN("Ignoring metadata attachment.\n");
-            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
-                    "Ignoring a metadata attachment for a constant.");
-        }
-
-        ++sm6->value_count;
+        ++value_idx;
     }
 
-    /* Resolve cast forward refs. */
-    for (i = base_value_idx; i < sm6->value_count; ++i)
-    {
-        dst = &sm6->values[i];
-        if (dst->reg.type != VKD3DSPR_COUNT)
-            continue;
-
-        type = dst->type;
-
-        src = &sm6->values[dst->reg.idx[0].offset];
-        if (!sm6_value_is_numeric_array(src))
-        {
-            WARN("Value is not an array.\n");
-            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                    "Constexpr cast source value is not a global array element.");
-            return VKD3D_ERROR_INVALID_SHADER;
-        }
-
-        *dst = *src;
-        dst->type = type;
-        dst->reg.data_type = vkd3d_data_type_from_sm6_type(type->u.pointer.type);
-    }
+    VKD3D_ASSERT(value_idx == sm6->value_count);
 
     return VKD3D_OK;
 }
