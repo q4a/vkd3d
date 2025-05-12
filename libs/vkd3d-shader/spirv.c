@@ -5804,6 +5804,9 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
     if (compiler->shader_type == VKD3D_SHADER_TYPE_DOMAIN && reg_type != VKD3DSPR_PATCHCONST)
         sysval = VKD3D_SHADER_SV_NONE;
 
+    if (!signature_element->used_mask)
+        return;
+
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
 
     array_sizes[0] = signature_element->register_count;
