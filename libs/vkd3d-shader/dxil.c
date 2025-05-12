@@ -2026,11 +2026,6 @@ static inline bool sm6_type_is_handle(const struct sm6_type *type)
     return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.Handle");
 }
 
-static inline const struct sm6_type *sm6_type_get_element_type(const struct sm6_type *type)
-{
-    return (type->class == TYPE_CLASS_ARRAY || type->class == TYPE_CLASS_VECTOR) ? type->u.array.elem_type : type;
-}
-
 static const struct sm6_type *sm6_type_get_pointer_to_type(const struct sm6_type *type,
         enum bitcode_address_space addr_space, struct sm6_parser *sm6)
 {
@@ -3321,10 +3316,8 @@ static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, c
 
 static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const struct dxil_block *block)
 {
-    enum vkd3d_shader_register_type reg_type = VKD3DSPR_INVALID;
-    const struct sm6_type *type, *elem_type, *ptr_type;
+    const struct sm6_type *type, *ptr_type;
     size_t i, base_value_idx, value_idx;
-    enum vkd3d_data_type reg_data_type;
     const struct dxil_record *record;
     const struct sm6_value *src;
     enum vkd3d_result ret;
@@ -3345,18 +3338,6 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
             if (!(type = sm6_parser_get_type(sm6, record->operands[0])))
                 return VKD3D_ERROR_INVALID_SHADER;
 
-            elem_type = sm6_type_get_element_type(type);
-            if (sm6_type_is_numeric(elem_type))
-            {
-                reg_data_type = vkd3d_data_type_from_sm6_type(elem_type);
-                reg_type = elem_type->u.width > 32 ? VKD3DSPR_IMMCONST64 : VKD3DSPR_IMMCONST;
-            }
-            else
-            {
-                reg_data_type = VKD3D_DATA_UNUSED;
-                reg_type = VKD3DSPR_INVALID;
-            }
-
             if (i == block->record_count - 1)
                 WARN("Unused SETTYPE record.\n");
 
@@ -3371,19 +3352,22 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
 
         dst = sm6_parser_get_current_value(sm6);
         dst->type = type;
-        dst->value_type = VALUE_TYPE_REG;
         dst->is_back_ref = true;
-        vsir_register_init(&dst->reg, reg_type, reg_data_type, 0);
 
         switch (record->code)
         {
             case CST_CODE_NULL:
-                if (sm6_type_is_array(type)
-                        && (ret = value_allocate_constant_array(dst, type, NULL, sm6)) < 0)
+                if (sm6_type_is_array(type))
                 {
-                    return ret;
+                    if ((ret = value_allocate_constant_array(dst, type, NULL, sm6)) < 0)
+                        return ret;
                 }
-                /* For non-aggregates, register constant data is already zero-filled. */
+                else
+                {
+                    dst->value_type = VALUE_TYPE_CONSTANT;
+                    memset(&dst->u.constant, 0, sizeof(dst->u.constant));
+                    sm6_register_from_value(&dst->reg, dst, sm6);
+                }
                 break;
 
             case CST_CODE_INTEGER:
