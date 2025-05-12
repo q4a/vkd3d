@@ -862,12 +862,14 @@ static enum vkd3d_result vsir_program_lower_tex(struct vsir_program *program,
     }
     else if (tex->flags == VKD3DSI_TEXLD_BIAS)
     {
+        enum vkd3d_shader_swizzle_component w = vsir_swizzle_get_component(srcs[0].swizzle, 3);
+
         tex->opcode = VKD3DSIH_SAMPLE_B;
         tex->src = srcs;
         tex->src_count = 4;
 
         srcs[3] = tex->src[0];
-        srcs[3].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
+        srcs[3].swizzle = vkd3d_shader_create_swizzle(w, w, w, w);
     }
     else
     {
