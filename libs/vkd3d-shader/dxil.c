@@ -6857,6 +6857,10 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
                 VKD3D_ASSERT(from->u.width == 1 || to->u.width == 64);
                 is_valid = from_int && to_int;
             }
+            else
+            {
+                is_valid = false;
+            }
             break;
         case CAST_FPTOUI:
             op = VKD3DSIH_FTOU;
