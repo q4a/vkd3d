@@ -6955,9 +6955,11 @@ static void sm6_parser_emit_cast(struct sm6_parser *sm6, const struct dxil_recor
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 
-    /* bitcast */
+    /* VSIR bitcasts are represented by source registers with types different
+     * from the types they were written with, rather than with different types
+     * for the MOV source and destination. */
     if (handler_idx == VKD3DSIH_MOV)
-        src_param->reg.data_type = dst->reg.data_type;
+        src_param->reg.data_type = ins->dst[0].reg.data_type;
 }
 
 struct sm6_cmp_info
