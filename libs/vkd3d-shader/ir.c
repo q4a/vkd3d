@@ -2048,23 +2048,27 @@ static enum vkd3d_result shader_signature_map_patch_constant_index_ranges(struct
 
     for (i = 0; i < s->element_count; i += register_count)
     {
+        uint32_t used_mask;
+
         e = &s->elements[i];
         register_count = 1;
 
         if (!e->sysval_semantic)
             continue;
 
+        used_mask = e->used_mask;
         for (j = i + 1; j < s->element_count; ++j, ++register_count)
         {
             f = &s->elements[j];
             if (f->register_index != e->register_index + register_count || !sysval_semantics_should_merge(e, f))
                 break;
+            used_mask |= f->used_mask;
         }
         if (register_count < 2)
             continue;
 
         if ((ret = range_map_set_register_range(normaliser, range_map,
-                e->register_index, register_count, e->mask, e->used_mask, false)) < 0)
+                e->register_index, register_count, e->mask, used_mask, false)) < 0)
             return ret;
     }
 
