@@ -338,7 +338,10 @@ bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_cont
 void vkd3d_shader_vnote(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_log_level level, const char *format, va_list args)
 {
-    if (context->log_level < level)
+    struct vkd3d_string_buffer *messages = &context->messages;
+    size_t pos = messages->content_size;
+
+    if (!WARN_ON() && context->log_level < level)
         return;
 
     if (location)
@@ -346,13 +349,17 @@ void vkd3d_shader_vnote(struct vkd3d_shader_message_context *context, const stru
         const char *source_name = location->source_name ? location->source_name : "<anonymous>";
 
         if (location->line)
-            vkd3d_string_buffer_printf(&context->messages, "%s:%u:%u: ",
+            vkd3d_string_buffer_printf(messages, "%s:%u:%u: ",
                     source_name, location->line, location->column);
         else
-            vkd3d_string_buffer_printf(&context->messages, "%s: ", source_name);
+            vkd3d_string_buffer_printf(messages, "%s: ", source_name);
     }
-    vkd3d_string_buffer_vprintf(&context->messages, format, args);
-    vkd3d_string_buffer_printf(&context->messages, "\n");
+    vkd3d_string_buffer_vprintf(messages, format, args);
+    vkd3d_string_buffer_printf(messages, "\n");
+
+    WARN("%.*s", (int)(messages->content_size - pos), &messages->buffer[pos]);
+    if (context->log_level < level)
+        messages->content_size = pos;
 }
 
 void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
