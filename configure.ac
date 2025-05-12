@@ -197,6 +197,7 @@ case $host_os in
       AC_SUBST([DEMO_CFLAGS],[$XCB_CFLAGS])
       ;;
 esac
+VKD3D_CHECK_CFLAGS([-fno-lto], [DEMO_CFLAGS="$DEMO_CFLAGS -fno-lto"])
 AM_CONDITIONAL([BUILD_DEMOS], [test "x$enable_demos" = "xyes"])
 AM_CONDITIONAL([BUILD_DOC], [test $DX_FLAG_doc = 1])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$enable_tests" != "xno"])
