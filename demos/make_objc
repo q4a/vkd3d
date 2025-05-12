@@ -39,7 +39,7 @@ sub method_parameters($$)
 
 sub send_function($)
 {
-    shift->{'return-float'} ? "objc_msgSend_fpret" : "objc_msgSend";
+    shift->{'return-float'} ? "vkd3d_objc_msgSend_fpret" : "objc_msgSend";
 }
 
 sub invocation_type($$)
@@ -129,7 +129,15 @@ sub print_header($)
 
     print "#include <objc/objc-runtime.h>\n\n";
 
+    print "#ifdef __arm64__\n";
+    print "# define vkd3d_objc_msgSend_fpret objc_msgSend\n";
+    print "#else\n";
+    print "# define vkd3d_objc_msgSend_fpret objc_msgSend_fpret\n";
+    print "#endif /* __arm64__ */\n\n";
+
     print_interface foreach (@{$grammar->{interfaces}});
+
+    print "#undef vkd3d_objc_msgSend_fpret\n\n";
 
     print "#endif /* $guard */\n";
 }
