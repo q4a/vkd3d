@@ -392,7 +392,10 @@ void vkd3d_shader_warning(struct vkd3d_shader_message_context *context, const st
 void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args)
 {
-    if (context->log_level < VKD3D_SHADER_LOG_ERROR)
+    struct vkd3d_string_buffer *messages = &context->messages;
+    size_t pos = messages->content_size;
+
+    if (!WARN_ON() && context->log_level < VKD3D_SHADER_LOG_ERROR)
         return;
 
     if (location)
@@ -400,17 +403,21 @@ void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const str
         const char *source_name = location->source_name ? location->source_name : "<anonymous>";
 
         if (location->line)
-            vkd3d_string_buffer_printf(&context->messages, "%s:%u:%u: E%04u: ",
+            vkd3d_string_buffer_printf(messages, "%s:%u:%u: E%04u: ",
                     source_name, location->line, location->column, error);
         else
-            vkd3d_string_buffer_printf(&context->messages, "%s: E%04u: ", source_name, error);
+            vkd3d_string_buffer_printf(messages, "%s: E%04u: ", source_name, error);
     }
     else
     {
-        vkd3d_string_buffer_printf(&context->messages, "E%04u: ", error);
+        vkd3d_string_buffer_printf(messages, "E%04u: ", error);
     }
-    vkd3d_string_buffer_vprintf(&context->messages, format, args);
-    vkd3d_string_buffer_printf(&context->messages, "\n");
+    vkd3d_string_buffer_vprintf(messages, format, args);
+    vkd3d_string_buffer_printf(messages, "\n");
+
+    WARN("%.*s", (int)(messages->content_size - pos), &messages->buffer[pos]);
+    if (context->log_level < VKD3D_SHADER_LOG_ERROR)
+        messages->content_size = pos;
 }
 
 void vkd3d_shader_error(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
