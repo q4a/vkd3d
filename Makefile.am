@@ -540,7 +540,7 @@ EXTRA_DIST += $(vkd3d_shader_tests)
 
 if BUILD_DEMOS
 DEMOS_LDADD = $(LDADD) @DL_LIBS@ @DEMO_LIBS@
-DEMOS_CFLAGS = $(AM_CFLAGS) @DEMO_CFLAGS@ -Wa,-I$(srcdir)/demos
+DEMOS_CFLAGS = $(AM_CFLAGS) @DEMO_CFLAGS@ -I$(srcdir)/demos -Wa,-I$(srcdir)/demos
 bin_PROGRAMS += $(vkd3d_demos)
 
 demos_vkd3d_gears_SOURCES = demos/gears.c demos/gears.hlsl
