@@ -6877,7 +6877,7 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
         case CAST_FPTRUNC:
             /* TODO: native 16-bit */
             op = (from->u.width == 64) ? VKD3DSIH_DTOF : VKD3DSIH_NOP;
-            is_valid = from_fp && to_fp;
+            is_valid = from_fp && to_fp && to->u.width <= from->u.width;
             break;
         case CAST_FPEXT:
             /* TODO: native 16-bit */
