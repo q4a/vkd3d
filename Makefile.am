@@ -133,11 +133,11 @@ vkd3d_shader_tests = \
 	tests/hlsl/f16tof32.shader_test \
 	tests/hlsl/f32tof16.shader_test \
 	tests/hlsl/faceforward.shader_test \
-	tests/hlsl/fog.shader_test \
 	tests/hlsl/ffp-point-size.shader_test \
 	tests/hlsl/float-comparison.shader_test \
 	tests/hlsl/floor.shader_test \
 	tests/hlsl/fmod.shader_test \
+	tests/hlsl/fog.shader_test \
 	tests/hlsl/for.shader_test \
 	tests/hlsl/frac.shader_test \
 	tests/hlsl/function-cast.shader_test \
