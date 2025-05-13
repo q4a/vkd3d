@@ -711,6 +711,7 @@ struct sm6_value
     enum sm6_value_type value_type;
     unsigned int structure_stride;
     bool is_back_ref;
+    bool non_uniform;
     union
     {
         struct sm6_function_data function;
@@ -2514,6 +2515,8 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
         case VALUE_TYPE_DATA:
             vkd3d_unreachable();
     }
+
+    reg->non_uniform = value->non_uniform;
 }
 
 static void sm6_parser_init_ssa_value(struct sm6_parser *sm6, struct sm6_value *value)
@@ -8003,7 +8006,8 @@ static void metadata_attachment_record_apply(const struct dxil_record *record, e
             }
             else if (metadata_node_get_unary_uint(node, &operand, sm6))
             {
-                dst->reg.non_uniform = !!operand;
+                dst->non_uniform = !!operand;
+                sm6_register_from_value(&dst->reg, dst, sm6);
             }
         }
         else
