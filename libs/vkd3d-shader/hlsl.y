@@ -2559,6 +2559,13 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                     "Variable '%s' is declared as both \"uniform\" and \"static\".", var->name);
 
+        if ((modifiers & HLSL_STORAGE_GROUPSHARED) && ctx->profile->type != VKD3D_SHADER_TYPE_COMPUTE)
+        {
+            modifiers &= ~HLSL_STORAGE_GROUPSHARED;
+            hlsl_warning(ctx, &var->loc, VKD3D_SHADER_WARNING_HLSL_IGNORED_MODIFIER,
+                    "Ignoring the 'groupshared' modifier in a non-compute shader.");
+        }
+
         if (modifiers & HLSL_STORAGE_GROUPSHARED)
             hlsl_fixme(ctx, &var->loc, "Group shared variables.");
 
