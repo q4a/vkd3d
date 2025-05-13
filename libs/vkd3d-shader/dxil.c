@@ -2307,7 +2307,15 @@ static bool sm6_value_is_constant_zero(const struct sm6_value *value)
 
 static inline bool sm6_value_is_undef(const struct sm6_value *value)
 {
-    return sm6_value_is_register(value) && value->reg.type == VKD3DSPR_UNDEF;
+    switch (value->value_type)
+    {
+        case VALUE_TYPE_UNDEFINED:
+        case VALUE_TYPE_INVALID:
+            return true;
+
+        default:
+            return false;
+    }
 }
 
 static bool sm6_value_vector_is_constant_or_undef(const struct sm6_value **values, unsigned int count)
