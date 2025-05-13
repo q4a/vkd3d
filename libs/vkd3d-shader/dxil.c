@@ -6805,6 +6805,7 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
 {
     enum vkd3d_shader_opcode op = VKD3DSIH_INVALID;
     bool from_int, to_int, from_fp, to_fp;
+    unsigned int from_width, to_width;
     bool is_valid = false;
 
     from_int = sm6_type_is_integer(from);
@@ -6828,70 +6829,58 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
         return VKD3DSIH_INVALID;
     }
 
-    /* DXC emits minimum precision types as 16-bit. These must be emitted
-     * as 32-bit in VSIR, so all width extensions to 32 bits are no-ops. */
     switch (code)
     {
         case CAST_TRUNC:
-            /* nop or min precision. TODO: native 16-bit */
-            if (to->u.width == from->u.width || (to->u.width == 16 && from->u.width == 32))
-                op = VKD3DSIH_NOP;
-            else
-                op = VKD3DSIH_UTOU;
+            op = VKD3DSIH_UTOU;
             is_valid = from_int && to_int && to->u.width <= from->u.width;
             break;
+
         case CAST_ZEXT:
-        case CAST_SEXT:
-            /* nop or min precision. TODO: native 16-bit.
-             * Extension instructions could be emitted for min precision, but in Windows
-             * the AMD RX 580 simply drops such instructions, which makes sense as no
-             * assumptions should be made about any behaviour which depends on bit width. */
-            if (to->u.width == from->u.width || (to->u.width == 32 && from->u.width == 16))
-            {
-                op = VKD3DSIH_NOP;
-                is_valid = from_int && to_int;
-            }
-            else if (to->u.width > from->u.width)
-            {
-                op = (code == CAST_ZEXT) ? VKD3DSIH_UTOU : VKD3DSIH_ITOI;
-                VKD3D_ASSERT(from->u.width == 1 || to->u.width == 64);
-                is_valid = from_int && to_int;
-            }
-            else
-            {
-                is_valid = false;
-            }
+            op = VKD3DSIH_UTOU;
+            is_valid = from_int && to_int && to->u.width >= from->u.width;
             break;
+
+        case CAST_SEXT:
+            op = VKD3DSIH_ITOI;
+            is_valid = from_int && to_int && to->u.width >= from->u.width;
+            break;
+
         case CAST_FPTOUI:
             op = VKD3DSIH_FTOU;
             is_valid = from_fp && to_int && to->u.width > 1;
             break;
+
         case CAST_FPTOSI:
             op = VKD3DSIH_FTOI;
             is_valid = from_fp && to_int && to->u.width > 1;
             break;
+
         case CAST_UITOFP:
             op = VKD3DSIH_UTOF;
             is_valid = from_int && to_fp;
             break;
+
         case CAST_SITOFP:
             op = VKD3DSIH_ITOF;
             is_valid = from_int && to_fp;
             break;
+
         case CAST_FPTRUNC:
-            /* TODO: native 16-bit */
-            op = (from->u.width == 64) ? VKD3DSIH_DTOF : VKD3DSIH_NOP;
+            op = VKD3DSIH_DTOF;
             is_valid = from_fp && to_fp && to->u.width <= from->u.width;
             break;
+
         case CAST_FPEXT:
-            /* TODO: native 16-bit */
-            op = (to->u.width == 64) ? VKD3DSIH_FTOD : VKD3DSIH_NOP;
+            op = VKD3DSIH_FTOD;
             is_valid = from_fp && to_fp && to->u.width >= from->u.width;
             break;
+
         case CAST_BITCAST:
             op = VKD3DSIH_MOV;
             is_valid = to->u.width == from->u.width;
             break;
+
         default:
             FIXME("Unhandled cast op %"PRIu64".\n", code);
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
@@ -6907,6 +6896,20 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
                 code, from->class, from->u.width, to->class, to->u.width);
         return VKD3DSIH_INVALID;
     }
+
+    /* 16-bit values are currently treated as 32-bit, because 16-bit is
+     * interpreted as a minimum precision hint in SM 6.0, and we don't handle
+     * SM > 6.0 yet. */
+     from_width = from->u.width;
+     if (from_width == 16)
+         from_width = 32;
+
+     to_width = to->u.width;
+     if (to_width == 16)
+         to_width = 32;
+
+     if (from->class == to->class && from_width == to_width)
+         op = VKD3DSIH_NOP;
 
     return op;
 }
