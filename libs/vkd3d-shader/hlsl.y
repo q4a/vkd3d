@@ -1183,6 +1183,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type,
 
         vkd3d_free((void *)type->name);
         type->name = v->name;
+        type->is_typedef = true;
 
         ret = hlsl_scope_add_type(ctx->cur_scope, type);
         if (!ret)
@@ -8219,7 +8220,7 @@ type_no_void:
     | KW_STRUCT TYPE_IDENTIFIER
         {
             $$ = hlsl_get_type(ctx->cur_scope, $2, true, true);
-            if ($$->class != HLSL_CLASS_STRUCT)
+            if ($$->class != HLSL_CLASS_STRUCT || $$->is_typedef)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" is not a structure.", $2);
             vkd3d_free($2);
         }

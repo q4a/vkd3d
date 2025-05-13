@@ -33,7 +33,7 @@
         return 0;
     }
 
-[pixel shader fail todo(sm<6)]
+[pixel shader fail]
     struct apple
     {
         float4 f;
