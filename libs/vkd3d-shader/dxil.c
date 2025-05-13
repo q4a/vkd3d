@@ -6949,10 +6949,9 @@ static void sm6_parser_emit_cast(struct sm6_parser *sm6, const struct dxil_recor
 
     if (handler_idx == VKD3DSIH_NOP)
     {
-        sm6_register_from_value(&dst->reg, value, sm6);
-        /* Set the result type for casts from 16-bit min precision. */
-        if (type->u.width != 16)
-            dst->reg.data_type = vkd3d_data_type_from_sm6_type(type);
+        *dst = *value;
+        dst->type = type;
+        sm6_register_from_value(&dst->reg, dst, sm6);
         return;
     }
 
