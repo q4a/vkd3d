@@ -3746,7 +3746,6 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
 
     dst = sm6_parser_get_current_value(sm6);
     dst->type = type;
-    dst->value_type = VALUE_TYPE_REG;
     dst->is_back_ref = true;
 
     if (is_constant && !init)
