@@ -2225,24 +2225,6 @@ static const char *sm6_parser_get_global_symbol_name(const struct sm6_parser *sm
     return NULL;
 }
 
-static unsigned int register_get_uint_value(const struct vkd3d_shader_register *reg)
-{
-    if (!register_is_constant(reg) || (!data_type_is_integer(reg->data_type) && !data_type_is_bool(reg->data_type)))
-        return UINT_MAX;
-
-    if (reg->dimension == VSIR_DIMENSION_VEC4)
-        WARN("Returning vec4.x.\n");
-
-    if (reg->type == VKD3DSPR_IMMCONST64)
-    {
-        if (reg->u.immconst_u64[0] > UINT_MAX)
-            FIXME("Truncating 64-bit value.\n");
-        return reg->u.immconst_u64[0];
-    }
-
-    return reg->u.immconst_u32[0];
-}
-
 static uint64_t register_get_uint64_value(const struct vkd3d_shader_register *reg)
 {
     if (!register_is_constant(reg) || !data_type_is_integer(reg->data_type))
@@ -2351,11 +2333,32 @@ static bool sm6_value_is_numeric_array(const struct sm6_value *value)
     }
 }
 
-static inline unsigned int sm6_value_get_constant_uint(const struct sm6_value *value)
+static unsigned int sm6_value_get_constant_uint(const struct sm6_value *value, struct sm6_parser *sm6)
 {
     if (!sm6_value_is_constant(value))
+    {
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                "Invalid non-constant value.");
         return UINT_MAX;
-    return register_get_uint_value(&value->reg);
+    }
+
+    if (value->type->class != TYPE_CLASS_INTEGER)
+    {
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                "Invalid non-integer constant value.");
+        return UINT_MAX;
+    }
+
+    if (value->type->u.width == 64)
+    {
+        uint64_t val = value->u.constant.immconst.immconst_u64[0];
+        if (val > UINT_MAX)
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                    "Invalid 64-bit constant %"PRIu64" will be truncated do %u.", val, (unsigned int)val);
+        return val;
+    }
+
+    return value->u.constant.immconst.immconst_u32[0];
 }
 
 static uint64_t sm6_value_get_constant_uint64(const struct sm6_value *value)
@@ -2620,7 +2623,7 @@ static void register_index_address_init(struct vkd3d_shader_register_index *idx,
 {
     if (address && sm6_value_is_constant(address))
     {
-        idx->offset = sm6_value_get_constant_uint(address);
+        idx->offset = sm6_value_get_constant_uint(address, sm6);
         idx->rel_addr = NULL;
     }
     else if (!address || sm6_value_is_undef(address))
@@ -3270,7 +3273,7 @@ static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, c
                 "Explicit pointee type for constexpr GEP does not match the element type.");
     }
 
-    offset = sm6_value_get_constant_uint(operands[2]);
+    offset = sm6_value_get_constant_uint(operands[2], sm6);
     if (!(gep_type = sm6_type_get_element_type_at_index(pointee_type, offset)))
     {
         WARN("Failed to get element type.\n");
@@ -4213,7 +4216,7 @@ static void sm6_parser_emit_alloca(struct sm6_parser *sm6, const struct dxil_rec
     if (!(size = sm6_parser_get_value_safe(sm6, record->operands[2])))
         return;
     /* A size of 1 means one instance of type[0], i.e. one array. */
-    if (sm6_value_get_constant_uint(size) != 1)
+    if (sm6_value_get_constant_uint(size, sm6) != 1)
     {
         FIXME("Allocation size is not 1.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
@@ -4838,7 +4841,7 @@ static void sm6_parser_emit_dx_binary(struct sm6_parser *sm6, enum dx_intrinsic_
 
 static enum vkd3d_shader_opcode map_dx_atomic_binop(const struct sm6_value *operand, struct sm6_parser *sm6)
 {
-    uint64_t code = sm6_value_get_constant_uint(operand);
+    uint64_t code = sm6_value_get_constant_uint(operand, sm6);
 
     switch (code)
     {
@@ -4942,7 +4945,7 @@ static void sm6_parser_emit_dx_barrier(struct sm6_parser *sm6, enum dx_intrinsic
     enum dxil_sync_flags flags;
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SYNC);
-    flags = sm6_value_get_constant_uint(operands[0]);
+    flags = sm6_value_get_constant_uint(operands[0], sm6);
     ins->flags = flags & (SYNC_THREAD_GROUP | SYNC_THREAD_GROUP_UAV);
     if (flags & SYNC_GLOBAL_UAV)
         ins->flags |= VKD3DSSF_GLOBAL_UAV;
@@ -4976,7 +4979,7 @@ static void sm6_parser_emit_dx_buffer_update_counter(struct sm6_parser *sm6, enu
                 "A dynamic update value for a UAV counter operation is not supported.");
         return;
     }
-    i = sm6_value_get_constant_uint(operands[1]);
+    i = sm6_value_get_constant_uint(operands[1], sm6);
     if (i != 1 && i != 255)
     {
         WARN("Unexpected update value %#x.\n", i);
@@ -5013,7 +5016,7 @@ static void sm6_parser_emit_dx_calculate_lod(struct sm6_parser *sm6, enum dx_int
     if (!sm6_parser_emit_coordinate_construct(sm6, &operands[2], 3, NULL, state, &coord))
         return;
 
-    clamp = sm6_value_get_constant_uint(operands[5]);
+    clamp = sm6_value_get_constant_uint(operands[5], sm6);
 
     ins = state->ins;
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_LOD);
@@ -5114,7 +5117,7 @@ static const struct sm6_descriptor_info *sm6_parser_get_descriptor(struct sm6_pa
         if (!sm6_value_is_constant(address))
             return d;
 
-        register_index = sm6_value_get_constant_uint(address);
+        register_index = sm6_value_get_constant_uint(address, sm6);
         if (register_index >= d->range.first && register_index <= d->range.last)
             return d;
     }
@@ -5131,8 +5134,8 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     struct sm6_value *dst;
     unsigned int id;
 
-    type = sm6_value_get_constant_uint(operands[0]);
-    id = sm6_value_get_constant_uint(operands[1]);
+    type = sm6_value_get_constant_uint(operands[0], sm6);
+    id = sm6_value_get_constant_uint(operands[1], sm6);
     if (!(d = sm6_parser_get_descriptor(sm6, type, id, operands[2])))
     {
         WARN("Failed to find resource type %#x, id %#x.\n", type, id);
@@ -5145,7 +5148,7 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     dst->value_type = VALUE_TYPE_HANDLE;
     dst->u.handle.d = d;
     dst->u.handle.index = operands[2];
-    dst->u.handle.non_uniform = !!sm6_value_get_constant_uint(operands[3]);
+    dst->u.handle.non_uniform = !!sm6_value_get_constant_uint(operands[3], sm6);
 
     /* NOP is used to flag no instruction emitted. */
     ins->opcode = VKD3DSIH_NOP;
@@ -5163,7 +5166,7 @@ static void sm6_parser_emit_dx_stream(struct sm6_parser *sm6, enum dx_intrinsic_
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
 
-    i = sm6_value_get_constant_uint(operands[0]);
+    i = sm6_value_get_constant_uint(operands[0], sm6);
     if (i >= MAX_GS_OUTPUT_STREAMS)
     {
         WARN("Invalid stream index %u.\n", i);
@@ -5204,7 +5207,7 @@ static void sm6_parser_emit_dx_domain_location(struct sm6_parser *sm6, enum dx_i
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
-    if ((component_idx = sm6_value_get_constant_uint(operands[0])) >= 3)
+    if ((component_idx = sm6_value_get_constant_uint(operands[0], sm6)) >= 3)
     {
         WARN("Invalid component index %u.\n", component_idx);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
@@ -5273,8 +5276,8 @@ static void sm6_parser_emit_dx_eval_attrib(struct sm6_parser *sm6, enum dx_intri
     unsigned int row_index, column_index;
     const struct signature_element *e;
 
-    row_index = sm6_value_get_constant_uint(operands[0]);
-    column_index = sm6_value_get_constant_uint(operands[2]);
+    row_index = sm6_value_get_constant_uint(operands[0], sm6);
+    column_index = sm6_value_get_constant_uint(operands[2], sm6);
 
     signature = &sm6->p.program->input_signature;
     if (row_index >= signature->element_count)
@@ -5361,7 +5364,7 @@ static void sm6_parser_emit_dx_compute_builtin(struct sm6_parser *sm6, enum dx_i
     if (component_count > 1)
     {
         src_param->reg.dimension = VSIR_DIMENSION_VEC4;
-        component_idx = sm6_value_get_constant_uint(operands[0]);
+        component_idx = sm6_value_get_constant_uint(operands[0], sm6);
     }
     src_param_init_scalar(src_param, component_idx);
 
@@ -5516,8 +5519,8 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
     const struct shader_signature *signature;
     const struct signature_element *e;
 
-    row_index = sm6_value_get_constant_uint(operands[0]);
-    column_index = sm6_value_get_constant_uint(operands[2]);
+    row_index = sm6_value_get_constant_uint(operands[0], sm6);
+    column_index = sm6_value_get_constant_uint(operands[2], sm6);
 
     if (is_control_point && operands[3]->value_type == VALUE_TYPE_UNDEFINED)
     {
@@ -5626,7 +5629,7 @@ static void sm6_parser_emit_dx_quad_op(struct sm6_parser *sm6, enum dx_intrinsic
     enum vkd3d_shader_opcode opcode;
     enum dxil_quad_op_kind quad_op;
 
-    quad_op = sm6_value_get_constant_uint(operands[1]);
+    quad_op = sm6_value_get_constant_uint(operands[1], sm6);
     if ((opcode = dx_map_quad_op(quad_op)) == VKD3DSIH_INVALID)
     {
         FIXME("Unhandled quad op kind %u.\n", quad_op);
@@ -5660,7 +5663,7 @@ static void sm6_parser_emit_dx_raw_buffer_load(struct sm6_parser *sm6, enum dx_i
 
     if (op == DX_RAW_BUFFER_LOAD)
     {
-        write_mask = sm6_value_get_constant_uint(operands[3]);
+        write_mask = sm6_value_get_constant_uint(operands[3], sm6);
         if (!write_mask || write_mask > VKD3DSP_WRITEMASK_ALL)
         {
             WARN("Invalid write mask %#x.\n", write_mask);
@@ -5703,7 +5706,7 @@ static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_
         return;
     raw = resource->u.handle.d->kind == RESOURCE_KIND_RAWBUFFER;
 
-    write_mask = sm6_value_get_constant_uint(operands[7]);
+    write_mask = sm6_value_get_constant_uint(operands[7], sm6);
     if (!write_mask || write_mask > VKD3DSP_WRITEMASK_ALL)
     {
         WARN("Invalid write mask %#x.\n", write_mask);
@@ -5729,7 +5732,7 @@ static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_
                     "Resource for a raw buffer store is not a raw or structured buffer.");
         }
 
-        alignment = sm6_value_get_constant_uint(operands[8]);
+        alignment = sm6_value_get_constant_uint(operands[8], sm6);
         if (alignment & (alignment - 1))
         {
             FIXME("Invalid alignment %#x.\n", alignment);
@@ -5826,7 +5829,7 @@ static void sm6_parser_emit_dx_buffer_store(struct sm6_parser *sm6, enum dx_intr
                 "Resource for a typed buffer store is not a typed buffer.");
     }
 
-    write_mask = sm6_value_get_constant_uint(operands[7]);
+    write_mask = sm6_value_get_constant_uint(operands[7], sm6);
     if (!write_mask || write_mask > VKD3DSP_WRITEMASK_ALL)
     {
         WARN("Invalid write mask %#x.\n", write_mask);
@@ -5919,17 +5922,17 @@ static void sm6_parser_emit_dx_get_sample_pos(struct sm6_parser *sm6, enum dx_in
     instruction_dst_param_init_ssa_vector(ins, 2, sm6);
 }
 
-static unsigned int sm6_value_get_texel_offset(const struct sm6_value *value)
+static unsigned int sm6_value_get_texel_offset(const struct sm6_value *value, struct sm6_parser *sm6)
 {
-    return sm6_value_is_undef(value) ? 0 : sm6_value_get_constant_uint(value);
+    return sm6_value_is_undef(value) ? 0 : sm6_value_get_constant_uint(value, sm6);
 }
 
 static void instruction_set_texel_offset(struct vkd3d_shader_instruction *ins,
         const struct sm6_value **operands, struct sm6_parser *sm6)
 {
-    ins->texel_offset.u = sm6_value_get_texel_offset(operands[0]);
-    ins->texel_offset.v = sm6_value_get_texel_offset(operands[1]);
-    ins->texel_offset.w = sm6_value_get_texel_offset(operands[2]);
+    ins->texel_offset.u = sm6_value_get_texel_offset(operands[0], sm6);
+    ins->texel_offset.v = sm6_value_get_texel_offset(operands[1], sm6);
+    ins->texel_offset.w = sm6_value_get_texel_offset(operands[2], sm6);
 }
 
 static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -6110,8 +6113,8 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intr
     const struct signature_element *e;
     const struct sm6_value *value;
 
-    row_index = sm6_value_get_constant_uint(operands[0]);
-    column_index = sm6_value_get_constant_uint(operands[2]);
+    row_index = sm6_value_get_constant_uint(operands[0], sm6);
+    column_index = sm6_value_get_constant_uint(operands[2], sm6);
 
     signature = is_patch_constant ? &program->patch_constant_signature : &program->output_signature;
     if (row_index >= signature->element_count)
@@ -6211,7 +6214,7 @@ static void sm6_parser_emit_dx_texture_gather(struct sm6_parser *sm6, enum dx_in
     src_param_init_vector_from_handle(sm6, &src_params[1 + extended_offset], &resource->u.handle);
     src_param_init_vector_from_handle(sm6, &src_params[2 + extended_offset], &sampler->u.handle);
     /* Swizzle stored in the sampler parameter is the scalar component index to be gathered. */
-    swizzle = sm6_value_get_constant_uint(operands[8]);
+    swizzle = sm6_value_get_constant_uint(operands[8], sm6);
     if (swizzle >= VKD3D_VEC4_SIZE)
     {
         WARN("Invalid swizzle %#x.\n", swizzle);
@@ -6285,7 +6288,7 @@ static void sm6_parser_emit_dx_texture_store(struct sm6_parser *sm6, enum dx_int
     if (!sm6_parser_emit_coordinate_construct(sm6, &operands[1], 3, NULL, state, &coord))
         return;
 
-    write_mask = sm6_value_get_constant_uint(operands[8]);
+    write_mask = sm6_value_get_constant_uint(operands[8], sm6);
     if (!write_mask || write_mask > VKD3DSP_WRITEMASK_ALL)
     {
         WARN("Invalid write mask %#x.\n", write_mask);
@@ -6359,7 +6362,7 @@ static void sm6_parser_emit_dx_wave_active_bit(struct sm6_parser *sm6, enum dx_i
     enum dxil_wave_bit_op_kind wave_op;
     enum vkd3d_shader_opcode opcode;
 
-    wave_op = sm6_value_get_constant_uint(operands[1]);
+    wave_op = sm6_value_get_constant_uint(operands[1], sm6);
 
     if ((opcode = sm6_dx_map_wave_bit_op(wave_op, sm6)) == VKD3DSIH_INVALID)
         return;
@@ -6406,8 +6409,8 @@ static void sm6_parser_emit_dx_wave_op(struct sm6_parser *sm6, enum dx_intrinsic
     enum dxil_wave_op_kind wave_op;
     bool is_signed;
 
-    wave_op = sm6_value_get_constant_uint(operands[1]);
-    is_signed = !sm6_value_get_constant_uint(operands[2]);
+    wave_op = sm6_value_get_constant_uint(operands[1], sm6);
+    is_signed = !sm6_value_get_constant_uint(operands[2], sm6);
     opcode = sm6_dx_map_wave_op(wave_op, is_signed, sm6_type_is_floating_point(operands[0]->type), sm6);
 
     if (opcode == VKD3DSIH_INVALID)
@@ -6800,7 +6803,7 @@ static void sm6_parser_emit_call(struct sm6_parser *sm6, const struct dxil_recor
                 "Expected a constant integer dx intrinsic function id.");
         return;
     }
-    sm6_parser_decode_dx_op(sm6, sm6_value_get_constant_uint(op_value),
+    sm6_parser_decode_dx_op(sm6, sm6_value_get_constant_uint(op_value, sm6),
             fn_value->u.function.name, &operands[1], operand_count - 1, state, dst);
 }
 
@@ -7306,7 +7309,7 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
         return;
 
     /* The first index is always zero, to form a simple pointer dereference. */
-    if (sm6_value_get_constant_uint(elem_value))
+    if (sm6_value_get_constant_uint(elem_value, sm6))
     {
         WARN("Expected constant zero.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
@@ -7326,7 +7329,7 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
         return;
 
     /* If indexing is dynamic, just get the type at offset zero. */
-    elem_idx = sm6_value_is_constant(elem_value) ? sm6_value_get_constant_uint(elem_value) : 0;
+    elem_idx = sm6_value_is_constant(elem_value) ? sm6_value_get_constant_uint(elem_value, sm6) : 0;
     type = sm6_type_get_element_type_at_index(pointee_type, elem_idx);
     if (!type)
     {
@@ -7769,7 +7772,7 @@ static bool sm6_metadata_value_is_zero_or_undef(const struct sm6_metadata_value 
             && (sm6_value_is_undef(m->u.value) || sm6_value_is_constant_zero(m->u.value));
 }
 
-static bool sm6_metadata_get_uint_value(const struct sm6_parser *sm6,
+static bool sm6_metadata_get_uint_value(struct sm6_parser *sm6,
         const struct sm6_metadata_value *m, unsigned int *u)
 {
     const struct sm6_value *value;
@@ -7783,12 +7786,12 @@ static bool sm6_metadata_get_uint_value(const struct sm6_parser *sm6,
     if (!sm6_type_is_integer(value->type))
         return false;
 
-    *u = sm6_value_get_constant_uint(value);
+    *u = sm6_value_get_constant_uint(value, sm6);
 
     return true;
 }
 
-static bool sm6_metadata_get_uint64_value(const struct sm6_parser *sm6,
+static bool sm6_metadata_get_uint64_value(struct sm6_parser *sm6,
         const struct sm6_metadata_value *m, uint64_t *u)
 {
     const struct sm6_value *value;
@@ -7802,7 +7805,7 @@ static bool sm6_metadata_get_uint64_value(const struct sm6_parser *sm6,
     if (!sm6_type_is_integer(value->type))
         return false;
 
-    *u = sm6_value_get_constant_uint(value);
+    *u = sm6_value_get_constant_uint(value, sm6);
 
     return true;
 }
