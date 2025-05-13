@@ -722,7 +722,6 @@ struct sm6_value
         struct sm6_groupsharedmem_data groupsharedmem;
         struct sm6_constant_data constant;
     } u;
-    struct vkd3d_shader_register reg;
 };
 
 struct dxil_record
@@ -2576,7 +2575,6 @@ static void sm6_parser_init_ssa_value(struct sm6_parser *sm6, struct sm6_value *
 
     value->value_type = VALUE_TYPE_SSA;
     value->u.ssa.id = id;
-    sm6_register_from_value(&value->reg, value, sm6);
 }
 
 static void register_make_constant_uint(struct vkd3d_shader_register *reg, unsigned int value)
@@ -3013,7 +3011,6 @@ static size_t sm6_parser_get_value_idx_by_ref(struct sm6_parser *sm6, const stru
             value->type = fwd_type;
             value->value_type = VALUE_TYPE_SSA;
             value->u.ssa.id = sm6_parser_alloc_ssa_id(sm6);
-            sm6_register_from_value(&value->reg, value, sm6);
         }
     }
 
@@ -3312,8 +3309,6 @@ static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, c
     index->index = operands[2];
     index->is_in_bounds = record->code == CST_CODE_CE_INBOUNDS_GEP;
 
-    sm6_register_from_value(&dst->reg, dst, sm6);
-
     return VKD3D_OK;
 }
 
@@ -3369,7 +3364,6 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 {
                     dst->value_type = VALUE_TYPE_CONSTANT;
                     memset(&dst->u.constant, 0, sizeof(dst->u.constant));
-                    sm6_register_from_value(&dst->reg, dst, sm6);
                 }
                 break;
 
@@ -3391,8 +3385,6 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 else
                     dst->u.constant.immconst.immconst_u64[0] = value;
 
-                sm6_register_from_value(&dst->reg, dst, sm6);
-
                 break;
 
             case CST_CODE_FLOAT:
@@ -3412,8 +3404,6 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                     dst->u.constant.immconst.immconst_u32[0] = value & ((1ull << type->u.width) - 1);
                 else
                     dst->u.constant.immconst.immconst_u64[0] = value;
-
-                sm6_register_from_value(&dst->reg, dst, sm6);
 
                 break;
 
@@ -3448,14 +3438,12 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
             case CST_CODE_UNDEF:
                 dxil_record_validate_operand_max_count(record, 0, sm6);
                 dst->value_type = VALUE_TYPE_UNDEFINED;
-                sm6_register_from_value(&dst->reg, dst, sm6);
                 break;
 
             default:
                 vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
                         "Constant code %u is unhandled.", record->code);
                 dst->value_type = VALUE_TYPE_INVALID;
-                sm6_register_from_value(&dst->reg, dst, sm6);
                 break;
         }
 
@@ -3530,8 +3518,6 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 type = dst->type;
                 *dst = *src;
                 dst->type = type;
-
-                sm6_register_from_value(&dst->reg, dst, sm6);
                 break;
         }
 
@@ -3610,7 +3596,6 @@ static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const stru
 
     dst->value_type = VALUE_TYPE_IDXTEMP;
     dst->u.idxtemp.id = ins->declaration.indexable_temp.register_idx;
-    sm6_register_from_value(&dst->reg, dst, sm6);
 }
 
 static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6_type *elem_type,
@@ -3624,7 +3609,6 @@ static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6
     dst->value_type = VALUE_TYPE_GROUPSHAREDMEM;
     dst->u.groupsharedmem.id = sm6->tgsm_count++;
     dst->structure_stride = 0;
-    sm6_register_from_value(&dst->reg, dst, sm6);
     sm6_register_from_value(&ins->declaration.tgsm_raw.reg.reg, dst, sm6);
     ins->declaration.tgsm_raw.alignment = alignment;
     byte_count = elem_type->u.width / 8u;
@@ -3649,7 +3633,6 @@ static void sm6_parser_declare_tgsm_structured(struct sm6_parser *sm6, const str
     dst->value_type = VALUE_TYPE_GROUPSHAREDMEM;
     dst->u.groupsharedmem.id = sm6->tgsm_count++;
     dst->structure_stride = elem_type->u.width / 8u;
-    sm6_register_from_value(&dst->reg, dst, sm6);
     sm6_register_from_value(&ins->declaration.tgsm_structured.reg.reg, dst, sm6);
     if (dst->structure_stride != 4)
     {
@@ -3963,7 +3946,6 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
             value->u.icb.id = icb->register_idx;
         else
             value->u.icb.id = 0;
-        sm6_register_from_value(&value->reg, value, sm6);
     }
 
     return VKD3D_OK;
@@ -6717,7 +6699,6 @@ static void sm6_parser_emit_unhandled(struct sm6_parser *sm6, struct vkd3d_shade
         return;
 
     dst->value_type = VALUE_TYPE_INVALID;
-    sm6_register_from_value(&dst->reg, dst, sm6);
 }
 
 static void sm6_parser_decode_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -6977,7 +6958,6 @@ static void sm6_parser_emit_cast(struct sm6_parser *sm6, const struct dxil_recor
     {
         *dst = *value;
         dst->type = type;
-        sm6_register_from_value(&dst->reg, dst, sm6);
         return;
     }
 
@@ -7376,8 +7356,6 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
 
     index->index = elem_value;
     index->is_in_bounds = record->operands[0];
-
-    sm6_register_from_value(&dst->reg, dst, sm6);
 
     ins->opcode = VKD3DSIH_NOP;
 }
@@ -8029,7 +8007,6 @@ static void metadata_attachment_record_apply(const struct dxil_record *record, e
             else if (metadata_node_get_unary_uint(node, &operand, sm6))
             {
                 dst->non_uniform = !!operand;
-                sm6_register_from_value(&dst->reg, dst, sm6);
             }
         }
         else
