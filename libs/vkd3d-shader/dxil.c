@@ -748,7 +748,7 @@ struct incoming_value
 
 struct sm6_phi
 {
-    struct vkd3d_shader_register reg;
+    struct sm6_value value;
     struct incoming_value *incoming;
     size_t incoming_capacity;
     size_t incoming_count;
@@ -7480,7 +7480,6 @@ static void sm6_parser_emit_phi(struct sm6_parser *sm6, const struct dxil_record
 
     if (!(phi = sm6_block_phi_require_space(code_block, sm6)))
         return;
-    sm6_register_from_value(&phi->reg, dst, sm6);
     phi->incoming_count = record->operand_count / 2u;
 
     if (!vkd3d_array_reserve((void **)&phi->incoming, &phi->incoming_capacity, phi->incoming_count,
@@ -8079,7 +8078,7 @@ static enum vkd3d_result sm6_function_resolve_phi_incomings(const struct sm6_fun
                             "A PHI incoming value is not a constant or SSA register.");
                     return VKD3D_ERROR_INVALID_SHADER;
                 }
-                if (src->reg.data_type != phi->reg.data_type)
+                if (src->type != phi->value.type)
                 {
                     WARN("Type mismatch.\n");
                     vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
@@ -8252,6 +8251,10 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         if (record->attachment)
             metadata_attachment_record_apply(record->attachment, record->code, ins, dst, sm6);
 
+        /* This is specific for PHI nodes, but must happen after attachments have been applied. */
+        if (record->code == FUNC_CODE_INST_PHI)
+            code_block->phi[code_block->phi_count - 1].value = *dst;
+
         if (is_terminator)
         {
             ++block_idx;
@@ -8398,7 +8401,7 @@ static void sm6_block_emit_phi(const struct sm6_block *block, struct sm6_parser 
         }
 
         dst_param_init(dst_param);
-        dst_param->reg = src_phi->reg;
+        sm6_register_from_value(&dst_param->reg, &src_phi->value, sm6);
     }
 }
 
