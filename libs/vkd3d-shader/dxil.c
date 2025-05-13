@@ -2296,7 +2296,7 @@ static bool sm6_value_is_handle(const struct sm6_value *value)
 
 static inline bool sm6_value_is_constant(const struct sm6_value *value)
 {
-    return sm6_value_is_register(value) && register_is_constant(&value->reg);
+    return value->value_type == VALUE_TYPE_CONSTANT;
 }
 
 static bool sm6_value_is_constant_zero(const struct sm6_value *value)
