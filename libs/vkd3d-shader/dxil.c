@@ -644,7 +644,6 @@ struct sm6_type
 enum sm6_value_type
 {
     VALUE_TYPE_FUNCTION,
-    VALUE_TYPE_REG,
     VALUE_TYPE_DATA,
     VALUE_TYPE_HANDLE,
     VALUE_TYPE_SSA,
@@ -2276,7 +2275,6 @@ static inline bool sm6_value_is_register(const struct sm6_value *value)
 {
     switch (value->value_type)
     {
-        case VALUE_TYPE_REG:
         case VALUE_TYPE_SSA:
         case VALUE_TYPE_ICB:
         case VALUE_TYPE_IDXTEMP:
@@ -2469,10 +2467,6 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
 
     switch (value->value_type)
     {
-        case VALUE_TYPE_REG:
-            *reg = value->reg;
-            break;
-
         case VALUE_TYPE_SSA:
             register_init_with_id(reg, VKD3DSPR_SSA, data_type, value->u.ssa.id);
             reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
@@ -8172,7 +8166,6 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         dst = sm6_parser_get_current_value(sm6);
         fwd_type = dst->type;
         dst->type = NULL;
-        dst->value_type = VALUE_TYPE_REG;
         dst->is_back_ref = true;
         is_terminator = false;
 
