@@ -2272,8 +2272,13 @@ static inline bool sm6_value_is_constant(const struct sm6_value *value)
 
 static bool sm6_value_is_constant_zero(const struct sm6_value *value)
 {
-    /* Constant vectors do not occur. */
-    return sm6_value_is_register(value) && register_is_scalar_constant_zero(&value->reg);
+    if (value->value_type != VALUE_TYPE_CONSTANT || value->type->class != TYPE_CLASS_INTEGER)
+        return false;
+
+    if (value->type->u.width == 64)
+        return value->u.constant.immconst.immconst_u64[0] == 0;
+    else
+        return value->u.constant.immconst.immconst_u32[0] == 0;
 }
 
 static inline bool sm6_value_is_undef(const struct sm6_value *value)
