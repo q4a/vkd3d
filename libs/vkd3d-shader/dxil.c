@@ -2334,7 +2334,7 @@ static bool sm6_value_is_data(const struct sm6_value *value)
 
 static bool sm6_value_is_ssa(const struct sm6_value *value)
 {
-    return sm6_value_is_register(value) && register_is_ssa(&value->reg);
+    return value->value_type == VALUE_TYPE_SSA;
 }
 
 static bool sm6_value_is_numeric_array(const struct sm6_value *value)
