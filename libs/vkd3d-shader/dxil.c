@@ -2537,9 +2537,9 @@ static void sm6_parser_init_ssa_value(struct sm6_parser *sm6, struct sm6_value *
 {
     unsigned int id;
 
-    if (register_is_ssa(&value->reg) && value->reg.idx[0].offset)
+    if (value->value_type == VALUE_TYPE_SSA && value->u.ssa.id)
     {
-        id = value->reg.idx[0].offset;
+        id = value->u.ssa.id;
         TRACE("Using forward-allocated id %u.\n", id);
     }
     else
