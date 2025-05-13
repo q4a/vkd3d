@@ -2377,6 +2377,33 @@ static uint64_t sm6_value_get_constant_uint64(const struct sm6_value *value, str
         return value->u.constant.immconst.immconst_u32[0];
 }
 
+static float sm6_value_get_constant_float(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!sm6_value_is_constant(value))
+    {
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                "Invalid non-constant value.");
+        return 0.0f;
+    }
+
+    if (value->type->class != TYPE_CLASS_FLOAT)
+    {
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                "Invalid non-floating-point constant value.");
+        return 0.0f;
+    }
+
+    if (value->type->u.width == 64)
+    {
+        double val = value->u.constant.immconst.immconst_f64[0];
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                "Invalid double constant %lf will be truncated do float %f.", val, (float)val);
+        return val;
+    }
+
+    return value->u.constant.immconst.immconst_f32[0];
+}
+
 static unsigned int sm6_parser_alloc_ssa_id(struct sm6_parser *sm6)
 {
     return sm6->ssa_next_id++;
@@ -3073,23 +3100,6 @@ static inline uint64_t decode_rotated_signed_value(uint64_t value)
         return neg ? -value : value;
     }
     return value << 63;
-}
-
-static float register_get_float_value(const struct vkd3d_shader_register *reg)
-{
-    if (!register_is_constant(reg) || !data_type_is_floating_point(reg->data_type))
-        return 0.0;
-
-    if (reg->dimension == VSIR_DIMENSION_VEC4)
-        WARN("Returning vec4.x.\n");
-
-    if (reg->type == VKD3DSPR_IMMCONST64)
-    {
-        WARN("Truncating double to float.\n");
-        return reg->u.immconst_f64[0];
-    }
-
-    return reg->u.immconst_f32[0];
 }
 
 static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, const struct sm6_type *type,
@@ -7819,7 +7829,7 @@ static bool sm6_metadata_get_uint64_value(struct sm6_parser *sm6,
     return true;
 }
 
-static bool sm6_metadata_get_float_value(const struct sm6_parser *sm6,
+static bool sm6_metadata_get_float_value(struct sm6_parser *sm6,
         const struct sm6_metadata_value *m, float *f)
 {
     const struct sm6_value *value;
@@ -7833,7 +7843,7 @@ static bool sm6_metadata_get_float_value(const struct sm6_parser *sm6,
     if (!sm6_type_is_floating_point(value->type))
         return false;
 
-    *f = register_get_float_value(&value->reg);
+    *f = sm6_value_get_constant_float(value, sm6);
 
     return true;
 }
