@@ -2225,17 +2225,6 @@ static const char *sm6_parser_get_global_symbol_name(const struct sm6_parser *sm
     return NULL;
 }
 
-static uint64_t register_get_uint64_value(const struct vkd3d_shader_register *reg)
-{
-    if (!register_is_constant(reg) || !data_type_is_integer(reg->data_type))
-        return UINT64_MAX;
-
-    if (reg->dimension == VSIR_DIMENSION_VEC4)
-        WARN("Returning vec4.x.\n");
-
-    return (reg->type == VKD3DSPR_IMMCONST64) ? reg->u.immconst_u64[0] : reg->u.immconst_u32[0];
-}
-
 static inline bool sm6_value_is_function_dcl(const struct sm6_value *value)
 {
     return value->value_type == VALUE_TYPE_FUNCTION;
@@ -2361,11 +2350,26 @@ static unsigned int sm6_value_get_constant_uint(const struct sm6_value *value, s
     return value->u.constant.immconst.immconst_u32[0];
 }
 
-static uint64_t sm6_value_get_constant_uint64(const struct sm6_value *value)
+static uint64_t sm6_value_get_constant_uint64(const struct sm6_value *value, struct sm6_parser *sm6)
 {
     if (!sm6_value_is_constant(value))
+    {
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                "Invalid non-constant value.");
         return UINT64_MAX;
-    return register_get_uint64_value(&value->reg);
+    }
+
+    if (value->type->class != TYPE_CLASS_INTEGER)
+    {
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_CONSTANT,
+                "Invalid non-integer constant value.");
+        return UINT64_MAX;
+    }
+
+    if (value->type->u.width == 64)
+        return value->u.constant.immconst.immconst_u64[0];
+    else
+        return value->u.constant.immconst.immconst_u32[0];
 }
 
 static unsigned int sm6_parser_alloc_ssa_id(struct sm6_parser *sm6)
@@ -7709,7 +7713,7 @@ static void sm6_parser_emit_switch(struct sm6_parser *sm6, const struct dxil_rec
                     "A switch case value is not a constant.");
         }
 
-        terminator->cases[i / 2u].value = sm6_value_get_constant_uint64(src);
+        terminator->cases[i / 2u].value = sm6_value_get_constant_uint64(src, sm6);
     }
 
     ins->opcode = VKD3DSIH_NOP;
