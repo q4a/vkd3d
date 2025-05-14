@@ -556,6 +556,7 @@ demos/vkd3d_triangle-triangle.$(OBJEXT): demos/triangle.hlsl
 endif
 
 noinst_HEADERS = $(vkd3d_test_headers) $(vkd3d_demos_headers)
+dist_noinst_SCRIPTS = libs/vkd3d-shader/make_spirv
 
 VKD3D_V_PERL = $(vkd3d_v_perl_@AM_V@)
 vkd3d_v_perl_ = $(vkd3d_v_perl_@AM_DEFAULT_V@)
@@ -575,7 +576,10 @@ vkd3d_v_widl_1 =
 if HAVE_WIDL
 CLEANFILES += $(widl_headers)
 endif
-EXTRA_DIST += $(widl_headers) $(widl_headers:.h=.idl)
+EXTRA_DIST += \
+	$(widl_headers) \
+	$(widl_headers:.h=.idl) \
+	include/private/spirv.core.grammar.json
 $(widl_headers): %.h: %.idl
 if HAVE_WIDL
 	$(VKD3D_V_WIDL)$(WIDL) -I$(srcdir)/include -h -o $@ $<
