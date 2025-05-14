@@ -5754,7 +5754,7 @@ static const char *debug_register(char class, struct hlsl_reg reg, const struct 
     static const char writemask_offset[] = {'w','x','y','z'};
     unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
 
-    if (reg_size > 4)
+    if (reg_size > 4 && !hlsl_type_is_patch_array(type))
     {
         if (reg_size & 3)
             return vkd3d_dbg_sprintf("%c%u-%c%u.%c", class, reg.id, class, reg.id + (reg_size / 4),
