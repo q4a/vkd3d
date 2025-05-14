@@ -3831,11 +3831,11 @@ static void dump_ir_string(struct vkd3d_string_buffer *buffer, const struct hlsl
     vkd3d_string_buffer_printf(buffer, "\"%s\"", debugstr_a(string->string));
 }
 
-static void dump_ir_store(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_store *store)
+static void dump_ir_store(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_store *store)
 {
     vkd3d_string_buffer_printf(buffer, "= (");
     dump_deref(buffer, &store->lhs);
-    if (store->writemask != VKD3DSP_WRITEMASK_ALL)
+    if (store->writemask != VKD3DSP_WRITEMASK_ALL && type_is_single_reg(hlsl_deref_get_type(ctx, &store->lhs)))
         vkd3d_string_buffer_printf(buffer, "%s", debug_hlsl_writemask(store->writemask));
     vkd3d_string_buffer_printf(buffer, " ");
     dump_src(buffer, &store->rhs);
@@ -4033,7 +4033,7 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
             break;
 
         case HLSL_IR_STORE:
-            dump_ir_store(buffer, hlsl_ir_store(instr));
+            dump_ir_store(ctx, buffer, hlsl_ir_store(instr));
             break;
 
         case HLSL_IR_SWITCH:
