@@ -4124,7 +4124,7 @@ void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
     const struct hlsl_type *old_type = old->data_type, *new_type = new->data_type;
     struct hlsl_src *src, *next;
 
-    if (hlsl_is_numeric_type(old_type))
+    if (old_type && hlsl_is_numeric_type(old_type))
     {
         VKD3D_ASSERT(hlsl_is_numeric_type(new_type));
         VKD3D_ASSERT(old_type->e.numeric.dimx == new_type->e.numeric.dimx);
