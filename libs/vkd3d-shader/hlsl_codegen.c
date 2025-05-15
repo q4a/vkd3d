@@ -13526,7 +13526,26 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     else
     {
         if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
-            hlsl_fixme(ctx, &entry_func->loc, "Passthrough hull shader control point function.");
+        {
+            if (!ctx->input_control_point_type)
+            {
+                hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INPUT_PATCH,
+                        "Pass-through control point function \"%s\" is missing an InputPatch parameter.",
+                        entry_func->func->name);
+            }
+            else if (ctx->output_control_point_count
+                    && ctx->output_control_point_count != ctx->input_control_point_count)
+            {
+                hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_CONTROL_POINT_COUNT,
+                        "Output control point count %u does not match the input control point count %u.",
+                        ctx->output_control_point_count, ctx->input_control_point_count);
+            }
+            else
+            {
+                ctx->output_control_point_type = ctx->input_control_point_type;
+                ctx->output_control_point_count = ctx->input_control_point_count;
+            }
+        }
     }
 
     if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY && ctx->input_primitive_type == VKD3D_PT_UNDEFINED)
