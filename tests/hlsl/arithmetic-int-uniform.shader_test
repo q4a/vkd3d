@@ -247,6 +247,59 @@ uniform 0 int64_t2 5000000000 -7000000000
 draw quad
 probe (0, 0) rgba (5.0e9, 7.0e9, 0.0, 0.0)
 
+[require]
+shader model >= 4.0
+
+[rtv 0]
+format r32g32b32a32-sint
+size (2d, 640, 480)
+
+% Minimum precision vectors in constant buffers have inconsistent behavior with
+% SM6 (see minimum-precision.shader_test), so we're reading with arrays instead.
+
+[pixel shader]
+uniform min16int u[4];
+
+int4 main() : sv_target
+{
+    min16int i = 1, j = -0xfff;
+    return int4(u[0] + i, u[1] + j, u[2] + i, u[3] + j);
+}
+
+[test]
+uniform 0 uint 0
+uniform 4 uint 0
+uniform 8 uint 0xffd
+uniform 12 uint 1
+todo(msl) draw quad
+probe (0, 0) rgbai(1, -0xfff, 0xffe, -0xffe)
+
+[pixel shader]
+uniform min16int u[4];
+
+int4 main() : sv_target
+{
+    min16int i = -3, j = 5;
+    return int4(u[0] * i, u[1] * j, u[2] * i, u[3] * j);
+}
+
+[test]
+uniform 0 uint 7
+uniform 4 uint 0xfffffff7
+uniform 8 uint 0xfffffff9
+uniform 12 uint 9
+todo(msl) draw quad
+probe (0, 0) rgbai(-21, -45, 21, 45)
+
+[pixel shader fail todo]
+% Minimum precision signed division is not supported.
+uniform min16int4 u;
+
+int4 main() : sv_target
+{
+    min16int i = 32767, j = -5;
+    return int4(u.x / i, u.y / j, u.z / i, u.w / j);
+}
 
 [require]
 shader model >= 6.2
