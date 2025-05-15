@@ -2499,6 +2499,79 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
     return VKD3D_DATA_UINT;
 }
 
+/* Based on the implementation in the OpenGL Mathematics library. */
+static uint32_t half_to_float(uint16_t value)
+{
+    uint32_t s = (value & 0x8000u) << 16;
+    uint32_t e = (value >> 10) & 0x1fu;
+    uint32_t m = value & 0x3ffu;
+
+    if (!e)
+    {
+        if (!m)
+        {
+            /* Plus or minus zero */
+            return s;
+        }
+        else
+        {
+            /* Denormalized number -- renormalize it */
+            while (!(m & 0x400u))
+            {
+                m <<= 1;
+                --e;
+            }
+
+            ++e;
+            m &= ~0x400u;
+        }
+    }
+    else if (e == 31u)
+    {
+        /* Positive or negative infinity for zero 'm'.
+         * Nan for non-zero 'm' -- preserve sign and significand bits */
+        return s | 0x7f800000u | (m << 13);
+    }
+
+    /* Normalized number */
+    e += 127u - 15u;
+    m <<= 13;
+
+    /* Assemble s, e and m. */
+    return s | (e << 23) | m;
+}
+
+static void register_convert_to_minimum_precision(struct vkd3d_shader_register *reg)
+{
+    unsigned int i;
+
+    switch (reg->data_type)
+    {
+        case VKD3D_DATA_HALF:
+            reg->data_type = VKD3D_DATA_FLOAT;
+            reg->precision = VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_16;
+            if (reg->type == VKD3DSPR_IMMCONST)
+            {
+                for (i = 0; i < VSIR_DIMENSION_VEC4; ++i)
+                    reg->u.immconst_u32[i] = half_to_float(reg->u.immconst_u32[i]);
+            }
+            break;
+
+        case VKD3D_DATA_UINT16:
+            reg->data_type = VKD3D_DATA_UINT;
+            reg->precision = VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16;
+            if (reg->type == VKD3DSPR_IMMCONST)
+            {
+                for (i = 0; i < VSIR_DIMENSION_VEC4; ++i)
+                    reg->u.immconst_u32[i] = (int16_t)reg->u.immconst_u32[i];
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
 static void register_index_address_init(struct vkd3d_shader_register_index *idx, const struct sm6_value *address,
         struct sm6_parser *sm6);
 
@@ -2543,6 +2616,7 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             vsir_register_init(reg, scalar_type->u.width == 64 ? VKD3DSPR_IMMCONST64 : VKD3DSPR_IMMCONST,
                     data_type, 0);
             reg->u = value->u.constant.immconst;
+            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_UNDEFINED:
