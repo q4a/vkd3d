@@ -141,6 +141,42 @@ uniform 0 double2 0.5 1.0
 todo(sm<6) draw quad
 probe (0, 0) rgbaui(0, 2, 0, 1)
 
+[pixel shader todo]
+uniform min16uint u[2];
+
+uint4 main() : sv_target
+{
+    uint4 ret;
+    double2 d = double2(u[0], u[1]);
+    asuint(d.x, ret.x, ret.y);
+    asuint(d.y, ret.z, ret.w);
+    return ret;
+}
+
+[test]
+uniform 0 uint 22
+uniform 4 uint 0xff00
+todo(sm<6) draw quad
+probe (0, 0) rgbaui(0, 0x40360000, 0, 0x40efe000)
+
+[pixel shader todo]
+uniform min16int u[2];
+
+uint4 main() : sv_target
+{
+    uint4 ret;
+    double2 d = double2(u[0], u[1]);
+    asuint(d.x, ret.x, ret.y);
+    asuint(d.y, ret.z, ret.w);
+    return ret;
+}
+
+[test]
+uniform 0 uint 22
+uniform 4 uint 0xffffff00
+todo(sm<6) draw quad
+probe (0, 0) rgbaui(0, 0x40360000, 0, 0xc0700000)
+
 [require]
 shader model >= 6.2
 native-16-bit
