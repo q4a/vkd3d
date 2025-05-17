@@ -107,6 +107,41 @@ draw quad
 probe (0, 0) rgba (-1.0, 2.0, 1073741824.0, 536870912.0)
 
 [require]
+shader model >= 5.0
+float64
+
+[pixel shader todo]
+uniform double2 d;
+
+int4 main() : sv_target
+{
+    min16int4 s = min16int4(d, d);
+    return s * min16int4(2, 2, 1, 1);
+}
+
+[test]
+uniform 0 double2 0.5 1.0
+todo(sm<6) draw quad
+probe (0, 0) rgbai(0, 2, 0, 1)
+uniform 0 double2 -0.5 -1.0
+todo(sm<6) draw quad
+probe (0, 0) rgbai(0, -2, 0, -1)
+
+[pixel shader todo]
+uniform double2 d;
+
+uint4 main() : sv_target
+{
+    min16uint4 s = min16uint4(d, d);
+    return s * min16uint4(2, 2, 1, 1);
+}
+
+[test]
+uniform 0 double2 0.5 1.0
+todo(sm<6) draw quad
+probe (0, 0) rgbaui(0, 2, 0, 1)
+
+[require]
 shader model >= 6.2
 native-16-bit
 float64
