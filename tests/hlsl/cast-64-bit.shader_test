@@ -212,3 +212,38 @@ uint4 main() : sv_target
 uniform 0 double2 0.5 1.0
 todo draw quad
 probe (0, 0) rgbaui(0, 2, 0, 1)
+
+[pixel shader]
+uniform uint16_t2 u;
+
+uint4 main() : sv_target
+{
+    uint4 ret;
+    double2 d = double2(u);
+    asuint(d.x, ret.x, ret.y);
+    asuint(d.y, ret.z, ret.w);
+    return ret;
+}
+
+[test]
+uniform 0 uint 0xff000022
+
+draw quad
+probe (0, 0) rgbaui(0, 0x40410000, 0, 0x40efe000)
+
+[pixel shader]
+uniform int16_t2 u;
+
+uint4 main() : sv_target
+{
+    uint4 ret;
+    double2 d = double2(u);
+    asuint(d.x, ret.x, ret.y);
+    asuint(d.y, ret.z, ret.w);
+    return ret;
+}
+
+[test]
+uniform 0 uint 0xff000022
+draw quad
+probe (0, 0) rgbaui(0, 0x40410000, 0, 0xc0700000)
