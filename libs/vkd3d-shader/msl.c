@@ -1046,21 +1046,31 @@ static void msl_generate_input_struct_declarations(struct msl_generator *gen)
         if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
             continue;
 
-        if (e->sysval_semantic)
+        switch (e->sysval_semantic)
         {
-            if (e->sysval_semantic == VKD3D_SHADER_SV_IS_FRONT_FACE)
-            {
+            case VKD3D_SHADER_SV_NONE:
+                break;
+
+            case VKD3D_SHADER_SV_POSITION:
+                if (type != VKD3D_SHADER_TYPE_PIXEL)
+                    msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                            "Internal compiler error: Unhandled SV_POSITION in shader type #%x.", type);
+                msl_print_indent(gen->buffer, 1);
+                vkd3d_string_buffer_printf(buffer, "float4 position [[position]];\n");
+                continue;
+
+            case VKD3D_SHADER_SV_IS_FRONT_FACE:
                 if (type != VKD3D_SHADER_TYPE_PIXEL)
                     msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                             "Internal compiler error: Unhandled SV_IS_FRONT_FACE in shader type #%x.", type);
-
                 msl_print_indent(gen->buffer, 1);
                 vkd3d_string_buffer_printf(buffer, "bool is_front_face [[front_facing]];\n");
                 continue;
-            }
-            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-                    "Internal compiler error: Unhandled system value %#x.", e->sysval_semantic);
-            continue;
+
+            default:
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled system value %#x.", e->sysval_semantic);
+                continue;
         }
 
         if (e->min_precision != VKD3D_SHADER_MINIMUM_PRECISION_NONE)
@@ -1265,23 +1275,33 @@ static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
             continue;
 
         vkd3d_string_buffer_printf(buffer, "    %s_in[%u]", gen->prefix, e->register_index);
-        if (e->sysval_semantic == VKD3D_SHADER_SV_NONE)
+        switch (e->sysval_semantic)
         {
-            msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
-            msl_print_write_mask(buffer, e->mask);
-            vkd3d_string_buffer_printf(buffer, " = input.shader_in_%u", i);
-            msl_print_write_mask(buffer, e->mask);
+            case VKD3D_SHADER_SV_NONE:
+                msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
+                msl_print_write_mask(buffer, e->mask);
+                vkd3d_string_buffer_printf(buffer, " = input.shader_in_%u", i);
+                break;
+
+            case VKD3D_SHADER_SV_POSITION:
+                msl_print_register_datatype(buffer, gen, VKD3D_DATA_FLOAT);
+                msl_print_write_mask(buffer, e->mask);
+                vkd3d_string_buffer_printf(buffer, " = float4(input.position.xyz, 1.0f / input.position.w)");
+                break;
+
+            case VKD3D_SHADER_SV_IS_FRONT_FACE:
+                msl_print_register_datatype(buffer, gen, VKD3D_DATA_UINT);
+                msl_print_write_mask(buffer, e->mask);
+                vkd3d_string_buffer_printf(buffer, " = uint4(input.is_front_face ? 0xffffffffu : 0u, 0, 0, 0)");
+                break;
+
+            default:
+                vkd3d_string_buffer_printf(buffer, " = <unhandled sysval %#x>", e->sysval_semantic);
+                msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                        "Internal compiler error: Unhandled system value %#x input.", e->sysval_semantic);
+                break;
         }
-        else if (e->sysval_semantic == VKD3D_SHADER_SV_IS_FRONT_FACE)
-        {
-            vkd3d_string_buffer_printf(buffer, ".u = uint4(input.is_front_face ? 0xffffffffu : 0u, 0, 0, 0)");
-        }
-        else
-        {
-            vkd3d_string_buffer_printf(buffer, " = <unhandled sysval %#x>", e->sysval_semantic);
-            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-                    "Internal compiler error: Unhandled system value %#x input.", e->sysval_semantic);
-        }
+        msl_print_write_mask(buffer, e->mask);
         vkd3d_string_buffer_printf(buffer, ";\n");
     }
 }

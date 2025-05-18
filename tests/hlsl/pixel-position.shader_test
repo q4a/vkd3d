@@ -21,7 +21,7 @@ float4 main(float4 pos : sv_position) : sv_target
 
 [test]
 clear rtv 0 0.0 0.0 0.0 0.0
-todo(msl) draw triangle strip 4
+draw triangle strip 4
 probe ( 80, 140) rgba(  0.0,   0.0, 0.0,         0.0)
 probe ( 80, 420) rgba( 80.5, 420.5, 0.100678146, 1.229981) 192
 probe (180, 140) rgba(180.5, 140.5, 0.077760354, 1.918082) 192
