@@ -306,6 +306,7 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
             &doubles, sizeof(doubles));
     ok(hr == S_OK, "Failed to check double precision feature support, hr %#lx.\n", hr);
     runner->caps.shader_caps[SHADER_CAP_FLOAT64] = doubles.DoublePrecisionFloatShaderOps;
+    runner->caps.shader_caps[SHADER_CAP_GEOMETRY_SHADER] = true;
 
     hr = ID3D11Device_CheckFeatureSupport(runner->device,
             D3D11_FEATURE_D3D11_OPTIONS2, &options2, sizeof(options2));
