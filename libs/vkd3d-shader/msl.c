@@ -60,6 +60,9 @@ struct msl_resource_type_info
     const char *type_suffix;
 };
 
+static void msl_print_subscript(struct vkd3d_string_buffer *buffer, struct msl_generator *gen,
+        const struct vkd3d_shader_src_param *rel_addr, unsigned int offset);
+
 static void VKD3D_PRINTF_FUNC(3, 4) msl_compiler_error(struct msl_generator *gen,
         enum vkd3d_shader_error error, const char *fmt, ...)
 {
@@ -358,7 +361,7 @@ static enum msl_data_type msl_print_register_name(struct vkd3d_string_buffer *bu
                     vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
                     return MSL_DATA_UNION;
                 }
-                if (reg->idx[0].rel_addr || reg->idx[1].rel_addr || reg->idx[2].rel_addr)
+                if (reg->idx[0].rel_addr || reg->idx[1].rel_addr)
                 {
                     msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                             "Internal compiler error: Unhandled constant buffer register indirect addressing.");
@@ -375,7 +378,7 @@ static enum msl_data_type msl_print_register_name(struct vkd3d_string_buffer *bu
                     return MSL_DATA_UNION;
                 }
                 msl_print_cbv_name(buffer, binding->binding);
-                vkd3d_string_buffer_printf(buffer, "[%u]", reg->idx[2].offset);
+                msl_print_subscript(buffer, gen, reg->idx[2].rel_addr, reg->idx[2].offset);
                 return MSL_DATA_UNION;
             }
 
@@ -541,6 +544,25 @@ static uint32_t msl_dst_init(struct msl_dst *msl_dst, struct msl_generator *gen,
         msl_print_write_mask(msl_dst->mask, write_mask);
 
     return write_mask;
+}
+
+static void msl_print_subscript(struct vkd3d_string_buffer *buffer, struct msl_generator *gen,
+        const struct vkd3d_shader_src_param *rel_addr, unsigned int offset)
+{
+    struct msl_src r;
+
+    if (!rel_addr)
+    {
+        vkd3d_string_buffer_printf(buffer, "[%u]", offset);
+        return;
+    }
+
+    msl_src_init(&r, gen, rel_addr, VKD3DSP_WRITEMASK_0);
+    vkd3d_string_buffer_printf(buffer, "[%s", r.str->buffer);
+    if (offset)
+        vkd3d_string_buffer_printf(buffer, " + %u", offset);
+    vkd3d_string_buffer_printf(buffer, "]");
+    msl_src_cleanup(&r, &gen->string_buffers);
 }
 
 static void VKD3D_PRINTF_FUNC(3, 4) msl_print_assignment(
