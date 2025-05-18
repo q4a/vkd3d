@@ -295,6 +295,10 @@ probe rtv 0 (480, 120) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (480, 240) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (480, 360) rgba(1.0, 1.0, 0.0, 1.0)
 
+[require]
+shader model >= 4.0
+geometry-shader
+
 % Let clip and cull distances go through a geometry shader.
 
 [geometry shader todo]
