@@ -192,7 +192,7 @@ format r32g32b32a32-sint
 size (2d, 640, 480)
 
 [test]
-todo(msl) draw triangle strip 4
+draw triangle strip 4
 todo(opengl) probe (0, 0) rgbai(-7000, -2, 0, 0)
 
 [pixel shader]
@@ -206,7 +206,7 @@ format r32g32b32a32-uint
 size (2d, 640, 480)
 
 [test]
-todo(msl) draw triangle strip 4
+draw triangle strip 4
 probe (0, 0) rgbai(-7000, -2, 0, 0)
 
 [require]
