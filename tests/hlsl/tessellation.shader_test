@@ -1,5 +1,6 @@
 [require]
 shader model >= 5.0
+tessellation-shader
 
 [vertex shader]
 struct data
@@ -95,7 +96,7 @@ float4 main(data input) : sv_target
 
 [test]
 % llvmpipe currently segfaults due to a bug during shader compilation in the driver.
-if(!llvmpipe) todo(glsl | msl | mvk & vulkan) draw 3 control point patch list 3
+if(!llvmpipe) todo(glsl | mvk & vulkan) draw 3 control point patch list 3
 if(!llvmpipe) todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
 
 % Passthrough hull shader control point function.
@@ -131,12 +132,13 @@ void main(InputPatch<data, 3> input)
 
 [test]
 % DXC doesn't generate a passthrough control point phase like FXC does
-if(!llvmpipe & sm<6) todo(glsl | msl | mvk & vulkan) draw 3 control point patch list 3
+if(!llvmpipe & sm<6) todo(glsl | mvk & vulkan) draw 3 control point patch list 3
 if(!llvmpipe & sm<6) todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
 
 [require]
 shader model >= 5.0
 shader model < 5.1
+tessellation-shader
 
 [hull shader dxbc-tpf-hex]
 % As above, but with some DCL_INDEXRANGE instructions that skip a signature
@@ -304,5 +306,5 @@ void main(patch_constant_data input,
 }
 
 [test]
-if(!llvmpipe) todo(glsl | msl | mvk & vulkan) draw 3 control point patch list 3
+if(!llvmpipe) todo(glsl | mvk & vulkan) draw 3 control point patch list 3
 if(!llvmpipe) todo(mvk) probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)

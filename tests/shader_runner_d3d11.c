@@ -318,6 +318,7 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
 
     runner->caps.shader_caps[SHADER_CAP_ROV] = options2.ROVsSupported;
     runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX] = options3.VPAndRTArrayIndexFromAnyShaderFeedingRasterizer;
+    runner->caps.shader_caps[SHADER_CAP_TESSELLATION_SHADER] = true;
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
     {
         runner->caps.format_caps[formats[i]] = get_format_support(runner->device, formats[i]);

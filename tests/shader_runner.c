@@ -360,17 +360,18 @@ static DXGI_FORMAT parse_format(const char *line, unsigned int *texel_size, bool
 
 static const char *const shader_cap_strings[] =
 {
-    [SHADER_CAP_CLIP_PLANES]       = "clip-planes",
-    [SHADER_CAP_DEPTH_BOUNDS]      = "depth-bounds",
-    [SHADER_CAP_FLOAT64]           = "float64",
-    [SHADER_CAP_FOG]               = "fog",
-    [SHADER_CAP_GEOMETRY_SHADER]   = "geometry-shader",
-    [SHADER_CAP_INT64]             = "int64",
-    [SHADER_CAP_NATIVE_16_BIT]     = "native-16-bit",
-    [SHADER_CAP_POINT_SIZE]        = "point-size",
-    [SHADER_CAP_ROV]               = "rov",
-    [SHADER_CAP_RT_VP_ARRAY_INDEX] = "rt-vp-array-index",
-    [SHADER_CAP_WAVE_OPS]          = "wave-ops",
+    [SHADER_CAP_CLIP_PLANES]         = "clip-planes",
+    [SHADER_CAP_DEPTH_BOUNDS]        = "depth-bounds",
+    [SHADER_CAP_FLOAT64]             = "float64",
+    [SHADER_CAP_FOG]                 = "fog",
+    [SHADER_CAP_GEOMETRY_SHADER]     = "geometry-shader",
+    [SHADER_CAP_INT64]               = "int64",
+    [SHADER_CAP_NATIVE_16_BIT]       = "native-16-bit",
+    [SHADER_CAP_POINT_SIZE]          = "point-size",
+    [SHADER_CAP_ROV]                 = "rov",
+    [SHADER_CAP_RT_VP_ARRAY_INDEX]   = "rt-vp-array-index",
+    [SHADER_CAP_TESSELLATION_SHADER] = "tessellation-shader",
+    [SHADER_CAP_WAVE_OPS]            = "wave-ops",
 };
 
 static bool match_shader_cap_string(const char *line, enum shader_cap *cap)

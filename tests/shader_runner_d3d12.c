@@ -1044,6 +1044,7 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     runner->caps.shader_caps[SHADER_CAP_ROV] = options.ROVsSupported;
     runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX]
             = options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizerSupportedWithoutGSEmulation;
+    runner->caps.shader_caps[SHADER_CAP_TESSELLATION_SHADER] = true;
     runner->caps.shader_caps[SHADER_CAP_WAVE_OPS] = options1.WaveOps;
     runner->caps.shader_caps[SHADER_CAP_NATIVE_16_BIT] = options4.Native16BitShaderOpsSupported;
 

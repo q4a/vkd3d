@@ -131,7 +131,6 @@ static bool check_gl_extensions(struct gl_runner *runner)
         "GL_ARB_internalformat_query",
         "GL_ARB_sampler_objects",
         "GL_ARB_shader_image_load_store",
-        "GL_ARB_tessellation_shader",
         "GL_ARB_texture_storage",
     };
 
@@ -152,6 +151,8 @@ static bool check_gl_extensions(struct gl_runner *runner)
             return false;
     }
 
+    if (check_gl_extension("GL_EXT_depth_bounds_test", count))
+        runner->caps.shader_caps[SHADER_CAP_DEPTH_BOUNDS] = true;
     if (check_gl_extension("GL_ARB_gpu_shader_fp64", count))
         runner->caps.shader_caps[SHADER_CAP_FLOAT64] = true;
     if (check_gl_extension("GL_ARB_gpu_shader_int64", count))
@@ -159,8 +160,8 @@ static bool check_gl_extensions(struct gl_runner *runner)
     if (check_gl_extension("GL_ARB_shader_viewport_layer_array", count) && (runner->language == GLSL
             || check_spirv_extension("SPV_EXT_shader_viewport_index_layer", spirv_count)))
         runner->caps.shader_caps[SHADER_CAP_RT_VP_ARRAY_INDEX] = true;
-    if (check_gl_extension("GL_EXT_depth_bounds_test", count))
-        runner->caps.shader_caps[SHADER_CAP_DEPTH_BOUNDS] = true;
+    if (check_gl_extension("GL_ARB_tessellation_shader", count))
+        runner->caps.shader_caps[SHADER_CAP_TESSELLATION_SHADER] = true;
 
     return true;
 }

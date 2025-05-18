@@ -1781,7 +1781,12 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     ENABLE_FEATURE(shaderClipDistance);
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
-    ENABLE_FEATURE(tessellationShader);
+
+    if (ret_features->tessellationShader)
+    {
+        features.tessellationShader = VK_TRUE;
+        runner->caps.shader_caps[SHADER_CAP_TESSELLATION_SHADER] = true;
+    }
 
     if (ret_features->geometryShader)
     {
