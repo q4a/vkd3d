@@ -7725,6 +7725,16 @@ static enum vkd3d_result vsir_program_insert_vertex_fog(struct vsir_program *pro
     return VKD3D_OK;
 }
 
+enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    if (!program->ssa_count)
+        return VKD3D_OK;
+
+    vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED, "Allocate SSA registers.");
+    return VKD3D_ERROR_NOT_IMPLEMENTED;
+}
+
 struct validation_context
 {
     struct vkd3d_shader_message_context *message_context;

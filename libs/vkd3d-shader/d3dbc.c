@@ -2137,6 +2137,9 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     struct vkd3d_bytecode_buffer *buffer = &d3dbc.buffer;
     int result;
 
+    if ((result = vsir_allocate_temp_registers(program, message_context)))
+        return result;
+
     d3dbc.program = program;
     d3dbc.message_context = message_context;
     switch (version->type)

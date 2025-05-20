@@ -4463,6 +4463,9 @@ int tpf_compile(struct vsir_program *program, uint64_t config_flags, const struc
     size_t i;
     int ret;
 
+    if ((ret = vsir_allocate_temp_registers(program, message_context)))
+        return ret;
+
     tpf.program = program;
     tpf.buffer = NULL;
     tpf.stat = &stat;

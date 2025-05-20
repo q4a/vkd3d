@@ -1503,6 +1503,8 @@ struct vsir_program
     size_t block_name_count;
 };
 
+enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context);
 void vsir_program_cleanup(struct vsir_program *program);
 int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
