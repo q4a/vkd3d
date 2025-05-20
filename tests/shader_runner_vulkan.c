@@ -353,7 +353,7 @@ static bool compile_d3d_code(struct vulkan_shader_runner *runner,
     int ret;
 
     options[0].name = VKD3D_SHADER_COMPILE_OPTION_API_VERSION;
-    options[0].value = VKD3D_SHADER_API_VERSION_1_15;
+    options[0].value = VKD3D_SHADER_API_VERSION_1_16;
     options[1].name = VKD3D_SHADER_COMPILE_OPTION_FEATURE;
     options[1].value = shader_runner_caps_get_feature_flags(&runner->caps);
 
