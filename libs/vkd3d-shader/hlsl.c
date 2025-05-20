@@ -3531,21 +3531,7 @@ static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_der
 
 const char *debug_hlsl_writemask(unsigned int writemask)
 {
-    static const char components[] = {'x', 'y', 'z', 'w'};
-    char string[5];
-    unsigned int i = 0, pos = 0;
-
-    VKD3D_ASSERT(!(writemask & ~VKD3DSP_WRITEMASK_ALL));
-
-    while (writemask)
-    {
-        if (writemask & 1)
-            string[pos++] = components[i];
-        writemask >>= 1;
-        i++;
-    }
-    string[pos] = '\0';
-    return vkd3d_dbg_sprintf(".%s", string);
+    return debug_vsir_writemask(writemask);
 }
 
 const char *debug_hlsl_swizzle(uint32_t swizzle, unsigned int size)

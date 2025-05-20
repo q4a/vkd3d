@@ -59,8 +59,7 @@ static inline unsigned int hlsl_swizzle_get_component(uint32_t swizzle, unsigned
 
 static inline void hlsl_swizzle_set_component(uint32_t *swizzle, unsigned int idx, unsigned int component)
 {
-    *swizzle &= ~(VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(idx));
-    *swizzle |= component << VKD3D_SHADER_SWIZZLE_SHIFT(idx);
+    vsir_swizzle_set_component(swizzle, idx, component);
 }
 
 enum hlsl_type_class

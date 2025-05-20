@@ -503,6 +503,53 @@ bool vsir_signature_find_sysval(const struct shader_signature *signature,
     return false;
 }
 
+const char *debug_vsir_writemask(unsigned int writemask)
+{
+    static const char components[] = {'x', 'y', 'z', 'w'};
+    char string[5];
+    unsigned int i = 0, pos = 0;
+
+    VKD3D_ASSERT(!(writemask & ~VKD3DSP_WRITEMASK_ALL));
+
+    while (writemask)
+    {
+        if (writemask & 1)
+            string[pos++] = components[i];
+        writemask >>= 1;
+        i++;
+    }
+    string[pos] = '\0';
+    return vkd3d_dbg_sprintf(".%s", string);
+}
+
+static unsigned int vsir_combine_write_masks(unsigned int first, unsigned int second)
+{
+    unsigned int ret = 0, j = 0;
+
+    for (unsigned int i = 0; i < VKD3D_VEC4_SIZE; ++i)
+    {
+        if (first & (1u << i))
+        {
+            if (second & (1u << j++))
+                ret |= (1u << i);
+        }
+    }
+
+    return ret;
+}
+
+static uint32_t vsir_combine_swizzles(uint32_t first, uint32_t second)
+{
+    uint32_t ret = 0;
+
+    for (unsigned int i = 0; i < VKD3D_VEC4_SIZE; ++i)
+    {
+        unsigned int s = vsir_swizzle_get_component(second, i);
+        vsir_swizzle_set_component(&ret, i, vsir_swizzle_get_component(first, s));
+    }
+    return ret;
+}
+
 void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count)
 {
@@ -7725,6 +7772,380 @@ static enum vkd3d_result vsir_program_insert_vertex_fog(struct vsir_program *pro
     return VKD3D_OK;
 }
 
+
+/* Distinguishes between instruction sources which are masked, where the used
+ * components of the source are determined by the write mask, and sources which
+ * are not masked, where the used components are pre-defined.
+ *
+ * E.g. "add r0.yz, r1.xyzw, r2.xyzw" uses the .yz components of r1 and r2, and
+ * therefore those sources are considered "masked", but
+ * "dp3 r0.y, r1.xyzw, r2.xyzw" uses the .xyz components. */
+static bool vsir_src_is_masked(enum vkd3d_shader_opcode opcode, unsigned int src_idx)
+{
+    switch (opcode)
+    {
+        case VKD3DSIH_ABS:
+        case VKD3DSIH_ACOS:
+        case VKD3DSIH_ADD:
+        case VKD3DSIH_AND:
+        case VKD3DSIH_ASIN:
+        case VKD3DSIH_ATAN:
+        case VKD3DSIH_BFI:
+        case VKD3DSIH_BFREV:
+        case VKD3DSIH_CMP:
+        case VKD3DSIH_CND:
+        case VKD3DSIH_COS:
+        case VKD3DSIH_COUNTBITS:
+        case VKD3DSIH_DADD: /* NB: These are masked, but the mask is double-sized. */
+        case VKD3DSIH_DDIV:
+        case VKD3DSIH_DFMA:
+        case VKD3DSIH_DIV:
+        case VKD3DSIH_DMAX:
+        case VKD3DSIH_DMIN:
+        case VKD3DSIH_DMOV:
+        case VKD3DSIH_DMOVC:
+        case VKD3DSIH_DMUL:
+        case VKD3DSIH_DRCP:
+        case VKD3DSIH_DSX:
+        case VKD3DSIH_DSX_COARSE:
+        case VKD3DSIH_DSX_FINE:
+        case VKD3DSIH_DSY:
+        case VKD3DSIH_DSY_COARSE:
+        case VKD3DSIH_DSY_FINE:
+        case VKD3DSIH_EQO:
+        case VKD3DSIH_EQU:
+        case VKD3DSIH_EXP:
+        case VKD3DSIH_EXPP:
+        case VKD3DSIH_F16TOF32:
+        case VKD3DSIH_F32TOF16:
+        case VKD3DSIH_FIRSTBIT_HI:
+        case VKD3DSIH_FIRSTBIT_LO:
+        case VKD3DSIH_FIRSTBIT_SHI:
+        case VKD3DSIH_FRC:
+        case VKD3DSIH_FREM:
+        case VKD3DSIH_FTOD:
+        case VKD3DSIH_FTOI:
+        case VKD3DSIH_FTOU:
+        case VKD3DSIH_GEO:
+        case VKD3DSIH_GEU:
+        case VKD3DSIH_HCOS:
+        case VKD3DSIH_HSIN:
+        case VKD3DSIH_HTAN:
+        case VKD3DSIH_IADD:
+        case VKD3DSIH_IBFE:
+        case VKD3DSIH_IDIV:
+        case VKD3DSIH_IEQ:
+        case VKD3DSIH_IGE:
+        case VKD3DSIH_ILT:
+        case VKD3DSIH_IMAD:
+        case VKD3DSIH_IMAX:
+        case VKD3DSIH_IMIN:
+        case VKD3DSIH_IMUL:
+        case VKD3DSIH_INE:
+        case VKD3DSIH_INEG:
+        case VKD3DSIH_ISFINITE:
+        case VKD3DSIH_ISHL:
+        case VKD3DSIH_ISHR:
+        case VKD3DSIH_ISINF:
+        case VKD3DSIH_ISNAN:
+        case VKD3DSIH_ITOD:
+        case VKD3DSIH_ITOF:
+        case VKD3DSIH_ITOI:
+        case VKD3DSIH_LOG:
+        case VKD3DSIH_LOGP:
+        case VKD3DSIH_LRP:
+        case VKD3DSIH_LTO:
+        case VKD3DSIH_LTU:
+        case VKD3DSIH_MAD:
+        case VKD3DSIH_MAX:
+        case VKD3DSIH_MIN:
+        case VKD3DSIH_MOV:
+        case VKD3DSIH_MOVA:
+        case VKD3DSIH_MOVC:
+        case VKD3DSIH_MSAD: /* FIXME: Is this correct? */
+        case VKD3DSIH_MUL:
+        case VKD3DSIH_NEO:
+        case VKD3DSIH_NEU:
+        case VKD3DSIH_NOT:
+        case VKD3DSIH_OR:
+        case VKD3DSIH_ORD:
+        case VKD3DSIH_PHI:
+        case VKD3DSIH_POW:
+        case VKD3DSIH_QUAD_READ_ACROSS_D:
+        case VKD3DSIH_QUAD_READ_ACROSS_X:
+        case VKD3DSIH_QUAD_READ_ACROSS_Y:
+        case VKD3DSIH_RCP:
+        case VKD3DSIH_ROUND_NE:
+        case VKD3DSIH_ROUND_NI:
+        case VKD3DSIH_ROUND_PI:
+        case VKD3DSIH_ROUND_Z:
+        case VKD3DSIH_RSQ:
+        case VKD3DSIH_SETP:
+        case VKD3DSIH_SGE:
+        case VKD3DSIH_SGN:
+        case VKD3DSIH_SIN:
+        case VKD3DSIH_SINCOS: /* FIXME: Only for sm4. */
+        case VKD3DSIH_SLT:
+        case VKD3DSIH_SQRT:
+        case VKD3DSIH_SUB:
+        case VKD3DSIH_SWAPC:
+        case VKD3DSIH_TAN:
+        case VKD3DSIH_UBFE:
+        case VKD3DSIH_UDIV:
+        case VKD3DSIH_UGE:
+        case VKD3DSIH_ULT:
+        case VKD3DSIH_UMAX:
+        case VKD3DSIH_UMIN:
+        case VKD3DSIH_UMUL:
+        case VKD3DSIH_UNO:
+        case VKD3DSIH_USHR:
+        case VKD3DSIH_UTOD:
+        case VKD3DSIH_UTOF:
+        case VKD3DSIH_UTOU:
+        case VKD3DSIH_WAVE_ACTIVE_ALL_EQUAL:
+        case VKD3DSIH_WAVE_ACTIVE_BIT_AND:
+        case VKD3DSIH_WAVE_ACTIVE_BIT_OR:
+        case VKD3DSIH_WAVE_ACTIVE_BIT_XOR:
+        case VKD3DSIH_WAVE_ALL_TRUE:
+        case VKD3DSIH_WAVE_ANY_TRUE:
+        case VKD3DSIH_WAVE_OP_ADD:
+        case VKD3DSIH_WAVE_OP_IMAX:
+        case VKD3DSIH_WAVE_OP_IMIN:
+        case VKD3DSIH_WAVE_OP_MAX:
+        case VKD3DSIH_WAVE_OP_MIN:
+        case VKD3DSIH_WAVE_OP_MUL:
+        case VKD3DSIH_WAVE_OP_UMAX:
+        case VKD3DSIH_WAVE_OP_UMIN:
+        case VKD3DSIH_WAVE_READ_LANE_FIRST:
+        case VKD3DSIH_XOR:
+            return true;
+
+        /* Atomics can't have a writemask. */
+        case VKD3DSIH_ATOMIC_AND:
+        case VKD3DSIH_ATOMIC_CMP_STORE:
+        case VKD3DSIH_ATOMIC_IADD:
+        case VKD3DSIH_ATOMIC_IMAX:
+        case VKD3DSIH_ATOMIC_IMIN:
+        case VKD3DSIH_ATOMIC_OR:
+        case VKD3DSIH_ATOMIC_UMAX:
+        case VKD3DSIH_ATOMIC_UMIN:
+        case VKD3DSIH_ATOMIC_XOR:
+        case VKD3DSIH_BEM:
+        case VKD3DSIH_BRANCH:
+        case VKD3DSIH_BREAK:
+        case VKD3DSIH_BREAKC:
+        case VKD3DSIH_BREAKP:
+        case VKD3DSIH_BUFINFO:
+        case VKD3DSIH_CALL:
+        case VKD3DSIH_CALLNZ:
+        case VKD3DSIH_CASE:
+        case VKD3DSIH_CHECK_ACCESS_FULLY_MAPPED: /* FIXME: Is this correct? */
+        case VKD3DSIH_CONTINUE:
+        case VKD3DSIH_CONTINUEP:
+        case VKD3DSIH_CRS:
+        case VKD3DSIH_CUT:
+        case VKD3DSIH_CUT_STREAM:
+        case VKD3DSIH_DCL:
+        case VKD3DSIH_DCL_CONSTANT_BUFFER:
+        case VKD3DSIH_DCL_FUNCTION_BODY:
+        case VKD3DSIH_DCL_FUNCTION_TABLE:
+        case VKD3DSIH_DCL_GLOBAL_FLAGS:
+        case VKD3DSIH_DCL_GS_INSTANCES:
+        case VKD3DSIH_DCL_HS_FORK_PHASE_INSTANCE_COUNT:
+        case VKD3DSIH_DCL_HS_JOIN_PHASE_INSTANCE_COUNT:
+        case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
+        case VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER:
+        case VKD3DSIH_DCL_INDEXABLE_TEMP:
+        case VKD3DSIH_DCL_INDEX_RANGE:
+        case VKD3DSIH_DCL_INPUT:
+        case VKD3DSIH_DCL_INPUT_CONTROL_POINT_COUNT:
+        case VKD3DSIH_DCL_INPUT_PRIMITIVE:
+        case VKD3DSIH_DCL_INPUT_PS:
+        case VKD3DSIH_DCL_INPUT_PS_SGV:
+        case VKD3DSIH_DCL_INPUT_PS_SIV:
+        case VKD3DSIH_DCL_INPUT_SGV:
+        case VKD3DSIH_DCL_INPUT_SIV:
+        case VKD3DSIH_DCL_INTERFACE:
+        case VKD3DSIH_DCL_OUTPUT:
+        case VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT:
+        case VKD3DSIH_DCL_OUTPUT_SGV:
+        case VKD3DSIH_DCL_OUTPUT_SIV:
+        case VKD3DSIH_DCL_OUTPUT_TOPOLOGY:
+        case VKD3DSIH_DCL_RESOURCE_RAW:
+        case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
+        case VKD3DSIH_DCL_SAMPLER:
+        case VKD3DSIH_DCL_STREAM:
+        case VKD3DSIH_DCL_TEMPS:
+        case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
+        case VKD3DSIH_DCL_TESSELLATOR_OUTPUT_PRIMITIVE:
+        case VKD3DSIH_DCL_TESSELLATOR_PARTITIONING:
+        case VKD3DSIH_DCL_TGSM_RAW:
+        case VKD3DSIH_DCL_TGSM_STRUCTURED:
+        case VKD3DSIH_DCL_THREAD_GROUP:
+        case VKD3DSIH_DCL_UAV_RAW:
+        case VKD3DSIH_DCL_UAV_STRUCTURED:
+        case VKD3DSIH_DCL_UAV_TYPED:
+        case VKD3DSIH_DCL_VERTICES_OUT:
+        case VKD3DSIH_DEF:
+        case VKD3DSIH_DEFAULT:
+        case VKD3DSIH_DEFB:
+        case VKD3DSIH_DEFI:
+        case VKD3DSIH_DEQO:
+        case VKD3DSIH_DGEO:
+        case VKD3DSIH_DISCARD:
+        case VKD3DSIH_DLT:
+        case VKD3DSIH_DNE:
+        case VKD3DSIH_DP2:
+        case VKD3DSIH_DP2ADD:
+        case VKD3DSIH_DP3:
+        case VKD3DSIH_DP4:
+        case VKD3DSIH_DST:
+        case VKD3DSIH_DTOF:
+        case VKD3DSIH_DTOI:
+        case VKD3DSIH_DTOU:
+        case VKD3DSIH_ELSE:
+        case VKD3DSIH_EMIT:
+        case VKD3DSIH_EMIT_STREAM:
+        case VKD3DSIH_ENDIF:
+        case VKD3DSIH_ENDLOOP:
+        case VKD3DSIH_ENDREP:
+        case VKD3DSIH_ENDSWITCH:
+        case VKD3DSIH_FCALL:
+        case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+        case VKD3DSIH_HS_DECLS:
+        case VKD3DSIH_HS_FORK_PHASE:
+        case VKD3DSIH_HS_JOIN_PHASE:
+        case VKD3DSIH_IF:
+        case VKD3DSIH_IFC:
+        /* It's unclear if any mapping is done for the source value.
+         * Does it require replicate swizzle? */
+        case VKD3DSIH_IMM_ATOMIC_ALLOC:
+        case VKD3DSIH_IMM_ATOMIC_AND:
+        case VKD3DSIH_IMM_ATOMIC_CMP_EXCH:
+        case VKD3DSIH_IMM_ATOMIC_CONSUME:
+        case VKD3DSIH_IMM_ATOMIC_EXCH:
+        case VKD3DSIH_IMM_ATOMIC_IADD:
+        case VKD3DSIH_IMM_ATOMIC_IMAX:
+        case VKD3DSIH_IMM_ATOMIC_IMIN:
+        case VKD3DSIH_IMM_ATOMIC_OR:
+        case VKD3DSIH_IMM_ATOMIC_UMAX:
+        case VKD3DSIH_IMM_ATOMIC_UMIN:
+        case VKD3DSIH_IMM_ATOMIC_XOR:
+        case VKD3DSIH_LABEL:
+        case VKD3DSIH_LOOP:
+        case VKD3DSIH_LIT:
+        case VKD3DSIH_M3x2:
+        case VKD3DSIH_M3x3:
+        case VKD3DSIH_M3x4:
+        case VKD3DSIH_M4x3:
+        case VKD3DSIH_M4x4:
+        case VKD3DSIH_NOP:
+        /* NRM writemask must be .xyz or .xyzw. */
+        case VKD3DSIH_NRM:
+        case VKD3DSIH_PHASE:
+        case VKD3DSIH_REP:
+        case VKD3DSIH_RET:
+        case VKD3DSIH_RETP:
+        /* Store instructions always require a trivial writemask. */
+        case VKD3DSIH_STORE_RAW:
+        case VKD3DSIH_STORE_STRUCTURED:
+        case VKD3DSIH_STORE_UAV_TYPED:
+        case VKD3DSIH_SWITCH:
+        case VKD3DSIH_SWITCH_MONOLITHIC:
+        case VKD3DSIH_SYNC:
+        case VKD3DSIH_TEX:
+        case VKD3DSIH_TEXBEM:
+        case VKD3DSIH_TEXBEML:
+        case VKD3DSIH_TEXCOORD:
+        case VKD3DSIH_TEXCRD:
+        case VKD3DSIH_TEXDEPTH:
+        case VKD3DSIH_TEXDP3:
+        case VKD3DSIH_TEXDP3TEX:
+        case VKD3DSIH_TEXKILL:
+        case VKD3DSIH_TEXLD:
+        case VKD3DSIH_TEXLDD:
+        case VKD3DSIH_TEXLDL:
+        case VKD3DSIH_TEXM3x2DEPTH:
+        case VKD3DSIH_TEXM3x2PAD:
+        case VKD3DSIH_TEXM3x2TEX:
+        case VKD3DSIH_TEXM3x3:
+        case VKD3DSIH_TEXM3x3DIFF:
+        case VKD3DSIH_TEXM3x3PAD:
+        case VKD3DSIH_TEXM3x3SPEC:
+        case VKD3DSIH_TEXM3x3TEX:
+        case VKD3DSIH_TEXM3x3VSPEC:
+        case VKD3DSIH_TEXREG2AR:
+        case VKD3DSIH_TEXREG2GB:
+        case VKD3DSIH_TEXREG2RGB:
+        case VKD3DSIH_WAVE_ACTIVE_BALLOT:
+        case VKD3DSIH_WAVE_ALL_BIT_COUNT:
+        case VKD3DSIH_WAVE_IS_FIRST_LANE:
+        case VKD3DSIH_WAVE_PREFIX_BIT_COUNT:
+            return false;
+
+        case VKD3DSIH_QUAD_READ_LANE_AT:
+        case VKD3DSIH_WAVE_READ_LANE_AT:
+            return (src_idx == 0);
+
+        /* sm4 resource instructions are an odd case, since they're not actually
+         * per-component. However, the "swizzle" placed on the resource allows
+         * arbitrary destination writemasks to be used.
+         *
+         * This means that for the purposes of the "remapping" done by
+         * temp_allocator_set_dst(), we can basically treat those sources as
+         * "mapped", altering them when we reassign the destination writemask. */
+
+        /* FIXME: The documentation seems to say that these instructions behave
+         * this way, but is it correct?
+         * (It's silent about EVAL_*, but presumably they behave the same way.) */
+        case VKD3DSIH_EVAL_CENTROID:
+        case VKD3DSIH_EVAL_SAMPLE_INDEX:
+        case VKD3DSIH_SAMPLE_INFO:
+        case VKD3DSIH_SAMPLE_POS:
+            return (src_idx == 0);
+        case VKD3DSIH_GATHER4:
+        case VKD3DSIH_GATHER4_C:
+        case VKD3DSIH_GATHER4_C_S:
+        case VKD3DSIH_GATHER4_S:
+        case VKD3DSIH_LD:
+        case VKD3DSIH_LD2DMS:
+        case VKD3DSIH_LD2DMS_S:
+        case VKD3DSIH_LD_RAW:
+        case VKD3DSIH_LD_RAW_S:
+        case VKD3DSIH_LD_S:
+        case VKD3DSIH_LD_UAV_TYPED:
+        case VKD3DSIH_LD_UAV_TYPED_S:
+        case VKD3DSIH_LOD:
+        case VKD3DSIH_RESINFO:
+        case VKD3DSIH_SAMPLE:
+        case VKD3DSIH_SAMPLE_B:
+        case VKD3DSIH_SAMPLE_B_CL_S:
+        case VKD3DSIH_SAMPLE_C:
+        case VKD3DSIH_SAMPLE_CL_S:
+        case VKD3DSIH_SAMPLE_C_CL_S:
+        case VKD3DSIH_SAMPLE_C_LZ:
+        case VKD3DSIH_SAMPLE_C_LZ_S:
+        case VKD3DSIH_SAMPLE_GRAD:
+        case VKD3DSIH_SAMPLE_GRAD_CL_S:
+        case VKD3DSIH_SAMPLE_LOD:
+        case VKD3DSIH_SAMPLE_LOD_S:
+            return (src_idx == 1);
+        case VKD3DSIH_GATHER4_PO:
+        case VKD3DSIH_GATHER4_PO_C:
+        case VKD3DSIH_GATHER4_PO_C_S:
+        case VKD3DSIH_GATHER4_PO_S:
+        case VKD3DSIH_LD_STRUCTURED:
+        case VKD3DSIH_LD_STRUCTURED_S:
+            return (src_idx == 2);
+
+        case VKD3DSIH_INVALID:
+        case VKD3DSIH_COUNT:
+            break;
+    }
+
+    vkd3d_unreachable();
+}
+
 struct liveness_tracker
 {
     struct liveness_tracker_reg
@@ -7911,10 +8332,219 @@ static enum vkd3d_result track_liveness(struct vsir_program *program, struct liv
     return VKD3D_OK;
 }
 
+struct temp_allocator
+{
+    struct vkd3d_shader_message_context *message_context;
+    struct temp_allocator_reg
+    {
+        uint8_t allocated_mask;
+        uint32_t temp_id;
+    } *ssa_regs;
+    size_t allocated_ssa_count;
+    enum vkd3d_result result;
+};
+
+static uint8_t get_available_writemask(const struct temp_allocator *allocator,
+        struct liveness_tracker *tracker, unsigned int first_write, unsigned int last_access, uint32_t temp_id)
+{
+    uint8_t writemask = VKD3DSP_WRITEMASK_ALL;
+
+    for (size_t i = 0; i < allocator->allocated_ssa_count; ++i)
+    {
+        const struct temp_allocator_reg *reg = &allocator->ssa_regs[i];
+        const struct liveness_tracker_reg *liveness_reg = &tracker->ssa_regs[i];
+
+        /* We do not overlap if first write == last read:
+         * this is the case where we are allocating the result of that
+         * expression, e.g. "add r0, r0, r1". */
+
+        if (reg->temp_id == temp_id
+                && first_write < liveness_reg->last_access
+                && last_access > liveness_reg->first_write)
+            writemask &= ~reg->allocated_mask;
+
+        if (!writemask)
+            return writemask;
+    }
+
+    return writemask;
+}
+
+static void temp_allocator_allocate(struct temp_allocator *allocator, struct liveness_tracker *tracker,
+        struct temp_allocator_reg *reg, const struct liveness_tracker_reg *liveness_reg, uint32_t base_id)
+{
+    if (!liveness_reg->written)
+        return;
+
+    for (uint32_t id = base_id;; ++id)
+    {
+        uint8_t available_mask = get_available_writemask(allocator, tracker,
+                liveness_reg->first_write, liveness_reg->last_access, id);
+
+        if (liveness_reg->fixed_mask)
+        {
+            if ((available_mask & liveness_reg->mask) == liveness_reg->mask)
+            {
+                reg->temp_id = id;
+                reg->allocated_mask = liveness_reg->mask;
+                return;
+            }
+        }
+        else
+        {
+            /* For SSA values the mask is always zero-based and contiguous.
+             * We don't correctly handle cases where it's not, currently. */
+            VKD3D_ASSERT((liveness_reg->mask | (liveness_reg->mask - 1)) == liveness_reg->mask);
+
+            if (vkd3d_popcount(available_mask) >= vkd3d_popcount(liveness_reg->mask))
+            {
+                reg->temp_id = id;
+                reg->allocated_mask = vsir_combine_write_masks(available_mask, liveness_reg->mask);
+                return;
+            }
+        }
+    }
+}
+
+static void temp_allocator_set_src(struct temp_allocator *allocator, struct vkd3d_shader_src_param *src)
+{
+    struct temp_allocator_reg *reg;
+
+    for (unsigned int k = 0; k < src->reg.idx_count; ++k)
+    {
+        if (src->reg.idx[k].rel_addr)
+            temp_allocator_set_src(allocator, src->reg.idx[k].rel_addr);
+    }
+
+    if (src->reg.type == VKD3DSPR_SSA)
+        reg = &allocator->ssa_regs[src->reg.idx[0].offset];
+    else
+        return;
+
+    src->reg.type = VKD3DSPR_TEMP;
+    src->reg.idx[0].offset = reg->temp_id;
+    src->swizzle = vsir_combine_swizzles(vsir_swizzle_from_writemask(reg->allocated_mask), src->swizzle);
+}
+
+static uint32_t vsir_map_swizzle(uint32_t swizzle, unsigned int writemask)
+{
+    unsigned int src_component = 0;
+    uint32_t ret = 0;
+
+    /* Leave replicate swizzles alone; some instructions need them. */
+    if (swizzle == VKD3D_SHADER_SWIZZLE(X, X, X, X)
+            || swizzle == VKD3D_SHADER_SWIZZLE(Y, Y, Y, Y)
+            || swizzle == VKD3D_SHADER_SWIZZLE(Z, Z, Z, Z)
+            || swizzle == VKD3D_SHADER_SWIZZLE(W, W, W, W))
+        return swizzle;
+
+    for (unsigned int dst_component = 0; dst_component < VKD3D_VEC4_SIZE; ++dst_component)
+    {
+        if (writemask & (1u << dst_component))
+            vsir_swizzle_set_component(&ret, dst_component, vsir_swizzle_get_component(swizzle, src_component++));
+    }
+    return ret;
+}
+
+static void vsir_remap_immconst(struct vkd3d_shader_src_param *src, unsigned int writemask)
+{
+    union vsir_immediate_constant prev = src->reg.u;
+    unsigned int src_component = 0;
+
+    for (unsigned int dst_component = 0; dst_component < VKD3D_VEC4_SIZE; ++dst_component)
+    {
+        if (writemask & (1u << dst_component))
+            src->reg.u.immconst_u32[dst_component] = prev.immconst_u32[src_component++];
+    }
+}
+
+static void vsir_remap_immconst64(struct vkd3d_shader_src_param *src, unsigned int writemask)
+{
+    if (writemask == (VKD3DSP_WRITEMASK_2 | VKD3DSP_WRITEMASK_3))
+        src->reg.u.immconst_u64[1] = src->reg.u.immconst_u64[0];
+}
+
+static bool vsir_opcode_is_double(enum vkd3d_shader_opcode opcode)
+{
+    switch (opcode)
+    {
+        case VKD3DSIH_DADD:
+        case VKD3DSIH_DDIV:
+        case VKD3DSIH_DFMA:
+        case VKD3DSIH_DMAX:
+        case VKD3DSIH_DMIN:
+        case VKD3DSIH_DMOV:
+        case VKD3DSIH_DMOVC:
+        case VKD3DSIH_DMUL:
+        case VKD3DSIH_DRCP:
+        case VKD3DSIH_DEQO:
+        case VKD3DSIH_DGEO:
+        case VKD3DSIH_DLT:
+        case VKD3DSIH_DNE:
+        case VKD3DSIH_DTOF:
+        case VKD3DSIH_DTOI:
+        case VKD3DSIH_DTOU:
+        case VKD3DSIH_FTOD:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static void temp_allocator_set_dst(struct temp_allocator *allocator,
+        struct vkd3d_shader_dst_param *dst, const struct vkd3d_shader_instruction *ins)
+{
+    struct temp_allocator_reg *reg;
+
+    for (unsigned int k = 0; k < dst->reg.idx_count; ++k)
+    {
+        if (dst->reg.idx[k].rel_addr)
+            temp_allocator_set_src(allocator, dst->reg.idx[k].rel_addr);
+    }
+
+    if (dst->reg.type == VKD3DSPR_SSA)
+        reg = &allocator->ssa_regs[dst->reg.idx[0].offset];
+    else
+        return;
+
+    dst->reg.type = VKD3DSPR_TEMP;
+    dst->reg.idx[0].offset = reg->temp_id;
+    if (reg->allocated_mask != dst->write_mask)
+    {
+        dst->write_mask = reg->allocated_mask;
+
+        if (vsir_opcode_is_double(ins->opcode))
+        {
+            vkd3d_shader_error(allocator->message_context, &ins->location,
+                    VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED, "Doubles are not currently handled.");
+            allocator->result = VKD3D_ERROR_NOT_IMPLEMENTED;
+        }
+
+        for (unsigned int i = 0; i < ins->src_count; ++i)
+        {
+            struct vkd3d_shader_src_param *src = &ins->src[i];
+
+            if (vsir_src_is_masked(ins->opcode, i))
+            {
+                if (src->reg.type == VKD3DSPR_IMMCONST)
+                    vsir_remap_immconst(src, dst->write_mask);
+                else if (src->reg.type == VKD3DSPR_IMMCONST64)
+                    vsir_remap_immconst64(src, dst->write_mask);
+                else
+                    src->swizzle = vsir_map_swizzle(src->swizzle, dst->write_mask);
+            }
+        }
+    }
+}
+
 enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context)
 {
+    struct temp_allocator allocator = {0};
+    struct temp_allocator_reg *regs;
     struct liveness_tracker tracker;
+    uint32_t temp_count = 0;
     enum vkd3d_result ret;
 
     if (!program->ssa_count)
@@ -7923,9 +8553,109 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
     if ((ret = track_liveness(program, &tracker)))
         return ret;
 
+    if (!(regs = vkd3d_calloc(program->ssa_count, sizeof(*regs))))
+    {
+        liveness_tracker_cleanup(&tracker);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    allocator.message_context = message_context;
+    allocator.ssa_regs = regs;
+
+    for (unsigned int i = 0; i < program->ssa_count; ++i)
+    {
+        const struct liveness_tracker_reg *liveness_reg = &tracker.ssa_regs[i];
+        struct temp_allocator_reg *reg = &allocator.ssa_regs[i];
+
+        temp_allocator_allocate(&allocator, &tracker, reg, liveness_reg, program->temp_count);
+        TRACE("Allocated r%u%s to sr%u (liveness %u-%u).\n",
+                reg->temp_id, debug_vsir_writemask(reg->allocated_mask), i,
+                liveness_reg->first_write, liveness_reg->last_access);
+        ++allocator.allocated_ssa_count;
+    }
+
+    for (unsigned int i = 0; i < program->instructions.count; ++i)
+    {
+        const struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        /* Make sure we do the srcs first; setting the dst writemask may need
+         * to remap their swizzles. */
+        for (unsigned int j = 0; j < ins->src_count; ++j)
+            temp_allocator_set_src(&allocator, &ins->src[j]);
+        for (unsigned int j = 0; j < ins->dst_count; ++j)
+            temp_allocator_set_dst(&allocator, &ins->dst[j], ins);
+    }
+
+    /* Rewrite dcl_temps to reflect the new temp count.
+     * Note that dcl_temps appears once per phase, and should reflect only the
+     * number of temps needed by that phase.
+     * Therefore we iterate backwards through the shader, finding the maximum
+     * register used by any instruction, update the dcl_temps at the beginning
+     * of each phase, and then reset the temp count back to 0 for the next
+     * phase (if any). */
+    for (int i = program->instructions.count - 1; i >= 0; --i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        if (ins->opcode == VKD3DSIH_DCL_TEMPS)
+        {
+            ins->declaration.count = temp_count;
+            temp_count = 0;
+            continue;
+        }
+        if (temp_count && program->shader_version.major >= 4
+                && (ins->opcode == VKD3DSIH_HS_CONTROL_POINT_PHASE
+                        || ins->opcode == VKD3DSIH_HS_FORK_PHASE
+                        || ins->opcode == VKD3DSIH_HS_JOIN_PHASE))
+        {
+            /* The phase didn't have a dcl_temps instruction, but we added
+             * temps here, so we need to insert one. */
+            if (!shader_instruction_array_insert_at(&program->instructions, i + 1, 1))
+            {
+                vkd3d_free(regs);
+                liveness_tracker_cleanup(&tracker);
+                return VKD3D_ERROR_OUT_OF_MEMORY;
+            }
+
+            ins = &program->instructions.elements[i + 1];
+            vsir_instruction_init(ins, &program->instructions.elements[i].location, VKD3DSIH_DCL_TEMPS);
+            ins->declaration.count = temp_count;
+            temp_count = 0;
+            continue;
+        }
+
+        /* No need to check sources. If we've produced an unwritten source then
+         * that's a bug somewhere in this pass. */
+        for (unsigned int j = 0; j < ins->dst_count; ++j)
+        {
+            if (ins->dst[j].reg.type == VKD3DSPR_TEMP)
+            {
+                temp_count = max(temp_count, ins->dst[j].reg.idx[0].offset + 1);
+                program->temp_count = max(program->temp_count, temp_count);
+            }
+        }
+    }
+
+    if (temp_count && program->shader_version.major >= 4)
+    {
+        struct vkd3d_shader_instruction *ins;
+
+        if (!shader_instruction_array_insert_at(&program->instructions, 0, 1))
+        {
+            vkd3d_free(regs);
+            liveness_tracker_cleanup(&tracker);
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+
+        ins = &program->instructions.elements[0];
+        vsir_instruction_init(ins, &program->instructions.elements[1].location, VKD3DSIH_DCL_TEMPS);
+        ins->declaration.count = temp_count;
+    }
+
+    program->ssa_count = 0;
+
+    vkd3d_free(regs);
     liveness_tracker_cleanup(&tracker);
-    vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED, "Allocate SSA registers.");
-    return VKD3D_ERROR_NOT_IMPLEMENTED;
+    return allocator.result;
 }
 
 struct validation_context

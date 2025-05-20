@@ -1852,6 +1852,8 @@ static inline uint32_t vsir_write_mask_32_from_64(uint32_t write_mask64)
     }
 }
 
+const char *debug_vsir_writemask(unsigned int writemask);
+
 static inline uint32_t vsir_swizzle_64_from_32(uint32_t swizzle32)
 {
     switch (swizzle32)
@@ -1899,6 +1901,12 @@ static inline uint32_t vsir_swizzle_32_from_64(uint32_t swizzle64)
 static inline unsigned int vsir_swizzle_get_component(uint32_t swizzle, unsigned int idx)
 {
     return (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(idx)) & VKD3D_SHADER_SWIZZLE_MASK;
+}
+
+static inline void vsir_swizzle_set_component(uint32_t *swizzle, unsigned int idx, unsigned int component)
+{
+    *swizzle &= ~(VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(idx));
+    *swizzle |= component << VKD3D_SHADER_SWIZZLE_SHIFT(idx);
 }
 
 static inline unsigned int vkd3d_compact_swizzle(uint32_t swizzle, uint32_t write_mask)
