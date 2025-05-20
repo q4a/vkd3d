@@ -165,13 +165,29 @@ if(sm<4)  probe (0, 0) rgba(243, 243, 243, 111)
 if(sm>=4) probe (0, 0) rgba(234, 234, 234, 111)
 
 [require]
-shader model >= 6.2
-native-16-bit
+shader model >= 4.0
 
 [srv 0]
 size (2d, 2, 2)
 0.0 0.0 0.0 0.0     0.0 0.0 0.0 0.0
 0.0 0.0 0.0 0.0     2621.0 0.0 -2621.0 0.0
+
+[pixel shader]
+sampler s;
+Texture2D<min16float4> t;
+
+float4 main() : sv_target
+{
+    return t.Sample(s, float2(0.5, 0.5));
+}
+
+[test]
+todo(msl) draw quad
+probe (0, 0) rgba(655.0, 0, -655.0, 0) 4096
+
+[require]
+shader model >= 6.2
+native-16-bit
 
 [pixel shader]
 sampler s;
