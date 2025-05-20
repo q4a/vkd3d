@@ -7725,12 +7725,205 @@ static enum vkd3d_result vsir_program_insert_vertex_fog(struct vsir_program *pro
     return VKD3D_OK;
 }
 
+struct liveness_tracker
+{
+    struct liveness_tracker_reg
+    {
+        bool written;
+        bool fixed_mask;
+        uint8_t mask;
+        unsigned int first_write, last_access;
+    } *ssa_regs;
+};
+
+static void liveness_track_src(struct liveness_tracker *tracker,
+        struct vkd3d_shader_src_param *src, unsigned int index)
+{
+    for (unsigned int k = 0; k < src->reg.idx_count; ++k)
+    {
+        if (src->reg.idx[k].rel_addr)
+            liveness_track_src(tracker, src->reg.idx[k].rel_addr, index);
+    }
+
+    if (src->reg.type == VKD3DSPR_SSA)
+        tracker->ssa_regs[src->reg.idx[0].offset].last_access = index;
+}
+
+static void liveness_track_dst(struct liveness_tracker *tracker, struct vkd3d_shader_dst_param *dst,
+        unsigned int index, const struct vkd3d_shader_version *version, enum vkd3d_shader_opcode opcode)
+{
+    struct liveness_tracker_reg *reg;
+
+    for (unsigned int k = 0; k < dst->reg.idx_count; ++k)
+    {
+        if (dst->reg.idx[k].rel_addr)
+            liveness_track_src(tracker, dst->reg.idx[k].rel_addr, index);
+    }
+
+    if (dst->reg.type == VKD3DSPR_SSA)
+        reg = &tracker->ssa_regs[dst->reg.idx[0].offset];
+    else
+        return;
+
+    if (!reg->written)
+        reg->first_write = index;
+    reg->last_access = index;
+    reg->written = true;
+    reg->mask |= dst->write_mask;
+
+    switch (opcode)
+    {
+        case VKD3DSIH_BEM:
+        case VKD3DSIH_CRS:
+        case VKD3DSIH_DST:
+        case VKD3DSIH_LIT:
+        case VKD3DSIH_M3x2:
+        case VKD3DSIH_M3x3:
+        case VKD3DSIH_M3x4:
+        case VKD3DSIH_M4x3:
+        case VKD3DSIH_M4x4:
+        case VKD3DSIH_NRM:
+        case VKD3DSIH_TEX:
+        case VKD3DSIH_TEXBEM:
+        case VKD3DSIH_TEXBEML:
+        case VKD3DSIH_TEXCOORD:
+        case VKD3DSIH_TEXCRD:
+        case VKD3DSIH_TEXDEPTH:
+        case VKD3DSIH_TEXDP3:
+        case VKD3DSIH_TEXDP3TEX:
+        case VKD3DSIH_TEXLD:
+        case VKD3DSIH_TEXLDD:
+        case VKD3DSIH_TEXLDL:
+        case VKD3DSIH_TEXM3x2DEPTH:
+        case VKD3DSIH_TEXM3x2PAD:
+        case VKD3DSIH_TEXM3x2TEX:
+        case VKD3DSIH_TEXM3x3:
+        case VKD3DSIH_TEXM3x3DIFF:
+        case VKD3DSIH_TEXM3x3PAD:
+        case VKD3DSIH_TEXM3x3SPEC:
+        case VKD3DSIH_TEXM3x3TEX:
+        case VKD3DSIH_TEXM3x3VSPEC:
+        case VKD3DSIH_TEXREG2AR:
+        case VKD3DSIH_TEXREG2GB:
+        case VKD3DSIH_TEXREG2RGB:
+            /* All of these instructions have fixed destinations—they can
+             * in some cases be masked, but the destination cannot be
+             * reallocated to a different set of components. */
+        case VKD3DSIH_IDIV:
+        case VKD3DSIH_IMUL:
+        case VKD3DSIH_SWAPC:
+        case VKD3DSIH_UDIV:
+        case VKD3DSIH_UMUL:
+            /* These instructions don't have fixed destinations, but they have
+             * multiple destination and are per-component, meaning that the
+             * destination masks for each component have to match.
+             * This is a bit tricky to pull off, so for now we just force
+             * these to have a fixed mask as well.
+             * This assumes that the destination masks are equal to each other
+             * to begin with! */
+            reg->fixed_mask = true;
+            break;
+
+        case VKD3DSIH_SINCOS:
+            /* sm1 has a fixed destination like LIT, NRM.
+             * sm4 is two-component and masked, like IMUL. */
+            if (version->major < 3)
+            {
+                /* We have the additional constraint here that sincos scratches
+                 * whichever components of .xyz it doesn't write. We can achieve
+                 * this by simply adding those components to reg->mask. */
+                reg->mask |= 0x7;
+            }
+            reg->fixed_mask = true;
+            break;
+
+        default:
+            break;
+    }
+}
+
+static void liveness_tracker_cleanup(struct liveness_tracker *tracker)
+{
+    vkd3d_free(tracker->ssa_regs);
+}
+
+static enum vkd3d_result track_liveness(struct vsir_program *program, struct liveness_tracker *tracker)
+{
+    struct liveness_tracker_reg *regs;
+    unsigned int loop_depth = 0;
+    unsigned int loop_start = 0;
+
+    memset(tracker, 0, sizeof(*tracker));
+
+    if (!(regs = vkd3d_calloc(program->ssa_count, sizeof(*regs))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    tracker->ssa_regs = regs;
+
+    for (unsigned int i = 0; i < program->instructions.count; ++i)
+    {
+        const struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        if (ins->opcode == VKD3DSIH_LOOP || ins->opcode == VKD3DSIH_REP)
+        {
+            if (!loop_depth++)
+                loop_start = i;
+        }
+        else if (ins->opcode == VKD3DSIH_ENDLOOP || ins->opcode == VKD3DSIH_ENDREP)
+        {
+            if (!--loop_depth)
+            {
+                /* Go through the allocator, find anything that was touched
+                 * during the loop, and extend its liveness to the whole range
+                 * of the loop.
+                 * This isn't very sophisticated (e.g. we could try to avoid
+                 * this for registers first written inside a loop body and only
+                 * ever read inside one), but many of the cases that matter are
+                 * affected by other optimizations such as copy propagation
+                 * anyway.
+                 *
+                 * This is overkill for SSA registers. If an SSA register is
+                 * written in loop L and last read in L, we don't need to touch
+                 * its liveness. If it's last read in an inferior loop of L, we
+                 * only need to extend its last-read to the end of L. (And it
+                 * should be illegal for an SSA value to be read in a block
+                 * containing L.)
+                 * We don't try to perform this optimization yet, in the name of
+                 * maximal simplicity, and also because this code is intended to
+                 * be extended to non-SSA values. */
+                for (unsigned int j = 0; j < program->ssa_count; ++j)
+                {
+                    struct liveness_tracker_reg *reg = &tracker->ssa_regs[j];
+
+                    if (reg->first_write > loop_start)
+                        reg->first_write = loop_start;
+                    if (reg->last_access < i)
+                        reg->last_access = i;
+                }
+            }
+        }
+
+        for (unsigned int j = 0; j < ins->dst_count; ++j)
+            liveness_track_dst(tracker, &ins->dst[j], i, &program->shader_version, ins->opcode);
+        for (unsigned int j = 0; j < ins->src_count; ++j)
+            liveness_track_src(tracker, &ins->src[j], i);
+    }
+
+    return VKD3D_OK;
+}
+
 enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context)
 {
+    struct liveness_tracker tracker;
+    enum vkd3d_result ret;
+
     if (!program->ssa_count)
         return VKD3D_OK;
 
+    if ((ret = track_liveness(program, &tracker)))
+        return ret;
+
+    liveness_tracker_cleanup(&tracker);
     vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED, "Allocate SSA registers.");
     return VKD3D_ERROR_NOT_IMPLEMENTED;
 }
