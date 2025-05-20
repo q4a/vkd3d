@@ -155,3 +155,62 @@ uniform 4 uint4 0x120011 0x140013 0x160015 0x180017
 uniform 8 uint4 0x220021 0x240023 0x260025 0x280027
 draw quad
 todo probe (0, 0) rgbaui(1, 1, 1, 1)
+
+% Same tests for floating point numbers
+
+[require]
+shader model >= 4.0
+shader model < 6.0
+
+[pixel shader]
+uniform min16float4 p;
+uniform min16float3 q;
+uniform min16float2 r;
+uniform min16float s;
+
+uint4 main() : sv_target
+{
+    if (p.x == 1.0 && p.y == 2.0 && p.z == 3.0 && p.w == 4.0
+            && q.x == 11.0 && q.y == 12.0 && q.z == 13.0
+            && r.x == 21.0 && r.y == 22.0 && s == 23.0)
+        return 1;
+    return 0;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 11.0 12.0 13.0 14.0
+uniform 8 float4 21.0 22.0 23.0 24.0
+todo(msl) draw quad
+probe (0, 0) rgbaui(1, 1, 1, 1)
+
+[require]
+shader model >= 6.0
+
+[pixel shader]
+uniform min16float4 p;
+uniform min16float3 q;
+uniform min16float2 r;
+uniform min16float s;
+
+uint4 main() : sv_target
+{
+    /* On AMD the stride is 4. */
+    if (p.x == 1.0 && p.y == 3.0 && p.z == 5.0 && p.w == 7.0
+            && q.x == 11.0 && q.y == 13.0 && q.z == 15.0
+            && r.x == 21.0 && r.y == 23.0 && s == 25.0)
+        return 1;
+    /* On NVIDIA and WARP the stride is 2. */
+    if (p.x == 1.0 && p.y == 2.0 && p.z == 3.0 && p.w == 4.0
+            && q.x == 11.0 && q.y == 12.0 && q.z == 13.0
+            && r.x == 21.0 && r.y == 22.0 && s == 23.0)
+        return 1;
+    return 0;
+}
+
+[test]
+uniform 0 uint4 0x40003c00 0x44004200 0x46004500 0x48004700
+uniform 4 uint4 0x4a004980 0x4b004a80 0x4c004b80 0x4c804c40
+uniform 8 uint4 0x4d804d40 0x4e004dc0 0x4e804e40 0x4f004ec0
+draw quad
+todo probe (0, 0) rgbaui(1, 1, 1, 1)
