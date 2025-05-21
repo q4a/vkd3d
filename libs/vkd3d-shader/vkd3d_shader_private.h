@@ -1781,14 +1781,6 @@ static inline bool component_type_is_64_bit(enum vkd3d_shader_component_type com
     return component_type == VKD3D_SHADER_COMPONENT_DOUBLE || component_type == VKD3D_SHADER_COMPONENT_UINT64;
 }
 
-enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d_shader_sysval_semantic sysval,
-        unsigned int index);
-
-static inline enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval(enum vkd3d_shader_sysval_semantic sysval)
-{
-    return vkd3d_siv_from_sysval_indexed(sysval, 0);
-}
-
 static inline unsigned int vsir_write_mask_get_component_idx(uint32_t write_mask)
 {
     unsigned int i;

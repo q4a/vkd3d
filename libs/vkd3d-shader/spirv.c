@@ -847,57 +847,6 @@ static void vkd3d_spirv_dump(const struct vkd3d_shader_code *spirv, enum vkd3d_s
     vkd3d_shader_message_context_cleanup(&message_context);
 }
 
-enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d_shader_sysval_semantic sysval,
-        unsigned int index)
-{
-    switch (sysval)
-    {
-        case VKD3D_SHADER_SV_COVERAGE:
-        case VKD3D_SHADER_SV_DEPTH:
-        case VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL:
-        case VKD3D_SHADER_SV_DEPTH_LESS_EQUAL:
-        case VKD3D_SHADER_SV_NONE:
-        case VKD3D_SHADER_SV_STENCIL_REF:
-        case VKD3D_SHADER_SV_TARGET:
-            return VKD3D_SIV_NONE;
-        case VKD3D_SHADER_SV_POSITION:
-            return VKD3D_SIV_POSITION;
-        case VKD3D_SHADER_SV_CLIP_DISTANCE:
-            return VKD3D_SIV_CLIP_DISTANCE;
-        case VKD3D_SHADER_SV_CULL_DISTANCE:
-            return VKD3D_SIV_CULL_DISTANCE;
-        case VKD3D_SHADER_SV_INSTANCE_ID:
-            return VKD3D_SIV_INSTANCE_ID;
-        case VKD3D_SHADER_SV_IS_FRONT_FACE:
-            return VKD3D_SIV_IS_FRONT_FACE;
-        case VKD3D_SHADER_SV_PRIMITIVE_ID:
-            return VKD3D_SIV_PRIMITIVE_ID;
-        case VKD3D_SHADER_SV_RENDER_TARGET_ARRAY_INDEX:
-            return VKD3D_SIV_RENDER_TARGET_ARRAY_INDEX;
-        case VKD3D_SHADER_SV_SAMPLE_INDEX:
-            return VKD3D_SIV_SAMPLE_INDEX;
-        case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
-            return VKD3D_SIV_QUAD_U0_TESS_FACTOR + index;
-        case VKD3D_SHADER_SV_TESS_FACTOR_QUADINT:
-            return VKD3D_SIV_QUAD_U_INNER_TESS_FACTOR + index;
-        case VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE:
-            return VKD3D_SIV_TRIANGLE_U_TESS_FACTOR + index;
-        case VKD3D_SHADER_SV_TESS_FACTOR_TRIINT:
-            return VKD3D_SIV_TRIANGLE_INNER_TESS_FACTOR;
-        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDET:
-            return VKD3D_SIV_LINE_DETAIL_TESS_FACTOR;
-        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
-            return VKD3D_SIV_LINE_DENSITY_TESS_FACTOR;
-        case VKD3D_SHADER_SV_VERTEX_ID:
-            return VKD3D_SIV_VERTEX_ID;
-        case VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX:
-            return VKD3D_SIV_VIEWPORT_ARRAY_INDEX;
-        default:
-            FIXME("Unhandled sysval %#x, index %u.\n", sysval, index);
-            return VKD3D_SIV_NONE;
-    }
-}
-
 struct vkd3d_spirv_stream
 {
     uint32_t *words;
