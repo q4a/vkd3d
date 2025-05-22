@@ -775,16 +775,19 @@ static struct resource_readback *metal_runner_get_resource_readback(struct shade
         struct resource *res, unsigned int sub_resource_idx)
 {
     struct metal_resource *resource = metal_resource(res);
+    MTLRenderPassColorAttachmentDescriptor *attachment;
     struct metal_runner *runner = metal_runner(r);
+    id<MTLRenderCommandEncoder> resolve;
     id<MTLCommandBuffer> command_buffer;
     struct metal_resource_readback *rb;
+    MTLRenderPassDescriptor *pass_desc;
+    MTLTextureDescriptor *texture_desc;
     id<MTLBlitCommandEncoder> blit;
+    id<MTLTexture> src_texture;
     unsigned int layer, level;
 
     if (resource->r.desc.dimension != RESOURCE_DIMENSION_2D)
         fatal_error("Unhandled resource dimension %#x.\n", resource->r.desc.dimension);
-    if (resource->r.desc.sample_count > 1)
-        fatal_error("Unhandled sample count %u.\n", resource->r.desc.sample_count);
 
     rb = malloc(sizeof(*rb));
     rb->rb.width = resource->r.desc.width;
@@ -801,8 +804,40 @@ static struct resource_readback *metal_runner_get_resource_readback(struct shade
     {
         command_buffer = [runner->queue commandBuffer];
 
+        src_texture = resource->texture;
+        if (resource->r.desc.sample_count > 1)
+        {
+            pass_desc = [MTLRenderPassDescriptor renderPassDescriptor];
+            attachment = pass_desc.colorAttachments[0];
+
+            if (resource->r.desc.type != RESOURCE_TYPE_RENDER_TARGET)
+                fatal_error("Unhandled multi-sample resolve of resource with type %#x.\n", resource->r.desc.type);
+
+            texture_desc = [[MTLTextureDescriptor new] autorelease];
+            texture_desc.textureType = MTLTextureType2D;
+            texture_desc.pixelFormat = get_metal_pixel_format(resource->r.desc.format);
+            texture_desc.width = resource->r.desc.width;
+            texture_desc.height = resource->r.desc.height;
+            texture_desc.arrayLength = resource->r.desc.depth;
+            texture_desc.mipmapLevelCount = resource->r.desc.level_count;
+            texture_desc.sampleCount = 1;
+            texture_desc.storageMode = MTLStorageModePrivate;
+            texture_desc.usage = MTLTextureUsageRenderTarget;
+
+            src_texture = [[runner->device newTextureWithDescriptor:texture_desc] autorelease];
+            ok(src_texture, "Failed to create resolve texture.\n");
+
+            attachment.texture = resource->texture;
+            attachment.resolveTexture = src_texture;
+            attachment.loadAction = MTLLoadActionLoad;
+            attachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
+
+            resolve = [command_buffer renderCommandEncoderWithDescriptor:pass_desc];
+            [resolve endEncoding];
+        }
+
         blit = [command_buffer blitCommandEncoder];
-        [blit copyFromTexture:resource->texture
+        [blit copyFromTexture:src_texture
                 sourceSlice:layer
                 sourceLevel:level
                 sourceOrigin:MTLOriginMake(0, 0, 0)
