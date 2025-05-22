@@ -888,24 +888,30 @@ static bool metal_runner_init(struct metal_runner *runner)
     memset(runner, 0, sizeof(*runner));
 
     devices = MTLCopyAllDevices();
-    if (![devices count])
+    for (device in devices)
     {
-        skip("Failed to find a usable Metal device.\n");
-        [devices release];
-        return false;
+        if (!check_argument_buffer_support(device))
+        {
+            trace("Ignoring device \"%s\" because it doesn't have usable argument buffer support.\n",
+                    [[device name] UTF8String]);
+            continue;
+        }
+
+        if (!runner->device
+                || (!device.lowPower && runner->device.lowPower)
+                || (!device.removable && runner->device.removable))
+            runner->device = device;
     }
-    device = [devices objectAtIndex:0];
-    runner->device = [device retain];
+    device = [runner->device retain];
     [devices release];
 
-    trace("GPU: %s\n", [[device name] UTF8String]);
-
-    if (!check_argument_buffer_support(device))
+    if (!device)
     {
-        skip("Device does not have usable argument buffer support.\n");
-        [device release];
+        skip("Failed to find a suitable Metal device.\n");
         return false;
     }
+
+    trace("GPU: %s\n", [[device name] UTF8String]);
 
     if (!(runner->queue = [device newCommandQueue]))
     {
