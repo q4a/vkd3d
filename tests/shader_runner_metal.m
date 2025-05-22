@@ -686,6 +686,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
                     break;
             }
         }
+        pipeline_desc.rasterSampleCount = runner->r.sample_count;
         viewport.width = fb_width;
         viewport.height = fb_height;
 
