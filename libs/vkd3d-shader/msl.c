@@ -382,6 +382,11 @@ static enum msl_data_type msl_print_register_name(struct vkd3d_string_buffer *bu
                 return MSL_DATA_UNION;
             }
 
+        case VKD3DSPR_IDXTEMP:
+            vkd3d_string_buffer_printf(buffer, "x%u", reg->idx[0].offset);
+            msl_print_subscript(buffer, gen, reg->idx[1].rel_addr, reg->idx[1].offset);
+            return MSL_DATA_UNION;
+
         default:
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                     "Internal compiler error: Unhandled register type %#x.", reg->type);
@@ -901,6 +906,14 @@ static void msl_ret(struct msl_generator *gen, const struct vkd3d_shader_instruc
     vkd3d_string_buffer_printf(gen->buffer, "return;\n");
 }
 
+static void msl_dcl_indexable_temp(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "vkd3d_vec4 x%u[%u];\n",
+            ins->declaration.indexable_temp.register_idx,
+            ins->declaration.indexable_temp.register_size);
+}
+
 static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     gen->location = ins->location;
@@ -912,6 +925,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_AND:
             msl_binop(gen, ins, "&");
+            break;
+        case VKD3DSIH_DCL_INDEXABLE_TEMP:
+            msl_dcl_indexable_temp(gen, ins);
             break;
         case VKD3DSIH_NOP:
             break;

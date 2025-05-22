@@ -101,7 +101,7 @@ float4 main(struct ps_data ps_input) : SV_Target
 [test]
 uniform 0 uint4 1 2 0 1
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(msl) draw triangle strip 4
+draw triangle strip 4
 probe (0, 0) rgba(0.0, 1.0, 0.0, 1.0)
 
 [require]
