@@ -1388,7 +1388,7 @@ static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader
     msl_generate_output_struct_declarations(gen);
 
     vkd3d_string_buffer_printf(gen->buffer,
-            "void %s_main(thread vkd3d_vec4 *v, "
+            "static void %s_main(thread vkd3d_vec4 *v, "
             "thread vkd3d_vec4 *o",
             gen->prefix);
     if (gen->write_depth)
