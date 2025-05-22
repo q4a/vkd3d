@@ -1074,9 +1074,19 @@ static void msl_generate_input_struct_declarations(struct msl_generator *gen)
                 vkd3d_string_buffer_printf(buffer, "bool is_front_face [[front_facing]];\n");
                 continue;
 
+            case VKD3D_SHADER_SV_SAMPLE_INDEX:
+                if (type != VKD3D_SHADER_TYPE_PIXEL)
+                    msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                            "Internal compiler error: Unhandled SV_SAMPLE_INDEX in shader type #%x.", type);
+                msl_print_indent(gen->buffer, 1);
+                vkd3d_string_buffer_printf(buffer, "uint sample_index [[sample_id]];\n");
+                continue;
+
             default:
                 msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                         "Internal compiler error: Unhandled system value %#x.", e->sysval_semantic);
+                msl_print_indent(gen->buffer, 1);
+                vkd3d_string_buffer_printf(buffer, "<unhandled sysval %#x>;\n", e->sysval_semantic);
                 continue;
         }
 
@@ -1308,6 +1318,12 @@ static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
                 msl_print_register_datatype(buffer, gen, VKD3D_DATA_UINT);
                 msl_print_write_mask(buffer, e->mask);
                 vkd3d_string_buffer_printf(buffer, " = uint4(input.is_front_face ? 0xffffffffu : 0u, 0, 0, 0)");
+                break;
+
+            case VKD3D_SHADER_SV_SAMPLE_INDEX:
+                msl_print_register_datatype(buffer, gen, VKD3D_DATA_UINT);
+                msl_print_write_mask(buffer, e->mask);
+                vkd3d_string_buffer_printf(buffer, " = uint4(input.sample_index, 0u, 0u, 0u)");
                 break;
 
             default:
