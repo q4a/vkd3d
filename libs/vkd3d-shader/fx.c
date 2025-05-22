@@ -369,18 +369,23 @@ static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context
     name = get_fx_4_type_name(element_type);
     modifiers = element_type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK;
 
-    LIST_FOR_EACH_ENTRY(type_entry, &fx->types, struct type_entry, entry)
+    /* We don't try to reuse nameless types; they will get the same
+     * "<unnamed>" name, but are not available for the type cache. */
+    if (name)
     {
-        if (strcmp(type_entry->name, name))
-            continue;
+        LIST_FOR_EACH_ENTRY(type_entry, &fx->types, struct type_entry, entry)
+        {
+            if (strcmp(type_entry->name, name))
+                continue;
 
-        if (type_entry->elements_count != elements_count)
-            continue;
+            if (type_entry->elements_count != elements_count)
+                continue;
 
-        if (type_entry->modifiers != modifiers)
-            continue;
+            if (type_entry->modifiers != modifiers)
+                continue;
 
-        return type_entry->offset;
+            return type_entry->offset;
+        }
     }
 
     if (!(type_entry = hlsl_alloc(fx->ctx, sizeof(*type_entry))))
@@ -391,7 +396,8 @@ static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context
     type_entry->elements_count = elements_count;
     type_entry->modifiers = modifiers;
 
-    list_add_tail(&fx->types, &type_entry->entry);
+    if (name)
+        list_add_tail(&fx->types, &type_entry->entry);
 
     return type_entry->offset;
 }
@@ -1238,7 +1244,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
     name = get_fx_4_type_name(element_type);
 
-    name_offset = write_string(name, fx);
+    name_offset = write_string(name ? name : "<unnamed>", fx);
     if (element_type->class == HLSL_CLASS_STRUCT)
     {
         if (!(field_offsets = hlsl_calloc(ctx, element_type->e.record.field_count, sizeof(*field_offsets))))

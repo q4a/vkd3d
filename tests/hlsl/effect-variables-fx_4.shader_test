@@ -56,6 +56,19 @@ BlendState bs
     BlendOpAlpha = add;
 };
 
+[effect]
+cbuffer cb1
+{
+    float a1;
+};
+cbuffer cb2
+{
+    struct
+    {
+        float a2;
+    } s1;
+};
+
 [effect fail]
 BlendState bs
 {
