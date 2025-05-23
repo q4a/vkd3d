@@ -957,6 +957,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_ENDIF:
             msl_end_block(gen);
             break;
+        case VKD3DSIH_EQO:
         case VKD3DSIH_IEQ:
             msl_relop(gen, ins, "==");
             break;
