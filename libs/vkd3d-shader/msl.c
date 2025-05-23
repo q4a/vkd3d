@@ -737,19 +737,36 @@ static void msl_begin_block(struct msl_generator *gen)
     ++gen->indent;
 }
 
-static void msl_if(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+static void msl_print_condition(struct vkd3d_string_buffer *buffer, struct msl_generator *gen,
+        enum vkd3d_shader_conditional_op op, const struct vkd3d_shader_src_param *arg)
 {
     const char *condition;
     struct msl_src src;
 
-    msl_src_init(&src, gen, &ins->src[0], VKD3DSP_WRITEMASK_0);
+    msl_src_init(&src, gen, arg, VKD3DSP_WRITEMASK_0);
 
-    msl_print_indent(gen->buffer, gen->indent);
-    condition = ins->flags == VKD3D_SHADER_CONDITIONAL_OP_NZ ? "bool" : "!bool";
-    vkd3d_string_buffer_printf(gen->buffer, "if (%s(%s))\n", condition, src.str->buffer);
+    condition = op == VKD3D_SHADER_CONDITIONAL_OP_NZ ? "bool" : "!bool";
+    vkd3d_string_buffer_printf(buffer, "if (%s(%s))\n", condition, src.str->buffer);
 
     msl_src_cleanup(&src, &gen->string_buffers);
+}
 
+static void msl_discard(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    /* Note that discard_fragment() in Metal 2.2 and earlier behaves like
+     * SPIR-V OpKill, while in Metal 2.3 and later it behaves like
+     * OpDemoteToHelperInvocationEXT. We assume we have at least Metal 3
+     * here. */
+    msl_print_indent(gen->buffer, gen->indent);
+    msl_print_condition(gen->buffer, gen, ins->flags, &ins->src[0]);
+    msl_print_indent(gen->buffer, gen->indent + 1);
+    vkd3d_string_buffer_printf(gen->buffer, "discard_fragment();\n");
+}
+
+static void msl_if(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    msl_print_condition(gen->buffer, gen, ins->flags, &ins->src[0]);
     msl_begin_block(gen);
 }
 
@@ -1023,6 +1040,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_DEFAULT:
             msl_default(gen);
+            break;
+        case VKD3DSIH_DISCARD:
+            msl_discard(gen, ins);
             break;
         case VKD3DSIH_DIV:
             msl_binop(gen, ins, "/");
