@@ -1096,6 +1096,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_ILT:
         case VKD3DSIH_LTO:
+        case VKD3DSIH_ULT:
             msl_relop(gen, ins, "<");
             break;
         case VKD3DSIH_MAD:
