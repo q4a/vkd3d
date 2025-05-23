@@ -1688,8 +1688,8 @@ static uint32_t write_fx_2_default_value(struct hlsl_type *value_type, struct hl
 
                 for (j = 0; j < type->e.record.field_count; ++j)
                 {
-                    write_fx_2_default_value(fields[i].type, value, fx);
-                    value += hlsl_type_component_count(fields[i].type);
+                    write_fx_2_default_value(fields[j].type, value, fx);
+                    value += hlsl_type_component_count(fields[j].type);
                 }
                 break;
             }
@@ -2033,8 +2033,8 @@ static uint32_t write_fx_4_default_value(struct hlsl_type *value_type, struct hl
 
                 for (j = 0; j < type->e.record.field_count; ++j)
                 {
-                    write_fx_4_default_value(fields[i].type, value, fx);
-                    value += hlsl_type_component_count(fields[i].type);
+                    write_fx_4_default_value(fields[j].type, value, fx);
+                    value += hlsl_type_component_count(fields[j].type);
                 }
                 break;
             }
