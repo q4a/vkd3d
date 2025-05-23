@@ -3919,7 +3919,7 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     if (load->texel_offset.node)
     {
         hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
-                "Texel offsets are not supported on profiles lower than 4.0.\n");
+                "Texel offsets are not supported on profiles lower than 4.0.");
         return false;
     }
 

@@ -6343,7 +6343,7 @@ static enum vkd3d_shader_opcode sm6_dx_map_wave_bit_op(enum dxil_wave_bit_op_kin
         default:
             FIXME("Unhandled wave bit op %u.\n", op);
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_UNHANDLED_INTRINSIC,
-                    "Wave bit operation %u is unhandled.\n", op);
+                    "Wave bit operation %u is unhandled.", op);
             return VKD3DSIH_INVALID;
     }
 }
@@ -6389,7 +6389,7 @@ static enum vkd3d_shader_opcode sm6_dx_map_wave_op(enum dxil_wave_op_kind op, bo
         default:
             FIXME("Unhandled wave op %u.\n", op);
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_UNHANDLED_INTRINSIC,
-                    "Wave operation %u is unhandled.\n", op);
+                    "Wave operation %u is unhandled.", op);
             return VKD3DSIH_INVALID;
     }
 }
@@ -6892,7 +6892,7 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
         default:
             FIXME("Unhandled cast op %"PRIu64".\n", code);
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                    "Cast operation %"PRIu64" is unhandled.\n", code);
+                    "Cast operation %"PRIu64" is unhandled.", code);
             return VKD3DSIH_INVALID;
     }
 
@@ -6900,7 +6900,7 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
     {
         FIXME("Invalid types %u and/or %u for op %"PRIu64".\n", from->class, to->class, code);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                "Cast operation %"PRIu64" from type class %u, width %u to type class %u, width %u is invalid.\n",
+                "Cast operation %"PRIu64" from type class %u, width %u to type class %u, width %u is invalid.",
                 code, from->class, from->u.width, to->class, to->u.width);
         return VKD3DSIH_INVALID;
     }
