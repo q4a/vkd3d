@@ -975,6 +975,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             msl_cast(gen, ins, "uint");
             break;
         case VKD3DSIH_GEO:
+        case VKD3DSIH_IGE:
             msl_relop(gen, ins, ">=");
             break;
         case VKD3DSIH_IF:
