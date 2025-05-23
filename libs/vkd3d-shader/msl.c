@@ -761,6 +761,19 @@ static void msl_else(struct msl_generator *gen)
     msl_begin_block(gen);
 }
 
+static void msl_loop(struct msl_generator *gen)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "for (;;)\n");
+    msl_begin_block(gen);
+}
+
+static void msl_break(struct msl_generator *gen)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "break;\n");
+}
+
 static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const struct msl_resource_type_info *resource_type_info;
@@ -966,6 +979,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_AND:
             msl_binop(gen, ins, "&");
             break;
+        case VKD3DSIH_BREAK:
+            msl_break(gen);
+            break;
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             msl_dcl_indexable_temp(gen, ins);
             break;
@@ -987,6 +1003,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             msl_else(gen);
             break;
         case VKD3DSIH_ENDIF:
+        case VKD3DSIH_ENDLOOP:
             msl_end_block(gen);
             break;
         case VKD3DSIH_EQO:
@@ -1048,6 +1065,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_LOG:
             msl_intrinsic(gen, ins, "log2");
+            break;
+        case VKD3DSIH_LOOP:
+            msl_loop(gen);
             break;
         case VKD3DSIH_MOV:
             msl_mov(gen, ins);
