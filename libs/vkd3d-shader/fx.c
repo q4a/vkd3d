@@ -3234,7 +3234,7 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
             continue;
 
         write_fx_4_numeric_variable(var, shared, fx);
-        size += get_fx_4_type_size(var->data_type);
+        size = max(size, get_fx_4_type_size(var->data_type) + var->buffer_offset * 4);
         ++count;
     }
 
