@@ -774,6 +774,37 @@ static void msl_break(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "break;\n");
 }
 
+static void msl_switch(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    struct msl_src src;
+
+    msl_src_init(&src, gen, &ins->src[0], VKD3DSP_WRITEMASK_0);
+
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "switch (%s)\n", src.str->buffer);
+    msl_begin_block(gen);
+
+    msl_src_cleanup(&src, &gen->string_buffers);
+}
+
+static void msl_case(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    struct msl_src src;
+
+    msl_src_init(&src, gen, &ins->src[0], VKD3DSP_WRITEMASK_0);
+
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "case %s:\n", src.str->buffer);
+
+    msl_src_cleanup(&src, &gen->string_buffers);
+}
+
+static void msl_default(struct msl_generator *gen)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "default:\n");
+}
+
 static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const struct msl_resource_type_info *resource_type_info;
@@ -982,10 +1013,16 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_BREAK:
             msl_break(gen);
             break;
+        case VKD3DSIH_CASE:
+            msl_case(gen, ins);
+            break;
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             msl_dcl_indexable_temp(gen, ins);
             break;
         case VKD3DSIH_NOP:
+            break;
+        case VKD3DSIH_DEFAULT:
+            msl_default(gen);
             break;
         case VKD3DSIH_DIV:
             msl_binop(gen, ins, "/");
@@ -1004,6 +1041,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_ENDIF:
         case VKD3DSIH_ENDLOOP:
+        case VKD3DSIH_ENDSWITCH:
             msl_end_block(gen);
             break;
         case VKD3DSIH_EQO:
@@ -1104,6 +1142,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_SQRT:
             msl_intrinsic(gen, ins, "sqrt");
+            break;
+        case VKD3DSIH_SWITCH:
+            msl_switch(gen, ins);
             break;
         default:
             msl_unhandled(gen, ins);
