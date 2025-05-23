@@ -88,7 +88,7 @@ if(sm<4)  uniform 0 float4 10 20 30 40
 if(sm<4)  uniform 4 float4 50 60 70 80
 if(sm>=4) uniform 0 int4 10 20 30 40
 if(sm>=4) uniform 4 int4 50 60 70 80
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgba (100, 120, 140, 160)
 
 

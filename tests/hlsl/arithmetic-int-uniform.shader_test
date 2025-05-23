@@ -314,7 +314,7 @@ uniform 0 uint 7
 uniform 4 uint 0xfffffff7
 uniform 8 uint 0xfffffff9
 uniform 12 uint 9
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgbai(-21, -45, 21, 45)
 
 [pixel shader fail todo]
