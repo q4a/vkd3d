@@ -1170,6 +1170,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_SWITCH:
             msl_switch(gen, ins);
             break;
+        case VKD3DSIH_XOR:
+            msl_binop(gen, ins, "^");
+            break;
         default:
             msl_unhandled(gen, ins);
             break;

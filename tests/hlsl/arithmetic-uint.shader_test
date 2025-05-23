@@ -106,7 +106,7 @@ uint4 main() : SV_TARGET
 
 [test]
 uniform 0 uint4 0xccaa5533 7 1 2
-todo(msl) draw quad
+draw quad
 probe (0, 0) u32(0xff77, 0xf, 0x407f, 0x9)
 
 % Minimum precision vectors in constant buffers have inconsistent behavior with
