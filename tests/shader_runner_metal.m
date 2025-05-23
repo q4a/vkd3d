@@ -24,7 +24,12 @@
 #define BOOL VKD3D_BOOLEAN
 #include "shader_runner.h"
 #include "vkd3d_d3dcommon.h"
+#undef interface
 #undef BOOL
+
+@interface MTLRenderPipelineDescriptor ()
+@property (nonatomic, readwrite) NSUInteger sampleMask;
+@end
 
 static const MTLResourceOptions DEFAULT_BUFFER_RESOURCE_OPTIONS = MTLResourceCPUCacheModeDefaultCache
         | MTLResourceHazardTrackingModeDefault;
@@ -687,6 +692,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
             }
         }
         pipeline_desc.rasterSampleCount = runner->r.sample_count;
+        pipeline_desc.sampleMask = runner->r.sample_mask;
         viewport.width = fb_width;
         viewport.height = fb_height;
 
