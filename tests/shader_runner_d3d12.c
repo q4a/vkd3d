@@ -383,7 +383,7 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
 
     cs.pShaderBytecode = ID3D10Blob_GetBufferPointer(cs_code);
     cs.BytecodeLength = ID3D10Blob_GetBufferSize(cs_code);
-    todo_if(runner->r.is_todo)
+    todo_if(runner->r.is_todo) bug_if(runner->r.is_bug)
     pso = create_compute_pipeline_state(device, root_signature, cs);
     ID3D10Blob_Release(cs_code);
 

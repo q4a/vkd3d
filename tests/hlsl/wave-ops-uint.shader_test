@@ -367,7 +367,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0x1300000002, 21)
 probe uav 1 (1) rgui64(0x1300000002, 21)
 probe uav 1 (2) rgui64(0x1300000002, 21)
@@ -389,7 +389,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0x2a00000008, 31)
 probe uav 1 (1) rgui64(0x2a00000008, 31)
 probe uav 1 (2) rgui64(0x2a00000008, 31)
@@ -407,7 +407,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0xe400000008, 0x780)
 probe uav 1 (1) rgui64(0xe400000008, 0x780)
 probe uav 1 (2) rgui64(0xe400000008, 0x780)
@@ -425,7 +425,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0x800000001, 4)
 probe uav 1 (1) rgui64(0x800000001, 4)
 probe uav 1 (2) rgui64(0x800000001, 4)
@@ -443,7 +443,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0xf00000002, 16)
 probe uav 1 (1) rgui64(0xf00000002, 16)
 probe uav 1 (2) rgui64(0xf00000002, 16)
@@ -461,7 +461,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0, 0)
 probe uav 1 (1) rgui64( 0x800000001, 16)
 probe uav 1 (2) rgui64(0x1300000002, 21)
@@ -479,7 +479,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(1, 1)
 probe uav 1 (1) rgui64( 0x800000001,  16)
 probe uav 1 (2) rgui64(0x1300000001,  80)
@@ -497,7 +497,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0x800000000, 0)
 probe uav 1 (1) rgui64(0x800000000, 0)
 probe uav 1 (2) rgui64(0x800000000, 0)
@@ -515,7 +515,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0xf00000007, 0x17)
 probe uav 1 (1) rgui64(0xf00000007, 0x17)
 probe uav 1 (2) rgui64(0xf00000007, 0x17)
@@ -533,7 +533,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0x400000006, 0x17)
 probe uav 1 (1) rgui64(0x400000006, 0x17)
 probe uav 1 (2) rgui64(0x400000006, 0x17)
@@ -562,7 +562,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0x600000005,  0x800000007)
 probe uav 1 (1) rgui64(0x200000001,  0x400000003)
 probe uav 1 (2) rgui64(0xe0000000d, 0x100000000f)
@@ -582,7 +582,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0xa00000009,  0xc0000000b)
 probe uav 1 (1) rgui64(0xe0000000d, 0x100000000f)
 probe uav 1 (2) rgui64(0x200000001,  0x400000003)
@@ -602,7 +602,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0xe0000000d, 0x100000000f)
 probe uav 1 (1) rgui64(0xa00000009,  0xc0000000b)
 probe uav 1 (2) rgui64(0x600000005,  0x800000007)
@@ -622,7 +622,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-dispatch 4 1 1
+bug(mvk) dispatch 4 1 1
 probe uav 1 (0) rgui64(0xa00000009,  0xc0000000b)
 probe uav 1 (1) rgui64(0xa00000009,  0xc0000000b)
 probe uav 1 (2) rgui64(0xa00000009,  0xc0000000b)
