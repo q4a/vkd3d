@@ -271,7 +271,7 @@ uniform 0 uint 0
 uniform 4 uint 0
 uniform 8 uint 0xffd
 uniform 12 uint 1
-todo(msl) draw quad
+draw quad
 probe (0, 0) rgbai(1, -0xfff, 0xffe, -0xffe)
 
 [pixel shader]
@@ -290,14 +290,14 @@ uniform 4 uint 0xffe
 % i is allocated differently between SM4-5 and SM6
 uniform 5 uint 2
 uniform 8 uint 2
-todo(msl) draw quad
+draw quad
 % In D3D12 with SM5 all reads to the array return 0
 if(sm>=6 | !d3d12) probe (0, 0) rgbaui(0xfffff803, 0x1ffd, 0, 0)
 uniform 0 uint 0
 uniform 4 uint 0
 uniform 5 uint 0
 uniform 8 uint 0
-todo(msl) draw quad
+draw quad
 if(sm>=6 | !d3d12) probe (0, 0) rgbaui(1, 2, 0, 0)
 
 [pixel shader]

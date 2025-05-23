@@ -92,10 +92,16 @@ static MTLVertexFormat get_metal_attribute_format(DXGI_FORMAT format)
     {
         case DXGI_FORMAT_R32G32B32A32_FLOAT:
             return MTLVertexFormatFloat4;
+        case DXGI_FORMAT_R32G32B32A32_UINT:
+            return MTLVertexFormatUInt4;
         case DXGI_FORMAT_R32G32_FLOAT:
             return MTLVertexFormatFloat2;
         case DXGI_FORMAT_R32G32_SINT:
             return MTLVertexFormatInt2;
+        case DXGI_FORMAT_R32_FLOAT:
+            return MTLVertexFormatFloat;
+        case DXGI_FORMAT_R32_UINT:
+            return MTLVertexFormatUInt;
         default:
             return MTLVertexFormatInvalid;
     }

@@ -40,11 +40,11 @@ float4 main(float4 pos : SV_Position, uint sample_idx : SV_SampleIndex) : SV_Tar
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(msl) draw triangle list 3
-todo probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
-todo probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
-todo probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)
-todo probe (639, 479) rgba(0.0, 0.0, 0.0, 0.0)
+draw triangle list 3
+todo(vulkan | opengl | d3d12) probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
+todo(vulkan | opengl | d3d12) probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
+todo(vulkan | opengl | d3d12) probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)
+todo(vulkan | opengl | d3d12) probe (639, 479) rgba(0.0, 0.0, 0.0, 0.0)
 
 % Centroid interpolation, which means the pixel center if all samples are
 % covered and the first covered sample if a least a sample is not covered (in
@@ -72,11 +72,11 @@ float4 main(centroid float4 pos : SV_Position, uint sample_idx : SV_SampleIndex)
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(glsl | msl) draw triangle list 3
+todo(glsl) draw triangle list 3
 todo probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
-todo probe (638,   0) rgba(0.0, 0.0, 0.0, 0.0)
+todo(vulkan | opengl | d3d12) probe (638,   0) rgba(0.0, 0.0, 0.0, 0.0)
 todo probe (  0, 478) rgba(0.25, 0.25, 0.25, 0.25)
-todo probe (639, 479) rgba(0.0, 0.0, 0.0, 0.0)
+todo(vulkan | opengl | d3d12) probe (639, 479) rgba(0.0, 0.0, 0.0, 0.0)
 
 % Sample interpolation.
 
@@ -117,7 +117,7 @@ float4 main(float4 pos : SV_Position, float2 attr : ATTR, uint sample_idx : SV_S
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(msl) draw triangle list 3
+draw triangle list 3
 probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
 probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)

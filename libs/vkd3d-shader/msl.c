@@ -929,6 +929,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
     switch (ins->opcode)
     {
         case VKD3DSIH_ADD:
+        case VKD3DSIH_IADD:
             msl_binop(gen, ins, "+");
             break;
         case VKD3DSIH_AND:

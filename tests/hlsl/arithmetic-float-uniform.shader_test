@@ -300,13 +300,13 @@ if(sm>=6) uniform 4 uint 0x4200
 % i is allocated differently between SM4-5 and SM6
 uniform 5 uint 2
 uniform 8 uint 2
-todo(msl | sm>=6) draw quad
+todo(sm>=6) draw quad
 probe (0, 0) rgba(10.25, 3.5, 0.0, 0.0)
 uniform 0 uint 0
 uniform 4 uint 0
 uniform 5 uint 0
 uniform 8 uint 0
-todo(msl | sm>=6) draw quad
+todo(sm>=6) draw quad
 probe (0, 0) rgba(1.0, 2.0, 0, 0)
 
 [pixel shader]
