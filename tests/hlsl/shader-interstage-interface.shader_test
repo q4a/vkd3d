@@ -253,6 +253,10 @@ float4 main(float4 position : SV_Position, half2 t0 : TEXCOORD0, uint16_t2 t1 : 
     return float4(t0 - half2(h, h), t1);
 }
 
+[rtv 0]
+format r32g32b32a32-float
+size (2d, 640, 480)
+
 [test]
 uniform 0 uint 0
 draw triangle strip 4
@@ -293,6 +297,10 @@ int4 main(float4 position : SV_Position, int16_t2 t0 : TEXCOORD0) : SV_Target
     return int4(t0, 0, 0);
 }
 
+[rtv 0]
+format r32g32b32a32-sint
+size (2d, 640, 480)
+
 [test]
 draw triangle strip 4
 probe (0, 0) rgbai(-7000, -2, 0, 0)
@@ -302,6 +310,10 @@ uint4 main(float4 position : SV_Position, int16_t2 t0 : TEXCOORD0) : SV_Target
 {
     return uint4(t0, 0, 0);
 }
+
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
 
 [test]
 draw triangle strip 4
