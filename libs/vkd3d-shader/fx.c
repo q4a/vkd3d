@@ -1629,6 +1629,15 @@ static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_contex
     set_u32(buffer, pass_count_offset, count);
 }
 
+/* Effects represent bool values as 1/0, as opposed to ~0u/0 as used by
+ * Direct3D shader model 4+. */
+static uint32_t get_fx_default_numeric_value(const struct hlsl_type *type, uint32_t value)
+{
+    if (type->e.numeric.type == HLSL_TYPE_BOOL)
+        return !!value;
+    return value;
+}
+
 static uint32_t write_fx_2_default_value(struct hlsl_type *value_type, struct hlsl_default_value *value,
             struct fx_write_context *fx)
 {
@@ -1662,7 +1671,7 @@ static uint32_t write_fx_2_default_value(struct hlsl_type *value_type, struct hl
 
                         for (j = 0; j < comp_count; ++j)
                         {
-                            put_u32(buffer, value->number.u);
+                            put_u32(buffer, get_fx_default_numeric_value(type, value->number.u));
                             value++;
                         }
                         break;
@@ -2007,7 +2016,7 @@ static uint32_t write_fx_4_default_value(struct hlsl_type *value_type, struct hl
 
                         for (j = 0; j < comp_count; ++j)
                         {
-                            put_u32_unaligned(buffer, value->number.u);
+                            put_u32_unaligned(buffer, get_fx_default_numeric_value(type, value->number.u));
                             value++;
                         }
                         break;
