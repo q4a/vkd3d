@@ -55,7 +55,7 @@ struct msl_generator
 
 struct msl_resource_type_info
 {
-    size_t read_coord_size;
+    size_t coord_size;
     bool array;
     const char *type_suffix;
 };
@@ -84,11 +84,11 @@ static const struct msl_resource_type_info *msl_get_resource_type_info(enum vkd3
         [VKD3D_SHADER_RESOURCE_TEXTURE_2D]        = {2, 0, "2d"},
         [VKD3D_SHADER_RESOURCE_TEXTURE_2DMS]      = {2, 0, "2d_ms"},
         [VKD3D_SHADER_RESOURCE_TEXTURE_3D]        = {3, 0, "3d"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBE]      = {2, 0, "cube"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBE]      = {3, 0, "cube"},
         [VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY]   = {1, 1, "1d_array"},
         [VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY]   = {2, 1, "2d_array"},
         [VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY] = {2, 1, "2d_ms_array"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY] = {2, 1, "cube_array"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY] = {3, 1, "cube_array"},
     };
 
     if (!t || t >= ARRAY_SIZE(info))
@@ -228,6 +228,35 @@ static const struct vkd3d_shader_descriptor_binding *msl_get_cbv_binding(const s
     return NULL;
 }
 
+static const struct vkd3d_shader_descriptor_binding *msl_get_sampler_binding(const struct msl_generator *gen,
+        unsigned int register_space, unsigned int register_idx)
+{
+    const struct vkd3d_shader_interface_info *interface_info = gen->interface_info;
+    const struct vkd3d_shader_resource_binding *binding;
+    unsigned int i;
+
+    if (!interface_info)
+        return NULL;
+
+    for (i = 0; i < interface_info->binding_count; ++i)
+    {
+        binding = &interface_info->bindings[i];
+
+        if (binding->type != VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER)
+            continue;
+        if (binding->register_space != register_space)
+            continue;
+        if (binding->register_index != register_idx)
+            continue;
+        if (!msl_check_shader_visibility(gen, binding->shader_visibility))
+            continue;
+
+        return &binding->binding;
+    }
+
+    return NULL;
+}
+
 static const struct vkd3d_shader_descriptor_binding *msl_get_srv_binding(const struct msl_generator *gen,
         unsigned int register_space, unsigned int register_idx, enum vkd3d_shader_resource_type resource_type)
 {
@@ -267,10 +296,15 @@ static void msl_print_cbv_name(struct vkd3d_string_buffer *buffer, unsigned int 
     vkd3d_string_buffer_printf(buffer, "descriptors[%u].buf<vkd3d_vec4>()", binding);
 }
 
+static void msl_print_sampler_name(struct vkd3d_string_buffer *buffer, unsigned int binding)
+{
+    vkd3d_string_buffer_printf(buffer, "descriptors[%u].as<sampler>()", binding);
+}
+
 static void msl_print_srv_name(struct vkd3d_string_buffer *buffer, struct msl_generator *gen, unsigned int binding,
         const struct msl_resource_type_info *resource_type_info, enum vkd3d_data_type resource_data_type)
 {
-    vkd3d_string_buffer_printf(buffer, "descriptors[%u].tex<texture%s<",
+    vkd3d_string_buffer_printf(buffer, "descriptors[%u].as<texture%s<",
             binding, resource_type_info->type_suffix);
     msl_print_resource_datatype(gen, buffer, resource_data_type);
     vkd3d_string_buffer_printf(buffer, ">>()");
@@ -877,7 +911,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
                 "Internal compiler error: Unhandled resource type %#x.", resource_type);
         resource_type_info = msl_get_resource_type_info(VKD3D_SHADER_RESOURCE_TEXTURE_2D);
     }
-    coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->read_coord_size);
+    coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->coord_size);
 
     if ((binding = msl_get_srv_binding(gen, resource_space, resource_idx, resource_type)))
     {
@@ -917,6 +951,123 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     msl_print_assignment(gen, &dst, "%s", read->buffer);
 
     vkd3d_string_buffer_release(&gen->string_buffers, read);
+    msl_dst_cleanup(&dst, &gen->string_buffers);
+}
+
+static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    const struct msl_resource_type_info *resource_type_info;
+    unsigned int resource_id, resource_idx, resource_space;
+    const struct vkd3d_shader_descriptor_binding *binding;
+    unsigned int sampler_id, sampler_idx, sampler_space;
+    const struct vkd3d_shader_descriptor_info1 *d;
+    enum vkd3d_shader_resource_type resource_type;
+    unsigned int srv_binding, sampler_binding;
+    struct vkd3d_string_buffer *sample;
+    enum vkd3d_data_type data_type;
+    uint32_t coord_mask;
+    struct msl_dst dst;
+
+    if (vkd3d_shader_instruction_has_texel_offset(ins))
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                "Internal compiler error: Unhandled texel sample offset.");
+
+    if (ins->src[1].reg.idx[0].rel_addr || ins->src[1].reg.idx[1].rel_addr
+            || ins->src[2].reg.idx[0].rel_addr || ins->src[2].reg.idx[1].rel_addr)
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
+                "Descriptor indexing is not supported.");
+
+    resource_id = ins->src[1].reg.idx[0].offset;
+    resource_idx = ins->src[1].reg.idx[1].offset;
+    if ((d = vkd3d_shader_find_descriptor(&gen->program->descriptors,
+            VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, resource_id)))
+    {
+        resource_space = d->register_space;
+        resource_type = d->resource_type;
+        data_type = d->resource_data_type;
+    }
+    else
+    {
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                "Internal compiler error: Undeclared resource descriptor %u.", resource_id);
+        resource_space = 0;
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+        data_type = VKD3D_DATA_FLOAT;
+    }
+
+    if (resource_type == VKD3D_SHADER_RESOURCE_BUFFER
+            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
+            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
+                "Sampling resource type %#x is not supported.", resource_type);
+
+    if (!(resource_type_info = msl_get_resource_type_info(resource_type)))
+    {
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                "Internal compiler error: Unhandled resource type %#x.", resource_type);
+        resource_type_info = msl_get_resource_type_info(VKD3D_SHADER_RESOURCE_TEXTURE_2D);
+    }
+    coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->coord_size);
+
+    if ((binding = msl_get_srv_binding(gen, resource_space, resource_idx, resource_type)))
+    {
+        srv_binding = binding->binding;
+    }
+    else
+    {
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_BINDING_NOT_FOUND,
+                "No descriptor binding specified for SRV %u (index %u, space %u).",
+                resource_id, resource_idx, resource_space);
+        srv_binding = 0;
+    }
+
+    sampler_id = ins->src[2].reg.idx[0].offset;
+    sampler_idx = ins->src[2].reg.idx[1].offset;
+    if ((d = vkd3d_shader_find_descriptor(&gen->program->descriptors,
+            VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, sampler_id)))
+    {
+        sampler_space = d->register_space;
+    }
+    else
+    {
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                "Internal compiler error: Undeclared sampler descriptor %u.", sampler_id);
+        sampler_space = 0;
+    }
+
+    if ((binding = msl_get_sampler_binding(gen, sampler_space, sampler_idx)))
+    {
+        sampler_binding = binding->binding;
+    }
+    else
+    {
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_BINDING_NOT_FOUND,
+                "No descriptor binding specified for sampler %u (index %u, space %u).",
+                sampler_id, sampler_idx, sampler_space);
+        sampler_binding = 0;
+    }
+
+    msl_dst_init(&dst, gen, ins, &ins->dst[0]);
+    sample = vkd3d_string_buffer_get(&gen->string_buffers);
+
+    vkd3d_string_buffer_printf(sample, "as_type<uint4>(");
+    msl_print_srv_name(sample, gen, srv_binding, resource_type_info, data_type);
+    vkd3d_string_buffer_printf(sample, ".sample(");
+    msl_print_sampler_name(sample, sampler_binding);
+    vkd3d_string_buffer_printf(sample, ", ");
+    msl_print_src_with_type(sample, gen, &ins->src[0], coord_mask, ins->src[0].reg.data_type);
+    if (resource_type_info->array)
+    {
+        vkd3d_string_buffer_printf(sample, ", uint(");
+        msl_print_src_with_type(sample, gen, &ins->src[0], coord_mask + 1, ins->src[0].reg.data_type);
+        vkd3d_string_buffer_printf(sample, ")");
+    }
+    vkd3d_string_buffer_printf(sample, "))");
+    msl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
+
+    msl_print_assignment(gen, &dst, "%s", sample->buffer);
+
+    vkd3d_string_buffer_release(&gen->string_buffers, sample);
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
@@ -1085,6 +1236,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_FTOU:
             msl_cast(gen, ins, "uint");
+            break;
+        case VKD3DSIH_SAMPLE:
+            msl_sample(gen, ins);
             break;
         case VKD3DSIH_GEO:
         case VKD3DSIH_IGE:
@@ -1631,7 +1785,7 @@ static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader
                 "    const device void *ptr;\n"
                 "\n"
                 "    template<typename T>\n"
-                "    constant T &tex() constant\n"
+                "    constant T &as() constant\n"
                 "    {\n"
                 "        return reinterpret_cast<constant T &>(this->ptr);\n"
                 "    }\n"

@@ -121,6 +121,26 @@ static MTLPrimitiveType get_metal_primitive_type(D3D_PRIMITIVE_TOPOLOGY topology
     }
 }
 
+static MTLSamplerAddressMode get_metal_address_mode(D3D12_TEXTURE_ADDRESS_MODE mode)
+{
+    switch (mode)
+    {
+        case D3D12_TEXTURE_ADDRESS_MODE_WRAP:
+            return MTLSamplerAddressModeRepeat;
+        case D3D12_TEXTURE_ADDRESS_MODE_MIRROR:
+            return MTLSamplerAddressModeMirrorRepeat;
+        case D3D12_TEXTURE_ADDRESS_MODE_CLAMP:
+            return MTLSamplerAddressModeClampToEdge;
+        case D3D12_TEXTURE_ADDRESS_MODE_BORDER:
+            return MTLSamplerAddressModeClampToBorderColor;
+        case D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE:
+            return MTLSamplerAddressModeMirrorClampToEdge;
+
+        default:
+            fatal_error("Unhandled address mode %#x.\n", mode);
+    }
+}
+
 static MTLCompareFunction get_metal_compare_function(D3D12_COMPARISON_FUNC func)
 {
     switch (func)
@@ -410,6 +430,20 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
         }
     }
 
+    for (i = 0; i < runner->r.sampler_count; ++i)
+    {
+        binding = &bindings[interface_info.binding_count];
+        binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER;
+        binding->register_space = 0;
+        binding->register_index = runner->r.samplers[i].slot;
+        binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
+        binding->flags = 0;
+        binding->binding.set = 0;
+        binding->binding.binding = interface_info.binding_count;
+        binding->binding.count = 1;
+        ++interface_info.binding_count;
+    }
+
     interface_info.bindings = bindings;
     interface_info.next = &runner->signatures[type];
     runner->signatures[type].type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
@@ -446,7 +480,7 @@ static id<MTLFunction> compile_stage(struct metal_runner *runner, enum shader_ty
 }
 
 static bool encode_argument_buffer(struct metal_runner *runner,
-        id<MTLRenderCommandEncoder> command_encoder)
+        id<MTLRenderCommandEncoder> command_encoder, id<MTLSamplerState> *samplers)
 {
     NSMutableArray<MTLArgumentDescriptor *> *argument_descriptors;
     id<MTLDevice> device = runner->device;
@@ -487,6 +521,15 @@ static bool encode_argument_buffer(struct metal_runner *runner,
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
+    }
+
+    for (i = 0; i < runner->r.sampler_count; ++i)
+    {
+        arg_desc = [MTLArgumentDescriptor argumentDescriptor];
+        arg_desc.dataType = MTLDataTypeSampler;
+        arg_desc.index = [argument_descriptors count];
+        arg_desc.access = MTLBindingAccessReadOnly;
+        [argument_descriptors addObject:arg_desc];
     }
 
     if (![argument_descriptors count])
@@ -534,6 +577,11 @@ static bool encode_argument_buffer(struct metal_runner *runner,
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
+    }
+
+    for (i = 0; i < runner->r.sampler_count; ++i)
+    {
+        [encoder setSamplerState:samplers[i] atIndex:index++];
     }
 
     [argument_buffer didModifyRange:NSMakeRange(0, encoder.encodedLength)];
@@ -597,6 +645,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
     unsigned int fb_width, fb_height, vb_idx, i, j;
     struct metal_runner *runner = metal_runner(r);
     MTLRenderPipelineDescriptor *pipeline_desc;
+    id<MTLSamplerState> samplers[MAX_SAMPLERS];
     MTLVertexBufferLayoutDescriptor *binding;
     id<MTLDepthStencilState> ds_state = nil;
     id<MTLDevice> device = runner->device;
@@ -605,9 +654,11 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
     id<MTLCommandBuffer> command_buffer;
     MTLDepthStencilDescriptor *ds_desc;
     MTLRenderPassDescriptor *pass_desc;
+    MTLSamplerDescriptor *sampler_desc;
     MTLVertexDescriptor *vertex_desc;
     struct metal_resource *resource;
     id<MTLRenderPipelineState> pso;
+    const struct sampler *sampler;
     bool ret = false;
     NSError *err;
 
@@ -633,6 +684,25 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
         {
             trace("Failed to compile fragment function.\n");
             goto done;
+        }
+
+        sampler_desc = [[MTLSamplerDescriptor new] autorelease];
+        for (i = 0; i < runner->r.sampler_count; ++i)
+        {
+            sampler = &runner->r.samplers[i];
+            sampler_desc.sAddressMode = get_metal_address_mode(sampler->u_address);
+            sampler_desc.tAddressMode = get_metal_address_mode(sampler->v_address);
+            sampler_desc.rAddressMode = get_metal_address_mode(sampler->w_address);
+            sampler_desc.magFilter = (sampler->filter & 0x4)
+                    ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+            sampler_desc.minFilter = (sampler->filter & 0x1)
+                    ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+            sampler_desc.mipFilter = (sampler->filter & 0x10)
+                    ? MTLSamplerMipFilterLinear : MTLSamplerMipFilterNearest;
+            sampler_desc.compareFunction = sampler->func
+                    ? get_metal_compare_function(sampler->func) : MTLCompareFunctionNever;
+            sampler_desc.supportArgumentBuffers = true;
+            samplers[i] = [[device newSamplerStateWithDescriptor:sampler_desc] autorelease];
         }
 
         fb_width = ~0u;
@@ -705,7 +775,7 @@ static bool metal_runner_draw(struct shader_runner *r, D3D_PRIMITIVE_TOPOLOGY to
         command_buffer = [runner->queue commandBuffer];
         encoder = [command_buffer renderCommandEncoderWithDescriptor:pass_desc];
 
-        if (!encode_argument_buffer(runner, encoder))
+        if (!encode_argument_buffer(runner, encoder, samplers))
         {
             [encoder endEncoding];
             ret = false;
