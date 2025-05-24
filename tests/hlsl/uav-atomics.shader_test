@@ -149,12 +149,12 @@ void main()
 [test]
 uniform 0 int4 1 -3 0 0
 % SPIR-V compilation currently fails because of the mismatched resource type for u2.
-todo(mvk | vulkan | opengl | msl) dispatch 1 1 1
+todo(vulkan | opengl | msl) dispatch 1 1 1
 probe uav 2 (0) ri (1)
 probe uav 2 (1) ri (-3)
 
 uniform 0 int4 -3 1 0 0
-todo(mvk | vulkan | opengl | msl) dispatch 1 1 1
+todo(vulkan | opengl | msl) dispatch 1 1 1
 probe uav 2 (0) ri (1)
 probe uav 2 (1) ri (-3)
 
