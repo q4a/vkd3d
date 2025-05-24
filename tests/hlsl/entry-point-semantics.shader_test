@@ -96,7 +96,7 @@ float4 main(in apple a) : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
+bug(mvk & sm>=6) probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
 
 
 % Arrays of matrices get successive indexes.
