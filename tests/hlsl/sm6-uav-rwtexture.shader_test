@@ -116,7 +116,7 @@ float4 main() : sv_target1
 }
 
 [test]
-draw quad
+todo(mvk) draw quad
 probe uav 1 (0, 0) rgba (1.1, 1.2, 1.3, 1.4)
 probe uav 2 (0, 0) rgba (2.1, 2.2, 2.3, 2.4)
 
