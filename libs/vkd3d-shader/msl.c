@@ -967,6 +967,9 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     enum vkd3d_data_type data_type;
     uint32_t coord_mask;
     struct msl_dst dst;
+    bool bias;
+
+    bias = ins->opcode == VKD3DSIH_SAMPLE_B;
 
     if (vkd3d_shader_instruction_has_texel_offset(ins))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
@@ -1000,6 +1003,11 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
             || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
                 "Sampling resource type %#x is not supported.", resource_type);
+
+    if ((resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1D || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY)
+            && bias)
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
+                "Resource type %#x does not support mipmapping.", resource_type);
 
     if (!(resource_type_info = msl_get_resource_type_info(resource_type)))
     {
@@ -1060,6 +1068,12 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     {
         vkd3d_string_buffer_printf(sample, ", uint(");
         msl_print_src_with_type(sample, gen, &ins->src[0], coord_mask + 1, ins->src[0].reg.data_type);
+        vkd3d_string_buffer_printf(sample, ")");
+    }
+    if (bias)
+    {
+        vkd3d_string_buffer_printf(sample, ", bias(");
+        msl_print_src_with_type(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
         vkd3d_string_buffer_printf(sample, ")");
     }
     vkd3d_string_buffer_printf(sample, "))");
@@ -1238,6 +1252,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             msl_cast(gen, ins, "uint");
             break;
         case VKD3DSIH_SAMPLE:
+        case VKD3DSIH_SAMPLE_B:
             msl_sample(gen, ins);
             break;
         case VKD3DSIH_GEO:
