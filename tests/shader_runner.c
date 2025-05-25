@@ -147,6 +147,8 @@ static bool match_tag(struct shader_runner *runner, const char *tag)
 static bool check_qualifier_args_conjunction(struct shader_runner *runner,
         const char *line, const char **const rest, uint32_t *model_mask)
 {
+    /* Tags are tested in this order, so tag X must appear before Y if Y is a
+     * prefix of X. */
     static const char *const valid_tags[] =
     {
         "d3d12",
@@ -154,6 +156,7 @@ static bool check_qualifier_args_conjunction(struct shader_runner *runner,
         "llvmpipe",
         "mesa<23.3",
         "msl",
+        "mvk<1.2.11",
         "mvk",
         "opengl",
         "vulkan",

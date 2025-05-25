@@ -1053,6 +1053,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
     if (is_mvk_device(device))
     {
         runner->caps.tags[runner->caps.tag_count++] = "mvk";
+        if (is_mvk_device_lt(device, 1, 2, 11))
+            runner->caps.tags[runner->caps.tag_count++] = "mvk<1.2.11";
     }
     else
     {
