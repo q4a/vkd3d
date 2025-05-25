@@ -966,17 +966,18 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     unsigned int resource_id, resource_idx, resource_space;
     const struct vkd3d_shader_descriptor_binding *binding;
     unsigned int sampler_id, sampler_idx, sampler_space;
+    bool bias, compare, comparison_sampler, lod_zero;
     const struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_resource_type resource_type;
     unsigned int srv_binding, sampler_binding;
-    bool bias, compare, comparison_sampler;
     struct vkd3d_string_buffer *sample;
     enum vkd3d_data_type data_type;
     uint32_t coord_mask;
     struct msl_dst dst;
 
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
-    compare = ins->opcode == VKD3DSIH_SAMPLE_C;
+    compare = ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
 
     if (vkd3d_shader_instruction_has_texel_offset(ins))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
@@ -1012,7 +1013,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
                 "Sampling resource type %#x is not supported.", resource_type);
 
     if ((resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1D || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY)
-            && bias)
+            && (bias || lod_zero))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
                 "Resource type %#x does not support mipmapping.", resource_type);
 
@@ -1102,6 +1103,10 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
                     "Comparison samplers are not supported with resource type %#x.", resource_type);
         vkd3d_string_buffer_printf(sample, ", ");
         msl_print_src_with_type(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
+    }
+    if (lod_zero)
+    {
+        vkd3d_string_buffer_printf(sample, ", level(0.0f)");
     }
     if (bias)
     {
@@ -1290,6 +1295,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_SAMPLE:
         case VKD3DSIH_SAMPLE_B:
         case VKD3DSIH_SAMPLE_C:
+        case VKD3DSIH_SAMPLE_C_LZ:
             msl_sample(gen, ins);
             break;
         case VKD3DSIH_GEO:
