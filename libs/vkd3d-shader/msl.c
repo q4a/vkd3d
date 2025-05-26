@@ -365,10 +365,12 @@ static enum msl_data_type msl_print_register_name(struct vkd3d_string_buffer *bu
                     vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
                     return MSL_DATA_UNION;
                 }
+                /* FIXME: This should use vkd3d_shader_find_descriptor() to
+                 * find the resource index/space from the resource ID. */
                 if (!(binding = msl_get_cbv_binding(gen, 0, reg->idx[1].offset)))
                 {
                     msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_BINDING_NOT_FOUND,
-                            "Cannot finding binding for CBV register %u.", reg->idx[0].offset);
+                            "No descriptor binding specified for CBV %u.", reg->idx[0].offset);
                     vkd3d_string_buffer_printf(buffer, "<unhandled register %#x>", reg->type);
                     return MSL_DATA_UNION;
                 }
@@ -780,7 +782,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     if (!(binding = msl_get_srv_binding(gen, resource_space, resource_idx, resource_type)))
     {
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_BINDING_NOT_FOUND,
-                "Cannot finding binding for SRV register %u index %u space %u.",
+                "No descriptor binding specified for SRV %u (index %u, space %u).",
                 resource_id, resource_idx, resource_space);
         return;
     }
