@@ -57,7 +57,6 @@ struct msl_resource_type_info
 {
     size_t read_coord_size;
     bool array;
-    bool lod;
     const char *type_suffix;
 };
 
@@ -76,17 +75,17 @@ static const struct msl_resource_type_info *msl_get_resource_type_info(enum vkd3
 {
     static const struct msl_resource_type_info info[] =
     {
-        [VKD3D_SHADER_RESOURCE_NONE]              = {0, false, false, "none"},
-        [VKD3D_SHADER_RESOURCE_BUFFER]            = {1, false, false, "_buffer"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_1D]        = {1, false, false, "1d"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_2D]        = {2, false, true,  "2d"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMS]      = {2, false, false, "2d_ms"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_3D]        = {3, false, true,  "3d"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBE]      = {2, false, true,  "cube"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY]   = {1, true,  false, "1d_array"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY]   = {2, true,  true,  "2d_array"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY] = {2, true,  false, "2d_ms_array"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY] = {2, true,  true,  "cube_array"},
+        [VKD3D_SHADER_RESOURCE_NONE]              = {0, 0, "none"},
+        [VKD3D_SHADER_RESOURCE_BUFFER]            = {1, 0, "_buffer"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_1D]        = {1, 0, "1d"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2D]        = {2, 0, "2d"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMS]      = {2, 0, "2d_ms"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_3D]        = {3, 0, "3d"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBE]      = {2, 0, "cube"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY]   = {1, 1, "1d_array"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY]   = {2, 1, "2d_array"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY] = {2, 1, "2d_ms_array"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY] = {2, 1, "cube_array"},
     };
 
     if (!t || t >= ARRAY_SIZE(info))
@@ -798,7 +797,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
         vkd3d_string_buffer_printf(read, ", ");
         msl_print_src_with_type(read, gen, &ins->src[0], coord_mask + 1, VKD3D_DATA_UINT);
     }
-    if (resource_type_info->lod)
+    if (resource_type != VKD3D_SHADER_RESOURCE_BUFFER)
     {
         vkd3d_string_buffer_printf(read, ", ");
         msl_print_src_with_type(read, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, VKD3D_DATA_UINT);
