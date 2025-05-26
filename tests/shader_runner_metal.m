@@ -781,7 +781,28 @@ done:
 
 static bool metal_runner_copy(struct shader_runner *r, struct resource *src, struct resource *dst)
 {
-    return false;
+    struct metal_resource *s = metal_resource(src);
+    struct metal_resource *d = metal_resource(dst);
+    struct metal_runner *runner = metal_runner(r);
+    id<MTLCommandBuffer> command_buffer;
+    id<MTLBlitCommandEncoder> blit;
+
+    if (src->desc.dimension == RESOURCE_DIMENSION_BUFFER)
+        return false;
+
+    @autoreleasepool
+    {
+        command_buffer = [runner->queue commandBuffer];
+
+        blit = [command_buffer blitCommandEncoder];
+        [blit copyFromTexture:s->texture toTexture:d->texture];
+        [blit endEncoding];
+
+        [command_buffer commit];
+        [command_buffer waitUntilCompleted];
+    }
+
+    return true;
 }
 
 static struct resource_readback *metal_runner_get_resource_readback(struct shader_runner *r,

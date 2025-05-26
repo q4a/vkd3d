@@ -169,7 +169,7 @@ float4 main(uint id : sv_sampleindex) : sv_target
 clear rtv 0 0.0 0.0 0.0 0.0
 draw quad
 probe (32, 32) rgba(3.75, 0.25, 0.5, 1.0)
-todo(msl) copy rtv 0 srv 0
+copy rtv 0 srv 0
 
 [rtv 0]
 format r32g32b32a32-float
