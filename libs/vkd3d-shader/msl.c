@@ -61,8 +61,8 @@ struct msl_resource_type_info
     bool array;
     /* Whether the resource type has a shadow/comparison variant. */
     bool comparison;
-    /* The type suffix for the resource type. I.e., the "2d" part of
-     * "texture2d" or "depth2d". */
+    /* The type suffix for the resource type. I.e., the "2d_ms" part of
+     * "texture2d_ms_array" or "depth2d_ms_array". */
     const char *type_suffix;
 };
 
@@ -91,10 +91,10 @@ static const struct msl_resource_type_info *msl_get_resource_type_info(enum vkd3
         [VKD3D_SHADER_RESOURCE_TEXTURE_2DMS]      = {2, 0, 1, "2d_ms"},
         [VKD3D_SHADER_RESOURCE_TEXTURE_3D]        = {3, 0, 0, "3d"},
         [VKD3D_SHADER_RESOURCE_TEXTURE_CUBE]      = {3, 0, 1, "cube"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY]   = {1, 1, 0, "1d_array"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY]   = {2, 1, 1, "2d_array"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY] = {2, 1, 1, "2d_ms_array"},
-        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY] = {3, 1, 1, "cube_array"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY]   = {1, 1, 0, "1d"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY]   = {2, 1, 1, "2d"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY] = {2, 1, 1, "2d_ms"},
+        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY] = {3, 1, 1, "cube"},
     };
 
     if (!t || t >= ARRAY_SIZE(info))
@@ -310,8 +310,9 @@ static void msl_print_sampler_name(struct vkd3d_string_buffer *buffer, unsigned 
 static void msl_print_srv_name(struct vkd3d_string_buffer *buffer, struct msl_generator *gen, unsigned int binding,
         const struct msl_resource_type_info *resource_type_info, enum vkd3d_data_type resource_data_type, bool compare)
 {
-    vkd3d_string_buffer_printf(buffer, "descriptors[%u].as<%s%s<",
-            binding, compare ? "depth" : "texture", resource_type_info->type_suffix);
+    vkd3d_string_buffer_printf(buffer, "descriptors[%u].as<%s%s%s<",
+            binding, compare ? "depth" : "texture", resource_type_info->type_suffix,
+            resource_type_info->array ? "_array" : "");
     msl_print_resource_datatype(gen, buffer, resource_data_type);
     vkd3d_string_buffer_printf(buffer, ">>()");
 }
@@ -964,9 +965,9 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
 {
     const struct msl_resource_type_info *resource_type_info;
     unsigned int resource_id, resource_idx, resource_space;
+    bool bias, compare, comparison_sampler, grad, lod_zero;
     const struct vkd3d_shader_descriptor_binding *binding;
     unsigned int sampler_id, sampler_idx, sampler_space;
-    bool bias, compare, comparison_sampler, lod_zero;
     const struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_resource_type resource_type;
     unsigned int srv_binding, sampler_binding;
@@ -977,6 +978,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
 
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
     compare = ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
     lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
 
     if (vkd3d_shader_instruction_has_texel_offset(ins))
@@ -1013,7 +1015,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
                 "Sampling resource type %#x is not supported.", resource_type);
 
     if ((resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1D || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY)
-            && (bias || lod_zero))
+            && (bias || grad || lod_zero))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
                 "Resource type %#x does not support mipmapping.", resource_type);
 
@@ -1103,6 +1105,14 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
                     "Comparison samplers are not supported with resource type %#x.", resource_type);
         vkd3d_string_buffer_printf(sample, ", ");
         msl_print_src_with_type(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
+    }
+    if (grad)
+    {
+        vkd3d_string_buffer_printf(sample, ", gradient%s(", resource_type_info->type_suffix);
+        msl_print_src_with_type(sample, gen, &ins->src[3], coord_mask, ins->src[3].reg.data_type);
+        vkd3d_string_buffer_printf(sample, ", ");
+        msl_print_src_with_type(sample, gen, &ins->src[4], coord_mask, ins->src[4].reg.data_type);
+        vkd3d_string_buffer_printf(sample, ")");
     }
     if (lod_zero)
     {
@@ -1296,6 +1306,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_SAMPLE_B:
         case VKD3DSIH_SAMPLE_C:
         case VKD3DSIH_SAMPLE_C_LZ:
+        case VKD3DSIH_SAMPLE_GRAD:
             msl_sample(gen, ins);
             break;
         case VKD3DSIH_GEO:
