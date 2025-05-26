@@ -1547,12 +1547,33 @@ static uint32_t get_fx_2_type_class(const struct hlsl_type *type)
     return hlsl_sm1_class(type);
 }
 
-static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *name,
-        const struct hlsl_semantic *semantic, bool is_combined_sampler, struct fx_write_context *fx)
+struct fx_2_write_type_context
 {
-    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
-    uint32_t semantic_offset, offset, elements_count = 0, name_offset;
-    size_t i;
+    uint32_t *names;
+    uint32_t *semantics;
+    uint32_t count;
+
+    uint32_t offset;
+
+    bool is_combined_sampler;
+    struct fx_write_context *fx;
+};
+
+static void count_type_iter(const struct hlsl_type *type, const char *name,
+        const struct hlsl_semantic *semantic, void *context)
+{
+    struct fx_2_write_type_context *ctx = context;
+
+    ++ctx->count;
+}
+
+static void write_fx_2_type_iter(const struct hlsl_type *type, const char *name,
+        const struct hlsl_semantic *semantic, void *context)
+{
+    struct fx_2_write_type_context *ctx = context;
+    struct fx_write_context *fx = ctx->fx;
+    struct vkd3d_bytecode_buffer *buffer;
+    uint32_t offset, elements_count = 0;
 
     /* Resolve arrays to element type and number of elements. */
     if (type->class == HLSL_CLASS_ARRAY)
@@ -1561,13 +1582,11 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
         type = hlsl_get_multiarray_element_type(type);
     }
 
-    name_offset = write_string(name, fx);
-    semantic_offset = semantic->raw_name ? write_string(semantic->raw_name, fx) : 0;
-
-    offset = put_u32(buffer, hlsl_sm1_base_type(type, is_combined_sampler));
+    buffer = &fx->unstructured;
+    offset = put_u32(buffer, hlsl_sm1_base_type(type, ctx->is_combined_sampler));
     put_u32(buffer, get_fx_2_type_class(type));
-    put_u32(buffer, name_offset);
-    put_u32(buffer, semantic_offset);
+    *ctx->names++ = put_u32(buffer, 0);
+    *ctx->semantics++ = put_u32(buffer, 0);
     put_u32(buffer, elements_count);
 
     switch (type->class)
@@ -1592,19 +1611,68 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
             ;
     }
 
+    /* Save the offset of the top level type. */
+    if (!ctx->offset)
+        ctx->offset = offset;
+}
+
+static void write_fx_2_type_strings_iter(const struct hlsl_type *type, const char *name,
+        const struct hlsl_semantic *semantic, void *context)
+{
+    struct fx_2_write_type_context *ctx = context;
+    struct fx_write_context *fx = ctx->fx;
+    struct vkd3d_bytecode_buffer *buffer;
+
+    buffer = &fx->unstructured;
+    set_u32(buffer, *ctx->names++, write_string(name, fx));
+    set_u32(buffer, *ctx->semantics++, semantic->raw_name ? write_string(semantic->raw_name, fx) : 0);
+}
+
+static void foreach_type(const struct hlsl_type *type, const char *name, const struct hlsl_semantic *semantic,
+        void (*iter_func)(const struct hlsl_type *type, const char *name, const struct hlsl_semantic *semantic, void *context),
+        void *context)
+{
+    iter_func(type, name, semantic, context);
+
+    type = hlsl_get_multiarray_element_type(type);
     if (type->class == HLSL_CLASS_STRUCT)
     {
-        for (i = 0; i < type->e.record.field_count; ++i)
+        for (size_t i = 0; i < type->e.record.field_count; ++i)
         {
             const struct hlsl_struct_field *field = &type->e.record.fields[i];
-
-            /* Validated in check_invalid_object_fields(). */
-            VKD3D_ASSERT(hlsl_is_numeric_type(field->type));
-            write_fx_2_parameter(field->type, field->name, &field->semantic, false, fx);
+            foreach_type(field->type, field->name, &field->semantic, iter_func, context);
         }
     }
+}
 
-    return offset;
+static uint32_t write_fx_2_parameter(const struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct fx_2_write_type_context ctx = { .fx = fx, .is_combined_sampler = var->is_combined_sampler };
+    uint32_t *offsets;
+
+    /* Parameter type information has to be stored in a contiguous segment, so
+     * that any structure fields come right after each other. To achieve that
+     * the variable length string data is written after the type data. */
+
+    /* Calculate the number of string entries needed for this type. */
+    foreach_type(var->data_type, var->name, &var->semantic, count_type_iter, &ctx);
+
+    if (!(offsets = calloc(ctx.count, 2 * sizeof(*offsets))))
+        return 0;
+
+    /* Writing type information also sets string offsets. */
+    ctx.names = offsets;
+    ctx.semantics = &offsets[ctx.count];
+    foreach_type(var->data_type, var->name, &var->semantic, write_fx_2_type_iter, &ctx);
+
+    /* Now the final pass to write the string data. */
+    ctx.names = offsets;
+    ctx.semantics = &offsets[ctx.count];
+    foreach_type(var->data_type, var->name, &var->semantic, write_fx_2_type_strings_iter, &ctx);
+
+    free(offsets);
+
+    return ctx.offset;
 }
 
 static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -1876,7 +1944,7 @@ static void write_fx_2_parameters(struct fx_write_context *fx)
         if (!is_type_supported_fx_2(ctx, var->data_type, &var->loc))
             continue;
 
-        desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, var->is_combined_sampler, fx);
+        desc_offset = write_fx_2_parameter(var, fx);
         value_offset = write_fx_2_initial_value(var, fx);
 
         flags = 0;
@@ -1899,7 +1967,7 @@ static void write_fx_2_annotation(struct hlsl_ir_var *var, struct fx_write_conte
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t desc_offset, value_offset;
 
-    desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, var->is_combined_sampler, fx);
+    desc_offset = write_fx_2_parameter(var, fx);
     value_offset = write_fx_2_initial_value(var, fx);
 
     put_u32(buffer, desc_offset);
