@@ -763,16 +763,13 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
         data_type = VKD3D_DATA_FLOAT;
     }
 
-    if ((resource_type_info = msl_get_resource_type_info(resource_type)))
-    {
-        coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->read_coord_size);
-    }
-    else
+    if (!(resource_type_info = msl_get_resource_type_info(resource_type)))
     {
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                 "Internal compiler error: Unhandled resource type %#x.", resource_type);
-        coord_mask = vkd3d_write_mask_from_component_count(2);
+        resource_type_info = msl_get_resource_type_info(VKD3D_SHADER_RESOURCE_TEXTURE_2D);
     }
+    coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->read_coord_size);
 
     if (!(binding = msl_get_srv_binding(gen, resource_space, resource_idx, resource_type)))
     {
