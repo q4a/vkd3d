@@ -763,6 +763,13 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
         data_type = VKD3D_DATA_FLOAT;
     }
 
+    if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
+            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBE
+            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY
+            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY)
+        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
+                "Texel fetches from resource type %#x are not supported.", resource_type);
+
     if (!(resource_type_info = msl_get_resource_type_info(resource_type)))
     {
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
