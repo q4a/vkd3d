@@ -251,6 +251,80 @@ todo(sm<6) draw quad
 if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0, 0xffffffff, 0)
 if(sm>=6) probe (0, 0) rgbaui(1, 0, 1, 0)
 
+[rtv 0]
+format r32g32b32a32-float
+size (2d, 640, 480)
+
+% Minimum precision vectors in constant buffers have inconsistent behavior with
+% SM6 (see minimum-precision.shader_test), so we're reading with arrays instead.
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+uniform min16float u[4];
+
+float4 main() : sv_target
+{
+    min16float n = -1.5, m = 65.0;
+    return float4(u[0] + n, u[1] + m, u[2] + n, u[3] + m);
+}
+
+[test]
+if(sm<6) uniform 0 float 0
+if(sm<6) uniform 4 float 0
+if(sm<6) uniform 8 float 2.75
+if(sm<6) uniform 12 float 2.75
+if(sm>=6) uniform 0 uint 0
+if(sm>=6) uniform 4 uint 0
+if(sm>=6) uniform 8 uint 0x4180
+if(sm>=6) uniform 12 uint 0x4180
+draw quad
+todo(sm>=6) probe (0, 0) rgba(-1.5, 65.0, 1.25, 67.75)
+
+[pixel shader]
+uniform min16float u[4];
+
+float4 main() : sv_target
+{
+    min16float n = -1.5, m = 5.5;
+    return float4(u[0] * n, u[1] * m, u[2] * n, u[3] * m);
+}
+
+[test]
+if(sm<6) uniform 0 float -2.5
+if(sm<6) uniform 4 float 3.5
+if(sm<6) uniform 8 float 0.5
+if(sm<6) uniform 12 float -4.5
+if(sm>=6) uniform 0 uint 0xc100
+if(sm>=6) uniform 4 uint 0x4300
+if(sm>=6) uniform 8 uint 0x3800
+if(sm>=6) uniform 12 uint 0xc480
+draw quad
+todo(sm>=6) probe (0, 0) rgba(3.75, 19.25, -0.75, -24.75)
+
+[pixel shader]
+uniform min16float u[4];
+
+float4 main() : sv_target
+{
+    min16float n = 655.0, m = -0.5;
+    return float4(u[0] / n, u[1] / m, u[2] / n, u[3] / m);
+}
+
+[test]
+if(sm<6) uniform 0 float 3.25
+if(sm<6) uniform 4 float -1023.5
+if(sm<6) uniform 8 float -7.5
+if(sm<6) uniform 12 float 0.125
+if(sm>=6) uniform 0 uint 0x4280
+if(sm>=6) uniform 4 uint 0xe3ff
+if(sm>=6) uniform 8 uint 0xc780
+if(sm>=6) uniform 12 uint 0x3000
+draw quad
+% The computation is potentially done in f16, but ULPs are relative to the f32 result.
+todo(sm>=6) probe (0, 0) rgba (0.004962, 2047.0, -0.011451, -0.25) 8192
+
 
 [require]
 shader model >= 6.2
