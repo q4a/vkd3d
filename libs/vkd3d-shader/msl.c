@@ -735,6 +735,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     enum vkd3d_shader_resource_type resource_type;
     struct vkd3d_string_buffer *read;
     enum vkd3d_data_type data_type;
+    unsigned int srv_binding;
     uint32_t coord_mask;
     struct msl_dst dst;
 
@@ -779,19 +780,23 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     }
     coord_mask = vkd3d_write_mask_from_component_count(resource_type_info->read_coord_size);
 
-    if (!(binding = msl_get_srv_binding(gen, resource_space, resource_idx, resource_type)))
+    if ((binding = msl_get_srv_binding(gen, resource_space, resource_idx, resource_type)))
+    {
+        srv_binding = binding->binding;
+    }
+    else
     {
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_BINDING_NOT_FOUND,
                 "No descriptor binding specified for SRV %u (index %u, space %u).",
                 resource_id, resource_idx, resource_space);
-        return;
+        srv_binding = 0;
     }
 
     msl_dst_init(&dst, gen, ins, &ins->dst[0]);
     read = vkd3d_string_buffer_get(&gen->string_buffers);
 
     vkd3d_string_buffer_printf(read, "as_type<uint4>(");
-    msl_print_srv_name(read, gen, binding->binding, resource_type_info, data_type);
+    msl_print_srv_name(read, gen, srv_binding, resource_type_info, data_type);
     vkd3d_string_buffer_printf(read, ".read(");
     msl_print_src_with_type(read, gen, &ins->src[0], coord_mask, VKD3D_DATA_UINT);
     if (resource_type_info->array)
