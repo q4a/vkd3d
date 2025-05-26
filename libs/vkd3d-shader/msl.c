@@ -963,9 +963,9 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
 
 static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
+    bool bias, compare, comparison_sampler, grad, lod, lod_zero;
     const struct msl_resource_type_info *resource_type_info;
     unsigned int resource_id, resource_idx, resource_space;
-    bool bias, compare, comparison_sampler, grad, lod_zero;
     const struct vkd3d_shader_descriptor_binding *binding;
     unsigned int sampler_id, sampler_idx, sampler_space;
     const struct vkd3d_shader_descriptor_info1 *d;
@@ -979,6 +979,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
     compare = ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
     grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
+    lod = ins->opcode == VKD3DSIH_SAMPLE_LOD;
     lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
 
     if (vkd3d_shader_instruction_has_texel_offset(ins))
@@ -1015,7 +1016,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
                 "Sampling resource type %#x is not supported.", resource_type);
 
     if ((resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1D || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY)
-            && (bias || grad || lod_zero))
+            && (bias || grad || lod || lod_zero))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
                 "Resource type %#x does not support mipmapping.", resource_type);
 
@@ -1117,6 +1118,12 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     if (lod_zero)
     {
         vkd3d_string_buffer_printf(sample, ", level(0.0f)");
+    }
+    else if (lod)
+    {
+        vkd3d_string_buffer_printf(sample, ", level(");
+        msl_print_src_with_type(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
+        vkd3d_string_buffer_printf(sample, ")");
     }
     if (bias)
     {
@@ -1276,6 +1283,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_SAMPLE_C:
         case VKD3DSIH_SAMPLE_C_LZ:
         case VKD3DSIH_SAMPLE_GRAD:
+        case VKD3DSIH_SAMPLE_LOD:
             msl_sample(gen, ins);
             break;
         case VKD3DSIH_GEO:
