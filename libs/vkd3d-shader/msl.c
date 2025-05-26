@@ -861,10 +861,11 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
         data_type = VKD3D_DATA_FLOAT;
     }
 
-    if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
-            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBE
-            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY
-            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY)
+    if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBE
+            || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY
+            || (ins->opcode != VKD3DSIH_LD2DMS
+                    && (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
+                    || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
                 "Texel fetches from resource type %#x are not supported.", resource_type);
 
@@ -903,7 +904,10 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     if (resource_type != VKD3D_SHADER_RESOURCE_BUFFER)
     {
         vkd3d_string_buffer_printf(read, ", ");
-        msl_print_src_with_type(read, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, VKD3D_DATA_UINT);
+        if (ins->opcode != VKD3DSIH_LD2DMS)
+            msl_print_src_with_type(read, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, VKD3D_DATA_UINT);
+        else
+            msl_print_src_with_type(read, gen, &ins->src[2], VKD3DSP_WRITEMASK_0, VKD3D_DATA_UINT);
     }
     vkd3d_string_buffer_printf(read, "))");
     msl_print_swizzle(read, ins->src[1].swizzle, ins->dst[0].write_mask);
@@ -1123,6 +1127,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             msl_cast(gen, ins, "float");
             break;
         case VKD3DSIH_LD:
+        case VKD3DSIH_LD2DMS:
             msl_ld(gen, ins);
             break;
         case VKD3DSIH_LOG:
