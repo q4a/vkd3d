@@ -12130,6 +12130,22 @@ static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
     }
 }
 
+static void sm4_generate_vsir_add_dcl_stream(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_ir_var *var)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &var->loc, VKD3DSIH_DCL_STREAM, 0, 1)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+
+    vsir_src_param_init(&ins->src[0], VKD3DSPR_STREAM, VKD3D_DATA_OPAQUE, 1);
+    ins->src[0].reg.dimension = VSIR_DIMENSION_NONE;
+    ins->src[0].reg.idx[0].offset = var->regs[HLSL_REGSET_STREAM_OUTPUTS].index;
+}
+
 /* OBJECTIVE: Translate all the information from ctx and entry_func to the
  * vsir_program, so it can be used as input to tpf_compile() without relying
  * on ctx and entry_func. */
@@ -12203,6 +12219,17 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl
             sm4_generate_vsir_add_dcl_texture(ctx, program, resource, true);
     }
     sm4_free_extern_resources(extern_resources, extern_resources_count);
+
+    if (version.type == VKD3D_SHADER_TYPE_GEOMETRY && version.major >= 5)
+    {
+        const struct hlsl_ir_var *var;
+
+        LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+        {
+            if (var->bind_count[HLSL_REGSET_STREAM_OUTPUTS])
+                sm4_generate_vsir_add_dcl_stream(ctx, program, var);
+        }
+    }
 
     if (version.type == VKD3D_SHADER_TYPE_HULL)
         generate_vsir_add_program_instruction(ctx, program,

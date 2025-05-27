@@ -4176,6 +4176,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_CASE:
         case VKD3DSIH_CONTINUE:
         case VKD3DSIH_CUT:
+        case VKD3DSIH_DCL_STREAM:
         case VKD3DSIH_DEFAULT:
         case VKD3DSIH_DISCARD:
         case VKD3DSIH_DIV:
