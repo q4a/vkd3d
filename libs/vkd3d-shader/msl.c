@@ -980,8 +980,9 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     struct msl_dst dst;
 
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
-    compare = ins->opcode == VKD3DSIH_SAMPLE_C || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
-    gather = ins->opcode == VKD3DSIH_GATHER4;
+    compare = ins->opcode == VKD3DSIH_GATHER4_C || ins->opcode == VKD3DSIH_SAMPLE_C
+            || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    gather = ins->opcode == VKD3DSIH_GATHER4 || ins->opcode == VKD3DSIH_GATHER4_C;
     grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
     lod = ins->opcode == VKD3DSIH_SAMPLE_LOD;
     lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
@@ -1095,7 +1096,9 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     if (ins->dst[0].reg.data_type == VKD3D_DATA_UINT)
         vkd3d_string_buffer_printf(sample, "as_type<uint4>(");
     msl_print_srv_name(sample, gen, srv_binding, resource_type_info, data_type, compare);
-    if (gather)
+    if (gather && compare)
+        vkd3d_string_buffer_printf(sample, ".gather_compare(");
+    else if (gather)
         vkd3d_string_buffer_printf(sample, ".gather(");
     else if (compare)
         vkd3d_string_buffer_printf(sample, ".sample_compare(");
@@ -1142,7 +1145,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
         msl_print_src_with_type(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
         vkd3d_string_buffer_printf(sample, ")");
     }
-    if (gather && (component_idx = vsir_swizzle_get_component(ins->src[2].swizzle, 0)))
+    if (gather && !compare && (component_idx = vsir_swizzle_get_component(ins->src[2].swizzle, 0)))
     {
         if (resource_type_info->offset)
             vkd3d_string_buffer_printf(sample, ", int2(0)");
@@ -1151,7 +1154,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     vkd3d_string_buffer_printf(sample, ")");
     if (ins->dst[0].reg.data_type == VKD3D_DATA_UINT)
         vkd3d_string_buffer_printf(sample, ")");
-    if (!compare)
+    if (!compare || gather)
         msl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
 
     msl_print_assignment(gen, &dst, "%s", sample->buffer);
@@ -1296,6 +1299,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             msl_cast(gen, ins, "uint");
             break;
         case VKD3DSIH_GATHER4:
+        case VKD3DSIH_GATHER4_C:
         case VKD3DSIH_SAMPLE:
         case VKD3DSIH_SAMPLE_B:
         case VKD3DSIH_SAMPLE_C:
