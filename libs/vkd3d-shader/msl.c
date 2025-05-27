@@ -965,8 +965,9 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
 
 static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
-    bool bias, compare, comparison_sampler, gather, grad, lod, lod_zero;
+    bool bias, compare, comparison_sampler, gather, grad, lod, lod_zero, offset;
     const struct msl_resource_type_info *resource_type_info;
+    const struct vkd3d_shader_src_param *resource, *sampler;
     unsigned int resource_id, resource_idx, resource_space;
     const struct vkd3d_shader_descriptor_binding *binding;
     unsigned int sampler_id, sampler_idx, sampler_space;
@@ -982,22 +983,27 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
     compare = ins->opcode == VKD3DSIH_GATHER4_C || ins->opcode == VKD3DSIH_SAMPLE_C
             || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
-    gather = ins->opcode == VKD3DSIH_GATHER4 || ins->opcode == VKD3DSIH_GATHER4_C;
+    gather = ins->opcode == VKD3DSIH_GATHER4 || ins->opcode == VKD3DSIH_GATHER4_C
+            || ins->opcode == VKD3DSIH_GATHER4_PO;
     grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
     lod = ins->opcode == VKD3DSIH_SAMPLE_LOD;
     lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    offset = ins->opcode == VKD3DSIH_GATHER4_PO;
+
+    resource = &ins->src[1 + offset];
+    sampler = &ins->src[2 + offset];
 
     if (vkd3d_shader_instruction_has_texel_offset(ins))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                 "Internal compiler error: Unhandled texel sample offset.");
 
-    if (ins->src[1].reg.idx[0].rel_addr || ins->src[1].reg.idx[1].rel_addr
-            || ins->src[2].reg.idx[0].rel_addr || ins->src[2].reg.idx[1].rel_addr)
+    if (resource->reg.idx[0].rel_addr || resource->reg.idx[1].rel_addr
+            || sampler->reg.idx[0].rel_addr || sampler->reg.idx[1].rel_addr)
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
                 "Descriptor indexing is not supported.");
 
-    resource_id = ins->src[1].reg.idx[0].offset;
-    resource_idx = ins->src[1].reg.idx[1].offset;
+    resource_id = resource->reg.idx[0].offset;
+    resource_idx = resource->reg.idx[1].offset;
     if ((d = vkd3d_shader_find_descriptor(&gen->program->descriptors,
             VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, resource_id)))
     {
@@ -1050,8 +1056,8 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
         srv_binding = 0;
     }
 
-    sampler_id = ins->src[2].reg.idx[0].offset;
-    sampler_idx = ins->src[2].reg.idx[1].offset;
+    sampler_id = sampler->reg.idx[0].offset;
+    sampler_idx = sampler->reg.idx[1].offset;
     if ((d = vkd3d_shader_find_descriptor(&gen->program->descriptors,
             VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, sampler_id)))
     {
@@ -1145,9 +1151,17 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
         msl_print_src_with_type(sample, gen, &ins->src[3], VKD3DSP_WRITEMASK_0, ins->src[3].reg.data_type);
         vkd3d_string_buffer_printf(sample, ")");
     }
-    if (gather && !compare && (component_idx = vsir_swizzle_get_component(ins->src[2].swizzle, 0)))
+    if (offset)
     {
-        if (resource_type_info->offset)
+        if (!resource_type_info->offset)
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
+                    "Texel sample offsets are not supported with resource type %#x.", resource_type);
+        vkd3d_string_buffer_printf(sample, ", ");
+        msl_print_src_with_type(sample, gen, &ins->src[1], coord_mask, ins->src[1].reg.data_type);
+    }
+    if (gather && !compare && (component_idx = vsir_swizzle_get_component(sampler->swizzle, 0)))
+    {
+        if (!offset && resource_type_info->offset)
             vkd3d_string_buffer_printf(sample, ", int2(0)");
         vkd3d_string_buffer_printf(sample, ", component::%c", "xyzw"[component_idx]);
     }
@@ -1155,7 +1169,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     if (ins->dst[0].reg.data_type == VKD3D_DATA_UINT)
         vkd3d_string_buffer_printf(sample, ")");
     if (!compare || gather)
-        msl_print_swizzle(sample, ins->src[1].swizzle, ins->dst[0].write_mask);
+        msl_print_swizzle(sample, resource->swizzle, ins->dst[0].write_mask);
 
     msl_print_assignment(gen, &dst, "%s", sample->buffer);
 
@@ -1300,6 +1314,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VKD3DSIH_GATHER4:
         case VKD3DSIH_GATHER4_C:
+        case VKD3DSIH_GATHER4_PO:
         case VKD3DSIH_SAMPLE:
         case VKD3DSIH_SAMPLE_B:
         case VKD3DSIH_SAMPLE_C:
