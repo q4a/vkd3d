@@ -4176,6 +4176,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_CASE:
         case VKD3DSIH_CONTINUE:
         case VKD3DSIH_CUT:
+        case VKD3DSIH_CUT_STREAM:
         case VKD3DSIH_DCL_STREAM:
         case VKD3DSIH_DEFAULT:
         case VKD3DSIH_DISCARD:
@@ -4191,6 +4192,7 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         case VKD3DSIH_DSY_FINE:
         case VKD3DSIH_ELSE:
         case VKD3DSIH_EMIT:
+        case VKD3DSIH_EMIT_STREAM:
         case VKD3DSIH_ENDIF:
         case VKD3DSIH_ENDLOOP:
         case VKD3DSIH_ENDSWITCH:

@@ -541,7 +541,7 @@ gs_data main(point gs_data vin[1], inout TriangleStream<gs_data> vout)
 }
 
 % Output streams with nonzero stream indices are only allowed with point streams, and with SM >= 5.
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -610,7 +610,7 @@ void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout Triangle
     vout1.RestartStrip();
 }
 
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -623,7 +623,7 @@ void main(point gs_data vin[1], inout PointStream<gs_data> vout1, inout Triangle
 }
 
 % A maximum of 4 streams are allowed.
-[geometry shader fail(sm<5) todo(sm>=5)]
+[geometry shader fail(sm<5)]
 struct gs_data
 {
     float4 pos : SV_POSITION;
