@@ -867,6 +867,27 @@ static void msl_default(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "default:\n");
 }
 
+static void msl_print_texel_offset(struct vkd3d_string_buffer *buffer, struct msl_generator *gen,
+        unsigned int offset_size, const struct vkd3d_shader_texel_offset *offset)
+{
+    switch (offset_size)
+    {
+        case 1:
+            vkd3d_string_buffer_printf(buffer, "%d", offset->u);
+            break;
+        case 2:
+            vkd3d_string_buffer_printf(buffer, "int2(%d, %d)", offset->u, offset->v);
+            break;
+        default:
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Invalid texel offset size %u.", offset_size);
+            /* fall through */
+        case 3:
+            vkd3d_string_buffer_printf(buffer, "int3(%d, %d, %d)", offset->u, offset->v, offset->w);
+            break;
+    }
+}
+
 static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     const struct msl_resource_type_info *resource_type_info;
@@ -965,7 +986,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
 
 static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
-    bool bias, compare, comparison_sampler, gather, grad, lod, lod_zero, offset;
+    bool bias, compare, comparison_sampler, dynamic_offset, gather, grad, lod, lod_zero, offset;
     const struct msl_resource_type_info *resource_type_info;
     const struct vkd3d_shader_src_param *resource, *sampler;
     unsigned int resource_id, resource_idx, resource_space;
@@ -983,19 +1004,16 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     bias = ins->opcode == VKD3DSIH_SAMPLE_B;
     compare = ins->opcode == VKD3DSIH_GATHER4_C || ins->opcode == VKD3DSIH_SAMPLE_C
             || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    dynamic_offset = ins->opcode == VKD3DSIH_GATHER4_PO;
     gather = ins->opcode == VKD3DSIH_GATHER4 || ins->opcode == VKD3DSIH_GATHER4_C
             || ins->opcode == VKD3DSIH_GATHER4_PO;
     grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
     lod = ins->opcode == VKD3DSIH_SAMPLE_LOD;
     lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
-    offset = ins->opcode == VKD3DSIH_GATHER4_PO;
+    offset = dynamic_offset || vkd3d_shader_instruction_has_texel_offset(ins);
 
-    resource = &ins->src[1 + offset];
-    sampler = &ins->src[2 + offset];
-
-    if (vkd3d_shader_instruction_has_texel_offset(ins))
-        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-                "Internal compiler error: Unhandled texel sample offset.");
+    resource = &ins->src[1 + dynamic_offset];
+    sampler = &ins->src[2 + dynamic_offset];
 
     if (resource->reg.idx[0].rel_addr || resource->reg.idx[1].rel_addr
             || sampler->reg.idx[0].rel_addr || sampler->reg.idx[1].rel_addr)
@@ -1157,7 +1175,10 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
                     "Texel sample offsets are not supported with resource type %#x.", resource_type);
         vkd3d_string_buffer_printf(sample, ", ");
-        msl_print_src_with_type(sample, gen, &ins->src[1], coord_mask, ins->src[1].reg.data_type);
+        if (dynamic_offset)
+            msl_print_src_with_type(sample, gen, &ins->src[1], coord_mask, ins->src[1].reg.data_type);
+        else
+            msl_print_texel_offset(sample, gen, resource_type_info->coord_size, &ins->texel_offset);
     }
     if (gather && !compare && (component_idx = vsir_swizzle_get_component(sampler->swizzle, 0)))
     {
