@@ -1318,6 +1318,12 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VSIR_OP_DP4:
             msl_dot(gen, ins, VKD3DSP_WRITEMASK_ALL);
             break;
+        case VSIR_OP_DSX:
+            msl_intrinsic(gen, ins, "dfdx");
+            break;
+        case VSIR_OP_DSY:
+            msl_intrinsic(gen, ins, "dfdy");
+            break;
         case VSIR_OP_ELSE:
             msl_else(gen);
             break;
