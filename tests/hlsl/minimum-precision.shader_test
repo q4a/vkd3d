@@ -214,3 +214,82 @@ uniform 4 uint4 0x4a004980 0x4b004a80 0x4c004b80 0x4c804c40
 uniform 8 uint4 0x4d804d40 0x4e004dc0 0x4e804e40 0x4f004ec0
 draw quad
 todo probe (0, 0) rgbaui(1, 1, 1, 1)
+
+[require]
+shader model >= 4.0
+
+[rtv 0]
+format r32g32b32a32-uint
+size (2d, 640, 480)
+
+[pixel shader]
+uniform uint i, x;
+
+uint4 main() : sv_target
+{
+    min16uint arr[4] = {1, 2, 0x7ff, 0xfff};
+    arr[i] = x;
+    return uint4(arr);
+}
+
+[test]
+uniform 0 uint 0
+uniform 1 uint 100
+todo(msl) draw quad
+% In D3D12 with SM5 all reads to the array return 0
+if(sm>=6 | !d3d12) probe (0, 0) rgbaui(100, 2, 0x7ff, 0xfff)
+uniform 0 uint 2
+uniform 1 uint 1000
+todo(msl) draw quad
+if(sm>=6 | !d3d12) probe (0, 0) rgbaui(1, 2, 1000, 0xfff)
+
+[rtv 0]
+format r32g32b32a32-sint
+size (2d, 640, 480)
+
+[pixel shader]
+uniform uint i;
+uniform int x;
+
+int4 main() : sv_target
+{
+    min16int arr[4] = {1, 2, 0x7ff, 0xfff};
+    arr[i] = x;
+    return int4(arr);
+}
+
+[test]
+uniform 0 uint 0
+uniform 1 uint 100
+todo(msl) draw quad
+% In D3D12 with SM5 all reads to the array return 0
+if(sm>=6 | !d3d12) probe (0, 0) rgbaui(100, 2, 0x7ff, 0xfff)
+uniform 0 uint 2
+uniform 1 uint 1000
+todo(msl) draw quad
+if(sm>=6 | !d3d12) probe (0, 0) rgbaui(1, 2, 1000, 0xfff)
+
+[rtv 0]
+format r32g32b32a32-float
+size (2d, 640, 480)
+
+[pixel shader]
+uniform uint i;
+uniform float x;
+
+float4 main() : sv_target
+{
+    min16float arr[4] = {1.0, 2.0, 0.5, 111.0};
+    arr[i] = x;
+    return float4(arr);
+}
+
+[test]
+uniform 0 uint 0
+uniform 1 float 3.0
+todo(msl) draw quad
+probe (0, 0) rgba(3.0, 2.0, 0.5, 111.0)
+uniform 0 uint 2
+uniform 1 float 5.0
+todo(msl) draw quad
+probe (0, 0) rgba(1.0, 2.0, 5.0, 111.0)
