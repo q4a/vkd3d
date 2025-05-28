@@ -1062,6 +1062,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_TEXBEM:
             case VKD3DSIH_TEXBEML:
             case VKD3DSIH_TEXCOORD:
+            case VKD3DSIH_TEXCRD:
             case VKD3DSIH_TEXDEPTH:
             case VKD3DSIH_TEXDP3:
             case VKD3DSIH_TEXDP3TEX:
