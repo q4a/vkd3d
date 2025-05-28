@@ -1320,6 +1320,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VSIR_OP_DSX:
         case VSIR_OP_DSX_COARSE:
+        case VSIR_OP_DSX_FINE:
             /* dfdx() and dfdy() are specified to return "a high precision
              * partial derivative", which would seem to correspond to
              * DSX_FINE/DSY_FINE. As of MSL 3.2, coarse/fast variants don't
@@ -1328,6 +1329,7 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VSIR_OP_DSY:
         case VSIR_OP_DSY_COARSE:
+        case VSIR_OP_DSY_FINE:
             msl_intrinsic(gen, ins, "dfdy");
             break;
         case VSIR_OP_ELSE:

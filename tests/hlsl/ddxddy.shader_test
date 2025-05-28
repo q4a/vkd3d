@@ -74,7 +74,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-todo(glsl | msl) draw quad
+todo(glsl) draw quad
 probe (10, 10) rgba (-0.524999976, -0.164999843, 0.104999900, 0.0) 16
 probe (11, 10) rgba (-0.689999819, -0.164999843, 0.114999890, 0.0) 32
 probe (10, 11) rgba (-0.420000076, -0.154999852, 0.104999900, 0.0) 32
