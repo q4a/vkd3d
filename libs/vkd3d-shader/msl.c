@@ -836,6 +836,12 @@ static void msl_break(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "break;\n");
 }
 
+static void msl_continue(struct msl_generator *gen)
+{
+    msl_print_indent(gen->buffer, gen->indent);
+    vkd3d_string_buffer_printf(gen->buffer, "continue;\n");
+}
+
 static void msl_switch(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     struct msl_src src;
@@ -1285,6 +1291,9 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
             break;
         case VSIR_OP_CASE:
             msl_case(gen, ins);
+            break;
+        case VSIR_OP_CONTINUE:
+            msl_continue(gen);
             break;
         case VSIR_OP_DCL_INDEXABLE_TEMP:
             msl_dcl_indexable_temp(gen, ins);
