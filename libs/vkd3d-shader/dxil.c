@@ -2589,6 +2589,7 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
         case VALUE_TYPE_SSA:
             register_init_with_id(reg, VKD3DSPR_SSA, data_type, value->u.ssa.id);
             reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
+            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_ICB:
