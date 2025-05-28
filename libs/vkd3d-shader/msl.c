@@ -1971,6 +1971,8 @@ static void msl_generate_entrypoint(struct msl_generator *gen)
             vkd3d_string_buffer_printf(gen->buffer, "vertex ");
             break;
         case VKD3D_SHADER_TYPE_PIXEL:
+            if (gen->program->global_flags & VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL)
+                vkd3d_string_buffer_printf(gen->buffer, "[[early_fragment_tests]]\n");
             vkd3d_string_buffer_printf(gen->buffer, "fragment ");
             break;
         default:
@@ -2036,7 +2038,7 @@ static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader
     vkd3d_string_buffer_printf(gen->buffer, "#include <metal_texture>\n\n");
     vkd3d_string_buffer_printf(gen->buffer, "using namespace metal;\n\n");
 
-    if (gen->program->global_flags & ~VKD3DSGF_REFACTORING_ALLOWED)
+    if (gen->program->global_flags & ~(VKD3DSGF_REFACTORING_ALLOWED | VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                 "Internal compiler error: Unhandled global flags %#"PRIx64".", (uint64_t)gen->program->global_flags);
 
