@@ -3058,30 +3058,6 @@ static inline uint64_t decode_rotated_signed_value(uint64_t value)
     return value << 63;
 }
 
-static float bitcast_uint_to_float(unsigned int value)
-{
-    union
-    {
-        uint32_t uint32_value;
-        float float_value;
-    } u;
-
-    u.uint32_value = value;
-    return u.float_value;
-}
-
-static inline double bitcast_uint64_to_double(uint64_t value)
-{
-    union
-    {
-        uint64_t uint64_value;
-        double double_value;
-    } u;
-
-    u.uint64_value = value;
-    return u.double_value;
-}
-
 static float register_get_float_value(const struct vkd3d_shader_register *reg)
 {
     if (!register_is_constant(reg) || !data_type_is_floating_point(reg->data_type))
@@ -3093,10 +3069,10 @@ static float register_get_float_value(const struct vkd3d_shader_register *reg)
     if (reg->type == VKD3DSPR_IMMCONST64)
     {
         WARN("Truncating double to float.\n");
-        return bitcast_uint64_to_double(reg->u.immconst_u64[0]);
+        return reg->u.immconst_f64[0];
     }
 
-    return bitcast_uint_to_float(reg->u.immconst_u32[0]);
+    return reg->u.immconst_f32[0];
 }
 
 static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, const struct sm6_type *type,
