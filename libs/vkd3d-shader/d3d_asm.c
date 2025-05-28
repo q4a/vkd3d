@@ -298,7 +298,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_SWITCH_MONOLITHIC               ] = "switch",
     [VKD3DSIH_SYNC                            ] = "sync",
     [VKD3DSIH_TAN                             ] = "tan",
-    [VKD3DSIH_TEX                             ] = "texld",
+    [VKD3DSIH_TEX                             ] = "tex",
     [VKD3DSIH_TEXBEM                          ] = "texbem",
     [VKD3DSIH_TEXBEML                         ] = "texbeml",
     [VKD3DSIH_TEXCOORD                        ] = "texcoord",
@@ -307,6 +307,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_TEXDP3                          ] = "texdp3",
     [VKD3DSIH_TEXDP3TEX                       ] = "texdp3tex",
     [VKD3DSIH_TEXKILL                         ] = "texkill",
+    [VKD3DSIH_TEXLD                           ] = "texld",
     [VKD3DSIH_TEXLDD                          ] = "texldd",
     [VKD3DSIH_TEXLDL                          ] = "texldl",
     [VKD3DSIH_TEXM3x2DEPTH                    ] = "texm3x2depth",
@@ -1707,7 +1708,7 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
             shader_dump_sync_flags(compiler, ins->flags);
             break;
 
-        case VKD3DSIH_TEX:
+        case VKD3DSIH_TEXLD:
             if (vkd3d_shader_ver_ge(&compiler->shader_version, 2, 0))
             {
                 if (ins->flags & VKD3DSI_TEXLD_PROJECT)

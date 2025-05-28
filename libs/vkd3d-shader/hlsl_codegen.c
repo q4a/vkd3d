@@ -9304,16 +9304,16 @@ static void sm1_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
     switch (load->load_type)
     {
         case HLSL_RESOURCE_SAMPLE:
-            opcode = VKD3DSIH_TEX;
+            opcode = VKD3DSIH_TEXLD;
             break;
 
         case HLSL_RESOURCE_SAMPLE_PROJ:
-            opcode = VKD3DSIH_TEX;
+            opcode = VKD3DSIH_TEXLD;
             flags |= VKD3DSI_TEXLD_PROJECT;
             break;
 
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
-            opcode = VKD3DSIH_TEX;
+            opcode = VKD3DSIH_TEXLD;
             flags |= VKD3DSI_TEXLD_BIAS;
             break;
 

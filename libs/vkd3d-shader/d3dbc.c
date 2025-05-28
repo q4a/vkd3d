@@ -385,8 +385,8 @@ static const struct vkd3d_sm1_opcode_info ps_opcode_table[] =
     {VKD3D_SM1_OP_TEXCOORD,     1, 1, VKD3DSIH_TEXCRD,       {1, 4}, {1, 4}},
     {VKD3D_SM1_OP_TEXKILL,      1, 0, VKD3DSIH_TEXKILL,      {1, 0}},
     {VKD3D_SM1_OP_TEX,          1, 0, VKD3DSIH_TEX,          {0, 0}, {1, 3}},
-    {VKD3D_SM1_OP_TEX,          1, 1, VKD3DSIH_TEX,          {1, 4}, {1, 4}},
-    {VKD3D_SM1_OP_TEX,          1, 2, VKD3DSIH_TEX,          {2, 0}},
+    {VKD3D_SM1_OP_TEX,          1, 1, VKD3DSIH_TEXLD,        {1, 4}, {1, 4}},
+    {VKD3D_SM1_OP_TEX,          1, 2, VKD3DSIH_TEXLD,        {2, 0}},
     {VKD3D_SM1_OP_TEXBEM,       1, 1, VKD3DSIH_TEXBEM,       {0, 0}, {1, 3}},
     {VKD3D_SM1_OP_TEXBEML,      1, 1, VKD3DSIH_TEXBEML,      {1, 0}, {1, 3}},
     {VKD3D_SM1_OP_TEXREG2AR,    1, 1, VKD3DSIH_TEXREG2AR,    {1, 0}, {1, 3}},
@@ -2014,7 +2014,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VKD3DSIH_MUL:
         case VKD3DSIH_SINCOS:
         case VKD3DSIH_SLT:
-        case VKD3DSIH_TEX:
+        case VKD3DSIH_TEXLD:
         case VKD3DSIH_TEXLDD:
             d3dbc_write_instruction(d3dbc, ins);
             break;

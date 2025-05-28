@@ -823,7 +823,7 @@ static enum vkd3d_result vsir_program_lower_texldp(struct vsir_program *program,
     div_ins->src[1] = tex->src[0];
     div_ins->src[1].swizzle = vkd3d_shader_create_swizzle(w_comp, w_comp, w_comp, w_comp);
 
-    if (!vsir_instruction_init_with_params(program, tex_ins, location, VKD3DSIH_TEX, 1, 2))
+    if (!vsir_instruction_init_with_params(program, tex_ins, location, VKD3DSIH_TEXLD, 1, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     tex_ins->dst[0] = tex->dst[0];
@@ -838,7 +838,7 @@ static enum vkd3d_result vsir_program_lower_texldp(struct vsir_program *program,
     return VKD3D_OK;
 }
 
-static enum vkd3d_result vsir_program_lower_tex(struct vsir_program *program,
+static enum vkd3d_result vsir_program_lower_texld(struct vsir_program *program,
         struct vkd3d_shader_instruction *tex, struct vkd3d_shader_message_context *message_context)
 {
     unsigned int idx = tex->src[1].reg.idx[0].offset;
@@ -1041,7 +1041,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                     return ret;
                 break;
 
-            case VKD3DSIH_TEX:
+            case VKD3DSIH_TEXLD:
                 if (ins->flags == VKD3DSI_TEXLD_PROJECT)
                 {
                     if ((ret = vsir_program_lower_texldp(program, ins, &tmp_idx)) < 0)
@@ -1049,7 +1049,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 }
                 else
                 {
-                    if ((ret = vsir_program_lower_tex(program, ins, message_context)) < 0)
+                    if ((ret = vsir_program_lower_texld(program, ins, message_context)) < 0)
                         return ret;
                 }
                 break;
