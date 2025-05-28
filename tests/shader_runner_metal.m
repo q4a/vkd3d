@@ -76,6 +76,7 @@ static MTLPixelFormat get_metal_pixel_format(DXGI_FORMAT format)
             return MTLPixelFormatR32Float;
         case DXGI_FORMAT_R32_SINT:
             return MTLPixelFormatR32Sint;
+        case DXGI_FORMAT_UNKNOWN:
         case DXGI_FORMAT_R32_TYPELESS:
         case DXGI_FORMAT_R32_UINT:
             return MTLPixelFormatR32Uint;
@@ -232,18 +233,6 @@ static void init_resource_texture(struct metal_runner *runner,
     id<MTLDevice> device = runner->device;
     MTLTextureDescriptor *desc;
 
-    switch (params->desc.type)
-    {
-        case RESOURCE_TYPE_RENDER_TARGET:
-        case RESOURCE_TYPE_DEPTH_STENCIL:
-        case RESOURCE_TYPE_TEXTURE:
-            break;
-
-        case RESOURCE_TYPE_UAV:
-        case RESOURCE_TYPE_VERTEX_BUFFER:
-            return;
-    }
-
     if (params->desc.sample_count > 1)
     {
         if (params->desc.level_count > 1)
@@ -260,6 +249,9 @@ static void init_resource_texture(struct metal_runner *runner,
     desc = [[MTLTextureDescriptor alloc] init];
     switch (params->desc.dimension)
     {
+        case RESOURCE_DIMENSION_BUFFER:
+            desc.textureType = MTLTextureTypeTextureBuffer;
+            break;
         case RESOURCE_DIMENSION_2D:
             if (params->desc.sample_count > 1)
                 desc.textureType = params->desc.layer_count > 1 ? MTLTextureType2DMultisampleArray
@@ -360,10 +352,21 @@ static struct resource *metal_runner_create_resource(struct shader_runner *r, co
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
-    if (params->desc.dimension == RESOURCE_DIMENSION_BUFFER)
-        init_resource_buffer(runner, resource, params);
-    else
-        init_resource_texture(runner, resource, params);
+    switch (params->desc.type)
+    {
+        case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+        case RESOURCE_TYPE_TEXTURE:
+            init_resource_texture(runner, resource, params);
+            break;
+
+        case RESOURCE_TYPE_VERTEX_BUFFER:
+            init_resource_buffer(runner, resource, params);
+            break;
+
+        case RESOURCE_TYPE_UAV:
+            break;
+    }
 
     return &resource->r;
 }
@@ -581,11 +584,6 @@ static bool encode_argument_buffer(struct metal_runner *runner,
         {
             case RESOURCE_TYPE_TEXTURE:
                 [encoder setTexture:resource->texture atIndex:index++];
-                if (!resource->texture)
-                {
-                    trace("Unsupported buffer texture\n");
-                    return false;
-                }
                 [command_encoder useResource:resource->texture
                         usage:MTLResourceUsageRead
                         stages:MTLRenderStageVertex | MTLRenderStageFragment];
