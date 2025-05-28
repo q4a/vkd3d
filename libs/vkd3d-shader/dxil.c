@@ -3179,6 +3179,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
     struct vkd3d_shader_immediate_constant_buffer *icb;
     const struct sm6_type *elem_type;
     unsigned int i, size, count;
+    uint64_t *data64;
 
     elem_type = type->u.array.elem_type;
     /* Multidimensional arrays are emitted in flattened form. */
@@ -3230,16 +3231,37 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
         return VKD3D_OK;
 
     count = type->u.array.count;
-    if (size > sizeof(icb->data[0]))
+    switch (icb->data_type)
     {
-        uint64_t *data = (uint64_t *)icb->data;
-        for (i = 0; i < count; ++i)
-            data[i] = operands[i];
-    }
-    else
-    {
-        for (i = 0; i < count; ++i)
-            icb->data[i] = operands[i];
+        case VKD3D_DATA_HALF:
+            for (i = 0; i < count; ++i)
+                icb->data[i] = half_to_float(operands[i]);
+            icb->data_type = VKD3D_DATA_FLOAT;
+            break;
+
+        case VKD3D_DATA_UINT16:
+            for (i = 0; i < count; ++i)
+                icb->data[i] = (int16_t)operands[i];
+            icb->data_type = VKD3D_DATA_UINT;
+            break;
+
+        case VKD3D_DATA_FLOAT:
+        case VKD3D_DATA_UINT:
+            for (i = 0; i < count; ++i)
+                icb->data[i] = operands[i];
+            break;
+
+        case VKD3D_DATA_DOUBLE:
+        case VKD3D_DATA_UINT64:
+            data64 = (uint64_t *)icb->data;
+            for (i = 0; i < count; ++i)
+                data64[i] = operands[i];
+            break;
+
+        default:
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Invalid array of type %u.", icb->data_type);
+            return VKD3D_ERROR_INVALID_SHADER;
     }
 
     return VKD3D_OK;
