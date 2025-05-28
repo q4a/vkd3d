@@ -293,6 +293,9 @@ static void init_resource_texture(struct metal_runner *runner,
             break;
 
         case RESOURCE_TYPE_UAV:
+            desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+            break;
+
         case RESOURCE_TYPE_VERTEX_BUFFER:
             break;
     }
@@ -357,14 +360,12 @@ static struct resource *metal_runner_create_resource(struct shader_runner *r, co
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_TEXTURE:
+        case RESOURCE_TYPE_UAV:
             init_resource_texture(runner, resource, params);
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
             init_resource_buffer(runner, resource, params);
-            break;
-
-        case RESOURCE_TYPE_UAV:
             break;
     }
 
@@ -444,9 +445,24 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
                 ++interface_info.binding_count;
                 break;
 
+            case RESOURCE_TYPE_UAV:
+                binding = &bindings[interface_info.binding_count];
+                binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
+                binding->register_space = 0;
+                binding->register_index = resource->r.desc.slot;
+                binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
+                if (resource->r.desc.dimension == RESOURCE_DIMENSION_BUFFER)
+                    binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
+                else
+                    binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
+                binding->binding.set = 0;
+                binding->binding.binding = interface_info.binding_count;
+                binding->binding.count = 1;
+                ++interface_info.binding_count;
+                break;
+
             case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_DEPTH_STENCIL:
-            case RESOURCE_TYPE_UAV:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
 
@@ -538,9 +554,17 @@ static bool encode_argument_buffer(struct metal_runner *runner,
                 [argument_descriptors addObject:arg_desc];
                 break;
 
+            case RESOURCE_TYPE_UAV:
+                arg_desc = [MTLArgumentDescriptor argumentDescriptor];
+                arg_desc.dataType = MTLDataTypeTexture;
+                arg_desc.index = [argument_descriptors count];
+                arg_desc.access = MTLBindingAccessReadWrite;
+                arg_desc.textureType = [resource->texture textureType];
+                [argument_descriptors addObject:arg_desc];
+                break;
+
             case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_DEPTH_STENCIL:
-            case RESOURCE_TYPE_UAV:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
@@ -589,9 +613,15 @@ static bool encode_argument_buffer(struct metal_runner *runner,
                         stages:MTLRenderStageVertex | MTLRenderStageFragment];
                 break;
 
+            case RESOURCE_TYPE_UAV:
+                [encoder setTexture:resource->texture atIndex:index++];
+                [command_encoder useResource:resource->texture
+                        usage:MTLResourceUsageRead | MTLResourceUsageWrite
+                        stages:MTLRenderStageVertex | MTLRenderStageFragment];
+                break;
+
             case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_DEPTH_STENCIL:
-            case RESOURCE_TYPE_UAV:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
@@ -908,7 +938,8 @@ static struct resource_readback *metal_runner_get_resource_readback(struct shade
     id<MTLTexture> src_texture;
     unsigned int layer, level;
 
-    if (resource->r.desc.dimension != RESOURCE_DIMENSION_2D)
+    if (resource->r.desc.dimension != RESOURCE_DIMENSION_BUFFER
+            && resource->r.desc.dimension != RESOURCE_DIMENSION_2D)
         fatal_error("Unhandled resource dimension %#x.\n", resource->r.desc.dimension);
 
     rb = malloc(sizeof(*rb));

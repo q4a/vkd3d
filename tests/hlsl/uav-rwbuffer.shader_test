@@ -184,7 +184,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe uav 1 (0) i32(11, -12, 13, -14)
 probe uav 1 (1) i32(-15, 16, -17, 18)
 
@@ -203,7 +203,7 @@ float4 main() : sv_target1
 }
 
 [test]
-todo(msl) draw quad
+draw quad
 probe uav 2 (0) f32(11.1, 12.2, 13.3, 14.4)
 
 [require]
