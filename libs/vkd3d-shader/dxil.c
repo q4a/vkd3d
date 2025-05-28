@@ -2603,6 +2603,7 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             reg->idx[0].offset = value->u.idxtemp.id;
             register_index_address_init(&reg->idx[1], value->u.idxtemp.index.index, sm6);
             reg->idx[1].is_in_bounds = value->u.idxtemp.index.is_in_bounds;
+            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_GROUPSHAREDMEM:
