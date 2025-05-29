@@ -305,15 +305,15 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 }
 
 [test]
-todo dispatch 2 1 1
-todo probe uav 0 (0) u32(0x14321)
-todo probe uav 0 (1) u32(0x14321)
-todo probe uav 0 (2) u32(0x14321)
-todo probe uav 0 (3) u32(0x14321)
-todo probe uav 0 (4) u32(0x24321)
-todo probe uav 0 (5) u32(0x24321)
-todo probe uav 0 (6) u32(0x24321)
-todo probe uav 0 (7) u32(0x24321)
+todo(sm<6) dispatch 2 1 1
+probe uav 0 (0) u32(0x14321)
+probe uav 0 (1) u32(0x14321)
+probe uav 0 (2) u32(0x14321)
+probe uav 0 (3) u32(0x14321)
+probe uav 0 (4) u32(0x24321)
+probe uav 0 (5) u32(0x24321)
+probe uav 0 (6) u32(0x24321)
+probe uav 0 (7) u32(0x24321)
 
 [require]
 shader model >= 6.2

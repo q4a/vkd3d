@@ -3720,7 +3720,10 @@ static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6
     dst->structure_stride = 0;
     sm6_register_from_value(&ins->declaration.tgsm_raw.reg.reg, dst, sm6);
     ins->declaration.tgsm_raw.alignment = alignment;
-    byte_count = elem_type->u.width / 8u;
+    byte_count = elem_type->u.width / CHAR_BIT;
+    /* Convert minimum precision types to their 32-bit equivalent. */
+    if (byte_count == 2)
+        byte_count = 4;
     if (byte_count != 4)
     {
         FIXME("Unsupported byte count %u.\n", byte_count);
