@@ -3744,7 +3744,10 @@ static void sm6_parser_declare_tgsm_structured(struct sm6_parser *sm6, const str
     dst_param_init(&ins->declaration.tgsm_structured.reg);
     dst->value_type = VALUE_TYPE_GROUPSHAREDMEM;
     dst->u.groupsharedmem.id = sm6->tgsm_count++;
-    dst->structure_stride = elem_type->u.width / 8u;
+    dst->structure_stride = elem_type->u.width / CHAR_BIT;
+    /* Convert minimum precision types to their 32-bit equivalent. */
+    if (dst->structure_stride == 2)
+        dst->structure_stride = 4;
     sm6_register_from_value(&ins->declaration.tgsm_structured.reg.reg, dst, sm6);
     if (dst->structure_stride != 4)
     {
