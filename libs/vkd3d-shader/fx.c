@@ -994,16 +994,6 @@ static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx
     fx->shader_count++;
 }
 
-static uint32_t get_fx_4_type_size(const struct hlsl_type *type)
-{
-    uint32_t elements_count;
-
-    elements_count = hlsl_get_multiarray_size(type);
-    type = hlsl_get_multiarray_element_type(type);
-
-    return type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float) * elements_count;
-}
-
 enum fx_4_type_constants
 {
     /* Numeric types encoding */
@@ -3295,6 +3285,8 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
     size = 0;
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
+        uint32_t unpacked_size;
+
         if (!is_numeric_fx_4_type(var->data_type))
             continue;
 
@@ -3302,7 +3294,9 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
             continue;
 
         write_fx_4_numeric_variable(var, shared, fx);
-        size = max(size, get_fx_4_type_size(var->data_type) + var->buffer_offset * 4);
+
+        unpacked_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float);
+        size = max(size, unpacked_size + var->buffer_offset * 4);
         ++count;
     }
 
