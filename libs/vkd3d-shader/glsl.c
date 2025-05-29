@@ -2313,7 +2313,7 @@ static void shader_glsl_handle_global_flags(struct vkd3d_string_buffer *buffer,
         flags &= ~VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL;
     }
 
-    if (flags)
+    if (flags & ~VKD3DSGF_REFACTORING_ALLOWED)
         vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
                 "Internal compiler error: Unhandled global flags %#"PRIx64".", (uint64_t)flags);
 }
