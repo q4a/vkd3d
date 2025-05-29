@@ -1,4 +1,79 @@
 [require]
+% SM < 5.0 requires that groupshared variables are arrays of N elements,
+% where N is the number of threads in a group, and they are only ever indexed
+% by SV_GroupIndex when storing (though violating this last condition gives
+% E_NOTIMPL rather than E_FAIL).
+shader model >= 4.0
+shader model < 5.0
+
+[compute shader fail todo]
+RWByteAddressBuffer u : register(u0);
+groupshared uint m;
+
+    [numthreads(4, 1, 1)]
+void main(uint local_idx : SV_GroupIndex)
+{
+    if (local_idx == 0)
+        m = 0;
+    GroupMemoryBarrierWithGroupSync();
+    u.Store(4 * local_idx, m);
+}
+
+[compute shader fail todo]
+RWByteAddressBuffer u : register(u0);
+groupshared uint m[1];
+
+    [numthreads(4, 1, 1)]
+void main(uint local_idx : SV_GroupIndex)
+{
+    if (local_idx == 0)
+        m[0] = 0;
+    GroupMemoryBarrierWithGroupSync();
+    u.Store(4 * local_idx, m[0]);
+}
+
+[compute shader notimpl]
+RWByteAddressBuffer u : register(u0);
+groupshared uint m[4];
+
+    [numthreads(4, 1, 1)]
+void main(uint local_idx : SV_GroupIndex)
+{
+    if (local_idx == 0)
+        m[0] = 0;
+    GroupMemoryBarrierWithGroupSync();
+    u.Store(4 * local_idx, m[0]);
+}
+
+[require]
+shader model >= 4.0
+
+[uav 0]
+format r32-typeless
+size (raw_buffer, 4)
+
+0 0 0 0
+
+[compute shader todo]
+RWByteAddressBuffer u : register(u0);
+groupshared uint m[4];
+
+    [numthreads(4, 1, 1)]
+void main(uint local_idx : SV_GroupIndex)
+{
+    m[local_idx] = 0xcafef00d;
+    GroupMemoryBarrierWithGroupSync();
+    u.Store(4 * local_idx, m[0]);
+}
+
+[test]
+todo(sm<6) dispatch 1 1 1
+probe uav 0 (0) rui(0xcafef00d)
+probe uav 0 (1) rui(0xcafef00d)
+probe uav 0 (2) rui(0xcafef00d)
+probe uav 0 (3) rui(0xcafef00d)
+
+[require]
 shader model >= 5.0
 
 [uav 1]
