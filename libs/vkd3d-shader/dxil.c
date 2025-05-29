@@ -2599,7 +2599,6 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
         case VALUE_TYPE_SSA:
             register_init_with_id(reg, VKD3DSPR_SSA, data_type, value->u.ssa.id);
             reg->dimension = sm6_type_is_scalar(value->type) ? VSIR_DIMENSION_SCALAR : VSIR_DIMENSION_VEC4;
-            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_ICB:
@@ -2607,7 +2606,6 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             reg->idx[0].offset = value->u.icb.id;
             register_index_address_init(&reg->idx[1], value->u.icb.index.index, sm6);
             reg->idx[1].is_in_bounds = value->u.icb.index.is_in_bounds;
-            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_IDXTEMP:
@@ -2615,7 +2613,6 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             reg->idx[0].offset = value->u.idxtemp.id;
             register_index_address_init(&reg->idx[1], value->u.idxtemp.index.index, sm6);
             reg->idx[1].is_in_bounds = value->u.idxtemp.index.is_in_bounds;
-            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_GROUPSHAREDMEM:
@@ -2623,14 +2620,12 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             reg->idx[0].offset = value->u.groupsharedmem.id;
             register_index_address_init(&reg->idx[1], value->u.groupsharedmem.index.index, sm6);
             reg->idx[1].is_in_bounds = value->u.groupsharedmem.index.is_in_bounds;
-            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_CONSTANT:
             vsir_register_init(reg, scalar_type->u.width == 64 ? VKD3DSPR_IMMCONST64 : VKD3DSPR_IMMCONST,
                     data_type, 0);
             reg->u = value->u.constant.immconst;
-            register_convert_to_minimum_precision(reg);
             break;
 
         case VALUE_TYPE_UNDEFINED:
@@ -2644,6 +2639,7 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
             vkd3d_unreachable();
     }
 
+    register_convert_to_minimum_precision(reg);
     reg->non_uniform = value->non_uniform;
 }
 
