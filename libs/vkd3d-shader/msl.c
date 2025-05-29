@@ -488,6 +488,9 @@ static void msl_print_src_with_type(struct vkd3d_string_buffer *buffer, struct m
         case VKD3DSPSM_ABS:
             vkd3d_string_buffer_printf(buffer, "abs(%s)", str->buffer);
             break;
+        case VKD3DSPSM_ABSNEG:
+            vkd3d_string_buffer_printf(buffer, "-abs(%s)", str->buffer);
+            break;
         default:
             vkd3d_string_buffer_printf(buffer, "<unhandled modifier %#x>(%s)",
                     vsir_src->modifiers, str->buffer);
