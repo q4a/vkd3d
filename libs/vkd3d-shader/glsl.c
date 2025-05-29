@@ -421,6 +421,9 @@ static void shader_glsl_print_src(struct vkd3d_string_buffer *buffer, struct vkd
         case VKD3DSPSM_ABS:
             vkd3d_string_buffer_printf(buffer, "abs(%s)", str->buffer);
             break;
+        case VKD3DSPSM_ABSNEG:
+            vkd3d_string_buffer_printf(buffer, "-abs(%s)", str->buffer);
+            break;
         default:
             vkd3d_string_buffer_printf(buffer, "<unhandled modifier %#x>(%s)",
                     vsir_src->modifiers, str->buffer);
