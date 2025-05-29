@@ -9273,7 +9273,7 @@ static void vsir_validate_hull_shader_phase(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
     if (ctx->program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_OPCODE,
                 "Phase instruction \"%s\" (%#x) is only valid in a hull shader.",
                 vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
     if (ctx->depth != 0)
@@ -9359,7 +9359,7 @@ static void vsir_validate_dcl_index_range(struct validation_context *ctx,
 
     if (ctx->program->normalisation_level >= VSIR_NORMALISED_SM6)
     {
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_OPCODE,
                 "DCL_INDEX_RANGE is not allowed with fully normalised input/output.");
         return;
     }
@@ -10026,8 +10026,8 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     if (instruction->opcode >= VKD3DSIH_INVALID)
     {
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Invalid instruction handler %#x.",
-                instruction->opcode);
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_OPCODE,
+                "Invalid opcode %#x.", instruction->opcode);
     }
 
     if (version->type == VKD3D_SHADER_TYPE_HULL && ctx->phase == VKD3DSIH_INVALID)
@@ -10043,7 +10043,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
             default:
                 if (!vsir_instruction_is_dcl(instruction))
-                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_OPCODE,
                             "Instruction \"%s\" (%#x) appears before any phase instruction in a hull shader.",
                             vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
                 break;
