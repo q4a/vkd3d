@@ -237,6 +237,84 @@ void main(uint local_idx : SV_GroupIndex)
 todo(sm<6) dispatch 1 1 1
 probe uav 1 (0) rui (39)
 
+[uav 0]
+format r32-typeless
+size (raw_buffer, 8)
+
+0xf000f 0xf000f 0xf000f 0xf000f
+0xf000f 0xf000f 0xf000f 0xf000f
+
+[compute shader todo]
+RWByteAddressBuffer u : register(u0);
+groupshared min16uint m[4];
+
+    [numthreads(4, 1, 1)]
+void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
+{
+    min16uint id = (min16uint)group_id.x;
+    /* 16-bit atomic ops are not supported. */
+    m[local_idx] = id + 8 * (local_idx + 1);
+    GroupMemoryBarrierWithGroupSync();
+    m[local_idx] += m[local_idx ^ 1];
+    GroupMemoryBarrierWithGroupSync();
+    /* Depending on the driver and D3D version, two or four bytes are written
+     * when using a minimum precision type, so we explicitly cast. */
+    u.Store(16 * group_id.x + 4 * local_idx, (uint)m[local_idx]);
+}
+
+[test]
+todo dispatch 2 1 1
+todo probe uav 0 (0) rui(0x18)
+todo probe uav 0 (1) rui(0x18)
+todo probe uav 0 (2) rui(0x38)
+todo probe uav 0 (3) rui(0x38)
+todo probe uav 0 (4) rui(0x1a)
+todo probe uav 0 (5) rui(0x1a)
+todo probe uav 0 (6) rui(0x3a)
+todo probe uav 0 (7) rui(0x3a)
+
+[uav 0]
+format r32-typeless
+size (raw_buffer, 8)
+
+0xf000f 0xf000f 0xf000f 0xf000f
+0xf000f 0xf000f 0xf000f 0xf000f
+
+[compute shader todo]
+RWByteAddressBuffer u : register(u0);
+groupshared min16uint m;
+
+    [numthreads(4, 1, 1)]
+void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
+{
+    if (local_idx == 0)
+        m = local_idx + 1;
+    GroupMemoryBarrierWithGroupSync();
+    if (local_idx == 1)
+        m += (local_idx + 1) << (4 * local_idx);
+    GroupMemoryBarrierWithGroupSync();
+    if (local_idx == 2)
+        m += (local_idx + 1) << (4 * local_idx);
+    GroupMemoryBarrierWithGroupSync();
+    if (local_idx == 3)
+        m += (local_idx + 1) << (4 * local_idx);
+    GroupMemoryBarrierWithGroupSync();
+    uint m_local = m;
+    m_local += (group_id + 1) << 16;
+    u.Store(16 * group_id + 4 * local_idx, m_local);
+}
+
+[test]
+todo dispatch 2 1 1
+todo probe uav 0 (0) rui(0x14321)
+todo probe uav 0 (1) rui(0x14321)
+todo probe uav 0 (2) rui(0x14321)
+todo probe uav 0 (3) rui(0x14321)
+todo probe uav 0 (4) rui(0x24321)
+todo probe uav 0 (5) rui(0x24321)
+todo probe uav 0 (6) rui(0x24321)
+todo probe uav 0 (7) rui(0x24321)
+
 [require]
 shader model >= 6.2
 native-16-bit
