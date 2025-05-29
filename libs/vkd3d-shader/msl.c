@@ -545,6 +545,9 @@ static void VKD3D_PRINTF_FUNC(3, 4) msl_print_assignment(
     uint32_t modifiers = dst->vsir->modifiers;
     va_list args;
 
+    /* It is always legitimate to ignore _pp. */
+    modifiers &= ~VKD3DSPDM_PARTIALPRECISION;
+
     if (dst->vsir->shift)
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                 "Internal compiler error: Unhandled destination shift %#x.", dst->vsir->shift);
