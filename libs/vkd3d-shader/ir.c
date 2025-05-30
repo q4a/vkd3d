@@ -10621,6 +10621,17 @@ static void vsir_validate_double_comparison_operation(struct validation_context 
     vsir_validate_comparison_operation(ctx, instruction, types);
 }
 
+static void vsir_validate_float_comparison_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_FLOAT] = true,
+    };
+
+    vsir_validate_comparison_operation(ctx, instruction, types);
+}
+
 static void vsir_validate_branch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     size_t i;
@@ -11331,6 +11342,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_DSY] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_DSY_COARSE] =                       {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_DSY_FINE] =                         {1,   1, vsir_validate_float_elementwise_operation},
+    [VSIR_OP_EQO] =                              {1,   2, vsir_validate_float_comparison_operation},
     [VSIR_OP_HS_CONTROL_POINT_PHASE] =           {0,   0, vsir_validate_hull_shader_phase},
     [VSIR_OP_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
     [VSIR_OP_HS_FORK_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
