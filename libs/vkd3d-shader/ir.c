@@ -11344,6 +11344,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_DSY_COARSE] =                       {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_DSY_FINE] =                         {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_EQO] =                              {1,   2, vsir_validate_float_comparison_operation},
+    [VSIR_OP_EQU] =                              {1,   2, vsir_validate_float_comparison_operation},
     [VSIR_OP_HS_CONTROL_POINT_PHASE] =           {0,   0, vsir_validate_hull_shader_phase},
     [VSIR_OP_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
     [VSIR_OP_HS_FORK_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
