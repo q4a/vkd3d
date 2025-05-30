@@ -11235,6 +11235,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_DSX_FINE] =                         {1,   1, vsir_validate_float_elementwise_operation},
     [VKD3DSIH_DSY] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VKD3DSIH_DSY_COARSE] =                       {1,   1, vsir_validate_float_elementwise_operation},
+    [VKD3DSIH_DSY_FINE] =                         {1,   1, vsir_validate_float_elementwise_operation},
     [VKD3DSIH_HS_CONTROL_POINT_PHASE] =           {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_HS_FORK_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
