@@ -11169,6 +11169,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_DLT] =                              {1,   2, vsir_validate_double_comparison_operation},
     [VKD3DSIH_DMAX] =                             {1,   2, vsir_validate_double_elementwise_operation},
     [VKD3DSIH_DMIN] =                             {1,   2, vsir_validate_double_elementwise_operation},
+    [VKD3DSIH_DMOV] =                             {1,   1, vsir_validate_double_elementwise_operation},
     [VKD3DSIH_HS_CONTROL_POINT_PHASE] =           {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_HS_FORK_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
