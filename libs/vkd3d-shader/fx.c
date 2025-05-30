@@ -4569,6 +4569,8 @@ static void fx_parse_buffers(struct fx_parser *parser)
         name = fx_4_get_string(parser, buffer.name);
 
         vkd3d_string_buffer_printf(&parser->buffer, "cbuffer %s", name);
+        if (buffer.bind_point != ~0u)
+            vkd3d_string_buffer_printf(&parser->buffer, " : register(b%u)", buffer.bind_point);
         fx_parse_fx_4_annotations(parser);
 
         vkd3d_string_buffer_printf(&parser->buffer, "\n{\n");
