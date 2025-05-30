@@ -10423,6 +10423,52 @@ static void vsir_validate_logic_elementwise_operation(struct validation_context 
     vsir_validate_elementwise_operation(ctx, instruction, types);
 }
 
+static void vsir_validate_comparison_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction, const bool types[VKD3D_DATA_COUNT])
+{
+    enum vkd3d_data_type dst_data_type, src_data_type;
+    unsigned int i;
+
+    if (instruction->dst_count < 1)
+        return;
+
+    dst_data_type = instruction->dst[0].reg.data_type;
+
+    if (dst_data_type != VKD3D_DATA_UINT && dst_data_type != VKD3D_DATA_BOOL)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid data type %#x for result of comparison operation \"%s\" (%#x).",
+                dst_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+
+    if (instruction->src_count < 1)
+        return;
+
+    src_data_type = instruction->src[0].reg.data_type;
+
+    if (src_data_type >= VKD3D_DATA_COUNT)
+        return;
+
+    for (i = 1; i < instruction->src_count; ++i)
+    {
+        if (instruction->src[i].reg.data_type != src_data_type)
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                    "Data type %#x for operand %u doesn't match the first operands data type %#x "
+                    "for comparison operation \"%s\" (%#x).",
+                    instruction->src[i].reg.data_type, i, src_data_type,
+                    vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+    }
+}
+
+static void vsir_validate_double_comparison_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_DOUBLE] = true,
+    };
+
+    vsir_validate_comparison_operation(ctx, instruction, types);
+}
+
 static void vsir_validate_branch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     size_t i;
@@ -11118,6 +11164,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VKD3DSIH_DADD] =                             {1,   2, vsir_validate_double_elementwise_operation},
     [VKD3DSIH_DDIV] =                             {1,   2, vsir_validate_double_elementwise_operation},
     [VKD3DSIH_DFMA] =                             {1,   3, vsir_validate_double_elementwise_operation},
+    [VKD3DSIH_DGEO] =                             {1,   2, vsir_validate_double_comparison_operation},
     [VKD3DSIH_HS_CONTROL_POINT_PHASE] =           {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
     [VKD3DSIH_HS_FORK_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
