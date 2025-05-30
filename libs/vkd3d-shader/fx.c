@@ -1011,6 +1011,9 @@ enum fx_4_type_constants
     FX_4_NUMERIC_COLUMNS_SHIFT = 11,
     FX_4_NUMERIC_COLUMN_MAJOR_MASK = 0x4000,
 
+    /* Variable flags */
+    FX_4_HAS_EXPLICIT_BIND_POINT = 0x4,
+
     /* Object types */
     FX_4_OBJECT_TYPE_STRING = 0x1,
     FX_4_OBJECT_TYPE_BLEND_STATE = 0x2,
@@ -2130,13 +2133,9 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t name_offset, type_offset, value_offset;
     uint32_t semantic_offset, flags = 0;
-    enum fx_4_numeric_variable_flags
-    {
-        HAS_EXPLICIT_BIND_POINT = 0x4,
-    };
 
     if (var->has_explicit_bind_point)
-        flags |= HAS_EXPLICIT_BIND_POINT;
+        flags |= FX_4_HAS_EXPLICIT_BIND_POINT;
 
     type_offset = write_type(var->data_type, fx);
     name_offset = write_string(var->name, fx);
@@ -4533,6 +4532,11 @@ static void fx_parse_fx_4_numeric_variables(struct fx_parser *parser, uint32_t c
         {
             semantic = fx_4_get_string(parser, var.semantic);
             vkd3d_string_buffer_printf(&parser->buffer, " : %s", semantic);
+        }
+        if (var.flags & FX_4_HAS_EXPLICIT_BIND_POINT)
+        {
+            vkd3d_string_buffer_printf(&parser->buffer, " : packoffset(c%u.%c)",
+                    var.offset / 16, "xyzw"[(var.offset % 16) / 4]);
         }
         fx_parse_fx_4_annotations(parser);
 
