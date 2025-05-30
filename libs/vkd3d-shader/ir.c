@@ -11326,6 +11326,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_BRANCH] =                           {0, ~0u, vsir_validate_branch},
     [VSIR_OP_DADD] =                             {1,   2, vsir_validate_double_elementwise_operation},
     [VSIR_OP_DDIV] =                             {1,   2, vsir_validate_double_elementwise_operation},
+    [VSIR_OP_DEQO] =                             {1,   2, vsir_validate_double_comparison_operation},
     [VSIR_OP_DFMA] =                             {1,   3, vsir_validate_double_elementwise_operation},
     [VSIR_OP_DGEO] =                             {1,   2, vsir_validate_double_comparison_operation},
     [VSIR_OP_DIV] =                              {1,   2, vsir_validate_float_elementwise_operation},
