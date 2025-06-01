@@ -3962,7 +3962,7 @@ static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_a
     }
     vkd3d_string_buffer_printf(&parser->buffer, " = ");
 
-    if (state && state->type == FX_UINT)
+    if (state && state->type == FX_UINT && state->values)
     {
         const struct rhs_named_value *ptr = state->values;
         uint32_t value;
