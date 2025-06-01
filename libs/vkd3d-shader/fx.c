@@ -873,7 +873,7 @@ fx_2_states[] =
     { "AdaptiveTess_Y",            HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 84 },
     { "AdaptiveTess_Z",            HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 85 },
     { "AdaptiveTess_W",            HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 86 },
-    { "EnableAdaptiveTesselation", HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 87 },
+    { "EnableAdaptiveTessellation",HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 87 },
     { "TwoSidedStencilMode",       HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 88 },
     { "StencilFail",               HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 89, fx_2_stencilcaps_values },
     { "StencilZFail",              HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 90, fx_2_stencilcaps_values },
@@ -904,12 +904,12 @@ fx_2_states[] =
     { "BumpEnvMat01",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 113 },
     { "BumpEnvMat10",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 114 },
     { "BumpEnvMat11",          HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 115 },
-    { "TextCoordIndex",        HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 116 },
+    { "TexCoordIndex",         HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 116 },
     { "BumpEnvLScale",         HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 117 },
     { "BumpEnvLOffset",        HLSL_CLASS_SCALAR, FX_FLOAT, 1, 8, 118 },
     { "TextureTransformFlags", HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 119, fx_2_texturetransform_values },
     { "Constant",              HLSL_CLASS_SCALAR, FX_UINT, 1, 8, 120 },
-    { "NPatchMode",            HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 121 },
+    { "PatchSegments",         HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 121 },
     { "FVF",                   HLSL_CLASS_SCALAR, FX_UINT, 1, 1, 122 },
 
     { "ProjectionTransform", HLSL_CLASS_MATRIX, FX_FLOAT, 4, 1, 123 },
@@ -970,7 +970,7 @@ fx_2_states[] =
     { "MipMapLodBias",     HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 172 },
     { "MaxMipLevel",       HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 173 },
     { "MaxAnisotropy",     HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 174 },
-    { "SRBTexture",        HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 175 },
+    { "SRGBTexture",       HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 175 },
     { "ElementIndex",      HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 176 },
 };
 
