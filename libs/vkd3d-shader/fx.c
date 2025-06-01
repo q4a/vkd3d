@@ -3986,7 +3986,7 @@ static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_a
     }
     else if (state)
     {
-        if (state->type == FX_UINT || state->type == FX_FLOAT)
+        if (state->type == FX_UINT || state->type == FX_FLOAT || state->type == FX_BOOL)
         {
             uint32_t offset = entry->type, base_type;
             unsigned int size;
