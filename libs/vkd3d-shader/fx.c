@@ -3988,11 +3988,12 @@ static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_a
     {
         if (state->type == FX_UINT || state->type == FX_FLOAT)
         {
-            uint32_t offset = entry->type;
+            uint32_t offset = entry->type, base_type;
             unsigned int size;
 
             size = fx_get_fx_2_type_size(parser, &offset);
-            parse_fx_2_numeric_value(parser, entry->value, size, entry->type);
+            fx_parser_read_unstructured(parser, &base_type, entry->type, sizeof(base_type));
+            parse_fx_2_numeric_value(parser, entry->value, size, base_type);
         }
         else if (state->type == FX_VERTEXSHADER || state->type == FX_PIXELSHADER)
         {
