@@ -612,10 +612,12 @@ static void VKD3D_PRINTF_FUNC(3, 4) msl_print_assignment(
 
 static void msl_unhandled(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
+    const char *name = vsir_opcode_get_name(ins->opcode, "<unknown>");
+
     msl_print_indent(gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(gen->buffer, "/* <unhandled instruction %#x> */\n", ins->opcode);
+    vkd3d_string_buffer_printf(gen->buffer, "/* <unhandled instruction \"%s\" (%#x)> */\n", name, ins->opcode);
     msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-            "Internal compiler error: Unhandled instruction %#x.", ins->opcode);
+            "Internal compiler error: Unhandled instruction \"%s\" (%#x).", name, ins->opcode);
 }
 
 static void msl_binop(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins, const char *op)
