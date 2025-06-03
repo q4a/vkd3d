@@ -1416,8 +1416,8 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_TEXREG2GB:
             case VKD3DSIH_TEXREG2RGB:
                 vkd3d_shader_error(ctx->message_context, &ins->location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                        "Aborting due to unimplemented feature: Combined sampler instruction %#x.",
-                        ins->opcode);
+                        "Aborting due to unimplemented feature: Combined sampler instruction \"%s\" (%#x).",
+                        vsir_opcode_get_name(ins->opcode, "<unknown>"), ins->opcode);
                 return VKD3D_ERROR_NOT_IMPLEMENTED;
 
             default:
