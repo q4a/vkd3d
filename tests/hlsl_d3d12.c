@@ -84,7 +84,15 @@ static const char test_include2_top[] =
     "#include \"file4\"\n"
     ",ss)";
 
+/* Test #include immediately followed by EOF. */
 static const char test_include2_file4[] =
+    "#include \"file5\"";
+
+/* Test #include immediately followed by comment immediately followed by EOF. */
+static const char test_include2_file5[] =
+    "#include \"file6\"/*";
+
+static const char test_include2_file6[] =
     "FUNC(pa";
 
 static unsigned int refcount_file1, refcount_file2, refcount_file3, include_count_file2;
@@ -127,6 +135,20 @@ static HRESULT WINAPI test_include_Open(ID3DInclude *iface, D3D_INCLUDE_TYPE typ
         ok(!parent_data, "Got parent data %p.\n", parent_data);
         *code = test_include2_file4;
         *size = strlen(test_include2_file4);
+    }
+    else if (!strcmp(filename, "file5"))
+    {
+        ok(type == D3D_INCLUDE_LOCAL, "Got type %#x.\n", type);
+        ok(parent_data == test_include2_file4, "Got parent data %p.\n", parent_data);
+        *code = test_include2_file5;
+        *size = strlen(test_include2_file5);
+    }
+    else if (!strcmp(filename, "file6"))
+    {
+        ok(type == D3D_INCLUDE_LOCAL, "Got type %#x.\n", type);
+        ok(parent_data == test_include2_file5, "Got parent data %p.\n", parent_data);
+        *code = test_include2_file6;
+        *size = strlen(test_include2_file6);
     }
     else
     {
@@ -392,7 +414,13 @@ static void test_preprocess(void)
 
             "pass",
             "fail",
-        }
+        },
+
+        /* Make sure we handle the empty-file case without breaking. */
+        {
+            "",
+            "",
+        },
     };
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
