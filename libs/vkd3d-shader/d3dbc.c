@@ -2030,8 +2030,8 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
             {
                 vkd3d_shader_error(d3dbc->message_context, &ins->location,
                         VKD3D_SHADER_ERROR_D3DBC_INVALID_WRITEMASK,
-                        "writemask %#x for vsir instruction with opcode %#x is not single component.",
-                        writemask, ins->opcode);
+                        "Writemask %#x for instruction \"%s\" (%#x) is not single component.",
+                        writemask, vsir_opcode_get_name(ins->opcode, "<unknown>"), ins->opcode);
                 d3dbc->failed = true;
             }
             d3dbc_write_instruction(d3dbc, ins);
@@ -2039,7 +2039,8 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
 
         default:
             vkd3d_shader_error(d3dbc->message_context, &ins->location, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
-                   "vsir instruction with opcode %#x.", ins->opcode);
+                   "Internal compiler error: Unhandled instruction \"%s\" (%#x).",
+                   vsir_opcode_get_name(ins->opcode, "<unknown>"), ins->opcode);
             d3dbc->failed = true;
             break;
     }
