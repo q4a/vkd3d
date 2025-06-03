@@ -612,6 +612,8 @@ enum vkd3d_shader_opcode
     VKD3DSIH_COUNT,
 };
 
+const char *vsir_opcode_get_name(enum vkd3d_shader_opcode op, const char *error);
+
 enum vkd3d_shader_register_type
 {
     VKD3DSPR_TEMP,
