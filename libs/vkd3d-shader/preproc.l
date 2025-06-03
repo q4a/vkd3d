@@ -71,8 +71,8 @@ INT_SUFFIX      [uUlL]{0,2}
 
 %%
 
-<INITIAL>"//"                       {yy_push_state(CXX_COMMENT, yyscanner);}
-<INITIAL>"/*"                       {yy_push_state(C_COMMENT, yyscanner);}
+<INITIAL,INCLUDE,LINE>"//"          {yy_push_state(CXX_COMMENT, yyscanner);}
+<INITIAL,INCLUDE,LINE>"/*"          {yy_push_state(C_COMMENT, yyscanner);}
 <CXX_COMMENT>\\{NEWLINE}            {}
 <CXX_COMMENT>\n                     {
         yy_pop_state(yyscanner);

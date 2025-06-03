@@ -59,7 +59,7 @@ static void check_preprocess_(const char *file, int line, const char *source,
 
 static const char test_include_top[] =
     "#include \"file1\"\n"
-    "#include < file2 >\n"
+    "#include/* a comment */< file2 >//another comment\n"
     "ARGES\n";
 
 static const char test_include_file1[] =
