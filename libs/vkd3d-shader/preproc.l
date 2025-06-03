@@ -80,7 +80,11 @@ INT_SUFFIX      [uUlL]{0,2}
         return T_NEWLINE;
     }
 <C_COMMENT>"*/"                     {yy_pop_state(yyscanner);}
-<C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
+<C_COMMENT,CXX_COMMENT><<EOF>>      {
+        yy_pop_state(yyscanner);
+        BEGIN(INITIAL);
+        yyterminate();
+    }
 <C_COMMENT,CXX_COMMENT>.            {}
 <C_COMMENT>\n                       {}
 
@@ -195,6 +199,10 @@ INT_SUFFIX      [uUlL]{0,2}
 <INITIAL,INCLUDE,ERROR,LINE>{NEWLINE}   {
         BEGIN(INITIAL);
         return T_NEWLINE;
+    }
+<INITIAL,INCLUDE,ERROR,LINE><<EOF>> {
+        BEGIN(INITIAL);
+        yyterminate();
     }
 
 <INITIAL,INCLUDE,LINE>{WS}+         {}
