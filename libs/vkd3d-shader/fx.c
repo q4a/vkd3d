@@ -761,7 +761,7 @@ static const struct rhs_named_value fx_2_filter_values[] =
     { NULL }
 };
 
-static const struct fx_2_state
+struct fx_2_state
 {
     const char *name;
     enum hlsl_type_class class;
@@ -770,8 +770,9 @@ static const struct fx_2_state
     uint32_t array_size;
     uint32_t id;
     const struct rhs_named_value *values;
-}
-fx_2_states[] =
+};
+
+static const struct fx_2_state fx_2_pass_states[] =
 {
     { "ZEnable",          HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 0, fx_2_zenable_values },
     { "FillMode",         HLSL_CLASS_SCALAR, FX_UINT,  1, 1, 1, fx_2_fillmode_values },
@@ -963,6 +964,23 @@ fx_2_states[] =
     { "MaxAnisotropy",     HLSL_CLASS_SCALAR, FX_UINT,    1, 261, 174 },
     { "SRGBTexture",       HLSL_CLASS_SCALAR, FX_UINT,    1, 261, 175 },
     { "ElementIndex",      HLSL_CLASS_SCALAR, FX_UINT,    1, 261, 176 },
+};
+
+static const struct fx_2_state fx_2_sampler_states[] =
+{
+    { "Texture",           HLSL_CLASS_SCALAR, FX_TEXTURE, 1, 1, 164 },
+    { "AddressU",          HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 165, fx_2_address_values },
+    { "AddressV",          HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 166, fx_2_address_values },
+    { "AddressW",          HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 167, fx_2_address_values },
+    { "BorderColor",       HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 168 },
+    { "MagFilter",         HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 169, fx_2_filter_values },
+    { "MinFilter",         HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 170, fx_2_filter_values },
+    { "MipFilter",         HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 171, fx_2_filter_values },
+    { "MipMapLodBias",     HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 172 },
+    { "MaxMipLevel",       HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 173 },
+    { "MaxAnisotropy",     HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 174 },
+    { "SRGBTexture",       HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 175 },
+    { "ElementIndex",      HLSL_CLASS_SCALAR, FX_UINT,    1, 1, 176 },
 };
 
 static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -3851,7 +3869,8 @@ static bool is_fx_2_sampler(uint32_t type)
             || type == D3DXPT_SAMPLERCUBE;
 }
 
-static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_assignment *entry);
+static void fx_parse_fx_2_assignment(struct fx_parser *parser, enum hlsl_type_class container,
+        const struct fx_assignment *entry);
 
 static void parse_fx_2_sampler(struct fx_parser *parser, uint32_t element_count,
         uint32_t offset)
@@ -3876,7 +3895,7 @@ static void parse_fx_2_sampler(struct fx_parser *parser, uint32_t element_count,
             fx_parser_read_unstructured(parser, &entry, offset, sizeof(entry));
 
             parse_fx_print_indent(parser);
-            fx_parse_fx_2_assignment(parser, &entry);
+            fx_parse_fx_2_assignment(parser, HLSL_CLASS_SAMPLER, &entry);
         }
         parse_fx_end_indent(parser);
         parse_fx_print_indent(parser);
@@ -3954,15 +3973,29 @@ static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
     vkd3d_string_buffer_printf(&parser->buffer, ">");
 }
 
-static void fx_parse_fx_2_assignment(struct fx_parser *parser, const struct fx_assignment *entry)
+static const struct fx_2_state *fx_2_get_state_by_id(enum hlsl_type_class container, uint32_t id)
+{
+    const struct fx_2_state *table;
+    unsigned int count;
+
+    count = container == HLSL_CLASS_PASS ? ARRAY_SIZE(fx_2_pass_states) : ARRAY_SIZE(fx_2_sampler_states);
+    table = container == HLSL_CLASS_PASS ? fx_2_pass_states : fx_2_sampler_states;
+
+    /* State identifiers are sequential, no gaps */
+    if (id >= table[0].id && id <= table[count - 1].id)
+        return &table[id - table[0].id];
+
+    return NULL;
+}
+
+static void fx_parse_fx_2_assignment(struct fx_parser *parser, enum hlsl_type_class container,
+        const struct fx_assignment *entry)
 {
     const struct rhs_named_value *named_value = NULL;
-    const struct fx_2_state *state = NULL;
+    const struct fx_2_state *state;
 
-    if (entry->id <= ARRAY_SIZE(fx_2_states))
+    if ((state = fx_2_get_state_by_id(container, entry->id)))
     {
-        state = &fx_2_states[entry->id];
-
         vkd3d_string_buffer_printf(&parser->buffer, "%s", state->name);
         if (state->array_size > 1)
             vkd3d_string_buffer_printf(&parser->buffer, "[%u]", entry->lhs_index);
@@ -4073,7 +4106,7 @@ static void fx_parse_fx_2_technique(struct fx_parser *parser)
 
             parse_fx_print_indent(parser);
             fx_parser_read_u32s(parser, &entry, sizeof(entry));
-            fx_parse_fx_2_assignment(parser, &entry);
+            fx_parse_fx_2_assignment(parser, HLSL_CLASS_PASS, &entry);
         }
         parse_fx_end_indent(parser);
 
