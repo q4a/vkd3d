@@ -30856,6 +30856,7 @@ static void test_domain_shader_inputs(void)
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
     D3D12_INPUT_LAYOUT_DESC input_layout;
     struct d3d12_resource_readback rb;
+    float got = 0.0f, expected = 0.0f;
     struct test_context_desc desc;
     struct test_context context;
     ID3D12Resource *so_buffer;
@@ -31047,7 +31048,9 @@ static void test_domain_shader_inputs(void)
         elems = get_readback_data(&rb.rb, y, 0, 0, stride);
         for (x = 0; x < ARRAY_SIZE(*reference); ++x)
         {
-            if (!compare_float(reference[y][x], elems[x], 0))
+            got = elems[x];
+            expected = reference[y][x];
+            if (!compare_float(expected, got, 0))
             {
                 fail = true;
                 break;
@@ -31058,7 +31061,7 @@ static void test_domain_shader_inputs(void)
             break;
     }
     bug_if(is_mvk_device(context.device))
-    ok(!fail, "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
+    ok(!fail, "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", got, y, x, expected);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
@@ -31072,6 +31075,7 @@ static void test_domain_shader_one_patch_constant_input(void)
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
     D3D12_INPUT_LAYOUT_DESC input_layout;
     struct d3d12_resource_readback rb;
+    float got = 0.0f, expected = 0.0f;
     struct test_context_desc desc;
     struct test_context context;
     ID3D12Resource *so_buffer;
@@ -31232,7 +31236,9 @@ static void test_domain_shader_one_patch_constant_input(void)
         elems = get_readback_data(&rb.rb, y, 0, 0, stride);
         for (x = 0; x < ARRAY_SIZE(*reference); ++x)
         {
-            if (!compare_float(reference[y][x], elems[x], 0))
+            got = elems[x];
+            expected = reference[y][x];
+            if (!compare_float(expected, got, 0))
             {
                 fail = true;
                 break;
@@ -31243,7 +31249,7 @@ static void test_domain_shader_one_patch_constant_input(void)
             break;
     }
     bug_if(is_mvk_device(context.device))
-    ok(!fail, "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
+    ok(!fail, "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", got, y, x, expected);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
