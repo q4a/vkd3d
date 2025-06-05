@@ -35116,6 +35116,13 @@ static void test_graphics_compute_queue_synchronization(void)
     device = context.device;
     queue = context.queue;
 
+    if (is_mvk_paravirtualized_device(device))
+    {
+        skip("GPU hangs on paravirtualized MVK.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
     root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
     root_parameters[0].Descriptor.ShaderRegister = 1;
     root_parameters[0].Descriptor.RegisterSpace = 0;

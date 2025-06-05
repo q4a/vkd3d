@@ -538,6 +538,11 @@ static inline bool is_mvk_device(ID3D12Device *device)
     return false;
 }
 
+static inline bool is_mvk_paravirtualized_device(ID3D12Device *device)
+{
+    return false;
+}
+
 static inline bool is_mvk_device_lt(ID3D12Device *device, uint32_t major, uint32_t minor, uint32_t patch)
 {
     return false;
@@ -870,6 +875,16 @@ static inline bool is_mvk_device(ID3D12Device *device)
 
     get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MOLTENVK;
+}
+
+static inline bool is_mvk_paravirtualized_device(ID3D12Device *device)
+{
+    VkPhysicalDeviceDriverPropertiesKHR properties;
+    VkPhysicalDeviceProperties device_properties;
+
+    get_driver_properties(device, &device_properties, &properties);
+    return properties.driverID == VK_DRIVER_ID_MOLTENVK
+            && strcmp(device_properties.deviceName, "Apple Paravirtual device") == 0;
 }
 
 /* MoltenVK uses a different pattern than standard Vulkan. */
