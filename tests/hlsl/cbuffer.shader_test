@@ -1022,7 +1022,7 @@ uint4 main() : sv_target
 [test]
 uniform 0 uint 0x7fffffff
 draw quad
-probe (0, 0) rgbaui(0xffff, 0x7fff, 0, 0)
+probe (0, 0) u32(0xffff, 0x7fff, 0, 0)
 
 [pixel shader]
 uniform uint16_t4 u0;
@@ -1036,7 +1036,7 @@ uint4 main() : sv_target
 [test]
 uniform 0 uint4 0x20001 0x40003 0x60005 0x80007
 draw quad
-probe (0, 0) rgbaui(1, 2, 6, 7)
+probe (0, 0) u32(1, 2, 6, 7)
 
 [pixel shader]
 uniform int16_t2 i;

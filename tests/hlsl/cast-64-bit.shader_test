@@ -33,7 +33,7 @@ uint4 main() : sv_target
 [test]
 uniform 0 double2 -4.5 8.500003814697266
 todo(sm<6) draw quad
-probe (0, 0) rgbaui (0, 0xc0120000, 0x80000000, 0x40210000)
+probe (0, 0) u32(0, 0xc0120000, 0x80000000, 0x40210000)
 
 
 [pixel shader todo]
@@ -139,7 +139,7 @@ uint4 main() : sv_target
 [test]
 uniform 0 double2 0.5 1.0
 todo(sm<6) draw quad
-probe (0, 0) rgbaui(0, 2, 0, 1)
+probe (0, 0) u32(0, 2, 0, 1)
 
 [pixel shader todo]
 uniform min16uint u[2];
@@ -157,7 +157,7 @@ uint4 main() : sv_target
 uniform 0 uint 22
 uniform 4 uint 0xff00
 todo(sm<6) draw quad
-probe (0, 0) rgbaui(0, 0x40360000, 0, 0x40efe000)
+probe (0, 0) u32(0, 0x40360000, 0, 0x40efe000)
 
 [pixel shader todo]
 uniform min16int u[2];
@@ -175,7 +175,7 @@ uint4 main() : sv_target
 uniform 0 uint 22
 uniform 4 uint 0xffffff00
 todo(sm<6) draw quad
-probe (0, 0) rgbaui(0, 0x40360000, 0, 0xc0700000)
+probe (0, 0) u32(0, 0x40360000, 0, 0xc0700000)
 
 [require]
 shader model >= 6.2
@@ -211,7 +211,7 @@ uint4 main() : sv_target
 [test]
 uniform 0 double2 0.5 1.0
 todo draw quad
-probe (0, 0) rgbaui(0, 2, 0, 1)
+probe (0, 0) u32(0, 2, 0, 1)
 
 [pixel shader]
 uniform uint16_t2 u;
@@ -229,7 +229,7 @@ uint4 main() : sv_target
 uniform 0 uint 0xff000022
 
 draw quad
-probe (0, 0) rgbaui(0, 0x40410000, 0, 0x40efe000)
+probe (0, 0) u32(0, 0x40410000, 0, 0x40efe000)
 
 [pixel shader]
 uniform int16_t2 u;
@@ -246,4 +246,4 @@ uint4 main() : sv_target
 [test]
 uniform 0 uint 0xff000022
 draw quad
-probe (0, 0) rgbaui(0, 0x40410000, 0, 0xc0700000)
+probe (0, 0) u32(0, 0x40410000, 0, 0xc0700000)

@@ -292,13 +292,13 @@ uniform 5 uint 2
 uniform 8 uint 2
 draw quad
 % In D3D12 with SM5 all reads to the array return 0
-if(sm>=6 | !d3d12) probe (0, 0) rgbaui(0xfffff803, 0x1ffd, 0, 0)
+if(sm>=6 | !d3d12) probe (0, 0) u32(0xfffff803, 0x1ffd, 0, 0)
 uniform 0 uint 0
 uniform 4 uint 0
 uniform 5 uint 0
 uniform 8 uint 0
 draw quad
-if(sm>=6 | !d3d12) probe (0, 0) rgbaui(1, 2, 0, 0)
+if(sm>=6 | !d3d12) probe (0, 0) u32(1, 2, 0, 0)
 
 [pixel shader]
 uniform min16int u[4];

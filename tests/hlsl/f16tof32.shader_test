@@ -79,9 +79,9 @@ probe (0, 0) rgba(3.0517578e-05, 3.0517578e-05, 3.0517578e-05, 3.0517578e-05)
 % positive infinity
 uniform 0 uint 0x7c00
 todo(msl) draw quad
-probe (0, 0) rgbaui(0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000)
+probe (0, 0) u32(0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000)
 
 % negative infinity
 uniform 0 uint 0xfc00
 todo(msl) draw quad
-probe (0, 0) rgbaui(0xff800000, 0xff800000, 0xff800000, 0xff800000)
+probe (0, 0) u32(0xff800000, 0xff800000, 0xff800000, 0xff800000)

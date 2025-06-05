@@ -241,4 +241,4 @@ uint4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgbaui(0, 1, 10, 100)
+probe (0, 0) u32(0, 1, 10, 100)

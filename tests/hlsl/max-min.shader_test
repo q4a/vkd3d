@@ -102,7 +102,7 @@ uint4 main() : sv_target
 [test]
 uniform 0 uint4 1 2 0 0
 todo(msl) draw quad
-probe (0, 0) rgbaui (2, 1, 2, 1)
+probe (0, 0) u32(2, 1, 2, 1)
 
 [rtv 0]
 format r32g32b32a32-sint

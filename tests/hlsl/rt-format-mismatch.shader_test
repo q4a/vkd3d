@@ -30,7 +30,7 @@ uint4 main() : sv_target
 
 [test]
 todo(mvk & vulkan | msl) draw quad
-todo(mvk) probe (0, 0) rgbaui (0, 22, 0xfeedcafe, 0xffffffff)
+todo(mvk) probe (0, 0) u32(0, 22, 0xfeedcafe, 0xffffffff)
 
 [pixel shader]
 int4 main() : sv_target
@@ -74,7 +74,7 @@ uint4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgbaui (0, 22, 0xfeedcafe, 0xffffffff)
+probe (0, 0) u32(0, 22, 0xfeedcafe, 0xffffffff)
 
 [pixel shader]
 int4 main() : sv_target
@@ -118,7 +118,7 @@ uint4 main() : sv_target
 
 [test]
 todo(mvk & vulkan | msl) draw quad
-todo(mvk) probe (0, 0) rgbaui (0, 22, 0xfeedcafe, 0xffffffff)
+todo(mvk) probe (0, 0) u32(0, 22, 0xfeedcafe, 0xffffffff)
 
 [pixel shader]
 int4 main() : sv_target
@@ -162,7 +162,7 @@ uint4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rui (22)
+probe (0, 0) u32(22)
 
 [pixel shader]
 int4 main() : sv_target

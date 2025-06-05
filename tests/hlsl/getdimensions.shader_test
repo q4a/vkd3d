@@ -78,7 +78,7 @@ void main()
 
 [test]
 dispatch 1 1 1
-probe uav 0 (0) rui(4)
+probe uav 0 (0) u32(4)
 
 [uav 0]
 stride 6
@@ -107,8 +107,8 @@ void main()
 
 [test]
 dispatch 1 1 1
-probe uav 0 (0) rui(0x38000002)
-probe uav 0 (1) rui(6)
+probe uav 0 (0) u32(0x38000002)
+probe uav 0 (1) u32(6)
 
 [uav 0]
 stride 8
@@ -137,8 +137,8 @@ void main()
 
 [test]
 dispatch 1 1 1
-probe uav 0 (0) rui(0x38000002)
-probe uav 0 (1) rui(8)
+probe uav 0 (0) u32(0x38000002)
+probe uav 0 (1) u32(8)
 
 [uav 0]
 stride 8
@@ -166,5 +166,5 @@ void main()
 
 [test]
 dispatch 1 1 1
-probe uav 0 (0) rui(2)
-probe uav 0 (1) rui(8)
+probe uav 0 (0) u32(2)
+probe uav 0 (1) u32(8)

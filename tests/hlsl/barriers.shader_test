@@ -98,4 +98,4 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 
 [test]
 todo(glsl) dispatch 1 1 1
-probe uav 3 (0, 0, 1024, 1) rui(1024)
+probe uav 3 (0, 0, 1024, 1) u32(1024)

@@ -232,24 +232,24 @@ uniform 4 double2 2.0 4.0
 uniform 8 double2 5.0 7.0
 uniform 12 double2 6.0 8.0
 todo(sm<6) draw quad
-if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff)
-if(sm>=6) probe (0, 0) rgbaui(1, 1, 1, 1)
+if(sm<6) probe (0, 0) u32(0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff)
+if(sm>=6) probe (0, 0) u32(1, 1, 1, 1)
 
 uniform 0 double2 1.0 4.0
 uniform 4 double2 2.0 3.0
 uniform 8 double2 5.0 8.0
 uniform 12 double2 6.0 7.0
 todo(sm<6) draw quad
-if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0xffffffff, 0, 0)
-if(sm>=6) probe (0, 0) rgbaui(1, 1, 0, 0)
+if(sm<6) probe (0, 0) u32(0xffffffff, 0xffffffff, 0, 0)
+if(sm>=6) probe (0, 0) u32(1, 1, 0, 0)
 
 uniform 0 double2 1.0 4.0
 uniform 4 double2 2.0 3.0
 uniform 8 double2 6.0 7.0
 uniform 12 double2 5.0 8.0
 todo(sm<6) draw quad
-if(sm<6) probe (0, 0) rgbaui(0xffffffff, 0, 0xffffffff, 0)
-if(sm>=6) probe (0, 0) rgbaui(1, 0, 1, 0)
+if(sm<6) probe (0, 0) u32(0xffffffff, 0, 0xffffffff, 0)
+if(sm>=6) probe (0, 0) u32(1, 0, 1, 0)
 
 [rtv 0]
 format r32g32b32a32-float

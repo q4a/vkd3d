@@ -818,7 +818,7 @@ static void read_uint(const char **line, unsigned int *u, bool is_uniform)
     if (*u != val)
         fatal_error("Out of range uint constant '%.*s'.\n", (int)(rest - *line), *line);
 
-    *line = rest + (!is_uniform && *rest == ',');
+    *line = rest;
 }
 
 static void read_int4(const char **line, struct ivec4 *v)
@@ -829,12 +829,12 @@ static void read_int4(const char **line, struct ivec4 *v)
     read_int(line, &v->w, true);
 }
 
-static void read_uint4(const char **line, struct uvec4 *v, bool is_uniform)
+static void read_uint4(const char **line, struct uvec4 *v)
 {
-    read_uint(line, &v->x, is_uniform);
-    read_uint(line, &v->y, is_uniform);
-    read_uint(line, &v->z, is_uniform);
-    read_uint(line, &v->w, is_uniform);
+    read_uint(line, &v->x, true);
+    read_uint(line, &v->y, true);
+    read_uint(line, &v->z, true);
+    read_uint(line, &v->w, true);
 }
 
 static void read_int64(const char **line, int64_t *i, bool is_uniform)
@@ -1288,40 +1288,52 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 check_readback_data_double(rb, &rect, v.x, ulps);
             }
         }
-        else if (match_string(line, "i32", &line))
+        else if (match_string(line, "u32", &line) || (is_signed = match_string(line, "i32", &line)))
         {
-            struct ivec4 v;
+            struct uvec4 v;
 
             if (*line != '(')
                 fatal_error("Malformed probe arguments '%s'.\n", line);
             ++line;
 
-            read_int(&line, &v.x, false);
+            if (is_signed)
+                read_int(&line, (int32_t *)&v.x, false);
+            else
+                read_uint(&line, &v.x, false);
 
             while (isspace(*line))
                 ++line;
             if (*line == ',')
             {
                 ++line;
-                read_int(&line, &v.y, false);
+                if (is_signed)
+                    read_int(&line, (int32_t *)&v.y, false);
+                else
+                    read_uint(&line, &v.y, false);
 
                 while (isspace(*line))
                     ++line;
                 if (*line != ',')
                     fatal_error("Malformed probe arguments '%s'.\n", line);
                 ++line;
-                read_int(&line, &v.z, false);
+                if (is_signed)
+                    read_int(&line, (int32_t *)&v.z, false);
+                else
+                    read_uint(&line, &v.z, false);
 
                 while (isspace(*line))
                     ++line;
                 if (*line != ',')
                     fatal_error("Malformed probe arguments '%s'.\n", line);
                 ++line;
-                read_int(&line, &v.w, false);
+                if (is_signed)
+                    read_int(&line, (int32_t *)&v.w, false);
+                else
+                    read_uint(&line, &v.w, false);
 
                 line = close_parentheses(line);
                 todo_if(runner->is_todo) bug_if(runner->is_bug)
-                check_readback_data_ivec4(rb, &rect, &v);
+                check_readback_data_uvec4(rb, &rect, &v);
             }
             else
             {
@@ -1329,18 +1341,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 todo_if(runner->is_todo) bug_if(runner->is_bug)
                 check_readback_data_uint(rb, &box, v.x, 0);
             }
-        }
-        else if (match_string(line, "rgbaui", &line))
-        {
-            struct uvec4 v;
-
-            if (*line != '(')
-                fatal_error("Malformed probe arguments '%s'.\n", line);
-            ++line;
-            read_uint4(&line, &v, false);
-            line = close_parentheses(line);
-            todo_if(runner->is_todo) bug_if(runner->is_bug)
-            check_readback_data_uvec4(rb, &rect, &v);
         }
         else if (match_string(line, "rgba", &line))
         {
@@ -1365,18 +1365,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 ulps = 0;
             todo_if(runner->is_todo) bug_if(runner->is_bug)
             check_readback_data_vec2(rb, &rect, &v, ulps);
-        }
-        else if (match_string(line, "rui", &line))
-        {
-            unsigned int expect;
-
-            if (*line != '(')
-                fatal_error("Malformed probe arguments '%s'.\n", line);
-            ++line;
-            read_uint(&line, &expect, false);
-            line = close_parentheses(line);
-            todo_if(runner->is_todo) bug_if(runner->is_bug)
-            check_readback_data_uint(rb, &box, expect, 0);
         }
         else if (match_string(line, "r", &line))
         {
@@ -1440,7 +1428,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         {
             struct uvec4 v;
 
-            read_uint4(&line, &v, true);
+            read_uint4(&line, &v);
             set_uniforms(runner, offset, 4, &v);
         }
         else if (match_string(line, "int", &line))

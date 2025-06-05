@@ -35,7 +35,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl | msl) draw quad
-probe uav 1 (0) rgbaui(10, 11, 12, 13)
+probe uav 1 (0) u32(10, 11, 12, 13)
 
 [pixel shader]
 RWByteAddressBuffer u : register(u1);
@@ -49,7 +49,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl | msl) draw quad
-probe uav 1 (0) rgbaui(20, 21, 22, 23)
+probe uav 1 (0) u32(20, 21, 22, 23)
 
 [pixel shader]
 RWByteAddressBuffer u : register(u1);
@@ -63,7 +63,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl | msl) draw quad
-probe uav 1 (0) rgbaui(20, 21, 22, 23)
+probe uav 1 (0) u32(20, 21, 22, 23)
 
 [require]
 shader model >= 5.0
@@ -124,6 +124,6 @@ void main()
 
 [test]
 dispatch 1 1 1
-probe uav 1 (0) rui(0xfff4000b)
-probe uav 1 (1) rui(0xfff2000d)
-probe uav 1 (2) rui(0x4b404ab0)
+probe uav 1 (0) u32(0xfff4000b)
+probe uav 1 (1) u32(0xfff2000d)
+probe uav 1 (2) u32(0x4b404ab0)
