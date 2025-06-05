@@ -125,7 +125,7 @@ enum hlsl_sampler_dim
     HLSL_SAMPLER_DIM_STRUCTURED_BUFFER,
     HLSL_SAMPLER_DIM_RAW_BUFFER,
     HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_RAW_BUFFER,
-    /* NOTE: Remember to update object_methods[] in hlsl.y if this enum is modified. */
+    /* NOTE: Remember to update texture_methods[] and uav_methods[] in hlsl.y if this is modified. */
 };
 
 enum hlsl_so_object_type
