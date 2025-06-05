@@ -204,7 +204,7 @@ float4 main() : sv_target1
 
 [test]
 todo(msl) draw quad
-probe uav 2 (0) rgba (11.1, 12.2, 13.3, 14.4)
+probe uav 2 (0) f32(11.1, 12.2, 13.3, 14.4)
 
 [require]
 shader model >= 6.2
@@ -228,7 +228,7 @@ void main()
 [test]
 uniform 0 uint4 0x4a204990 0x4b404ab0 0 0
 dispatch 1 1 1
-probe uav 1 (0) rgba(11.125, 12.25, 13.375, 14.5)
+probe uav 1 (0) f32(11.125, 12.25, 13.375, 14.5)
 
 [compute shader]
 uniform half4 h;
@@ -243,7 +243,7 @@ void main()
 [test]
 uniform 0 uint4 0x4a204990 0x4b404ab0 0 0
 dispatch 1 1 1
-probe uav 1 (0) rgba(11.125, 12.25, 13.375, 14.5)
+probe uav 1 (0) f32(11.125, 12.25, 13.375, 14.5)
 
 [compute shader]
 uniform half h;
@@ -258,7 +258,7 @@ void main()
 [test]
 uniform 0 uint 0x4990
 dispatch 1 1 1
-probe uav 1 (0) r(11.125)
+probe uav 1 (0) f32(11.125)
 
 [uav 1]
 format r32g32b32a32-uint

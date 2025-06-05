@@ -21,7 +21,7 @@ float4 main() : sv_target
 todo(glsl | msl) draw quad
 probe uav 1 (0) i32(10)
 if(sm<6) probe uav 1 (1) i32(11)
-if(sm>=6) probe uav 1 (1) r (11.1)
+if(sm>=6) probe uav 1 (1) f32(11.1)
 
 [pixel shader]
 RWByteAddressBuffer u : register(u1);

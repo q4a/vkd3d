@@ -38,7 +38,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba (0.1, 0.2, 0.1, 0.2)
+probe (0, 0) f32(0.1, 0.2, 0.1, 0.2)
 
 
 [pixel shader fail todo]
@@ -79,7 +79,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(1.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(1.0, 2.0, 2.0, 2.0)
 
 
 % float and float1 can be defined separately...
@@ -195,7 +195,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
+probe (0, 0) f32(1.0, 1.0, 1.0, 1.0)
 
 % Component type narrowing is preferred over component count narrowing.
 [pixel shader]
@@ -209,7 +209,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
+probe (0, 0) f32(1.0, 1.0, 1.0, 1.0)
 
 % Let C be the common type that would be produced in an arithmetic expression
 % between the parameter and argument types. If C is the same as the parameter, the
@@ -237,7 +237,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(0.0, 0.0, 0.0, 0.0)
+probe (0, 0) f32(0.0, 0.0, 0.0, 0.0)
 
 % Let C be the common type that would be produced in an arithmetic expression
 % between the parameter and argument types. If C is the same as the argument,
@@ -299,7 +299,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 
 % Let C be the common type that would be produced in an arithmetic expression
 % between the parameter and argument types. If C is "int" and the parameter is "uint", the
@@ -326,7 +326,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo(sm<6) probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+todo(sm<6) probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 
 % Same as above.
 
@@ -349,7 +349,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 
 % An exact match is preferred for minimum precision types as well.
 [pixel shader todo]
@@ -363,7 +363,7 @@ float4 main() : sv_target
 
 [test]
 todo(sm<6) draw quad
-probe (0, 0) rgba(1.0, 1.0, 1.0, 1.0)
+probe (0, 0) f32(1.0, 1.0, 1.0, 1.0)
 
 [require]
 % Need SM5 for doubles.
@@ -395,7 +395,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 
 % Component type widening is preferred over component type narrowing.
 [pixel shader]
@@ -409,7 +409,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 
 % Component count widening is preferred over component type narrowing.
 [pixel shader]
@@ -423,7 +423,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 
 % Component count widening is preferred over component type class conversion.
 [pixel shader]
@@ -437,7 +437,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 % Let C be the common type that would be produced in an arithmetic expression
 % between the parameter and argument types. If C has the same base type as the argument,
 % but with more components, it is preferred over all other cases.
@@ -466,7 +466,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) r(2.0)
+probe (0, 0) f32(2.0)
 
 [pixel shader]
 float func(uint4 x, double y)
@@ -489,7 +489,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) r(1.0)
+probe (0, 0) f32(1.0)
 
 [pixel shader]
 float func(uint4 x, double y)
@@ -512,7 +512,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) r(1.0)
+probe (0, 0) f32(1.0)
 
 [pixel shader]
 float func(half4 x, half y, half z, half a)
@@ -535,7 +535,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) r(1.0)
+probe (0, 0) f32(1.0)
 
 [require]
 % Reset
@@ -559,7 +559,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(2.0, 2.0, 2.0, 2.0)
+probe (0, 0) f32(2.0, 2.0, 2.0, 2.0)
 
 % Some matrices are implicitly compatible with vectors and will ambiguate with them.
 
@@ -681,7 +681,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) rgba(42.0, 42.0, 42.0, 42.0)
+probe (0, 0) f32(42.0, 42.0, 42.0, 42.0)
 
 [pixel shader]
 float func(float x, float y)
@@ -703,7 +703,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) r(2.0)
+probe (0, 0) f32(2.0)
 
 [pixel shader]
 float func(float3 a, float3 b, float3 c, float3 d)
@@ -725,4 +725,4 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe (0, 0) r(1.0)
+probe (0, 0) f32(1.0)

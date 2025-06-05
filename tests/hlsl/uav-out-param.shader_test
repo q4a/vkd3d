@@ -27,7 +27,7 @@ void main()
 
 [test]
 todo(msl) dispatch 1 1 1
-probe uav 0 (0, 0) rgba (0.4, 0.1, 0.2, 0.3)
+probe uav 0 (0, 0) f32(0.4, 0.1, 0.2, 0.3)
 
 [uav 0]
 format r32-float
@@ -52,4 +52,4 @@ void main()
 
 [test]
 todo(msl) dispatch 1 1 1
-probe uav 0 (0, 0) r (0.2)
+probe uav 0 (0, 0) f32(0.2)
