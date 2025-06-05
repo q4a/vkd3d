@@ -101,7 +101,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe uav 1 (0) ri64 (-12)
+probe uav 1 (0) i64(-12)
 probe uav 1 (1) rd (13.3)
 
 [require]
