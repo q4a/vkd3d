@@ -4369,7 +4369,7 @@ struct vsir_block_list
 
 static void vsir_block_list_init(struct vsir_block_list *list)
 {
-    memset(list, 0, sizeof(*list));
+    *list = (struct vsir_block_list){0};
 }
 
 static void vsir_block_list_cleanup(struct vsir_block_list *list)
