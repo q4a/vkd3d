@@ -81,7 +81,7 @@ float4 main() : sv_target
 [test]
 todo(glsl) draw quad
 if(sm<6) probe uav 1 (0) ri (12)
-if(sm>=6) probe uav 1 (0) rd (12.2)
+if(sm>=6) probe uav 1 (0) f64(12.2)
 
 
 % SM 6 add support for templated Store<>().
@@ -102,7 +102,7 @@ float4 main() : sv_target
 [test]
 draw quad
 probe uav 1 (0) i64(-12)
-probe uav 1 (1) rd (13.3)
+probe uav 1 (1) f64(13.3)
 
 [require]
 shader model >= 6.2

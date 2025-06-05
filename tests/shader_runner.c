@@ -867,6 +867,21 @@ static void read_uint64(const char **line, uint64_t *u, bool is_uniform)
     *line = rest;
 }
 
+static void read_f64(const char **line, double *d)
+{
+    double val;
+    char *rest;
+
+    errno = 0;
+    val = strtod(*line, &rest);
+
+    if (errno != 0 || rest == *line)
+        fatal_error("Malformed f64 constant '%s'.\n", *line);
+
+    *d = val;
+    *line = rest;
+}
+
 static void read_int64_t2(const char **line, struct i64vec2 *v)
 {
     read_int64(line, &v->x, true);
@@ -1245,6 +1260,34 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 check_readback_data_uint64(rb, &box, v.x, 0);
             }
         }
+        else if (match_string(line, "f64", &line))
+        {
+            struct dvec2 v;
+
+            if (*line != '(')
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            ++line;
+
+            read_f64(&line, &v.x);
+            while (isspace(*line))
+                ++line;
+            if (*line == ',')
+            {
+                ++line;
+                read_f64(&line, &v.y);
+                if (sscanf(line, " ) %u", &ulps) < 1)
+                    ulps = 0;
+                todo_if(runner->is_todo) bug_if(runner->is_bug)
+                check_readback_data_dvec2(rb, &rect, &v, ulps);
+            }
+            else
+            {
+                if (sscanf(line, " ) %u", &ulps) < 1)
+                    ulps = 0;
+                todo_if(runner->is_todo) bug_if(runner->is_bug)
+                check_readback_data_double(rb, &rect, v.x, ulps);
+            }
+        }
         else if (match_string(line, "rgbaui", &line))
         {
             struct uvec4 v;
@@ -1307,29 +1350,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             line = close_parentheses(line);
             todo_if(runner->is_todo) bug_if(runner->is_bug)
             check_readback_data_uint(rb, &box, expect, 0);
-        }
-        else if (match_string(line, "rgd", &line))
-        {
-            struct dvec2 v;
-
-            ret = sscanf(line, "( %lf , %lf ) %u", &v.x, &v.y, &ulps);
-            if (ret < 2)
-                fatal_error("Malformed probe arguments '%s'.\n", line);
-            if (ret < 3)
-                ulps = 0;
-            todo_if(runner->is_todo) check_readback_data_dvec2(rb, &rect, &v, ulps);
-        }
-        else if (match_string(line, "rd", &line))
-        {
-            double expect;
-
-            ret = sscanf(line, "( %lf ) %u", &expect, &ulps);
-            if (ret < 1)
-                fatal_error("Malformed probe arguments '%s'.\n", line);
-            if (ret < 2)
-                ulps = 0;
-            todo_if(runner->is_todo) bug_if(runner->is_bug)
-            check_readback_data_double(rb, &rect, expect, ulps);
         }
         else if (match_string(line, "r", &line))
         {
