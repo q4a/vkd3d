@@ -8727,8 +8727,9 @@ static void vsir_validate_dst_count(struct validation_context *ctx,
 {
     if (instruction->dst_count != count)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DEST_COUNT,
-                "Invalid destination count %u for an instruction of type %#x, expected %u.",
-                        instruction->dst_count, instruction->opcode, count);
+                "Invalid destination parameter count %u for instruction \"%s\" (%#x); expected %u.",
+                instruction->dst_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
+                instruction->opcode, count);
 }
 
 static void vsir_validate_src_count(struct validation_context *ctx,
@@ -8736,8 +8737,9 @@ static void vsir_validate_src_count(struct validation_context *ctx,
 {
     if (instruction->src_count != count)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source count %u for an instruction of type %#x, expected %u.",
-                instruction->src_count, instruction->opcode, count);
+                "Invalid source parameter count %u for instruction \"%s\" (%#x); expected %u.",
+                instruction->src_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
+                instruction->opcode, count);
 }
 
 static bool vsir_validate_src_min_count(struct validation_context *ctx,
@@ -8746,8 +8748,9 @@ static bool vsir_validate_src_min_count(struct validation_context *ctx,
     if (instruction->src_count < count)
     {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source count %u for an instruction of type %#x, expected at least %u.",
-                instruction->src_count, instruction->opcode, count);
+                "Invalid source parameter count %u for instruction \"%s\" (%#x); expected at least %u.",
+                instruction->src_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
+                instruction->opcode, count);
         return false;
     }
 
@@ -8760,8 +8763,9 @@ static bool vsir_validate_src_max_count(struct validation_context *ctx,
     if (instruction->src_count > count)
     {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source count %u for an instruction of type %#x, expected at most %u.",
-                instruction->src_count, instruction->opcode, count);
+                "Invalid source parameter count %u for instruction \"%s\" (%#x); expected at most %u.",
+                instruction->src_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
+                instruction->opcode, count);
         return false;
     }
 
@@ -9249,7 +9253,9 @@ static void vsir_validate_cf_type(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction, enum vsir_control_flow_type expected_type)
 {
     if (ctx->program->cf_type != expected_type)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid instruction %#x in %s shader.",
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                "Invalid instruction \"%s\" (%#x) in %s shader.",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"),
                 instruction->opcode, name_from_cf_type(ctx->program->cf_type));
 }
 
@@ -9268,12 +9274,12 @@ static void vsir_validate_hull_shader_phase(struct validation_context *ctx,
 {
     if (ctx->program->shader_version.type != VKD3D_SHADER_TYPE_HULL)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
-                "Phase instruction %#x is only valid in a hull shader.",
-                instruction->opcode);
+                "Phase instruction \"%s\" (%#x) is only valid in a hull shader.",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
     if (ctx->depth != 0)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
-                "Phase instruction %#x must appear to top level.",
-                instruction->opcode);
+                "Phase instruction \"%s\" (%#x) must appear at the top level.",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
     ctx->phase = instruction->opcode;
     ctx->dcl_temps_found = false;
 }
@@ -10038,8 +10044,8 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             default:
                 if (!vsir_instruction_is_dcl(instruction))
                     validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
-                            "Instruction %#x appear before any phase instruction in a hull shader.",
-                            instruction->opcode);
+                            "Instruction \"%s\" (%#x) appears before any phase instruction in a hull shader.",
+                            vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
                 break;
         }
     }
@@ -10059,8 +10065,8 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             default:
                 if (!vsir_instruction_is_dcl(instruction))
                     validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
-                            "Invalid instruction %#x outside any block.",
-                            instruction->opcode);
+                            "Invalid instruction \"%s\" (%#x) outside any block.",
+                            vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
                 break;
         }
     }
