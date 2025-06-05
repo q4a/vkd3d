@@ -19,8 +19,8 @@ float4 main() : sv_target
 
 [test]
 todo(glsl | msl) draw quad
-probe uav 1 (0) ri (10)
-if(sm<6) probe uav 1 (1) ri (11)
+probe uav 1 (0) i32(10)
+if(sm<6) probe uav 1 (1) i32(11)
 if(sm>=6) probe uav 1 (1) r (11.1)
 
 [pixel shader]
@@ -80,7 +80,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-if(sm<6) probe uav 1 (0) ri (12)
+if(sm<6) probe uav 1 (0) i32(12)
 if(sm>=6) probe uav 1 (0) f64(12.2)
 
 

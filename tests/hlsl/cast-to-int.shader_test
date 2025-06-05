@@ -102,10 +102,10 @@ int4 main() : sv_target
 [test]
 uniform 0 int4 0x10002 0x8003 0x10002 0x8003
 draw quad
-probe (0, 0) rgbai(4, 6, 2, -32765)
+probe (0, 0) i32(4, 6, 2, -32765)
 uniform 0 int4 -1 -3 -1 -3
 draw quad
-probe (0, 0) rgbai(-2, -6, -1, -3)
+probe (0, 0) i32(-2, -6, -1, -3)
 
 [pixel shader]
 uniform float4 f;
@@ -119,7 +119,7 @@ int4 main() : sv_target
 [test]
 uniform 0 float4 0.5 1.0 0.5 1.0
 todo draw quad
-probe (0, 0) rgbai(0, 2, 0, 1)
+probe (0, 0) i32(0, 2, 0, 1)
 uniform 0 float4 -0.5 -1.0 -0.5 -1.0
 todo draw quad
-probe (0, 0) rgbai(0, -2, 0, -1)
+probe (0, 0) i32(0, -2, 0, -1)

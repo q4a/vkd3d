@@ -272,7 +272,7 @@ uniform 4 uint 0
 uniform 8 uint 0xffd
 uniform 12 uint 1
 draw quad
-probe (0, 0) rgbai(1, -0xfff, 0xffe, -0xffe)
+probe (0, 0) i32(1, -0xfff, 0xffe, -0xffe)
 
 [pixel shader]
 uniform min16int u[2];
@@ -315,7 +315,7 @@ uniform 4 uint 0xfffffff7
 uniform 8 uint 0xfffffff9
 uniform 12 uint 9
 draw quad
-probe (0, 0) rgbai(-21, -45, 21, 45)
+probe (0, 0) i32(-21, -45, 21, 45)
 
 [pixel shader fail todo]
 % Minimum precision signed division is not supported.
@@ -344,7 +344,7 @@ int4 main() : sv_target
 uniform 0 uint 0
 uniform 1 uint 0x0001fffd
 draw quad
-probe (0, 0) rgbai(1, 0x7fff, -2, -32768)
+probe (0, 0) i32(1, 0x7fff, -2, -32768)
 
 [pixel shader]
 uniform int16_t4 u;
@@ -359,7 +359,7 @@ int4 main() : sv_target
 uniform 0 uint 0xfff70007
 uniform 1 uint4 0x9fff9
 draw quad
-probe (0, 0) rgbai(-21, -45, 21, 45)
+probe (0, 0) i32(-21, -45, 21, 45)
 
 [pixel shader]
 uniform int16_t4 u;
@@ -374,4 +374,4 @@ int4 main() : sv_target
 uniform 0 uint 0x000b7ffe
 uniform 1 uint 0x80007fff
 draw quad
-probe (0, 0) rgbai(0, -2, 1, 6553)
+probe (0, 0) i32(0, -2, 1, 6553)

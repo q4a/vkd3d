@@ -1049,4 +1049,4 @@ int4 main() : sv_target
 [test]
 uniform 0 uint 0x7fffffff
 draw quad
-probe (0, 0) rgbai(-1, 32767, 0, 0)
+probe (0, 0) i32(-1, 32767, 0, 0)

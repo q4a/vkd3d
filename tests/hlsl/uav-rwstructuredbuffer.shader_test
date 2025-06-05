@@ -154,8 +154,8 @@ float4 main() : sv_target1
 
 [test]
 todo(sm<6) draw quad
-probe uav 2 (0) rgbai (11, -12, 13, -14)
-probe uav 2 (1) rgbai (-15, 16, -17, 18)
+probe uav 2 (0) i32(11, -12, 13, -14)
+probe uav 2 (1) i32(-15, 16, -17, 18)
 
 [uav 2]
 stride 4
@@ -176,8 +176,8 @@ float4 main() : sv_target1
 
 [test]
 todo(sm<6) draw quad
-probe uav 2 (0) ri (11)
-probe uav 2 (1) ri (12)
+probe uav 2 (0) i32(11)
+probe uav 2 (1) i32(12)
 
 [require]
 shader model >= 6.2

@@ -33,4 +33,4 @@ void main()
 
 [test]
 todo(sm<6) dispatch 3 1 1
-probe uav 1 (0) ri (-12)
+probe uav 1 (0) i32(-12)

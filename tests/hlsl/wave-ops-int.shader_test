@@ -33,10 +33,10 @@ void main(uint id : SV_GroupIndex)
 
 [test]
 dispatch 4 1 1
-probe uav 1 (0) rgbai (-3, 1, -4, 2)
-probe uav 1 (1) rgbai (-3, 1, -4, 2)
-probe uav 1 (2) rgbai (-3, 1, -4, 2)
-probe uav 1 (3) rgbai (-3, 1, -4, 2)
+probe uav 1 (0) i32(-3, 1, -4, 2)
+probe uav 1 (1) i32(-3, 1, -4, 2)
+probe uav 1 (2) i32(-3, 1, -4, 2)
+probe uav 1 (3) i32(-3, 1, -4, 2)
 
 
 [compute shader]
@@ -51,10 +51,10 @@ void main(uint id : SV_GroupIndex)
 
 [test]
 dispatch 4 1 1
-probe uav 1 (0) rgbai (3, 5, -1, 2)
-probe uav 1 (1) rgbai (3, 5, -1, 2)
-probe uav 1 (2) rgbai (3, 5, -1, 2)
-probe uav 1 (3) rgbai (3, 5, -1, 2)
+probe uav 1 (0) i32(3, 5, -1, 2)
+probe uav 1 (1) i32(3, 5, -1, 2)
+probe uav 1 (2) i32(3, 5, -1, 2)
+probe uav 1 (3) i32(3, 5, -1, 2)
 
 
 [require]
@@ -97,10 +97,10 @@ void main(uint id : SV_GroupIndex)
 
 [test]
 bug(mvk) dispatch 4 1 1
-probe uav 1 (0) rgbai(-3, -1, -4, 2)
-probe uav 1 (1) rgbai(-3, -1, -4, 2)
-probe uav 1 (2) rgbai(-3, -1, -4, 2)
-probe uav 1 (3) rgbai(-3, -1, -4, 2)
+probe uav 1 (0) i32(-3, -1, -4, 2)
+probe uav 1 (1) i32(-3, -1, -4, 2)
+probe uav 1 (2) i32(-3, -1, -4, 2)
+probe uav 1 (3) i32(-3, -1, -4, 2)
 
 
 [compute shader]
@@ -115,7 +115,7 @@ void main(uint id : SV_GroupIndex)
 
 [test]
 bug(mvk) dispatch 4 1 1
-probe uav 1 (0) rgbai(0, 5, -1, 2)
-probe uav 1 (1) rgbai(0, 5, -1, 2)
-probe uav 1 (2) rgbai(0, 5, -1, 2)
-probe uav 1 (3) rgbai(0, 5, -1, 2)
+probe uav 1 (0) i32(0, 5, -1, 2)
+probe uav 1 (1) i32(0, 5, -1, 2)
+probe uav 1 (2) i32(0, 5, -1, 2)
+probe uav 1 (3) i32(0, 5, -1, 2)

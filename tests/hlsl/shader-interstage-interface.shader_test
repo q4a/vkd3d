@@ -193,7 +193,7 @@ size (2d, 640, 480)
 
 [test]
 draw triangle strip 4
-todo(opengl) probe (0, 0) rgbai(-7000, -2, 0, 0)
+todo(opengl) probe (0, 0) i32(-7000, -2, 0, 0)
 
 [pixel shader]
 uint4 main(float4 position : SV_Position, min16int2 t0 : TEXCOORD0) : SV_Target
@@ -207,7 +207,7 @@ size (2d, 640, 480)
 
 [test]
 draw triangle strip 4
-probe (0, 0) rgbai(-7000, -2, 0, 0)
+probe (0, 0) i32(-7000, -2, 0, 0)
 
 [require]
 shader model >= 6.2
@@ -303,7 +303,7 @@ size (2d, 640, 480)
 
 [test]
 draw triangle strip 4
-probe (0, 0) rgbai(-7000, -2, 0, 0)
+probe (0, 0) i32(-7000, -2, 0, 0)
 
 [pixel shader]
 uint4 main(float4 position : SV_Position, int16_t2 t0 : TEXCOORD0) : SV_Target
@@ -317,4 +317,4 @@ size (2d, 640, 480)
 
 [test]
 draw triangle strip 4
-probe (0, 0) rgbai(-7000, -2, 0, 0)
+probe (0, 0) i32(-7000, -2, 0, 0)
