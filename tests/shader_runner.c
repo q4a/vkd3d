@@ -849,7 +849,7 @@ static void read_int64(const char **line, int64_t *i, bool is_uniform)
         fatal_error("Malformed int64 constant '%s'.\n", *line);
 
     *i = val;
-    *line = rest + (!is_uniform && *rest == ',');
+    *line = rest;
 }
 
 static void read_uint64(const char **line, uint64_t *u, bool is_uniform)
@@ -864,7 +864,7 @@ static void read_uint64(const char **line, uint64_t *u, bool is_uniform)
         fatal_error("Malformed uint64 constant '%s'.\n", *line);
 
     *u = val;
-    *line = rest + (!is_uniform && *rest == ',');
+    *line = rest;
 }
 
 static void read_int64_t2(const char **line, struct i64vec2 *v)
@@ -1142,6 +1142,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         struct resource_readback *rb;
         struct resource *resource;
         bool is_signed = false;
+        D3D12_BOX box;
         RECT rect;
         int len;
 
@@ -1204,7 +1205,47 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         rb = runner->ops->get_resource_readback(runner, resource, array_layer * resource->desc.level_count);
 
-        if (match_string(line, "rgbaui", &line))
+        box.left = rect.left;
+        box.right = rect.right;
+        box.top = rect.top;
+        box.bottom = rect.bottom;
+        box.front = 0;
+        box.back = 1;
+
+        if (match_string(line, "u64", &line) || (is_signed = match_string(line, "i64", &line)))
+        {
+            struct u64vec2 v;
+
+            if (*line != '(')
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            ++line;
+
+            if (is_signed)
+                read_int64(&line, (int64_t *)&v.x, false);
+            else
+                read_uint64(&line, &v.x, false);
+
+            while (isspace(*line))
+                ++line;
+            if (*line == ',')
+            {
+                ++line;
+                if (is_signed)
+                    read_int64(&line, (int64_t *)&v.y, false);
+                else
+                    read_uint64(&line, &v.y, false);
+                line = close_parentheses(line);
+                todo_if(runner->is_todo) bug_if(runner->is_bug)
+                check_readback_data_u64vec2(rb, &rect, &v);
+            }
+            else
+            {
+                line = close_parentheses(line);
+                todo_if(runner->is_todo) bug_if(runner->is_bug)
+                check_readback_data_uint64(rb, &box, v.x, 0);
+            }
+        }
+        else if (match_string(line, "rgbaui", &line))
         {
             struct uvec4 v;
 
@@ -1255,14 +1296,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         else if (match_string(line, "rui", &line) || (is_signed = match_string(line, "ri", &line)))
         {
             unsigned int expect;
-            D3D12_BOX box;
 
-            box.left = rect.left;
-            box.right = rect.right;
-            box.top = rect.top;
-            box.bottom = rect.bottom;
-            box.front = 0;
-            box.back = 1;
             if (*line != '(')
                 fatal_error("Malformed probe arguments '%s'.\n", line);
             ++line;
@@ -1273,40 +1307,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             line = close_parentheses(line);
             todo_if(runner->is_todo) bug_if(runner->is_bug)
             check_readback_data_uint(rb, &box, expect, 0);
-        }
-        else if (match_string(line, "rgui64", &line))
-        {
-            struct u64vec2 v;
-
-            if (*line != '(')
-                fatal_error("Malformed probe arguments '%s'.\n", line);
-            ++line;
-            read_uint64(&line, &v.x, false);
-            read_uint64(&line, &v.y, false);
-            line = close_parentheses(line);
-            todo_if(runner->is_todo) check_readback_data_u64vec2(rb, &rect, &v);
-        }
-        else if (match_string(line, "rui64", &line) || (is_signed = match_string(line, "i64", &line)))
-        {
-            uint64_t expect;
-            D3D12_BOX box;
-
-            box.left = rect.left;
-            box.right = rect.right;
-            box.top = rect.top;
-            box.bottom = rect.bottom;
-            box.front = 0;
-            box.back = 1;
-            if (*line != '(')
-                fatal_error("Malformed probe arguments '%s'.\n", line);
-            ++line;
-            if (is_signed)
-                read_int64(&line, (int64_t *)&expect, false);
-            else
-                read_uint64(&line, &expect, false);
-            line = close_parentheses(line);
-            todo_if(runner->is_todo) bug_if(runner->is_bug)
-            check_readback_data_uint64(rb, &box, expect, 0);
         }
         else if (match_string(line, "rgd", &line))
         {
