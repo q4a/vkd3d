@@ -148,14 +148,46 @@ void main(float2 in_pos : POSITION, out float4 pos : SV_Position, out float4 col
 % The point of this test is to check that signature masks are handled correctly
 % when they are not contiguous, so we attempt reading only component .xw from
 % `color'. This happens when the shader is compiled by native, but not by us,
-% currently, so it's not very useful for the moment. I'm leaving it anyway
-% so that it either becomes useful when our HLSL compiler becomes more optimized
-% or can be eventually rewritten in assembly/bytecode when the shader runner
-% supports that.
+% currently, so the same test appears in bytecode format just below.
 float4 main(float4 pos : SV_Position, float4 color : COLOR) : SV_Target
 {
     return float4(color.x, 10.0f, 11.0f, color.w);
 }
+
+[test]
+draw triangle list 3
+probe (0, 0) rgba(1.0, 10.0, 11.0, 4.0)
+
+[require]
+shader model >= 4.0
+shader model < 4.1
+
+[pixel shader dxbc-tpf-hex]
+% The same as above, but in bytecode format.
+
+% ps_4_0
+% dcl_input_ps linear v1.xw
+% dcl_output o0.xyzw
+% mov o0.xw, v1.xxxw
+% mov o0.yz, l(0,10.000000,11.000000,0)
+% ret
+
+44584243 01be226d 9678d2b0 d0f833c5 63e17c6c 01000000 f0010000 05000000
+34000000 8c000000 e0000000 14010000 74010000 52444546 50000000 00000000
+00000000 00000000 1c000000 0004ffff 00010000 1c000000 4d696372 6f736f66
+74202852 2920484c 534c2053 68616465 7220436f 6d70696c 65722031 302e302e
+31303031 312e3136 33383400 4953474e 4c000000 02000000 08000000 38000000
+00000000 01000000 03000000 00000000 0f000000 44000000 00000000 00000000
+03000000 01000000 0f090000 53565f50 6f736974 696f6e00 434f4c4f 5200abab
+4f53474e 2c000000 01000000 08000000 20000000 00000000 00000000 03000000
+00000000 0f000000 53565f54 61726765 7400abab 53484452 58000000 40000000
+16000000 62100003 92101000 01000000 65000003 f2201000 00000000 36000005
+92201000 00000000 061c1000 01000000 36000008 62201000 00000000 02400000
+00000000 00002041 00003041 00000000 3e000001 53544154 74000000 03000000
+00000000 00000000 02000000 00000000 00000000 00000000 01000000 00000000
+00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 02000000 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000 00000000
 
 [test]
 draw triangle list 3
