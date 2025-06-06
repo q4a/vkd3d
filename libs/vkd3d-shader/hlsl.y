@@ -5144,10 +5144,10 @@ static bool intrinsic_InterlockedXor(struct hlsl_ctx *ctx,
 
 static void validate_group_barrier_profile(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
 {
-    if (ctx->profile->type != VKD3D_SHADER_TYPE_COMPUTE || hlsl_version_lt(ctx, 5, 0))
+    if (ctx->profile->type != VKD3D_SHADER_TYPE_COMPUTE)
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
-                "Group barriers can only be used in compute shaders 5.0 or higher.");
+                "Group barriers can only be used in compute shaders.");
     }
 }
 
@@ -5171,10 +5171,10 @@ static bool intrinsic_DeviceMemoryBarrier(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     if ((ctx->profile->type != VKD3D_SHADER_TYPE_COMPUTE && ctx->profile->type != VKD3D_SHADER_TYPE_PIXEL)
-            || hlsl_version_lt(ctx, 5, 0))
+            || hlsl_version_lt(ctx, 4, 0))
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
-                "DeviceMemoryBarrier() can only be used in pixel and compute shaders 5.0 or higher.");
+                "DeviceMemoryBarrier() can only be used in compute and pixel shaders 4.0 or higher.");
     }
     return !!hlsl_block_add_sync(ctx, params->instrs, VKD3DSSF_GLOBAL_UAV, loc);
 }

@@ -1,9 +1,10 @@
 [require]
-shader model >= 5.0
+shader model >= 4.0
 
-% This is just a parsing test.
+% These are just parsing tests.
+
 [compute shader]
-    [numthreads(1024, 1, 1)]
+    [numthreads(768, 1, 1)]
 void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 {
     GroupMemoryBarrier();
@@ -13,6 +14,52 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
     AllMemoryBarrier();
     AllMemoryBarrierWithGroupSync();
 }
+
+[pixel shader]
+float4 main() : sv_target
+{
+    DeviceMemoryBarrier();
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    DeviceMemoryBarrierWithGroupSync();
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    GroupMemoryBarrier();
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    GroupMemoryBarrierWithGroupSync();
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    AllMemoryBarrier();
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    AllMemoryBarrierWithGroupSync();
+    return 0;
+}
+
+
+[require]
+shader model >= 5.0
 
 [uav 2]
 format r32g32b32a32-float
