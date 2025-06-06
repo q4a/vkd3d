@@ -71,6 +71,7 @@ struct demo_swapchain
 {
     IDXGISwapChain3 *swapchain;
     unsigned int buffer_count;
+    char device_name[128];
 };
 
 static inline void demo_cleanup(struct demo *demo)
@@ -96,6 +97,11 @@ static inline bool demo_init(struct demo *demo, void *user_data)
 static inline void demo_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
 {
     demo_win32_get_dpi(demo, dpi_x, dpi_y);
+}
+
+static inline const char *demo_get_platform_name(void)
+{
+    return "Direct3D 12";
 }
 
 static inline void demo_process_events(struct demo *demo)
@@ -138,15 +144,41 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
     struct demo_window_win32 *window_win32 = CONTAINING_RECORD(window, struct demo_window_win32, w);
     DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
     struct demo_swapchain *swapchain;
+    DXGI_ADAPTER_DESC adapter_desc;
     IDXGISwapChain1 *swapchain1;
     IDXGIFactory2 *factory;
+    IDXGIAdapter *adapter;
+    ID3D12Device *device;
+    unsigned int i;
     HRESULT hr;
+    LUID luid;
 
     if (!(swapchain = malloc(sizeof(*swapchain))))
         return NULL;
 
     if (FAILED(CreateDXGIFactory1(&IID_IDXGIFactory2, (void **)&factory)))
         goto fail;
+
+    if (FAILED(ID3D12CommandQueue_GetDevice(command_queue, &IID_ID3D12Device, (void **)&device)))
+        goto fail;
+    luid = ID3D12Device_GetAdapterLuid(device);
+    ID3D12Device_Release(device);
+
+    sprintf(swapchain->device_name, "Unknown");
+    for (i = 0; IDXGIFactory2_EnumAdapters(factory, i, &adapter) == S_OK; ++i)
+    {
+        hr = IDXGIAdapter_GetDesc(adapter, &adapter_desc);
+        IDXGIAdapter_Release(adapter);
+        if (FAILED(hr))
+            continue;
+
+        if (adapter_desc.AdapterLuid.LowPart == luid.LowPart
+                && adapter_desc.AdapterLuid.HighPart == luid.HighPart)
+        {
+            snprintf(swapchain->device_name, ARRAY_SIZE(swapchain->device_name), "%ls", adapter_desc.Description);
+            break;
+        }
+    }
 
     memset(&swapchain_desc, 0, sizeof(swapchain_desc));
     swapchain_desc.BufferCount = desc->buffer_count;
@@ -174,6 +206,11 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
 fail:
     free(swapchain);
     return NULL;
+}
+
+static inline const char *demo_swapchain_get_device_name(struct demo_swapchain *swapchain)
+{
+    return swapchain->device_name;
 }
 
 static inline unsigned int demo_swapchain_get_current_back_buffer_index(struct demo_swapchain *swapchain)

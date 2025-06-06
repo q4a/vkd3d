@@ -400,6 +400,8 @@ static int cxt_main(void)
     cxt_load_pipeline(&cxt);
     cxt_load_assets(&cxt);
 
+    printf("vkd3d-triangle: Running on \"%s\" using %s.\n",
+            demo_swapchain_get_device_name(cxt.swapchain), demo_get_platform_name());
     demo_process_events(&cxt.demo);
 
     cxt_wait_for_previous_frame(&cxt);

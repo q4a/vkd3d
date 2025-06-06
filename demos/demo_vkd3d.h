@@ -59,6 +59,7 @@ DECLARE_VK_PFN(vkCreateXcbSurfaceKHR)
 DECLARE_VK_PFN(vkDestroyFence)
 DECLARE_VK_PFN(vkDestroySurfaceKHR)
 DECLARE_VK_PFN(vkDestroySwapchainKHR)
+DECLARE_VK_PFN(vkGetPhysicalDeviceProperties)
 DECLARE_VK_PFN(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
 DECLARE_VK_PFN(vkGetPhysicalDeviceSurfaceFormatsKHR)
 DECLARE_VK_PFN(vkGetPhysicalDeviceSurfaceSupportKHR)
@@ -228,6 +229,7 @@ static void load_vulkan_procs(void)
     LOAD_VK_PFN(vkDestroyFence)
     LOAD_VK_PFN(vkDestroySurfaceKHR)
     LOAD_VK_PFN(vkDestroySwapchainKHR)
+    LOAD_VK_PFN(vkGetPhysicalDeviceProperties)
     LOAD_VK_PFN(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
     LOAD_VK_PFN(vkGetPhysicalDeviceSurfaceFormatsKHR)
     LOAD_VK_PFN(vkGetPhysicalDeviceSurfaceSupportKHR)
@@ -239,6 +241,7 @@ static void load_vulkan_procs(void)
 
 struct demo_swapchain
 {
+    VkPhysicalDeviceProperties vk_device_properties;
     VkSurfaceKHR vk_surface;
     VkSwapchainKHR vk_swapchain;
     VkFence vk_fence;
@@ -308,6 +311,11 @@ static inline bool demo_init(struct demo *demo, void *user_data)
 static inline void demo_get_dpi(struct demo *demo, double *dpi_x, double *dpi_y)
 {
     demo->get_dpi(demo, dpi_x, dpi_y);
+}
+
+static inline const char *demo_get_platform_name(void)
+{
+    return "vkd3d";
 }
 
 static inline void demo_process_events(struct demo *demo)
@@ -475,6 +483,7 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
         free(vk_images);
         goto fail;
     }
+    vkGetPhysicalDeviceProperties(vk_physical_device, &swapchain->vk_device_properties);
     swapchain->vk_surface = vk_surface;
     swapchain->vk_swapchain = vk_swapchain;
     swapchain->vk_fence = vk_fence;
@@ -542,6 +551,11 @@ fail:
     vkDestroySurfaceKHR(vk_instance, vk_surface, NULL);
     ID3D12Device_Release(d3d12_device);
     return NULL;
+}
+
+static inline const char *demo_swapchain_get_device_name(struct demo_swapchain *swapchain)
+{
+    return swapchain->vk_device_properties.deviceName;
 }
 
 static inline unsigned int demo_swapchain_get_current_back_buffer_index(struct demo_swapchain *swapchain)

@@ -891,6 +891,8 @@ static int cxg_main(void)
         cxg_populate_command_list(&cxg, i);
     }
 
+    printf("vkd3d-gears: Running on \"%s\" using %s.\n",
+            demo_swapchain_get_device_name(cxg.swapchain), demo_get_platform_name());
     demo_process_events(&cxg.demo);
 
     cxg_wait_for_previous_frame(&cxg);
