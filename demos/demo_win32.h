@@ -138,7 +138,7 @@ static demo_key demo_key_from_win32_vkey(DWORD vkey)
     if (vkey >= '0' && vkey <= '9')
         return vkey;
     if (vkey >= 'A' && vkey <= 'Z')
-        return vkey;
+        return vkey + 0x20;
 
     for (i = 0; i < ARRAY_SIZE(lookup); ++i)
     {

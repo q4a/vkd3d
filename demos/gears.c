@@ -813,7 +813,6 @@ static void cxg_key_press(struct demo_window *window, demo_key key, void *user_d
     switch (key)
     {
         case 'a':
-        case 'A':
             cxg->animate = !cxg->animate;
             break;
         case DEMO_KEY_ESCAPE:
