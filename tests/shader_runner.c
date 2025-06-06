@@ -1722,6 +1722,13 @@ static ID3D10Blob *parse_hex(const char *source)
         if (isspace(c))
             continue;
 
+        if (c == '%')
+        {
+            while (source[i] != '\n')
+                ++i;
+            continue;
+        }
+
         if ('0' <= c && c <= '9')
             value = 16 * value + (c - '0');
         else if ('a' <= c && c <= 'f')

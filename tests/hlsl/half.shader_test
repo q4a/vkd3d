@@ -6,6 +6,39 @@ float4 main() : sv_target
     return 0;
 }
 
+[pixel shader]
+float4 var;
+
+float4 main() : sv_target
+{
+    half4 ret = var + 0.5;
+    return ret;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe (0, 0) f32(1.5, 2.5, 3.5, 4.5)
+
+[require]
+shader model >= 2.0
+shader model < 3.0
+
+[pixel shader d3dbc-hex]
+% The same as above, but in bytecode format so we test the partial precision
+% destination modifier.
+0002ffff                                                % ps_2_0
+51000005 01000fa0 0000003f 00000000 00000000 00000000   % def c1, 0.5, 0, 0, 0
+01000002 00000f80 0000e4a0                              % mov r0, c0
+02000003 00002f80 0000e480 010000a0                     % add_pp r0, r0, c1.x
+01000002 00082f80 0000e480                              % mov_pp oC0, r0
+ffff0000                                                % end
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe (0, 0) f32(1.5, 2.5, 3.5, 4.5)
+
 [require]
 options: backcompat
 
