@@ -72,7 +72,7 @@ struct cx_triangle
     struct demo_swapchain *swapchain;
     ID3D12DescriptorHeap *rtv_heap;
     unsigned int rtv_descriptor_size;
-    ID3D12Resource *render_targets[3];
+    ID3D12Resource **render_targets;
     ID3D12CommandAllocator *command_allocator;
 
     ID3D12RootSignature *root_signature;
@@ -164,10 +164,11 @@ static void cxt_destroy_pipeline(struct cx_triangle *cxt)
     unsigned int i;
 
     ID3D12CommandAllocator_Release(cxt->command_allocator);
-    for (i = 0; i < ARRAY_SIZE(cxt->render_targets); ++i)
+    for (i = 0; i < demo_swapchain_get_back_buffer_count(cxt->swapchain); ++i)
     {
         ID3D12Resource_Release(cxt->render_targets[i]);
     }
+    free(cxt->render_targets);
     ID3D12DescriptorHeap_Release(cxt->rtv_heap);
     demo_swapchain_destroy(cxt->swapchain);
     ID3D12CommandQueue_Release(cxt->command_queue);
@@ -180,7 +181,7 @@ static void cxt_load_pipeline(struct cx_triangle *cxt)
     D3D12_DESCRIPTOR_HEAP_DESC rtv_heap_desc;
     D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle;
     D3D12_COMMAND_QUEUE_DESC queue_desc;
-    unsigned int i;
+    unsigned int i, rt_count;
     HRESULT hr;
 
     hr = D3D12CreateDevice(NULL, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, (void **)&cxt->device);
@@ -193,16 +194,19 @@ static void cxt_load_pipeline(struct cx_triangle *cxt)
             &IID_ID3D12CommandQueue, (void **)&cxt->command_queue);
     assert(SUCCEEDED(hr));
 
-    swapchain_desc.buffer_count = ARRAY_SIZE(cxt->render_targets);
+    swapchain_desc.buffer_count = 3;
     swapchain_desc.format = DXGI_FORMAT_B8G8R8A8_UNORM;
     swapchain_desc.width = cxt->width;
     swapchain_desc.height = cxt->height;
     cxt->swapchain = demo_swapchain_create(cxt->command_queue, cxt->window, &swapchain_desc);
     assert(cxt->swapchain);
+    rt_count = demo_swapchain_get_back_buffer_count(cxt->swapchain);
+    cxt->render_targets = calloc(rt_count, sizeof(*cxt->render_targets));
+    assert(cxt->render_targets);
     cxt->frame_idx = demo_swapchain_get_current_back_buffer_index(cxt->swapchain);
 
     memset(&rtv_heap_desc, 0, sizeof(rtv_heap_desc));
-    rtv_heap_desc.NumDescriptors = ARRAY_SIZE(cxt->render_targets);
+    rtv_heap_desc.NumDescriptors = rt_count;
     rtv_heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     rtv_heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     hr = ID3D12Device_CreateDescriptorHeap(cxt->device, &rtv_heap_desc,
@@ -212,7 +216,7 @@ static void cxt_load_pipeline(struct cx_triangle *cxt)
     cxt->rtv_descriptor_size = ID3D12Device_GetDescriptorHandleIncrementSize(cxt->device,
             D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     rtv_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(cxt->rtv_heap);
-    for (i = 0; i < ARRAY_SIZE(cxt->render_targets); ++i)
+    for (i = 0; i < rt_count; ++i)
     {
         cxt->render_targets[i] = demo_swapchain_get_back_buffer(cxt->swapchain, i);
         ID3D12Device_CreateRenderTargetView(cxt->device, cxt->render_targets[i], NULL, rtv_handle);

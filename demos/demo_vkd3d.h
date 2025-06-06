@@ -392,9 +392,13 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &surface_caps) < 0)
         goto fail;
 
-    if ((surface_caps.maxImageCount && desc->buffer_count > surface_caps.maxImageCount)
-            || desc->buffer_count < surface_caps.minImageCount
-            || desc->width > surface_caps.maxImageExtent.width || desc->width < surface_caps.minImageExtent.width
+    image_count = desc->buffer_count;
+    if (image_count < surface_caps.minImageCount)
+        image_count = surface_caps.minImageCount;
+    else if (surface_caps.maxImageCount && image_count > surface_caps.maxImageCount)
+        image_count = surface_caps.maxImageCount;
+
+    if (desc->width > surface_caps.maxImageExtent.width || desc->width < surface_caps.minImageExtent.width
             || desc->height > surface_caps.maxImageExtent.height || desc->height < surface_caps.minImageExtent.height
             || !(surface_caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR))
         goto fail;
@@ -432,7 +436,7 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
     vk_swapchain_desc.pNext = NULL;
     vk_swapchain_desc.flags = 0;
     vk_swapchain_desc.surface = vk_surface;
-    vk_swapchain_desc.minImageCount = desc->buffer_count;
+    vk_swapchain_desc.minImageCount = image_count;
     vk_swapchain_desc.imageFormat = format;
     vk_swapchain_desc.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     vk_swapchain_desc.imageExtent.width = desc->width;
@@ -553,6 +557,11 @@ static inline ID3D12Resource *demo_swapchain_get_back_buffer(struct demo_swapcha
         ID3D12Resource_AddRef(resource);
 
     return resource;
+}
+
+static inline unsigned int demo_swapchain_get_back_buffer_count(struct demo_swapchain *swapchain)
+{
+    return swapchain->buffer_count;
 }
 
 static inline void demo_swapchain_present(struct demo_swapchain *swapchain)

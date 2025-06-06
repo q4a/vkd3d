@@ -70,6 +70,7 @@ static inline void demo_window_cleanup(struct demo_window *window)
 struct demo_swapchain
 {
     IDXGISwapChain3 *swapchain;
+    unsigned int buffer_count;
 };
 
 static inline void demo_cleanup(struct demo *demo)
@@ -162,6 +163,7 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
     if (FAILED(hr))
         goto fail;
 
+    swapchain->buffer_count = desc->buffer_count;
     hr = IDXGISwapChain1_QueryInterface(swapchain1, &IID_IDXGISwapChain3, (void **)&swapchain->swapchain);
     IDXGISwapChain1_Release(swapchain1);
     if (FAILED(hr))
@@ -188,6 +190,11 @@ static inline ID3D12Resource *demo_swapchain_get_back_buffer(struct demo_swapcha
         return NULL;
 
     return buffer;
+}
+
+static inline unsigned int demo_swapchain_get_back_buffer_count(struct demo_swapchain *swapchain)
+{
+    return swapchain->buffer_count;
 }
 
 static inline void demo_swapchain_present(struct demo_swapchain *swapchain)
