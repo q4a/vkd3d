@@ -4339,13 +4339,18 @@ static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
     {
         fx_parse_fx_2_array_selector(parser);
     }
-    else
+    else if (state.assignment_type == FX_2_ASSIGNMENT_CODE_BLOB)
     {
         size = fx_parser_read_u32(parser);
         vkd3d_string_buffer_printf(&parser->buffer, "blob size %u\n", size);
         data = fx_parser_get_ptr(parser, size);
         fx_dump_blob(parser, data, size);
         fx_parser_skip(parser, align(size, 4));
+    }
+    else
+    {
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                "Unknown state assignment type %u.", state.assignment_type);
     }
 }
 
