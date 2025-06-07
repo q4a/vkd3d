@@ -4901,6 +4901,11 @@ static void fx_parse_fxlc_argument(struct fx_parser *parser, struct fxlc_arg *ar
     arg->address  = fxlvm_read_u32(code);
 }
 
+static void fx_print_fxlc_literal(struct fx_parser *parser, uint32_t address, struct fxlvm_code *code)
+{
+    vkd3d_string_buffer_print_f32(&parser->buffer, code->cli._4[address]);
+}
+
 static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_arg *arg, struct fxlvm_code *code)
 {
     uint32_t count;
@@ -4917,11 +4922,11 @@ static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_a
             }
 
             vkd3d_string_buffer_printf(&parser->buffer, "(");
-            vkd3d_string_buffer_print_f32(&parser->buffer, code->cli._4[arg->address]);
+            fx_print_fxlc_literal(parser, arg->address, code);
             for (unsigned int i = 1; i < code->comp_count; ++i)
             {
                 vkd3d_string_buffer_printf(&parser->buffer, ", ");
-                vkd3d_string_buffer_print_f32(&parser->buffer, code->cli._4[arg->address + (code->scalar ? 0 : i)]);
+                fx_print_fxlc_literal(parser, arg->address + (code->scalar ? 0 : i), code);
             }
             vkd3d_string_buffer_printf(&parser->buffer, ")");
             break;
