@@ -4252,24 +4252,6 @@ static void fx_parse_fx_2_data_blob(struct fx_parser *parser)
     fx_parser_skip(parser, align(size, 4));
 }
 
-static void fx_dump_blob(struct fx_parser *parser, const void *blob, uint32_t size)
-{
-    const uint32_t *data = blob;
-    unsigned int i, j, n;
-
-    size /= sizeof(*data);
-    i = 0;
-    while (i < size)
-    {
-        parse_fx_print_indent(parser);
-        n = min(size - i, 8);
-        for (j = 0; j < n; ++j)
-            vkd3d_string_buffer_printf(&parser->buffer, "0x%08x,", data[i + j]);
-        i += n;
-        vkd3d_string_buffer_printf(&parser->buffer, "\n");
-    }
-}
-
 static void fx_2_parse_fxlvm_expression(struct fx_parser *parser, const uint32_t *blob, uint32_t size);
 
 static void fx_parse_fx_2_array_selector(struct fx_parser *parser)
@@ -4313,7 +4295,7 @@ static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
         uint32_t state;
         uint32_t assignment_type;
     } state;
-    const char *data;
+    const uint32_t *data;
     uint32_t size;
 
     fx_parser_read_u32s(parser, &state, sizeof(state));
@@ -4342,9 +4324,9 @@ static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
     else if (state.assignment_type == FX_2_ASSIGNMENT_CODE_BLOB)
     {
         size = fx_parser_read_u32(parser);
-        vkd3d_string_buffer_printf(&parser->buffer, "blob size %u\n", size);
         data = fx_parser_get_ptr(parser, size);
-        fx_dump_blob(parser, data, size);
+        vkd3d_string_buffer_printf(&parser->buffer, "blob size %u\n", size);
+        fx_2_parse_fxlvm_expression(parser, data, size);
         fx_parser_skip(parser, align(size, 4));
     }
     else
@@ -5052,6 +5034,9 @@ static void fx_2_parse_fxlvm_expression(struct fx_parser *parser, const uint32_t
     struct fxlvm_code code = { 0 };
     uint32_t section_size;
     const uint32_t *data;
+
+    if (!blob)
+        return;
 
     /* Literal constants, using 64-bit floats. */
     if ((data = find_d3dbc_section(blob, count, TAG_CLIT, &section_size)))
