@@ -4823,8 +4823,11 @@ struct fxlvm_code
     const uint32_t *ptr, *end;
     bool failed;
 
-    const float *cli4;
-    uint32_t cli4_count;
+    union
+    {
+        const float *_4;
+    } cli;
+    uint32_t cli_count;
 
     const struct fx_4_ctab_entry *constants;
     uint32_t ctab_offset;
@@ -4906,7 +4909,7 @@ static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_a
     {
         case FX_FXLC_REG_LITERAL:
             count = code->scalar ? 1 : code->comp_count;
-            if (arg->address >= code->cli4_count || count > code->cli4_count - arg->address)
+            if (arg->address >= code->cli_count || count > code->cli_count - arg->address)
             {
                 vkd3d_string_buffer_printf(&parser->buffer, "(<out-of-bounds>)");
                 parser->failed = true;
@@ -4914,11 +4917,11 @@ static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_a
             }
 
             vkd3d_string_buffer_printf(&parser->buffer, "(");
-            vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg->address]);
+            vkd3d_string_buffer_print_f32(&parser->buffer, code->cli._4[arg->address]);
             for (unsigned int i = 1; i < code->comp_count; ++i)
             {
                 vkd3d_string_buffer_printf(&parser->buffer, ", ");
-                vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg->address + (code->scalar ? 0 : i)]);
+                vkd3d_string_buffer_print_f32(&parser->buffer, code->cli._4[arg->address + (code->scalar ? 0 : i)]);
             }
             vkd3d_string_buffer_printf(&parser->buffer, ")");
             break;
@@ -5040,8 +5043,8 @@ static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offse
     {
         uint32_t cli4_offset = offset + (size_t)cli4.data.code - (size_t)dxbc.code;
 
-        fx_parser_read_unstructured(parser, &code.cli4_count, cli4_offset, sizeof(code.cli4_count));
-        code.cli4 = fx_parser_get_unstructured_ptr(parser, cli4_offset + 4, code.cli4_count * sizeof(float));
+        fx_parser_read_unstructured(parser, &code.cli_count, cli4_offset, sizeof(code.cli_count));
+        code.cli._4 = fx_parser_get_unstructured_ptr(parser, cli4_offset + 4, code.cli_count * sizeof(float));
     }
 
     if (ctab.data.code)
