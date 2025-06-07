@@ -4720,7 +4720,7 @@ static const struct
     uint32_t opcode;
     const char *name;
 }
-fx_4_fxlc_opcodes[] =
+fxlc_opcodes[] =
 {
     { 0x100, "mov"   },
     { 0x101, "neg"   },
@@ -4775,14 +4775,14 @@ fx_4_fxlc_opcodes[] =
     { 0x70e, "d3ds_dotswiz" },
 };
 
-static const char *fx_4_get_fxlc_opcode_name(uint32_t opcode)
+static const char *get_fxlc_opcode_name(uint32_t opcode)
 {
     size_t i;
 
-    for (i = 0; i < ARRAY_SIZE(fx_4_fxlc_opcodes); ++i)
+    for (i = 0; i < ARRAY_SIZE(fxlc_opcodes); ++i)
     {
-        if (fx_4_fxlc_opcodes[i].opcode == opcode)
-            return fx_4_fxlc_opcodes[i].name;
+        if (fxlc_opcodes[i].opcode == opcode)
+            return fxlc_opcodes[i].name;
     }
 
     return "<unrecognized>";
@@ -4980,7 +4980,7 @@ static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offse
         code.scalar = false;
 
         parse_fx_print_indent(parser);
-        vkd3d_string_buffer_printf(&parser->buffer, "%s ", fx_4_get_fxlc_opcode_name(opcode));
+        vkd3d_string_buffer_printf(&parser->buffer, "%s ", get_fxlc_opcode_name(opcode));
 
         /* Destination first. */
         fx_4_parse_fxlc_argument(parser, offset + sizeof(arg) * src_count, &code);
