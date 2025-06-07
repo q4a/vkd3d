@@ -4270,6 +4270,8 @@ static void fx_dump_blob(struct fx_parser *parser, const void *blob, uint32_t si
     }
 }
 
+static void fx_2_parse_fxlvm_expression(struct fx_parser *parser, const uint32_t *blob, uint32_t size);
+
 static void fx_parse_fx_2_array_selector(struct fx_parser *parser)
 {
     uint32_t size, blob_size = 0;
@@ -4297,7 +4299,7 @@ static void fx_parse_fx_2_array_selector(struct fx_parser *parser)
     {
         parse_fx_print_indent(parser);
         vkd3d_string_buffer_printf(&parser->buffer, "selector blob size %u\n", blob_size);
-        fx_dump_blob(parser, blob, blob_size);
+        fx_2_parse_fxlvm_expression(parser, blob, blob_size);
     }
 }
 
@@ -4826,6 +4828,7 @@ struct fxlvm_code
     union
     {
         const float *_4;
+        const double *_8;
     } cli;
     uint32_t cli_count;
 
@@ -4849,7 +4852,34 @@ static uint32_t fxlvm_read_u32(struct fxlvm_code *code)
     return *code->ptr++;
 }
 
-static void fx_4_parse_print_swizzle(struct fx_parser *parser, const struct fxlvm_code *code, unsigned int addr)
+static const uint32_t *find_d3dbc_section(const uint32_t *ptr, uint32_t count, uint32_t tag, uint32_t *size)
+{
+    if (!count)
+        return NULL;
+
+    /* Skip version tag */
+    ptr++;
+    count--;
+
+    while (count > 2 && (*ptr & 0xffff) == 0xfffe)
+    {
+        unsigned int section_size;
+
+        section_size = (*ptr >> 16);
+        if (!section_size || section_size + 1 > count)
+            break;
+        if (*(ptr + 1) == tag)
+        {
+            *size = section_size;
+            return ptr + 2;
+        }
+        count -= section_size + 1;
+        ptr += section_size + 1;
+    }
+    return NULL;
+}
+
+static void fx_parse_print_swizzle(struct fx_parser *parser, const struct fxlvm_code *code, unsigned int addr)
 {
     unsigned int comp_count = code->scalar ? 1 : code->comp_count;
     static const char comp[] = "xyzw";
@@ -4861,27 +4891,37 @@ static void fx_4_parse_print_swizzle(struct fx_parser *parser, const struct fxlv
 static void fx_parse_fxlc_constant_argument(struct fx_parser *parser,
         const struct fxlc_arg *arg, const struct fxlvm_code *code)
 {
-    uint32_t i, offset, register_index = arg->address / 4; /* Address counts in components. */
+    uint32_t register_index = arg->address / 4; /* Address counts in components. */
 
-    for (i = 0; i < code->ctab_count; ++i)
+    if (code->ctab_count)
     {
-        const struct fx_4_ctab_entry *c = &code->constants[i];
+        uint32_t i, offset;
 
-        if (register_index < c->register_index || register_index - c->register_index >= c->register_count)
-            continue;
+        for (i = 0; i < code->ctab_count; ++i)
+        {
+            const struct fx_4_ctab_entry *c = &code->constants[i];
 
-        vkd3d_string_buffer_printf(&parser->buffer, "%s", &code->ctab[c->name]);
+            if (register_index < c->register_index || register_index - c->register_index >= c->register_count)
+                continue;
 
-        /* Register offset within variable */
-        offset = arg->address - c->register_index * 4;
+            vkd3d_string_buffer_printf(&parser->buffer, "%s", &code->ctab[c->name]);
 
-        if (offset / 4)
-            vkd3d_string_buffer_printf(&parser->buffer, "[%u]", offset / 4);
-        fx_4_parse_print_swizzle(parser, code, offset);
-        return;
+            /* Register offset within variable */
+            offset = arg->address - c->register_index * 4;
+
+            if (offset / 4)
+                vkd3d_string_buffer_printf(&parser->buffer, "[%u]", offset / 4);
+            fx_parse_print_swizzle(parser, code, offset);
+            return;
+        }
+
+        vkd3d_string_buffer_printf(&parser->buffer, "(var-not-found)");
     }
-
-    vkd3d_string_buffer_printf(&parser->buffer, "(var-not-found)");
+    else
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "c%u", register_index);
+        fx_parse_print_swizzle(parser, code, arg->address);
+    }
 }
 
 static void fx_parse_fxlc_argument(struct fx_parser *parser, struct fxlc_arg *arg, struct fxlvm_code *code)
@@ -4903,7 +4943,10 @@ static void fx_parse_fxlc_argument(struct fx_parser *parser, struct fxlc_arg *ar
 
 static void fx_print_fxlc_literal(struct fx_parser *parser, uint32_t address, struct fxlvm_code *code)
 {
-    vkd3d_string_buffer_print_f32(&parser->buffer, code->cli._4[address]);
+    if (parser->version.major >= 4)
+        vkd3d_string_buffer_print_f32(&parser->buffer, code->cli._4[address]);
+    else
+        vkd3d_string_buffer_print_f64(&parser->buffer, code->cli._8[address]);
 }
 
 static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_arg *arg, struct fxlvm_code *code)
@@ -4941,7 +4984,7 @@ static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_a
                 vkd3d_string_buffer_printf(&parser->buffer, "expr");
             else
                 vkd3d_string_buffer_printf(&parser->buffer, "r%u", arg->address / 4);
-            fx_4_parse_print_swizzle(parser, code, arg->address);
+            fx_parse_print_swizzle(parser, code, arg->address);
             break;
 
         default:
@@ -5003,6 +5046,29 @@ static void fx_parse_fxlvm_expression(struct fx_parser *parser, struct fxlvm_cod
     }
 
     parse_fx_end_indent(parser);
+}
+
+static void fx_2_parse_fxlvm_expression(struct fx_parser *parser, const uint32_t *blob, uint32_t size)
+{
+    uint32_t count = size / sizeof(uint32_t);
+    struct fxlvm_code code = { 0 };
+    uint32_t section_size;
+    const uint32_t *data;
+
+    /* Literal constants, using 64-bit floats. */
+    if ((data = find_d3dbc_section(blob, count, TAG_CLIT, &section_size)))
+    {
+        code.cli_count = *data++;
+        code.cli._8 = (const double *)data;
+    }
+
+    /* CTAB does not contain variable names */
+
+    /* Code blob */
+    code.ptr = find_d3dbc_section(blob, count, TAG_FXLC, &count);
+    code.end = code.ptr + count;
+
+    fx_parse_fxlvm_expression(parser, &code);
 }
 
 static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offset)
