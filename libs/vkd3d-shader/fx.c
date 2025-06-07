@@ -4806,8 +4806,23 @@ struct fx_4_ctab_entry
     uint32_t default_value;
 };
 
+struct fxlc_arg
+{
+    uint32_t reg_type;
+    uint32_t address;
+    bool indexed;
+    struct
+    {
+        uint32_t reg_type;
+        uint32_t address;
+    } index;
+};
+
 struct fxlvm_code
 {
+    const uint32_t *ptr, *end;
+    bool failed;
+
     const float *cli4;
     uint32_t cli4_count;
 
@@ -4820,6 +4835,17 @@ struct fxlvm_code
     bool scalar;
 };
 
+static uint32_t fxlvm_read_u32(struct fxlvm_code *code)
+{
+    if (code->end == code->ptr)
+    {
+        code->failed = true;
+        return 0;
+    }
+
+    return *code->ptr++;
+}
+
 static void fx_4_parse_print_swizzle(struct fx_parser *parser, const struct fxlvm_code *code, unsigned int addr)
 {
     unsigned int comp_count = code->scalar ? 1 : code->comp_count;
@@ -4830,7 +4856,7 @@ static void fx_4_parse_print_swizzle(struct fx_parser *parser, const struct fxlv
 }
 
 static void fx_4_parse_fxlc_constant_argument(struct fx_parser *parser,
-        const struct fx_4_fxlc_argument *arg, const struct fxlvm_code *code)
+        const struct fxlc_arg *arg, const struct fxlvm_code *code)
 {
     uint32_t i, offset, register_index = arg->address / 4; /* Address counts in components. */
 
@@ -4855,18 +4881,32 @@ static void fx_4_parse_fxlc_constant_argument(struct fx_parser *parser,
     vkd3d_string_buffer_printf(&parser->buffer, "(var-not-found)");
 }
 
-static void fx_4_parse_fxlc_argument(struct fx_parser *parser, uint32_t offset, const struct fxlvm_code *code)
+static void fx_parse_fxlc_argument(struct fx_parser *parser, struct fxlc_arg *arg, struct fxlvm_code *code)
 {
-    struct fx_4_fxlc_argument arg;
+    uint32_t flags;
+
+    memset(arg, 0, sizeof(*arg));
+
+    flags = fxlvm_read_u32(code);
+    if (flags)
+    {
+        arg->indexed = true;
+        arg->index.reg_type = fxlvm_read_u32(code);
+        arg->index.address  = fxlvm_read_u32(code);
+    }
+    arg->reg_type = fxlvm_read_u32(code);
+    arg->address  = fxlvm_read_u32(code);
+}
+
+static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_arg *arg, struct fxlvm_code *code)
+{
     uint32_t count;
 
-    fx_parser_read_unstructured(parser, &arg, offset, sizeof(arg));
-
-    switch (arg.reg_type)
+    switch (arg->reg_type)
     {
         case FX_FXLC_REG_LITERAL:
             count = code->scalar ? 1 : code->comp_count;
-            if (arg.address >= code->cli4_count || count > code->cli4_count - arg.address)
+            if (arg->address >= code->cli4_count || count > code->cli4_count - arg->address)
             {
                 vkd3d_string_buffer_printf(&parser->buffer, "(<out-of-bounds>)");
                 parser->failed = true;
@@ -4874,42 +4914,97 @@ static void fx_4_parse_fxlc_argument(struct fx_parser *parser, uint32_t offset, 
             }
 
             vkd3d_string_buffer_printf(&parser->buffer, "(");
-            vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg.address]);
+            vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg->address]);
             for (unsigned int i = 1; i < code->comp_count; ++i)
             {
                 vkd3d_string_buffer_printf(&parser->buffer, ", ");
-                vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg.address + (code->scalar ? 0 : i)]);
+                vkd3d_string_buffer_print_f32(&parser->buffer, code->cli4[arg->address + (code->scalar ? 0 : i)]);
             }
             vkd3d_string_buffer_printf(&parser->buffer, ")");
             break;
 
         case FX_FXLC_REG_CB:
-            fx_4_parse_fxlc_constant_argument(parser, &arg, code);
+            fx_4_parse_fxlc_constant_argument(parser, arg, code);
             break;
 
         case FX_FXLC_REG_OUTPUT:
         case FX_FXLC_REG_TEMP:
-            if (arg.reg_type == FX_FXLC_REG_OUTPUT)
+            if (arg->reg_type == FX_FXLC_REG_OUTPUT)
                 vkd3d_string_buffer_printf(&parser->buffer, "expr");
             else
-                vkd3d_string_buffer_printf(&parser->buffer, "r%u", arg.address / 4);
-            fx_4_parse_print_swizzle(parser, code, arg.address);
+                vkd3d_string_buffer_printf(&parser->buffer, "r%u", arg->address / 4);
+            fx_4_parse_print_swizzle(parser, code, arg->address);
             break;
 
         default:
-            vkd3d_string_buffer_printf(&parser->buffer, "<unknown register %u>", arg.reg_type);
+            vkd3d_string_buffer_printf(&parser->buffer, "<unknown register %u>", arg->reg_type);
             break;
     }
+}
+
+static void fx_parse_fxlvm_expression(struct fx_parser *parser, struct fxlvm_code *code)
+{
+    struct fxlc_arg args[9];
+    uint32_t ins_count;
+    size_t i, j;
+
+    ins_count = fxlvm_read_u32(code);
+
+    parse_fx_start_indent(parser);
+
+    for (i = 0; i < ins_count; ++i)
+    {
+        uint32_t instr, opcode, src_count;
+
+        instr = fxlvm_read_u32(code);
+        src_count = fxlvm_read_u32(code);
+
+        if (src_count >= ARRAY_SIZE(args))
+        {
+            fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                    "Unexpected instruction source count %u.", src_count);
+            break;
+        }
+
+        /* Sources entries are followed by the destination, first read them all.
+           Output format is "opcode dst, src[0]...src[n]". */
+        for (j = 0; j < src_count; ++j)
+            fx_parse_fxlc_argument(parser, &args[j], code);
+        fx_parse_fxlc_argument(parser, &args[src_count], code);
+
+        opcode = (instr >> FX_FXLC_OPCODE_SHIFT) & FX_FXLC_OPCODE_MASK;
+        code->comp_count = instr & FX_FXLC_COMP_COUNT_MASK;
+
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "%s ", get_fxlc_opcode_name(opcode));
+
+        code->scalar = false;
+        fx_print_fxlc_argument(parser, &args[src_count], code);
+        vkd3d_string_buffer_printf(&parser->buffer, ", ");
+
+        for (j = 0; j < src_count; ++j)
+        {
+            /* Scalar modifier applies only to the first source. */
+            code->scalar = j == 0 && !!(instr & FX_FXLC_IS_SCALAR_MASK);
+            fx_print_fxlc_argument(parser, &args[j], code);
+            if (j < src_count - 1)
+                vkd3d_string_buffer_printf(&parser->buffer, ", ");
+        }
+
+        vkd3d_string_buffer_printf(&parser->buffer, "\n");
+    }
+
+    parse_fx_end_indent(parser);
 }
 
 static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offset)
 {
     struct vkd3d_shader_dxbc_section_desc *section, fxlc, cli4, ctab;
     struct vkd3d_shader_dxbc_desc dxbc_desc;
+    struct fxlvm_code code = { 0 };
     struct vkd3d_shader_code dxbc;
-    uint32_t size, ins_count;
-    struct fxlvm_code code;
-    size_t i, j;
+    uint32_t size;
+    size_t i;
 
     offset = fx_parser_read_unstructured(parser, &size, offset, sizeof(size));
 
@@ -4962,47 +5057,10 @@ static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offse
                 ctab_offset + consts_offset, code.ctab_count * sizeof(*code.constants));
     }
 
-    offset += (size_t)fxlc.data.code - (size_t)dxbc.code;
-    offset = fx_parser_read_unstructured(parser, &ins_count, offset, sizeof(ins_count));
+    code.ptr = fxlc.data.code;
+    code.end = (uint32_t *)((uint8_t *)fxlc.data.code + fxlc.data.size);
 
-    parse_fx_start_indent(parser);
-
-    for (i = 0; i < ins_count; ++i)
-    {
-        uint32_t instr, opcode, src_count;
-        struct fx_4_fxlc_argument arg;
-
-        offset = fx_parser_read_unstructured(parser, &instr, offset, sizeof(instr));
-        offset = fx_parser_read_unstructured(parser, &src_count, offset, sizeof(src_count));
-
-        opcode = (instr >> FX_FXLC_OPCODE_SHIFT) & FX_FXLC_OPCODE_MASK;
-        code.comp_count = instr & FX_FXLC_COMP_COUNT_MASK;
-        code.scalar = false;
-
-        parse_fx_print_indent(parser);
-        vkd3d_string_buffer_printf(&parser->buffer, "%s ", get_fxlc_opcode_name(opcode));
-
-        /* Destination first. */
-        fx_4_parse_fxlc_argument(parser, offset + sizeof(arg) * src_count, &code);
-
-        for (j = 0; j < src_count; ++j)
-        {
-            vkd3d_string_buffer_printf(&parser->buffer, ", ");
-
-            /* Scalar modifier applies only to first source. */
-            code.scalar = j == 0 && !!(instr & FX_FXLC_IS_SCALAR_MASK);
-            fx_4_parse_fxlc_argument(parser, offset, &code);
-
-            offset += sizeof(arg);
-        }
-
-        /* Destination */
-        offset += sizeof(arg);
-
-        vkd3d_string_buffer_printf(&parser->buffer, "\n");
-    }
-
-    parse_fx_end_indent(parser);
+    fx_parse_fxlvm_expression(parser, &code);
 }
 
 static void fx_4_parse_state_object_initializer(struct fx_parser *parser, uint32_t count,
