@@ -4858,7 +4858,7 @@ static void fx_4_parse_print_swizzle(struct fx_parser *parser, const struct fxlv
         vkd3d_string_buffer_printf(&parser->buffer, ".%.*s", comp_count, &comp[addr % 4]);
 }
 
-static void fx_4_parse_fxlc_constant_argument(struct fx_parser *parser,
+static void fx_parse_fxlc_constant_argument(struct fx_parser *parser,
         const struct fxlc_arg *arg, const struct fxlvm_code *code)
 {
     uint32_t i, offset, register_index = arg->address / 4; /* Address counts in components. */
@@ -4932,7 +4932,7 @@ static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_a
             break;
 
         case FX_FXLC_REG_CB:
-            fx_4_parse_fxlc_constant_argument(parser, arg, code);
+            fx_parse_fxlc_constant_argument(parser, arg, code);
             break;
 
         case FX_FXLC_REG_OUTPUT:
