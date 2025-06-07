@@ -54,6 +54,19 @@ enum state_property_component_type
     FX_COMPONENT_TYPE_COUNT,
 };
 
+enum fxlvm_constants
+{
+    FX_FXLC_COMP_COUNT_MASK = 0xffff,
+    FX_FXLC_OPCODE_MASK = 0x7ff,
+    FX_FXLC_OPCODE_SHIFT = 20,
+    FX_FXLC_IS_SCALAR_MASK = 0x80000000,
+
+    FX_FXLC_REG_LITERAL = 1,
+    FX_FXLC_REG_CB = 2,
+    FX_FXLC_REG_OUTPUT = 4,
+    FX_FXLC_REG_TEMP = 7,
+};
+
 struct rhs_named_value
 {
     const char *name;
@@ -1079,17 +1092,6 @@ enum fx_4_type_constants
     FX_4_ASSIGNMENT_VALUE_EXPRESSION = 0x6,
     FX_4_ASSIGNMENT_INLINE_SHADER = 0x7,
     FX_5_ASSIGNMENT_INLINE_SHADER = 0x8,
-
-    /* FXLVM constants */
-    FX_4_FXLC_COMP_COUNT_MASK = 0xffff,
-    FX_4_FXLC_OPCODE_MASK = 0x7ff,
-    FX_4_FXLC_OPCODE_SHIFT = 20,
-    FX_4_FXLC_IS_SCALAR_MASK = 0x80000000,
-
-    FX_4_FXLC_REG_LITERAL = 1,
-    FX_4_FXLC_REG_CB = 2,
-    FX_4_FXLC_REG_OUTPUT = 4,
-    FX_4_FXLC_REG_TEMP = 7,
 };
 
 static const uint32_t fx_4_numeric_base_types[] =
@@ -4862,7 +4864,7 @@ static void fx_4_parse_fxlc_argument(struct fx_parser *parser, uint32_t offset, 
 
     switch (arg.reg_type)
     {
-        case FX_4_FXLC_REG_LITERAL:
+        case FX_FXLC_REG_LITERAL:
             count = code->scalar ? 1 : code->comp_count;
             if (arg.address >= code->cli4_count || count > code->cli4_count - arg.address)
             {
@@ -4881,13 +4883,13 @@ static void fx_4_parse_fxlc_argument(struct fx_parser *parser, uint32_t offset, 
             vkd3d_string_buffer_printf(&parser->buffer, ")");
             break;
 
-        case FX_4_FXLC_REG_CB:
+        case FX_FXLC_REG_CB:
             fx_4_parse_fxlc_constant_argument(parser, &arg, code);
             break;
 
-        case FX_4_FXLC_REG_OUTPUT:
-        case FX_4_FXLC_REG_TEMP:
-            if (arg.reg_type == FX_4_FXLC_REG_OUTPUT)
+        case FX_FXLC_REG_OUTPUT:
+        case FX_FXLC_REG_TEMP:
+            if (arg.reg_type == FX_FXLC_REG_OUTPUT)
                 vkd3d_string_buffer_printf(&parser->buffer, "expr");
             else
                 vkd3d_string_buffer_printf(&parser->buffer, "r%u", arg.address / 4);
@@ -4973,8 +4975,8 @@ static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offse
         offset = fx_parser_read_unstructured(parser, &instr, offset, sizeof(instr));
         offset = fx_parser_read_unstructured(parser, &src_count, offset, sizeof(src_count));
 
-        opcode = (instr >> FX_4_FXLC_OPCODE_SHIFT) & FX_4_FXLC_OPCODE_MASK;
-        code.comp_count = instr & FX_4_FXLC_COMP_COUNT_MASK;
+        opcode = (instr >> FX_FXLC_OPCODE_SHIFT) & FX_FXLC_OPCODE_MASK;
+        code.comp_count = instr & FX_FXLC_COMP_COUNT_MASK;
         code.scalar = false;
 
         parse_fx_print_indent(parser);
@@ -4988,7 +4990,7 @@ static void fx_4_parse_fxlvm_expression(struct fx_parser *parser, uint32_t offse
             vkd3d_string_buffer_printf(&parser->buffer, ", ");
 
             /* Scalar modifier applies only to first source. */
-            code.scalar = j == 0 && !!(instr & FX_4_FXLC_IS_SCALAR_MASK);
+            code.scalar = j == 0 && !!(instr & FX_FXLC_IS_SCALAR_MASK);
             fx_4_parse_fxlc_argument(parser, offset, &code);
 
             offset += sizeof(arg);
