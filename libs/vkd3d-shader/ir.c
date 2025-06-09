@@ -9743,7 +9743,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
     {
         uint32_t data_type_mask;
     }
-    src_modifier_data[] =
+    src_modifier_data[VKD3DSPSM_COUNT] =
     {
         [VKD3DSPSM_NEG]     = {F64_BIT | F32_BIT | F16_BIT | I32_BIT | U64_BIT | U32_BIT | U16_BIT},
         [VKD3DSPSM_BIAS]    = {F32_BIT},
@@ -9757,6 +9757,11 @@ static void vsir_validate_src_param(struct validation_context *ctx,
         [VKD3DSPSM_DW]      = {F32_BIT},
         [VKD3DSPSM_ABS]     = {F64_BIT | F32_BIT | F16_BIT},
         [VKD3DSPSM_ABSNEG]  = {F64_BIT | F32_BIT | F16_BIT},
+        /* This doesn't make a lot of sense. NOT is used only by D3DBC, and
+         * apparently only for IF instructions reading from a CONSTBOOL register.
+         * However, currently the D3DBC parser generates those registers of
+         * type float, so for the moment let's allow that. */
+        [VKD3DSPSM_NOT]     = {F32_BIT},
     };
 
     vsir_validate_register(ctx, &src->reg);
@@ -9773,7 +9778,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Source has invalid modifiers %#x.",
                 src->modifiers);
 
-    if (src->modifiers < ARRAY_SIZE(src_modifier_data) && src_modifier_data[src->modifiers].data_type_mask)
+    if (src->modifiers != VKD3DSPSM_NONE && src->modifiers < ARRAY_SIZE(src_modifier_data))
     {
         if (!(src_modifier_data[src->modifiers].data_type_mask & (1u << src->reg.data_type)))
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS,
