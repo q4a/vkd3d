@@ -8678,7 +8678,8 @@ static void vsir_validate_src_param(struct validation_context *ctx,
     }
     src_modifier_data[] =
     {
-        [VKD3DSPSM_NEG] = {F64_BIT | F32_BIT | F16_BIT | I32_BIT | U64_BIT | U32_BIT | U16_BIT},
+        [VKD3DSPSM_NEG]  = {F64_BIT | F32_BIT | F16_BIT | I32_BIT | U64_BIT | U32_BIT | U16_BIT},
+        [VKD3DSPSM_BIAS] = {F32_BIT},
     };
     vsir_validate_register(ctx, &src->reg);
 
