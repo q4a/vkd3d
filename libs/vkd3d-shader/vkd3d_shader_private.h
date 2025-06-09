@@ -538,6 +538,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_SETP,
     VKD3DSIH_SGE,
     VKD3DSIH_SGN,
+    VKD3DSIH_SIN,
     VKD3DSIH_SINCOS,
     VKD3DSIH_SLT,
     VKD3DSIH_SQRT,

@@ -7757,6 +7757,7 @@ static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
         {VKD3DSIH_ROUND_PI,        GLSLstd450Ceil},
         {VKD3DSIH_ROUND_Z,         GLSLstd450Trunc},
         {VKD3DSIH_RSQ,             GLSLstd450InverseSqrt},
+        {VKD3DSIH_SIN,             GLSLstd450Sin},
         {VKD3DSIH_SQRT,            GLSLstd450Sqrt},
         {VKD3DSIH_TAN,             GLSLstd450Tan},
         {VKD3DSIH_UMAX,            GLSLstd450UMax},
@@ -10761,6 +10762,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_ROUND_PI:
         case VKD3DSIH_ROUND_Z:
         case VKD3DSIH_RSQ:
+        case VKD3DSIH_SIN:
         case VKD3DSIH_SQRT:
         case VKD3DSIH_TAN:
         case VKD3DSIH_UMAX:

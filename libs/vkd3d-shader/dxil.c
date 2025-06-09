@@ -4829,6 +4829,8 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
             return VKD3DSIH_ISFINITE;
         case DX_COS:
             return VKD3DSIH_COS;
+        case DX_SIN:
+            return VKD3DSIH_SIN;
         case DX_TAN:
             return VKD3DSIH_TAN;
         case DX_ACOS:
@@ -6177,30 +6179,6 @@ static void sm6_parser_emit_dx_saturate(struct sm6_parser *sm6, enum dx_intrinsi
         ins->dst->modifiers = VKD3DSPDM_SATURATE;
 }
 
-static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
-        const struct sm6_value **operands, struct function_emission_state *state)
-{
-    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
-    struct vkd3d_shader_instruction *ins = state->ins;
-    struct vkd3d_shader_dst_param *dst_params;
-    struct vkd3d_shader_src_param *src_param;
-    unsigned int index;
-
-    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SINCOS);
-    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
-        return;
-    src_param_init_from_value(src_param, operands[0], sm6);
-
-    sm6_parser_init_ssa_value(sm6, dst);
-
-    index = op == DX_COS;
-    dst_params = instruction_dst_params_alloc(ins, 2, sm6);
-    dst_param_init(&dst_params[0]);
-    dst_param_init(&dst_params[1]);
-    sm6_register_from_value(&dst_params[index].reg, dst, sm6);
-    vsir_dst_param_init_null(&dst_params[index ^ 1]);
-}
-
 static void sm6_parser_emit_dx_split_double(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -6673,7 +6651,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_SAMPLE_INDEX                  ] = {"i", "",     sm6_parser_emit_dx_sample_index},
     [DX_SAMPLE_LOD                    ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SATURATE                      ] = {"g", "R",    sm6_parser_emit_dx_saturate},
-    [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
+    [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_SPLIT_DOUBLE                  ] = {"S", "d",    sm6_parser_emit_dx_split_double},
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},

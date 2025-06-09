@@ -291,6 +291,7 @@ const char *vsir_opcode_get_name(enum vkd3d_shader_opcode op, const char *error)
         [VKD3DSIH_SETP                            ] = "setp",
         [VKD3DSIH_SGE                             ] = "sge",
         [VKD3DSIH_SGN                             ] = "sgn",
+        [VKD3DSIH_SIN                             ] = "sin",
         [VKD3DSIH_SINCOS                          ] = "sincos",
         [VKD3DSIH_SLT                             ] = "slt",
         [VKD3DSIH_SQRT                            ] = "sqrt",
