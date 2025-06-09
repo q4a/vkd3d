@@ -4827,6 +4827,8 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
             return VKD3DSIH_ISINF;
         case DX_ISFINITE:
             return VKD3DSIH_ISFINITE;
+        case DX_COS:
+            return VKD3DSIH_COS;
         case DX_TAN:
             return VKD3DSIH_TAN;
         case DX_ACOS:
@@ -6602,7 +6604,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_BUFFER_UPDATE_COUNTER         ] = {"i", "H8",   sm6_parser_emit_dx_buffer_update_counter},
     [DX_CALCULATE_LOD                 ] = {"f", "HHfffb", sm6_parser_emit_dx_calculate_lod},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
-    [DX_COS                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
+    [DX_COS                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_COVERAGE                      ] = {"i", "",     sm6_parser_emit_dx_coverage},
     [DX_CREATE_HANDLE                 ] = {"H", "ccib", sm6_parser_emit_dx_create_handle},

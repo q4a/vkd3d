@@ -7734,6 +7734,7 @@ static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
         {VKD3DSIH_ACOS,            GLSLstd450Acos},
         {VKD3DSIH_ASIN,            GLSLstd450Asin},
         {VKD3DSIH_ATAN,            GLSLstd450Atan},
+        {VKD3DSIH_COS,             GLSLstd450Cos},
         {VKD3DSIH_DFMA,            GLSLstd450Fma},
         {VKD3DSIH_DMAX,            GLSLstd450NMax},
         {VKD3DSIH_DMIN,            GLSLstd450NMin},
@@ -10737,6 +10738,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_ACOS:
         case VKD3DSIH_ASIN:
         case VKD3DSIH_ATAN:
+        case VKD3DSIH_COS:
         case VKD3DSIH_HCOS:
         case VKD3DSIH_HSIN:
         case VKD3DSIH_HTAN:

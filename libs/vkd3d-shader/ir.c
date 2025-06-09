@@ -62,6 +62,7 @@ const char *vsir_opcode_get_name(enum vkd3d_shader_opcode op, const char *error)
         [VKD3DSIH_CHECK_ACCESS_FULLY_MAPPED       ] = "check_access_fully_mapped",
         [VKD3DSIH_CMP                             ] = "cmp",
         [VKD3DSIH_CND                             ] = "cnd",
+        [VKD3DSIH_COS                             ] = "cos",
         [VKD3DSIH_CONTINUE                        ] = "continue",
         [VKD3DSIH_CONTINUEP                       ] = "continuec",
         [VKD3DSIH_COUNTBITS                       ] = "countbits",
