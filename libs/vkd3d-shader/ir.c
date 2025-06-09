@@ -589,16 +589,21 @@ static void vsir_src_param_init_sampler(struct vkd3d_shader_src_param *src, unsi
     src->reg.dimension = VSIR_DIMENSION_NONE;
 }
 
+static void src_param_init_ssa_scalar(struct vkd3d_shader_src_param *src, unsigned int idx,
+        enum vkd3d_data_type data_type)
+{
+    vsir_src_param_init(src, VKD3DSPR_SSA, data_type, 1);
+    src->reg.idx[0].offset = idx;
+}
+
 static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
-    src->reg.idx[0].offset = idx;
+    src_param_init_ssa_scalar(src, idx, VKD3D_DATA_BOOL);
 }
 
 static void src_param_init_ssa_float(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_FLOAT, 1);
-    src->reg.idx[0].offset = idx;
+    src_param_init_ssa_scalar(src, idx, VKD3D_DATA_FLOAT);
 }
 
 static void src_param_init_ssa_float4(struct vkd3d_shader_src_param *src, unsigned int idx)
@@ -659,16 +664,21 @@ void vsir_dst_param_init_null(struct vkd3d_shader_dst_param *dst)
     dst->write_mask = 0;
 }
 
+static void dst_param_init_ssa_scalar(struct vkd3d_shader_dst_param *dst, unsigned int idx,
+        enum vkd3d_data_type data_type)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_SSA, data_type, 1);
+    dst->reg.idx[0].offset = idx;
+}
+
 static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
-    vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
-    dst->reg.idx[0].offset = idx;
+    dst_param_init_ssa_scalar(dst, idx, VKD3D_DATA_BOOL);
 }
 
 static void dst_param_init_ssa_float(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
-    vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_FLOAT, 1);
-    dst->reg.idx[0].offset = idx;
+    dst_param_init_ssa_scalar(dst, idx, VKD3D_DATA_FLOAT);
 }
 
 static void dst_param_init_ssa_float4(struct vkd3d_shader_dst_param *dst, unsigned int idx)
@@ -1081,50 +1091,65 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
 {
     struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     size_t pos = sincos - instructions->elements;
-    struct vkd3d_shader_instruction *ins;
-    unsigned int s;
+    struct vkd3d_shader_instruction *ins, *mov;
+    unsigned int s, count;
 
     if (sincos->dst_count != 1)
         return VKD3D_OK;
 
-    if (!shader_instruction_array_insert_at(instructions, pos + 1, 1))
+    count = 1 + vkd3d_popcount(sincos->dst[0].write_mask & (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1));
+
+    if (!shader_instruction_array_insert_at(instructions, pos + 1, count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
     sincos = &instructions->elements[pos];
 
     ins = &instructions->elements[pos + 1];
 
-    if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VKD3DSIH_SINCOS, 2, 1)))
+    /* Save the source in a SSA in case a destination collides with the source. */
+    mov = ins++;
+    if (!(vsir_instruction_init_with_params(program, mov, &sincos->location, VKD3DSIH_MOV, 1, 1)))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    ins->flags = sincos->flags;
+    mov->src[0] = sincos->src[0];
 
-    *ins->src = *sincos->src;
     /* Set the source swizzle to replicate the first component. */
     s = vsir_swizzle_get_component(sincos->src->swizzle, 0);
-    ins->src->swizzle = vkd3d_shader_create_swizzle(s, s, s, s);
+    mov->src[0].swizzle = vkd3d_shader_create_swizzle(s, s, s, s);
+
+    dst_param_init_ssa_scalar(&mov->dst[0], program->ssa_count, sincos->src[0].reg.data_type);
 
     if (sincos->dst->write_mask & VKD3DSP_WRITEMASK_1)
     {
+        if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VKD3DSIH_SIN, 1, 1)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        ins->flags = sincos->flags;
+
+        src_param_init_ssa_scalar(&ins->src[0], program->ssa_count, sincos->src[0].reg.data_type);
+
         ins->dst[0] = *sincos->dst;
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_1;
-    }
-    else
-    {
-        vsir_dst_param_init_null(&ins->dst[0]);
+
+        ++ins;
     }
 
     if (sincos->dst->write_mask & VKD3DSP_WRITEMASK_0)
     {
-        ins->dst[1] = *sincos->dst;
-        ins->dst[1].write_mask = VKD3DSP_WRITEMASK_0;
-    }
-    else
-    {
-        vsir_dst_param_init_null(&ins->dst[1]);
+        if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VKD3DSIH_COS, 1, 1)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        ins->flags = sincos->flags;
+
+        src_param_init_ssa_scalar(&ins->src[0], program->ssa_count, sincos->src[0].reg.data_type);
+
+        ins->dst[0] = *sincos->dst;
+        ins->dst[0].write_mask = VKD3DSP_WRITEMASK_0;
+
+        ++ins;
     }
 
-    /* Make the original instruction no-op */
     vkd3d_shader_instruction_make_nop(sincos);
+    ++program->ssa_count;
 
     return VKD3D_OK;
 }
