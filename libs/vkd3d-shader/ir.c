@@ -9656,12 +9656,17 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
     switch (dst->shift)
     {
         case 0:
+            break;
+
         case 1:
         case 2:
         case 3:
         case 13:
         case 14:
         case 15:
+            if (dst->reg.data_type != VKD3D_DATA_FLOAT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                        "Invalid data type %#x for destination with shift.", dst->reg.data_type);
             break;
 
         default:
