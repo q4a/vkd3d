@@ -9636,6 +9636,23 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Destination has invalid modifiers %#x.",
                 dst->modifiers);
 
+    if (dst->modifiers & VKD3DSPDM_SATURATE)
+    {
+        switch (dst->reg.data_type)
+        {
+            case VKD3D_DATA_FLOAT:
+            case VKD3D_DATA_DOUBLE:
+            case VKD3D_DATA_HALF:
+                break;
+
+            default:
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                        "Invalid data type %#x for destination with saturate modifier.", dst->reg.data_type);
+                break;
+
+        }
+    }
+
     switch (dst->shift)
     {
         case 0:
