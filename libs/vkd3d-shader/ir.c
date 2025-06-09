@@ -9732,6 +9732,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
         [VKD3DSPSM_X2]      = {F32_BIT},
         [VKD3DSPSM_X2NEG]   = {F32_BIT},
         [VKD3DSPSM_DZ]      = {F32_BIT},
+        [VKD3DSPSM_DW]      = {F32_BIT},
     };
     vsir_validate_register(ctx, &src->reg);
 
