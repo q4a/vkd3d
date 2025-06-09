@@ -8659,9 +8659,27 @@ static void vsir_validate_io_src_param(struct validation_context *ctx,
                 "Invalid register type %#x used as source parameter.", src->reg.type);
 }
 
+#define F64_BIT (1u << VKD3D_DATA_DOUBLE)
+#define F32_BIT (1u << VKD3D_DATA_FLOAT)
+#define F16_BIT (1u << VKD3D_DATA_HALF)
+
+#define I32_BIT (1u << VKD3D_DATA_INT)
+
+#define U64_BIT (1u << VKD3D_DATA_UINT64)
+#define U32_BIT (1u << VKD3D_DATA_UINT)
+#define U16_BIT (1u << VKD3D_DATA_UINT16)
+
 static void vsir_validate_src_param(struct validation_context *ctx,
         const struct vkd3d_shader_src_param *src)
 {
+    static const struct
+    {
+        uint32_t data_type_mask;
+    }
+    src_modifier_data[] =
+    {
+        [VKD3DSPSM_NEG] = {F64_BIT | F32_BIT | F16_BIT | I32_BIT | U64_BIT | U32_BIT | U16_BIT},
+    };
     vsir_validate_register(ctx, &src->reg);
 
     if (src->swizzle & ~0x03030303u)
@@ -8675,6 +8693,13 @@ static void vsir_validate_src_param(struct validation_context *ctx,
     if (src->modifiers >= VKD3DSPSM_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Source has invalid modifiers %#x.",
                 src->modifiers);
+
+    if (src->modifiers < ARRAY_SIZE(src_modifier_data) && src_modifier_data[src->modifiers].data_type_mask)
+    {
+        if (!(src_modifier_data[src->modifiers].data_type_mask & (1u << src->reg.data_type)))
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS,
+                    "Source has invalid modifier %#x for data type %u.", src->modifiers, src->reg.data_type);
+    }
 
     switch (src->reg.type)
     {
