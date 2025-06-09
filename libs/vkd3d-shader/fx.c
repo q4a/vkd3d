@@ -65,6 +65,7 @@ enum fxlvm_constants
     FX_FXLC_REG_CB = 2,
     FX_FXLC_REG_OUTPUT = 4,
     FX_FXLC_REG_TEMP = 7,
+    FX_FXLC_REG_MAX = FX_FXLC_REG_TEMP,
 };
 
 struct rhs_named_value
@@ -4931,7 +4932,37 @@ static void fx_print_fxlc_literal(struct fx_parser *parser, uint32_t address, st
 
 static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_arg *arg, struct fxlvm_code *code)
 {
+    static const char *table_names[FX_FXLC_REG_MAX + 1] =
+    {
+        [FX_FXLC_REG_LITERAL] = "imm",
+        [FX_FXLC_REG_CB] = "cb",
+        [FX_FXLC_REG_OUTPUT] = "o",
+        [FX_FXLC_REG_TEMP] = "r",
+    };
     uint32_t count;
+
+    if (arg->reg_type > FX_FXLC_REG_MAX)
+    {
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                "Unexpected register type %u.", arg->reg_type);
+        return;
+    }
+
+    if (arg->index.reg_type > FX_FXLC_REG_MAX)
+    {
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA,
+                "Unexpected index register type %u.", arg->index.reg_type);
+        return;
+    }
+
+    if (arg->indexed)
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "%s[%u + %s%u.%c]", table_names[arg->reg_type],
+                arg->address, table_names[arg->index.reg_type], arg->index.address,
+                "xyzw"[arg->index.address % 4]);
+        fx_parse_print_swizzle(parser, code, arg->address);
+        return;
+    }
 
     switch (arg->reg_type)
     {
