@@ -2485,18 +2485,6 @@ static uint32_t vkd3d_spirv_build_op_glsl_std450_fabs(struct vkd3d_spirv_builder
     return vkd3d_spirv_build_op_glsl_std450_tr1(builder, GLSLstd450FAbs, result_type, operand);
 }
 
-static uint32_t vkd3d_spirv_build_op_glsl_std450_sin(struct vkd3d_spirv_builder *builder,
-        uint32_t result_type, uint32_t operand)
-{
-    return vkd3d_spirv_build_op_glsl_std450_tr1(builder, GLSLstd450Sin, result_type, operand);
-}
-
-static uint32_t vkd3d_spirv_build_op_glsl_std450_cos(struct vkd3d_spirv_builder *builder,
-        uint32_t result_type, uint32_t operand)
-{
-    return vkd3d_spirv_build_op_glsl_std450_tr1(builder, GLSLstd450Cos, result_type, operand);
-}
-
 static uint32_t vkd3d_spirv_build_op_glsl_std450_max(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t x, uint32_t y)
 {
@@ -8027,41 +8015,6 @@ static void spirv_compiler_emit_rcp(struct spirv_compiler *compiler,
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
-static void spirv_compiler_emit_sincos(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_dst_param *dst_sin = &instruction->dst[0];
-    const struct vkd3d_shader_dst_param *dst_cos = &instruction->dst[1];
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_src_param *src = instruction->src;
-    uint32_t type_id, src_id, sin_id = 0, cos_id = 0;
-
-    if (dst_sin->reg.type != VKD3DSPR_NULL)
-    {
-        type_id = spirv_compiler_get_type_id_for_dst(compiler, dst_sin);
-        src_id = spirv_compiler_emit_load_src(compiler, src, dst_sin->write_mask);
-
-        sin_id = vkd3d_spirv_build_op_glsl_std450_sin(builder, type_id, src_id);
-    }
-
-    if (dst_cos->reg.type != VKD3DSPR_NULL)
-    {
-        if (dst_sin->reg.type == VKD3DSPR_NULL || dst_cos->write_mask != dst_sin->write_mask)
-        {
-            type_id = spirv_compiler_get_type_id_for_dst(compiler, dst_cos);
-            src_id = spirv_compiler_emit_load_src(compiler, src, dst_cos->write_mask);
-        }
-
-        cos_id = vkd3d_spirv_build_op_glsl_std450_cos(builder, type_id, src_id);
-    }
-
-    if (sin_id)
-        spirv_compiler_emit_store_dst(compiler, dst_sin, sin_id);
-
-    if (cos_id)
-        spirv_compiler_emit_store_dst(compiler, dst_cos, cos_id);
-}
-
 static void spirv_compiler_emit_imul(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -10777,9 +10730,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DRCP:
         case VKD3DSIH_RCP:
             spirv_compiler_emit_rcp(compiler, instruction);
-            break;
-        case VKD3DSIH_SINCOS:
-            spirv_compiler_emit_sincos(compiler, instruction);
             break;
         case VKD3DSIH_IMUL:
         case VKD3DSIH_UMUL:

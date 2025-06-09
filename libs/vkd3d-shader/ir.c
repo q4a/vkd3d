@@ -606,12 +606,18 @@ static void src_param_init_ssa_float(struct vkd3d_shader_src_param *src, unsigne
     src_param_init_ssa_scalar(src, idx, VKD3D_DATA_FLOAT);
 }
 
-static void src_param_init_ssa_float4(struct vkd3d_shader_src_param *src, unsigned int idx)
+static void src_param_init_ssa_vec4(struct vkd3d_shader_src_param *src, unsigned int idx,
+        enum vkd3d_data_type data_type)
 {
-    vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_FLOAT, 1);
+    vsir_src_param_init(src, VKD3DSPR_SSA, data_type, 1);
     src->reg.idx[0].offset = idx;
     src->reg.dimension = VSIR_DIMENSION_VEC4;
     src->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+}
+
+static void src_param_init_ssa_float4(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    src_param_init_ssa_vec4(src, idx, VKD3D_DATA_FLOAT);
 }
 
 static void src_param_init_temp_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
@@ -681,12 +687,18 @@ static void dst_param_init_ssa_float(struct vkd3d_shader_dst_param *dst, unsigne
     dst_param_init_ssa_scalar(dst, idx, VKD3D_DATA_FLOAT);
 }
 
-static void dst_param_init_ssa_float4(struct vkd3d_shader_dst_param *dst, unsigned int idx)
+static void dst_param_init_ssa_vec4(struct vkd3d_shader_dst_param *dst, unsigned int idx,
+        enum vkd3d_data_type data_type)
 {
-    vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_FLOAT, 1);
+    vsir_dst_param_init(dst, VKD3DSPR_SSA, data_type, 1);
     dst->reg.idx[0].offset = idx;
     dst->reg.dimension = VSIR_DIMENSION_VEC4;
     dst->write_mask = VKD3DSP_WRITEMASK_ALL;
+}
+
+static void dst_param_init_ssa_float4(struct vkd3d_shader_dst_param *dst, unsigned int idx)
+{
+    dst_param_init_ssa_vec4(dst, idx, VKD3D_DATA_FLOAT);
 }
 
 static void dst_param_init_temp_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
@@ -1094,9 +1106,6 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
     struct vkd3d_shader_instruction *ins, *mov;
     unsigned int s, count;
 
-    if (sincos->dst_count != 1)
-        return VKD3D_OK;
-
     count = 1 + vkd3d_popcount(sincos->dst[0].write_mask & (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1));
 
     if (!shader_instruction_array_insert_at(instructions, pos + 1, count))
@@ -1144,6 +1153,74 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
 
         ins->dst[0] = *sincos->dst;
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_0;
+
+        ++ins;
+    }
+
+    vkd3d_shader_instruction_make_nop(sincos);
+    ++program->ssa_count;
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_program_lower_sm4_sincos(struct vsir_program *program,
+        struct vkd3d_shader_instruction *sincos, struct vsir_transformation_context *ctx)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    size_t pos = sincos - instructions->elements;
+    struct vkd3d_shader_instruction *ins, *mov;
+    unsigned int count = 1;
+
+    if (sincos->dst_count != 2)
+    {
+        vkd3d_shader_error(ctx->message_context, &sincos->location,
+                VKD3D_SHADER_ERROR_VSIR_INVALID_DEST_COUNT,
+                "Internal compiler error: invalid destination count %u for SINCOS.",
+                sincos->dst_count);
+        return VKD3D_ERROR;
+    }
+
+    if (sincos->dst[0].reg.type != VKD3DSPR_NULL)
+        ++count;
+    if (sincos->dst[1].reg.type != VKD3DSPR_NULL)
+        ++count;
+
+    if (!shader_instruction_array_insert_at(instructions, pos + 1, count))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    sincos = &instructions->elements[pos];
+
+    ins = &instructions->elements[pos + 1];
+
+    /* Save the source in a SSA in case a destination collides with the source. */
+    mov = ins++;
+    if (!(vsir_instruction_init_with_params(program, mov, &sincos->location, VKD3DSIH_MOV, 1, 1)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    mov->src[0] = sincos->src[0];
+    dst_param_init_ssa_vec4(&mov->dst[0], program->ssa_count, sincos->src[0].reg.data_type);
+
+    if (sincos->dst[0].reg.type != VKD3DSPR_NULL)
+    {
+        if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VKD3DSIH_SIN, 1, 1)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        ins->flags = sincos->flags;
+
+        src_param_init_ssa_vec4(&ins->src[0], program->ssa_count, sincos->src[0].reg.data_type);
+        ins->dst[0] = sincos->dst[0];
+
+        ++ins;
+    }
+
+    if (sincos->dst[1].reg.type != VKD3DSPR_NULL)
+    {
+        if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VKD3DSIH_COS, 1, 1)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        ins->flags = sincos->flags;
+
+        src_param_init_ssa_vec4(&ins->src[0], program->ssa_count, sincos->src[0].reg.data_type);
+        ins->dst[0] = sincos->dst[1];
 
         ++ins;
     }
@@ -1402,8 +1479,16 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 break;
 
             case VKD3DSIH_SINCOS:
-                if ((ret = vsir_program_lower_sm1_sincos(program, ins)) < 0)
-                    return ret;
+                if (ins->dst_count == 1)
+                {
+                    if ((ret = vsir_program_lower_sm1_sincos(program, ins)) < 0)
+                        return ret;
+                }
+                else
+                {
+                    if ((ret = vsir_program_lower_sm4_sincos(program, ins, ctx)) < 0)
+                        return ret;
+                }
                 break;
 
             case VKD3DSIH_TEXLD:
