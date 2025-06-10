@@ -1191,37 +1191,6 @@ static void msl_movc(struct msl_generator *gen, const struct vkd3d_shader_instru
     msl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
-static void msl_mul64(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
-{
-    struct msl_src src[2];
-    struct msl_dst dst;
-    uint32_t mask;
-
-    if (ins->dst[0].reg.type != VKD3DSPR_NULL)
-    {
-        /* TODO: mulhi(). */
-        mask = msl_dst_init(&dst, gen, ins, &ins->dst[0]);
-        msl_print_assignment(gen, &dst, "<unhandled 64-bit multiplication>");
-        msl_dst_cleanup(&dst, &gen->string_buffers);
-
-        msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-                "Internal compiler error: Unhandled 64-bit integer multiplication.");
-    }
-
-    if (ins->dst[1].reg.type != VKD3DSPR_NULL)
-    {
-        mask = msl_dst_init(&dst, gen, ins, &ins->dst[1]);
-        msl_src_init(&src[0], gen, &ins->src[0], mask);
-        msl_src_init(&src[1], gen, &ins->src[1], mask);
-
-        msl_print_assignment(gen, &dst, "%s * %s", src[0].str->buffer, src[1].str->buffer);
-
-        msl_src_cleanup(&src[1], &gen->string_buffers);
-        msl_src_cleanup(&src[0], &gen->string_buffers);
-        msl_dst_cleanup(&dst, &gen->string_buffers);
-    }
-}
-
 static void msl_ret(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     msl_print_indent(gen->buffer, gen->indent);
@@ -1337,8 +1306,8 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
         case VKD3DSIH_MIN:
             msl_intrinsic(gen, ins, "min");
             break;
-        case VKD3DSIH_IMUL:
-            msl_mul64(gen, ins);
+        case VKD3DSIH_IMUL_LOW:
+            msl_binop(gen, ins, "*");
             break;
         case VKD3DSIH_INE:
         case VKD3DSIH_NEU:

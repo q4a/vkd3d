@@ -1146,6 +1146,24 @@ static enum vkd3d_result vsir_program_lower_precise_mad(struct vsir_program *pro
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_imul(struct vsir_program *program,
+        struct vkd3d_shader_instruction *imul, struct vsir_transformation_context *ctx)
+{
+    if (imul->dst[0].reg.type != VKD3DSPR_NULL)
+    {
+        vkd3d_shader_error(ctx->message_context, &imul->location,
+                VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                "Extended multiplication is not implemented.");
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+
+    imul->dst[0] = imul->dst[1];
+    imul->dst_count = 1;
+    imul->opcode = VKD3DSIH_IMUL_LOW;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *program,
         struct vkd3d_shader_instruction *sincos)
 {
@@ -1524,6 +1542,12 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_DCL_OUTPUT_SGV:
             case VKD3DSIH_DCL_OUTPUT_SIV:
                 vkd3d_shader_instruction_make_nop(ins);
+                break;
+
+            case VKD3DSIH_IMUL:
+            case VKD3DSIH_UMUL:
+                if ((ret = vsir_program_lower_imul(program, ins, ctx)) < 0)
+                    return ret;
                 break;
 
             case VKD3DSIH_SINCOS:

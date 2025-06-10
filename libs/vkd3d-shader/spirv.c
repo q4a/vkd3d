@@ -8020,30 +8020,6 @@ static void spirv_compiler_emit_rcp(struct spirv_compiler *compiler,
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
-static void spirv_compiler_emit_imul(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_dst_param *dst = instruction->dst;
-    const struct vkd3d_shader_src_param *src = instruction->src;
-    uint32_t type_id, val_id, src0_id, src1_id;
-
-    if (dst[0].reg.type != VKD3DSPR_NULL)
-        FIXME("Extended multiplies not implemented.\n"); /* SpvOpSMulExtended/SpvOpUMulExtended */
-
-    if (dst[1].reg.type == VKD3DSPR_NULL)
-        return;
-
-    type_id = spirv_compiler_get_type_id_for_dst(compiler, &dst[1]);
-
-    src0_id = spirv_compiler_emit_load_src(compiler, &src[0], dst[1].write_mask);
-    src1_id = spirv_compiler_emit_load_src(compiler, &src[1], dst[1].write_mask);
-
-    val_id = vkd3d_spirv_build_op_imul(builder, type_id, src0_id, src1_id);
-
-    spirv_compiler_emit_store_dst(compiler, &dst[1], val_id);
-}
-
 static void spirv_compiler_emit_imad(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -10736,10 +10712,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DRCP:
         case VKD3DSIH_RCP:
             spirv_compiler_emit_rcp(compiler, instruction);
-            break;
-        case VKD3DSIH_IMUL:
-        case VKD3DSIH_UMUL:
-            spirv_compiler_emit_imul(compiler, instruction);
             break;
         case VKD3DSIH_IMAD:
             spirv_compiler_emit_imad(compiler, instruction);

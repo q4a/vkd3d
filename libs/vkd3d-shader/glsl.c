@@ -1250,37 +1250,6 @@ static void shader_glsl_movc(struct vkd3d_glsl_generator *gen, const struct vkd3
     glsl_dst_cleanup(&dst, &gen->string_buffers);
 }
 
-static void shader_glsl_mul_extended(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
-{
-    struct glsl_src src[2];
-    struct glsl_dst dst;
-    uint32_t mask;
-
-    if (ins->dst[0].reg.type != VKD3DSPR_NULL)
-    {
-        /* FIXME: imulExtended()/umulExtended() from ARB_gpu_shader5/GLSL 4.00+. */
-        mask = glsl_dst_init(&dst, gen, ins, &ins->dst[0]);
-        shader_glsl_print_assignment(gen, &dst, "<unhandled 64-bit multiplication>");
-        glsl_dst_cleanup(&dst, &gen->string_buffers);
-
-        vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                "Internal compiler error: Unhandled 64-bit integer multiplication.");
-    }
-
-    if (ins->dst[1].reg.type != VKD3DSPR_NULL)
-    {
-        mask = glsl_dst_init(&dst, gen, ins, &ins->dst[1]);
-        glsl_src_init(&src[0], gen, &ins->src[0], mask);
-        glsl_src_init(&src[1], gen, &ins->src[1], mask);
-
-        shader_glsl_print_assignment(gen, &dst, "%s * %s", src[0].str->buffer, src[1].str->buffer);
-
-        glsl_src_cleanup(&src[1], &gen->string_buffers);
-        glsl_src_cleanup(&src[0], &gen->string_buffers);
-        glsl_dst_cleanup(&dst, &gen->string_buffers);
-    }
-}
-
 static void shader_glsl_print_sysval_name(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
         enum vkd3d_shader_sysval_semantic sysval, unsigned int idx)
 {
@@ -1583,9 +1552,6 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *gen,
         case VKD3DSIH_MIN:
         case VKD3DSIH_UMIN:
             shader_glsl_intrinsic(gen, ins, "min");
-            break;
-        case VKD3DSIH_IMUL:
-            shader_glsl_mul_extended(gen, ins);
             break;
         case VKD3DSIH_IMUL_LOW:
             shader_glsl_binop(gen, ins, "*");
