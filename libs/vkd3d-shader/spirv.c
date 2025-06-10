@@ -9812,7 +9812,9 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
     op = spirv_compiler_map_atomic_instruction(instruction);
     if (op == SpvOpMax)
     {
-        ERR("Unexpected instruction %#x.\n", instruction->opcode);
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Unhandled instruction \"%s\" (%#x).",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
         return;
     }
 
@@ -9891,9 +9893,9 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
 
     if (instruction->flags & VKD3DARF_VOLATILE)
     {
-        WARN("Ignoring 'volatile' attribute.\n");
         spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_IGNORING_FLAG,
-                "Ignoring the 'volatile' attribute flag for atomic instruction %#x.", instruction->opcode);
+                "Ignoring the 'volatile' attribute flag for atomic instruction \"%s\" (%#x).",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
     }
 
     memory_semantic = (instruction->flags & VKD3DARF_SEQ_CST)
