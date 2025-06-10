@@ -4516,7 +4516,7 @@ static enum vkd3d_shader_opcode map_binary_op(uint64_t code, const struct sm6_ty
             is_valid = is_int && !is_bool;
             break;
         case BINOP_MUL:
-            op = is_int ? VKD3DSIH_UMUL : (is_double ? VKD3DSIH_DMUL : VKD3DSIH_MUL);
+            op = is_int ? VKD3DSIH_IMUL_LOW : (is_double ? VKD3DSIH_DMUL : VKD3DSIH_MUL);
             is_valid = !is_bool;
             break;
         case BINOP_OR:
@@ -4603,7 +4603,7 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
             silence_warning = !(flags & ~(FP_NO_NAN | FP_NO_INF | FP_NO_SIGNED_ZEROS | FP_ALLOW_RECIPROCAL));
             break;
         case VKD3DSIH_IADD:
-        case VKD3DSIH_UMUL:
+        case VKD3DSIH_IMUL_LOW:
         case VKD3DSIH_ISHL:
             silence_warning = !(flags & ~(OB_NO_UNSIGNED_WRAP | OB_NO_SIGNED_WRAP));
             break;
@@ -4637,7 +4637,7 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
 
     dst->type = a->type;
 
-    if (handler_idx == VKD3DSIH_UMUL || handler_idx == VKD3DSIH_UDIV || handler_idx == VKD3DSIH_IDIV)
+    if (handler_idx == VKD3DSIH_UDIV || handler_idx == VKD3DSIH_IDIV)
     {
         struct vkd3d_shader_dst_param *dst_params = instruction_dst_params_alloc(ins, 2, sm6);
         unsigned int index = code != BINOP_UDIV && code != BINOP_SDIV;

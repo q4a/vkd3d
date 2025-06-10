@@ -208,6 +208,7 @@ const char *vsir_opcode_get_name(enum vkd3d_shader_opcode op, const char *error)
         [VKD3DSIH_IMM_ATOMIC_UMIN                 ] = "imm_atomic_umin",
         [VKD3DSIH_IMM_ATOMIC_XOR                  ] = "imm_atomic_xor",
         [VKD3DSIH_IMUL                            ] = "imul",
+        [VKD3DSIH_IMUL_LOW                        ] = "imul_low",
         [VKD3DSIH_INE                             ] = "ine",
         [VKD3DSIH_INEG                            ] = "ineg",
         [VKD3DSIH_ISFINITE                        ] = "isfinite",
@@ -7841,6 +7842,7 @@ static bool vsir_src_is_masked(enum vkd3d_shader_opcode opcode, unsigned int src
         case VKD3DSIH_IMAX:
         case VKD3DSIH_IMIN:
         case VKD3DSIH_IMUL:
+        case VKD3DSIH_IMUL_LOW:
         case VKD3DSIH_INE:
         case VKD3DSIH_INEG:
         case VKD3DSIH_ISFINITE:
