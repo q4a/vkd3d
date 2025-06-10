@@ -7536,6 +7536,7 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VSIR_OP_IADD,       SpvOpIAdd},
         {VSIR_OP_IMUL_LOW,   SpvOpIMul},
         {VSIR_OP_INEG,       SpvOpSNegate},
+        {VSIR_OP_IREM,       SpvOpSRem},
         {VSIR_OP_ISHL,       SpvOpShiftLeftLogical},
         {VSIR_OP_ISHR,       SpvOpShiftRightArithmetic},
         {VSIR_OP_ISINF,      SpvOpIsInf},
@@ -7618,13 +7619,14 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
 static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
+    uint32_t src_ids[SPIRV_MAX_SRC_COUNT], condition_id = 0, uint_max_id = 0;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
-    uint32_t src_ids[SPIRV_MAX_SRC_COUNT];
+    unsigned int i, component_count;
     uint32_t type_id, val_id;
     SpvOp op = SpvOpMax;
-    unsigned int i;
+    bool check_zero;
 
     if (src->reg.data_type == VKD3D_DATA_UINT64 && instruction->opcode == VSIR_OP_COUNTBITS)
     {
@@ -7664,13 +7666,40 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
+    /* SPIR-V doesn't mandate a behaviour when a denominator is zero,
+     * so we have an explicit check. */
+    switch (instruction->opcode)
+    {
+        case VSIR_OP_IREM:
+            check_zero = true;
+            break;
+
+        default:
+            check_zero = false;
+            break;
+    }
+
     VKD3D_ASSERT(instruction->dst_count == 1);
     VKD3D_ASSERT(instruction->src_count <= SPIRV_MAX_SRC_COUNT);
+    if (check_zero)
+        VKD3D_ASSERT(instruction->src_count == 2);
 
+    component_count = vsir_write_mask_component_count(dst[0].write_mask);
     type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
 
     for (i = 0; i < instruction->src_count; ++i)
         src_ids[i] = spirv_compiler_emit_load_src(compiler, &src[i], dst->write_mask);
+
+    if (check_zero)
+    {
+        condition_id = spirv_compiler_emit_int_to_bool(compiler,
+                VKD3D_SHADER_CONDITIONAL_OP_NZ, src[1].reg.data_type, component_count, src_ids[1]);
+
+        if (dst[0].reg.data_type == VKD3D_DATA_UINT64)
+            uint_max_id = spirv_compiler_get_constant_uint64_vector(compiler, UINT64_MAX, component_count);
+        else
+            uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, UINT_MAX, component_count);
+    }
 
     /* The SPIR-V specification states, "The resulting value is undefined if
      * Shift is greater than or equal to the bit width of the components of
@@ -7691,6 +7720,9 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
             src_ids, instruction->src_count);
     if (instruction->flags & VKD3DSI_PRECISE_XYZW)
         vkd3d_spirv_build_op_decorate(builder, val_id, SpvDecorationNoContraction, NULL, 0);
+
+    if (check_zero)
+        val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, val_id, uint_max_id);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
     return VKD3D_OK;
@@ -10650,6 +10682,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VSIR_OP_IADD:
         case VSIR_OP_IMUL_LOW:
         case VSIR_OP_INEG:
+        case VSIR_OP_IREM:
         case VSIR_OP_ISHL:
         case VSIR_OP_ISHR:
         case VSIR_OP_ISINF:

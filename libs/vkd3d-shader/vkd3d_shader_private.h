@@ -459,6 +459,7 @@ enum vkd3d_shader_opcode
     VSIR_OP_IMUL_LOW,
     VSIR_OP_INE,
     VSIR_OP_INEG,
+    VSIR_OP_IREM,
     VSIR_OP_ISFINITE,
     VSIR_OP_ISHL,
     VSIR_OP_ISHR,

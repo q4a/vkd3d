@@ -211,6 +211,7 @@ const char *vsir_opcode_get_name(enum vkd3d_shader_opcode op, const char *error)
         [VSIR_OP_IMUL_LOW                        ] = "imul_low",
         [VSIR_OP_INE                             ] = "ine",
         [VSIR_OP_INEG                            ] = "ineg",
+        [VSIR_OP_IREM                            ] = "irem",
         [VSIR_OP_ISFINITE                        ] = "isfinite",
         [VSIR_OP_ISHL                            ] = "ishl",
         [VSIR_OP_ISHR                            ] = "ishr",
@@ -7876,6 +7877,7 @@ static bool vsir_src_is_masked(enum vkd3d_shader_opcode opcode, unsigned int src
         case VSIR_OP_IMUL_LOW:
         case VSIR_OP_INE:
         case VSIR_OP_INEG:
+        case VSIR_OP_IREM:
         case VSIR_OP_ISFINITE:
         case VSIR_OP_ISHL:
         case VSIR_OP_ISHR:
