@@ -8265,7 +8265,6 @@ static void liveness_track_dst(struct liveness_tracker *tracker, struct vkd3d_sh
             /* All of these instructions have fixed destinations—they can
              * in some cases be masked, but the destination cannot be
              * reallocated to a different set of components. */
-        case VSIR_OP_IDIV:
         case VSIR_OP_IMUL:
         case VSIR_OP_SWAPC:
         case VSIR_OP_UDIV:

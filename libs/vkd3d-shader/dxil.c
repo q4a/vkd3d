@@ -4638,7 +4638,7 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
 
     dst->type = a->type;
 
-    if (handler_idx == VSIR_OP_UDIV || handler_idx == VSIR_OP_IDIV)
+    if (handler_idx == VSIR_OP_UDIV)
     {
         struct vkd3d_shader_dst_param *dst_params = instruction_dst_params_alloc(ins, 2, sm6);
         unsigned int index = code != BINOP_UDIV && code != BINOP_SDIV;
