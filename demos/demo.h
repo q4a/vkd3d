@@ -98,6 +98,11 @@ struct demo_vec4
     float x, y, z, w;
 };
 
+struct demo_matrix
+{
+    float m[4][4];
+};
+
 struct demo_swapchain_desc
 {
     unsigned int width;
@@ -121,6 +126,39 @@ static inline void demo_vec4_set(struct demo_vec4 *v, float x, float y, float z,
     v->y = y;
     v->z = z;
     v->w = w;
+}
+
+static inline void demo_matrix_multiply(struct demo_matrix *out,
+        const struct demo_matrix *a, const struct demo_matrix *b)
+{
+    unsigned int i, j;
+
+    for (i = 0; i < 4; ++i)
+    {
+        for (j = 0; j < 4; ++j)
+        {
+            out->m[i][j] = a->m[i][0] * b->m[0][j]
+                    + a->m[i][1] * b->m[1][j]
+                    + a->m[i][2] * b->m[2][j]
+                    + a->m[i][3] * b->m[3][j];
+        }
+    }
+}
+
+static inline void demo_matrix_perspective_rh(struct demo_matrix *m, float w, float h, float z_near, float z_far)
+{
+    float sx = 2.0 * z_near / w;
+    float sy = 2.0 * z_near / h;
+    float sz = z_far / (z_near - z_far);
+    float d = z_near * sz;
+
+    *m = (struct demo_matrix)
+    {{
+        {  sx, 0.0f, 0.0f,  0.0f},
+        {0.0f,   sy, 0.0f,  0.0f},
+        {0.0f, 0.0f,   sz, -1.0f},
+        {0.0f, 0.0f,    d,  0.0f},
+    }};
 }
 
 static inline void demo_rasterizer_desc_init_default(D3D12_RASTERIZER_DESC *desc)

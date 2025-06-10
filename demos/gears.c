@@ -59,7 +59,7 @@ struct cxg_fence
 
 struct cxg_cb_data
 {
-    float mvp_matrix[16];
+    struct demo_matrix mvp_matrix;
     float normal_matrix[12];
 };
 
@@ -230,44 +230,24 @@ static void cxg_wait_for_previous_frame(struct cx_gears *cxg)
 
 static void cxg_update_mvp(struct cx_gears *cxg)
 {
+    struct demo_matrix projection, world;
     float s1 = sinf(cxg->theta);
     float c1 = cosf(cxg->theta);
     float s2 = sinf(cxg->phi);
     float c2 = cosf(cxg->phi);
     float z_offset = -40.0f;
-    float z_max = 60.0f;
-    float z_min = 5.0f;
-    float sx = z_min;
-    float sy = z_min * cxg->aspect_ratio;
-    float sz = -((z_max + z_min) / (z_max - z_min));
-    float d = (-2.0f * z_max * z_min) / (z_max - z_min);
-    unsigned int i, j;
-    float world[] =
-    {
-          c1,  s2 * s1, c2 * -s1, 0.0f,
-        0.0f,       c2,       s2, 0.0f,
-          s1, -s2 * c1,  c2 * c1, 0.0f,
-        0.0f,     0.0f, z_offset, 1.0f,
-    };
-    float projection[] =
-    {
-          sx, 0.0f, 0.0f,  0.0f,
-        0.0f,   sy, 0.0f,  0.0f,
-        0.0f, 0.0f,   sz, -1.0f,
-        0.0f, 0.0f,    d,  0.0f,
-    };
 
-    for (i = 0; i < 4; ++i)
-    {
-        for (j = 0; j < 4; ++j)
-        {
-            cxg->cb_data->mvp_matrix[i * 4 + j] = projection[j] * world[i * 4]
-                    + projection[j +  4] * world[i * 4 + 1]
-                    + projection[j +  8] * world[i * 4 + 2]
-                    + projection[j + 12] * world[i * 4 + 3];
-        }
-    }
-    memcpy(cxg->cb_data->normal_matrix, world, sizeof(cxg->cb_data->normal_matrix));
+    world = (struct demo_matrix)
+    {{
+        {  c1,  s2 * s1, c2 * -s1, 0.0f},
+        {0.0f,       c2,       s2, 0.0f},
+        {  s1, -s2 * c1,  c2 * c1, 0.0f},
+        {0.0f,     0.0f, z_offset, 1.0f},
+    }};
+    demo_matrix_perspective_rh(&projection, 2.0f, 2.0f / cxg->aspect_ratio, 5.0f, 60.0f);
+
+    demo_matrix_multiply(&cxg->cb_data->mvp_matrix, &world, &projection);
+    memcpy(cxg->cb_data->normal_matrix, &world, sizeof(cxg->cb_data->normal_matrix));
 }
 
 static void cxg_render_frame(struct cx_gears *cxg)
