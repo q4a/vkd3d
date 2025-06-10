@@ -9131,7 +9131,9 @@ static void spirv_compiler_emit_sample(struct spirv_compiler *compiler,
                     &src[3], VKD3DSP_WRITEMASK_0);
             break;
         default:
-            ERR("Unexpected instruction %#x.\n", instruction->opcode);
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                    "Unhandled instruction \"%s\" (%#x).",
+                    vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
             return;
     }
 
