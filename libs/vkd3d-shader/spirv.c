@@ -10968,9 +10968,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             /* nothing to do */
             break;
         default:
-            FIXME("Unhandled instruction %#x.\n", instruction->opcode);
             spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER,
-                    "Encountered invalid/unhandled instruction handler %#x.", instruction->opcode);
+                    "Unhandled instruction \"%s\" (%#x).",
+                    vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
             break;
     }
 
