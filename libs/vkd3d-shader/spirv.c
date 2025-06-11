@@ -8427,7 +8427,9 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
         case VKD3DSIH_UGE: op = SpvOpUGreaterThanEqual; break;
         case VKD3DSIH_ULT: op = SpvOpULessThan; break;
         default:
-            ERR("Unexpected instruction %#x.\n", instruction->opcode);
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                    "Unhandled instruction \"%s\" (%#x).",
+                    vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
             return;
     }
 
