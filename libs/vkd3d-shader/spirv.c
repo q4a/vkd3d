@@ -7761,16 +7761,18 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
             || instruction->opcode == VKD3DSIH_FIRSTBIT_LO || instruction->opcode == VKD3DSIH_FIRSTBIT_SHI))
     {
         /* At least some drivers support this anyway, but if validation is enabled it will fail. */
-        FIXME("Unsupported 64-bit source for handler %#x.\n", instruction->opcode);
         spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
-                "64-bit source for handler %#x is not supported.", instruction->opcode);
+                "64-bit source for instruction \"%s\" (%#x) is not supported.",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
         return;
     }
 
     glsl_inst = spirv_compiler_map_ext_glsl_instruction(instruction);
     if (glsl_inst == GLSLstd450Bad)
     {
-        ERR("Unexpected instruction %#x.\n", instruction->opcode);
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Unhandled instruction \"%s\" (%#x).",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
         return;
     }
 
