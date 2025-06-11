@@ -4790,13 +4790,6 @@ static const char *get_fxlc_opcode_name(uint32_t opcode)
     return "<unrecognized>";
 }
 
-struct fx_4_fxlc_argument
-{
-    uint32_t flags;
-    uint32_t reg_type;
-    uint32_t address;
-};
-
 struct fx_4_ctab_entry
 {
     uint32_t name;
