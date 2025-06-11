@@ -113,6 +113,9 @@ source_type_info[] =
     {VKD3D_SHADER_SOURCE_FX,
         "fx",           "Raw effect binary section. This type includes fx_2_0 and fx_4+ formats.\n",
         true, VKD3D_SHADER_TARGET_D3D_ASM},
+    {VKD3D_SHADER_SOURCE_TX,
+        "tx",           "A D3DX texture shader. This is the format used for the 'tx_1_0' HLSL target profile.\n",
+        true, VKD3D_SHADER_TARGET_D3D_ASM},
     {VKD3D_SHADER_SOURCE_FX,
         "dxbc-fx",      "An effect binary embedded in a DXBC container.\n",
         true, VKD3D_SHADER_TARGET_D3D_ASM, TAG_FX10},
@@ -868,6 +871,8 @@ int main(int argc, char **argv)
                 options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_D3D_BYTECODE);
             else if ((token & 0xffff0000) == 0xfeff0000)
                 options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_FX);
+            else if ((token & 0xffff0000) == 0x54580000)
+                options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_TX);
             else
                 options.source_type = get_source_type_info(VKD3D_SHADER_SOURCE_HLSL);
         }

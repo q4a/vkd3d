@@ -3534,6 +3534,7 @@ int hlsl_emit_effect_binary(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
 struct fx_parser
 {
+    enum vkd3d_shader_source_type source_type;
     const uint8_t *ptr, *start, *end;
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_string_buffer buffer;
@@ -5012,9 +5013,14 @@ static void fx_parse_fxlvm_expression(struct fx_parser *parser, struct fxlvm_cod
     uint32_t ins_count;
     size_t i, j;
 
-    ins_count = fxlvm_read_u32(code);
-
     parse_fx_start_indent(parser);
+    if (parser->source_type == VKD3D_SHADER_SOURCE_TX)
+    {
+        parse_fx_print_indent(parser);
+        vkd3d_string_buffer_printf(&parser->buffer, "tx_1_0\n");
+    }
+
+    ins_count = fxlvm_read_u32(code);
 
     for (i = 0; i < ins_count; ++i)
     {
@@ -5635,6 +5641,7 @@ static void fx_parser_init(struct fx_parser *parser, const struct vkd3d_shader_c
         struct vkd3d_shader_message_context *message_context)
 {
     memset(parser, 0, sizeof(*parser));
+    parser->source_type = compile_info->source_type;
     parser->start = compile_info->source.code;
     parser->ptr = compile_info->source.code;
     parser->end = (uint8_t *)compile_info->source.code + compile_info->source.size;
@@ -5685,6 +5692,41 @@ int fx_parse(const struct vkd3d_shader_compile_info *compile_info,
         default:
             fx_parser_error(&parser, VKD3D_SHADER_ERROR_FX_INVALID_VERSION,
                     "Invalid effect binary version value 0x%08x.", version);
+            break;
+    }
+
+    vkd3d_shader_code_from_string_buffer(out, &parser.buffer);
+    fx_parser_cleanup(&parser);
+
+    if (parser.failed)
+        return VKD3D_ERROR_INVALID_SHADER;
+    return VKD3D_OK;
+}
+
+int tx_parse(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+{
+    struct fx_parser parser;
+    uint32_t version;
+
+    fx_parser_init(&parser, compile_info, message_context);
+
+    if (parser.end - parser.start < sizeof(version))
+    {
+        fx_parser_error(&parser, VKD3D_SHADER_ERROR_FX_INVALID_SIZE,
+                "Source size %zu is smaller than the TX header size.", compile_info->source.size);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    version = *(uint32_t *)parser.ptr;
+
+    switch (version)
+    {
+        case 0x54580100:
+            fx_2_parse_fxlvm_expression(&parser, (const uint32_t *)parser.ptr, parser.end - parser.ptr);
+            break;
+        default:
+            fx_parser_error(&parser, VKD3D_SHADER_ERROR_FX_INVALID_VERSION,
+                    "Invalid texture shader binary version value 0x%08x.", version);
             break;
     }
 
