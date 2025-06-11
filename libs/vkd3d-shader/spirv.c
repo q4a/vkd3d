@@ -8294,7 +8294,9 @@ static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *comp
         case VKD3DSIH_IBFE: op = SpvOpBitFieldSExtract; break;
         case VKD3DSIH_UBFE: op = SpvOpBitFieldUExtract; break;
         default:
-            ERR("Unexpected instruction %#x.\n", instruction->opcode);
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                    "Unhandled instruction \"%s\" (%#x).",
+                    vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
             return;
     }
 
