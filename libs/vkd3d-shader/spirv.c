@@ -7639,9 +7639,9 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
 
     if (op == SpvOpMax)
     {
-        ERR("Unexpected instruction %#x.\n", instruction->opcode);
         spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER,
-                "Encountered invalid/unhandled instruction handler %#x.", instruction->opcode);
+                "Encountered invalid/unhandled instruction \"%s\" (%#x).",
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
