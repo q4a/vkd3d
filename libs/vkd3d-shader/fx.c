@@ -4762,7 +4762,9 @@ fxlc_opcodes[] =
     { 0x236, "ushr"  },
     { 0x301, "movc"  },
     { 0x500, "dot"   },
+    { 0x502, "noise" },
     { 0x70e, "d3ds_dotswiz" },
+    { 0x711, "d3ds_noiseswiz" },
 };
 
 static const char *get_fxlc_opcode_name(uint32_t opcode)
