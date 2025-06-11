@@ -199,6 +199,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/multiple-rt.shader_test \
 	tests/hlsl/nested-arrays.shader_test \
 	tests/hlsl/nointerpolation.shader_test \
+	tests/hlsl/noise.shader_test \
 	tests/hlsl/non-const-indexing.shader_test \
 	tests/hlsl/normalize.shader_test \
 	tests/hlsl/null.shader_test \

@@ -734,6 +734,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_ISINF,
     HLSL_OP1_LOG2,
     HLSL_OP1_LOGIC_NOT,
+    HLSL_OP1_NOISE,
     HLSL_OP1_NEG,
     HLSL_OP1_RCP,
     HLSL_OP1_REINTERPRET,
