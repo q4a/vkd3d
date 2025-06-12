@@ -2271,8 +2271,18 @@ static inline bool sm6_value_is_constant(const struct sm6_value *value)
 
 static bool sm6_value_is_constant_zero(const struct sm6_value *value)
 {
-    if (value->value_type != VALUE_TYPE_CONSTANT || value->type->class != TYPE_CLASS_INTEGER)
+    if (value->value_type != VALUE_TYPE_CONSTANT)
         return false;
+
+    switch (value->type->class)
+    {
+        case TYPE_CLASS_INTEGER:
+        case TYPE_CLASS_FLOAT:
+            break;
+
+        default:
+            return false;
+    }
 
     if (value->type->u.width == 64)
         return value->u.constant.immconst.immconst_u64[0] == 0;
