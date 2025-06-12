@@ -2159,7 +2159,7 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     }
 
     put_u32(buffer, sm1_version(version->type, version->major, version->minor));
-    d3dbc_write_comment(&d3dbc, VKD3D_MAKE_TAG('C','T','A','B'), ctab);
+    d3dbc_write_comment(&d3dbc, TAG_CTAB, ctab);
     d3dbc_write_semantic_dcls(&d3dbc);
     d3dbc_write_program_instructions(&d3dbc);
 
