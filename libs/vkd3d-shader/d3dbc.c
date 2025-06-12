@@ -1830,6 +1830,7 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct v
     struct vkd3d_bytecode_buffer *buffer = &d3dbc->buffer;
     const struct vkd3d_shader_src_param *src;
     const struct vkd3d_sm1_opcode_info *info;
+    size_t size, token_position;
     unsigned int i;
     uint32_t token;
 
@@ -1842,9 +1843,7 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct v
     token = info->sm1_opcode;
     token |= VKD3D_SM1_INSTRUCTION_FLAGS_MASK & (ins->flags << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT);
 
-    if (version->major > 1)
-        token |= (ins->dst_count + ins->src_count) << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
-    put_u32(buffer, token);
+    token_position = put_u32(buffer, 0);
 
     for (i = 0; i < ins->dst_count; ++i)
     {
@@ -1864,6 +1863,14 @@ static void d3dbc_write_instruction(struct d3dbc_compiler *d3dbc, const struct v
         if (src->reg.idx_count && src->reg.idx[0].rel_addr)
             write_sm1_src_register(buffer, src->reg.idx[0].rel_addr);
     }
+
+    if (version->major > 1)
+    {
+        size = (bytecode_get_size(buffer) - token_position) / sizeof(uint32_t);
+        token |= ((size - 1) << VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT);
+    }
+
+    set_u32(buffer, token_position, token);
 };
 
 static void d3dbc_write_texkill(struct d3dbc_compiler *d3dbc, const struct vkd3d_shader_instruction *ins)
