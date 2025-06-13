@@ -61,8 +61,10 @@ enum fxlvm_constants
     FX_FXLC_OPCODE_SHIFT = 20,
     FX_FXLC_IS_SCALAR_MASK = 0x80000000,
 
+    FX_FXLC_REG_UNUSED = 0,
     FX_FXLC_REG_LITERAL = 1,
     FX_FXLC_REG_CB = 2,
+    FX_FXLC_REG_INPUT = 3,
     FX_FXLC_REG_OUTPUT = 4,
     FX_FXLC_REG_TEMP = 7,
     FX_FXLC_REG_MAX = FX_FXLC_REG_TEMP,
@@ -4916,6 +4918,46 @@ static void fx_parse_print_swizzle(struct fx_parser *parser, const struct fxlvm_
         vkd3d_string_buffer_printf(&parser->buffer, ".%.*s", comp_count, &comp[addr % 4]);
 }
 
+static void fx_print_fxlc_register(struct fx_parser *parser, uint32_t reg_type,
+        uint32_t address, uint32_t index_type, uint32_t index_address, struct fxlvm_code *code)
+{
+    static const char *table_names[FX_FXLC_REG_MAX + 1] =
+    {
+        [FX_FXLC_REG_LITERAL] = "imm",
+        [FX_FXLC_REG_CB] = "c",
+        [FX_FXLC_REG_INPUT] = "i",
+        [FX_FXLC_REG_OUTPUT] = "expr",
+        [FX_FXLC_REG_TEMP] = "r",
+    };
+    uint32_t reg_index = address / 4;
+
+    if (parser->source_type == VKD3D_SHADER_SOURCE_TX
+            && (reg_type == FX_FXLC_REG_INPUT || reg_type == FX_FXLC_REG_OUTPUT))
+    {
+        if (reg_type == FX_FXLC_REG_INPUT)
+        {
+            if (reg_index == 0)
+                vkd3d_string_buffer_printf(&parser->buffer, "vPos");
+            else if (reg_index == 1)
+                vkd3d_string_buffer_printf(&parser->buffer, "vPSize");
+        }
+        else
+        {
+            vkd3d_string_buffer_printf(&parser->buffer, "oC%u", reg_index);
+        }
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "%s%u", table_names[reg_type], reg_index);
+    }
+    if (index_type != FX_FXLC_REG_UNUSED)
+    {
+        vkd3d_string_buffer_printf(&parser->buffer, "[%s%u.%c]", table_names[index_type],
+                index_address / 4, "xyzw"[index_address % 4]);
+    }
+    fx_parse_print_swizzle(parser, code, address);
+}
+
 static void fx_parse_fxlc_constant_argument(struct fx_parser *parser,
         const struct fxlc_arg *arg, const struct fxlvm_code *code)
 {
@@ -4979,13 +5021,6 @@ static void fx_print_fxlc_literal(struct fx_parser *parser, uint32_t address, st
 
 static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_arg *arg, struct fxlvm_code *code)
 {
-    static const char *table_names[FX_FXLC_REG_MAX + 1] =
-    {
-        [FX_FXLC_REG_LITERAL] = "imm",
-        [FX_FXLC_REG_CB] = "cb",
-        [FX_FXLC_REG_OUTPUT] = "o",
-        [FX_FXLC_REG_TEMP] = "r",
-    };
     uint32_t count;
 
     if (arg->reg_type > FX_FXLC_REG_MAX)
@@ -5004,10 +5039,8 @@ static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_a
 
     if (arg->indexed)
     {
-        vkd3d_string_buffer_printf(&parser->buffer, "%s[%u + %s%u.%c]", table_names[arg->reg_type],
-                arg->address, table_names[arg->index.reg_type], arg->index.address,
-                "xyzw"[arg->index.address % 4]);
-        fx_parse_print_swizzle(parser, code, arg->address);
+        fx_print_fxlc_register(parser, arg->reg_type, arg->address, arg->index.reg_type,
+                arg->index.address, code);
         return;
     }
 
@@ -5036,13 +5069,10 @@ static void fx_print_fxlc_argument(struct fx_parser *parser, const struct fxlc_a
             fx_parse_fxlc_constant_argument(parser, arg, code);
             break;
 
+        case FX_FXLC_REG_INPUT:
         case FX_FXLC_REG_OUTPUT:
         case FX_FXLC_REG_TEMP:
-            if (arg->reg_type == FX_FXLC_REG_OUTPUT)
-                vkd3d_string_buffer_printf(&parser->buffer, "expr");
-            else
-                vkd3d_string_buffer_printf(&parser->buffer, "r%u", arg->address / 4);
-            fx_parse_print_swizzle(parser, code, arg->address);
+            fx_print_fxlc_register(parser, arg->reg_type, arg->address, FX_FXLC_REG_UNUSED, 0, code);
             break;
 
         default:
