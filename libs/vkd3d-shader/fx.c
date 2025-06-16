@@ -251,6 +251,8 @@ struct fx_write_context_ops
     void (*write_technique)(struct hlsl_ir_var *var, struct fx_write_context *fx);
     void (*write_pass)(struct hlsl_ir_var *var, struct fx_write_context *fx);
     void (*write_annotation)(struct hlsl_ir_var *var, struct fx_write_context *fx);
+    void (*write_state_assignment)(const struct hlsl_ir_var *var,
+            struct hlsl_state_block_entry *entry, struct fx_write_context *fx);
     bool are_child_effects_supported;
 };
 
@@ -313,6 +315,15 @@ static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
     fx->ops->write_pass(var, fx);
 }
 
+static void write_state_assignment(const struct hlsl_ir_var *var,
+        struct hlsl_state_block_entry *entry, struct fx_write_context *fx)
+{
+    fx->ops->write_state_assignment(var, entry, fx);
+}
+
+static uint32_t write_state_block(struct hlsl_ir_var *var,
+        unsigned int block_index, struct fx_write_context *fx);
+
 static uint32_t write_annotations(struct hlsl_scope *scope, struct fx_write_context *fx)
 {
     struct hlsl_ctx *ctx = fx->ctx;
@@ -348,8 +359,6 @@ static void write_fx_4_annotations(struct hlsl_scope *scope, struct fx_write_con
 static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx);
 static const char * get_fx_4_type_name(const struct hlsl_type *type);
 static void write_fx_4_annotation(struct hlsl_ir_var *var, struct fx_write_context *fx);
-static uint32_t write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
-        struct fx_write_context *fx);
 
 static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
@@ -516,7 +525,7 @@ static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx
     fx_4_decompose_state_blocks(var, fx);
 
     write_fx_4_annotations(var->annotations, fx);
-    count = write_fx_4_state_block(var, 0, fx);
+    count = write_state_block(var, 0, fx);
     set_u32(buffer, count_offset, count);
 }
 
@@ -1985,12 +1994,21 @@ static void write_fx_2_annotation(struct hlsl_ir_var *var, struct fx_write_conte
     put_u32(buffer, value_offset);
 }
 
+static void write_fx_2_state_assignment(const struct hlsl_ir_var *var,
+        struct hlsl_state_block_entry *entry, struct fx_write_context *fx)
+{
+    struct hlsl_ctx *ctx = fx->ctx;
+
+    hlsl_fixme(ctx, &var->loc, "Writing fx_2_0 state assignments is not implemented.");
+}
+
 static const struct fx_write_context_ops fx_2_ops =
 {
     .write_string = write_fx_2_string,
     .write_technique = write_fx_2_technique,
     .write_pass = write_fx_2_pass,
     .write_annotation = write_fx_2_annotation,
+    .write_state_assignment = write_fx_2_state_assignment,
 };
 
 static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
@@ -2053,12 +2071,16 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     return fx_write_context_cleanup(&fx);
 }
 
+static void write_fx_4_state_assignment(const struct hlsl_ir_var *var,
+        struct hlsl_state_block_entry *entry, struct fx_write_context *fx);
+
 static const struct fx_write_context_ops fx_4_ops =
 {
     .write_string = write_fx_4_string,
     .write_technique = write_fx_4_technique,
     .write_pass = write_fx_4_pass,
     .write_annotation = write_fx_4_annotation,
+    .write_state_assignment = write_fx_4_state_assignment,
     .are_child_effects_supported = true,
 };
 
@@ -3106,7 +3128,7 @@ static void fx_4_decompose_state_blocks(struct hlsl_ir_var *var, struct fx_write
     }
 }
 
-static uint32_t write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
+static uint32_t write_state_block(struct hlsl_ir_var *var, unsigned int block_index,
         struct fx_write_context *fx)
 {
     struct hlsl_state_block *block;
@@ -3127,7 +3149,7 @@ static uint32_t write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int blo
             /* Resolve special constant names and property names. */
             resolve_fx_state_block_values(var, entry, fx);
 
-            write_fx_4_state_assignment(var, entry, fx);
+            write_state_assignment(var, entry, fx);
             ++count;
         }
     }
@@ -3146,7 +3168,7 @@ static void write_fx_4_state_object_initializer(struct hlsl_ir_var *var, struct 
     for (i = 0; i < elements_count; ++i)
     {
         count_offset = put_u32(buffer, 0);
-        count = write_fx_4_state_block(var, i, fx);
+        count = write_state_block(var, i, fx);
         set_u32(buffer, count_offset, count);
     }
 }
