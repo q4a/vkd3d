@@ -2748,26 +2748,42 @@ struct fx_state_table
     unsigned int count;
 };
 
-static struct fx_state_table fx_4_get_state_table(enum hlsl_type_class type_class,
+static struct fx_state_table fx_get_state_table(enum hlsl_type_class type_class,
         unsigned int major, unsigned int minor)
 {
     struct fx_state_table table;
 
-    if (type_class == HLSL_CLASS_BLEND_STATE && (major == 5 || (major == 4 && minor == 1)))
+    if (major == 2)
     {
-        table.ptr = fx_5_blend_states;
-        table.count = ARRAY_SIZE(fx_5_blend_states);
+        if (type_class == HLSL_CLASS_PASS)
+        {
+            table.ptr = fx_2_pass_states;
+            table.count = ARRAY_SIZE(fx_2_pass_states);
+        }
+        else
+        {
+            table.ptr = fx_2_sampler_states;
+            table.count = ARRAY_SIZE(fx_2_sampler_states);
+        }
     }
     else
     {
-        table.ptr = fx_4_states;
-        table.count = ARRAY_SIZE(fx_4_states);
+        if (type_class == HLSL_CLASS_BLEND_STATE && (major == 5 || (major == 4 && minor == 1)))
+        {
+            table.ptr = fx_5_blend_states;
+            table.count = ARRAY_SIZE(fx_5_blend_states);
+        }
+        else
+        {
+            table.ptr = fx_4_states;
+            table.count = ARRAY_SIZE(fx_4_states);
+        }
     }
 
     return table;
 }
 
-static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var,
+static void resolve_fx_state_block_values(struct hlsl_ir_var *var,
         struct hlsl_state_block_entry *entry, struct fx_write_context *fx)
 {
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
@@ -2780,7 +2796,7 @@ static void resolve_fx_4_state_block_values(struct hlsl_ir_var *var,
     struct hlsl_ir_node *node;
     unsigned int i;
 
-    table = fx_4_get_state_table(type->class, ctx->profile->major_version, ctx->profile->minor_version);
+    table = fx_get_state_table(type->class, ctx->profile->major_version, ctx->profile->minor_version);
 
     for (i = 0; i < table.count; ++i)
     {
@@ -3091,7 +3107,7 @@ static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_i
                 continue;
 
             /* Resolve special constant names and property names. */
-            resolve_fx_4_state_block_values(var, entry, fx);
+            resolve_fx_state_block_values(var, entry, fx);
 
             write_fx_4_state_assignment(var, entry, fx);
             ++count;
@@ -3969,15 +3985,11 @@ static void fx_parse_fx_2_annotations(struct fx_parser *parser, uint32_t count)
 
 static const struct fx_state *fx_2_get_state_by_id(enum hlsl_type_class container, uint32_t id)
 {
-    const struct fx_state *table;
-    unsigned int count;
-
-    count = container == HLSL_CLASS_PASS ? ARRAY_SIZE(fx_2_pass_states) : ARRAY_SIZE(fx_2_sampler_states);
-    table = container == HLSL_CLASS_PASS ? fx_2_pass_states : fx_2_sampler_states;
+    struct fx_state_table table = fx_get_state_table(container, 2, 0);
 
     /* State identifiers are sequential, no gaps */
-    if (id >= table[0].id && id <= table[count - 1].id)
-        return &table[id - table[0].id];
+    if (id >= table.ptr[0].id && id <= table.ptr[table.count - 1].id)
+        return &table.ptr[id - table.ptr[0].id];
 
     return NULL;
 }
@@ -5181,7 +5193,7 @@ static void fx_4_parse_state_object_initializer(struct fx_parser *parser, uint32
     uint32_t i, j, comp_count;
     struct fx_state *state;
 
-    table = fx_4_get_state_table(type_class, parser->version.major, parser->version.minor);
+    table = fx_get_state_table(type_class, parser->version.major, parser->version.minor);
 
     for (i = 0; i < count; ++i)
     {
