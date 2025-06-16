@@ -1551,6 +1551,29 @@ static void vkd3d_spirv_build_op_name(struct vkd3d_spirv_builder *builder,
     vkd3d_spirv_build_string(stream, name, name_size);
 }
 
+static uint32_t vkd3d_spirv_build_op_string(struct vkd3d_spirv_builder *builder, const char *s)
+{
+    struct vkd3d_spirv_stream *stream = &builder->debug_stream;
+    uint32_t result_id = vkd3d_spirv_alloc_id(builder);
+    unsigned int size;
+
+    size = vkd3d_spirv_string_word_count(s);
+    vkd3d_spirv_build_word(stream, vkd3d_spirv_opcode_word(SpvOpString, 2 + size));
+    vkd3d_spirv_build_word(stream, result_id);
+    vkd3d_spirv_build_string(stream, s, size);
+
+    return result_id;
+}
+
+static void vkd3d_spirv_build_op_source(struct vkd3d_spirv_builder *builder, const char *source_name)
+{
+    struct vkd3d_spirv_stream *stream = &builder->debug_stream;
+    uint32_t source_id;
+
+    source_id = vkd3d_spirv_build_op_string(builder, source_name ? source_name : "<anonymous>");
+    vkd3d_spirv_build_op3(stream, SpvOpSource, 0, 0, source_id);
+}
+
 static void vkd3d_spirv_build_op_member_name(struct vkd3d_spirv_builder *builder,
         uint32_t type_id, uint32_t member, const char *fmt, ...)
 {
@@ -2565,7 +2588,8 @@ static uint32_t vkd3d_spirv_get_type_id_for_data_type(struct vkd3d_spirv_builder
     return vkd3d_spirv_get_type_id(builder, component_type, component_count);
 }
 
-static void vkd3d_spirv_builder_init(struct vkd3d_spirv_builder *builder, const char *entry_point)
+static void vkd3d_spirv_builder_init(struct vkd3d_spirv_builder *builder,
+        const char *entry_point, const char *source_name)
 {
     vkd3d_spirv_stream_init(&builder->debug_stream);
     vkd3d_spirv_stream_init(&builder->annotation_stream);
@@ -2580,6 +2604,7 @@ static void vkd3d_spirv_builder_init(struct vkd3d_spirv_builder *builder, const 
 
     rb_init(&builder->declarations, vkd3d_spirv_declaration_compare);
 
+    vkd3d_spirv_build_op_source(builder, source_name);
     builder->main_function_id = vkd3d_spirv_alloc_id(builder);
     vkd3d_spirv_build_op_name(builder, builder->main_function_id, "%s", entry_point);
 }
@@ -3173,7 +3198,8 @@ static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *p
         compiler->spirv_target_info = target_info;
     }
 
-    vkd3d_spirv_builder_init(&compiler->spirv_builder, spirv_compiler_get_entry_point_name(compiler));
+    vkd3d_spirv_builder_init(&compiler->spirv_builder,
+            spirv_compiler_get_entry_point_name(compiler), compile_info->source_name);
 
     compiler->formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
             | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
