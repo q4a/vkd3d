@@ -348,8 +348,8 @@ static void write_fx_4_annotations(struct hlsl_scope *scope, struct fx_write_con
 static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx);
 static const char * get_fx_4_type_name(const struct hlsl_type *type);
 static void write_fx_4_annotation(struct hlsl_ir_var *var, struct fx_write_context *fx);
-static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
-        uint32_t count_offset, struct fx_write_context *fx);
+static uint32_t write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
+        struct fx_write_context *fx);
 
 static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
@@ -507,7 +507,7 @@ static void fx_4_decompose_state_blocks(struct hlsl_ir_var *var, struct fx_write
 static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t name_offset, count_offset;
+    uint32_t name_offset, count_offset, count;
 
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
@@ -516,7 +516,8 @@ static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx
     fx_4_decompose_state_blocks(var, fx);
 
     write_fx_4_annotations(var->annotations, fx);
-    write_fx_4_state_block(var, 0, count_offset, fx);
+    count = write_fx_4_state_block(var, 0, fx);
+    set_u32(buffer, count_offset, count);
 }
 
 static void write_fx_2_annotations(struct hlsl_ir_var *var, uint32_t count_offset, struct fx_write_context *fx)
@@ -3105,10 +3106,9 @@ static void fx_4_decompose_state_blocks(struct hlsl_ir_var *var, struct fx_write
     }
 }
 
-static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
-        uint32_t count_offset, struct fx_write_context *fx)
+static uint32_t write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
+        struct fx_write_context *fx)
 {
-    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     struct hlsl_state_block *block;
     uint32_t i, count = 0;
 
@@ -3132,22 +3132,22 @@ static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_i
         }
     }
 
-    set_u32(buffer, count_offset, count);
+    return count;
 }
 
 static void write_fx_4_state_object_initializer(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     uint32_t elements_count = hlsl_get_multiarray_size(var->data_type), i;
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t count_offset;
+    uint32_t count_offset, count;
 
     fx_4_decompose_state_blocks(var, fx);
 
     for (i = 0; i < elements_count; ++i)
     {
         count_offset = put_u32(buffer, 0);
-
-        write_fx_4_state_block(var, i, count_offset, fx);
+        count = write_fx_4_state_block(var, i, fx);
+        set_u32(buffer, count_offset, count);
     }
 }
 
