@@ -264,3 +264,129 @@ float4 main(float4 position : position, struct banana ba : CASCADE, out float4 r
 clear rtv 0 0.0 0.0 0.0 0.0
 draw triangle strip 4
 probe (0, 0) f32(0.0, 1.0, 2.0, 0.0)
+
+[input layout]
+0 r32g32-float POSITION
+1 r32-float INPLACE 0
+1 r32-float INPLACE 1
+1 r32-float CASCADE 0
+1 r32-float CASCADE 1
+
+[vb 1]
+100.0  101.0  0.0  1.0
+100.0  101.0  0.0  1.0
+100.0  101.0  0.0  1.0
+100.0  101.0  0.0  1.0
+
+[vertex shader]
+struct apple
+{
+    float aa : INPLACE0;
+    float bb : INPLACE1;
+};
+
+float4 main(float4 position : position, struct apple ap1 : CASCADE,
+        struct apple ap2, out float4 res : RESULT) : sv_position
+{
+    res = float4(ap1.aa, ap1.bb, ap2.aa, ap2.bb);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+draw triangle strip 4
+probe (0, 0) f32(0.0, 1.0, 100.0, 101.0)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32g32b32a32-float SEMA 0
+1 r32g32b32a32-float SEMB 0
+
+[vb 1]
+40.0 41.0 42.0 43.0  80.0 81.0 82.0 83.0
+40.0 41.0 42.0 43.0  80.0 81.0 82.0 83.0
+40.0 41.0 42.0 43.0  80.0 81.0 82.0 83.0
+40.0 41.0 42.0 43.0  80.0 81.0 82.0 83.0
+
+[vertex shader]
+struct apple
+{
+    float4 f : SOMETHING_ELSE;
+};
+
+// RESULT on the return value overrides the SOMETHING_ELSE in the struct declaration.
+// Note that native only accepts a 4-component float32 vector as output.
+struct apple main(in float2 pos : POSITION, in float4 sema : SEMA,
+        in float4 semb : SEMB, out float4 out_pos : SV_POSITION) : RESULT
+{
+    struct apple res;
+
+    out_pos = float4(pos, 1.0, 1.0);
+    res.f = 100 * sema + semb;
+    return res;
+}
+
+[pixel shader]
+// Since the RETURN semantic got allocated before SV_POSITION in the vertex
+// shader output, swap the order in the pixel shader.
+float4 main(float4 res : RESULT, float4 pos : sv_position) : sv_target
+{
+    return res;
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+draw triangle strip 4
+todo(opengl) probe (0, 0) f32(4080.0, 4181.0, 4282.0, 4383.0)
+
+
+% Test multiple overrides.
+[vertex shader]
+struct apple
+{
+    float4 f : SOMETHING_ELSE;
+};
+
+void main(in float2 pos : POSITION, apple sema : SEMA, apple semb : SEMB,
+        out apple res : RESULT, out apple out_pos : SV_POSITION)
+{
+    out_pos.f = float4(pos, 1.0, 1.0);
+    res.f = 100 * semb.f + sema.f;
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+draw triangle strip 4
+probe (0, 0) f32(8040.0, 8141.0, 8242.0, 8343.0)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32g32b32a32-float SEMA 3
+1 r32g32b32a32-float SEMA 4
+
+[vb 1]
+30.0 31.0 32.0 33.0  40.0 41.0 42.0 43.0
+30.0 31.0 32.0 33.0  40.0 41.0 42.0 43.0
+30.0 31.0 32.0 33.0  40.0 41.0 42.0 43.0
+30.0 31.0 32.0 33.0  40.0 41.0 42.0 43.0
+
+% Test semantic cascading with initial offset.
+[vertex shader]
+struct apple
+{
+    float4 f : SOMETHING_ELSE; // gets SEMA3
+    float4 g : OVERRIDDEN2;    // gets SEMA4
+};
+
+void main(in float2 pos : POSITION, apple ap : SEMA3, out float4 res : RESULT, out float4 out_pos : SV_POSITION)
+{
+    out_pos = float4(pos, 1, 1);
+    res = float4(ap.f.xy, ap.g.zw);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+draw triangle strip 4
+probe (0, 0) f32(30.0, 31.0, 42.0, 43.0)
