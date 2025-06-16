@@ -502,6 +502,8 @@ static uint32_t write_fx_4_string(const char *string, struct fx_write_context *f
     return string_entry->offset;
 }
 
+static void fx_4_decompose_state_blocks(struct hlsl_ir_var *var, struct fx_write_context *fx);
+
 static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
@@ -510,6 +512,8 @@ static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
     count_offset = put_u32(buffer, 0);
+
+    fx_4_decompose_state_blocks(var, fx);
 
     write_fx_4_annotations(var->annotations, fx);
     write_fx_4_state_block(var, 0, count_offset, fx);
@@ -3082,6 +3086,25 @@ static unsigned int decompose_fx_4_state_block(struct hlsl_ir_var *var, struct h
     return decompose_fx_4_state_block_expand_array(var, block, entry_index, fx);
 }
 
+static void fx_4_decompose_state_blocks(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    unsigned int block_count = hlsl_get_multiarray_size(var->data_type);
+    struct hlsl_state_block *block;
+
+    if (!var->state_blocks)
+        return;
+
+    for (unsigned int i = 0; i < block_count; ++i)
+    {
+        block = var->state_blocks[i];
+
+        for (unsigned int j = 0; j < block->count;)
+        {
+            j += decompose_fx_4_state_block(var, block, j, fx);
+        }
+    }
+}
+
 static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_index,
         uint32_t count_offset, struct fx_write_context *fx)
 {
@@ -3092,11 +3115,6 @@ static void write_fx_4_state_block(struct hlsl_ir_var *var, unsigned int block_i
     if (var->state_blocks)
     {
         block = var->state_blocks[block_index];
-
-        for (i = 0; i < block->count;)
-        {
-            i += decompose_fx_4_state_block(var, block, i, fx);
-        }
 
         for (i = 0; i < block->count; ++i)
         {
@@ -3122,6 +3140,8 @@ static void write_fx_4_state_object_initializer(struct hlsl_ir_var *var, struct 
     uint32_t elements_count = hlsl_get_multiarray_size(var->data_type), i;
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t count_offset;
+
+    fx_4_decompose_state_blocks(var, fx);
 
     for (i = 0; i < elements_count; ++i)
     {
