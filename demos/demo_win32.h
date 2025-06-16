@@ -127,11 +127,15 @@ static demo_key demo_key_from_win32_vkey(DWORD vkey)
     }
     lookup[] =
     {
-        {VK_ESCAPE, DEMO_KEY_ESCAPE},
-        {VK_LEFT,   DEMO_KEY_LEFT},
-        {VK_RIGHT,  DEMO_KEY_RIGHT},
-        {VK_UP,     DEMO_KEY_UP},
-        {VK_DOWN,   DEMO_KEY_DOWN},
+        {VK_OEM_MINUS,  '-'},
+        {VK_OEM_PLUS,   '='},
+        {VK_ESCAPE,     DEMO_KEY_ESCAPE},
+        {VK_LEFT,       DEMO_KEY_LEFT},
+        {VK_UP,         DEMO_KEY_UP},
+        {VK_RIGHT,      DEMO_KEY_RIGHT},
+        {VK_DOWN,       DEMO_KEY_DOWN},
+        {VK_ADD,        DEMO_KEY_KP_ADD},
+        {VK_SUBTRACT,   DEMO_KEY_KP_SUBTRACT},
     };
     unsigned int i;
 

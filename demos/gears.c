@@ -45,7 +45,6 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <stdio.h>
-#include <math.h>
 #include "demo.h"
 
 DEMO_EMBED(gears_hlsl, "gears.hlsl");

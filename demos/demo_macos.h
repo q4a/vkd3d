@@ -176,12 +176,16 @@ static demo_key demo_key_from_nsevent(id event)
 {
     enum vkey
     {
-        kVK_ANSI_A      = 0x00,
-        kVK_Escape      = 0x35,
-        kVK_LeftArrow   = 0x7b,
-        kVK_RightArrow  = 0x7c,
-        kVK_DownArrow   = 0x7d,
-        kVK_UpArrow     = 0x7e,
+        kVK_ANSI_A              = 0x00,
+        kVK_ANSI_Equal          = 0x18,
+        kVK_ANSI_Minus          = 0x1b,
+        kVK_Escape              = 0x35,
+        kVK_ANSI_KeypadPlus     = 0x45,
+        kVK_ANSI_KeypadMinus    = 0x4e,
+        kVK_LeftArrow           = 0x7b,
+        kVK_RightArrow          = 0x7c,
+        kVK_DownArrow           = 0x7d,
+        kVK_UpArrow             = 0x7e,
     } vkey;
     size_t i;
 
@@ -192,12 +196,16 @@ static demo_key demo_key_from_nsevent(id event)
     }
     lookup[] =
     {
-        {kVK_ANSI_A,        'a'},
-        {kVK_Escape,        DEMO_KEY_ESCAPE},
-        {kVK_LeftArrow,     DEMO_KEY_LEFT},
-        {kVK_RightArrow,    DEMO_KEY_RIGHT},
-        {kVK_UpArrow,       DEMO_KEY_UP},
-        {kVK_DownArrow,     DEMO_KEY_DOWN},
+        {kVK_ANSI_A,            'a'},
+        {kVK_ANSI_Equal,        '='},
+        {kVK_ANSI_Minus,        '-'},
+        {kVK_Escape,            DEMO_KEY_ESCAPE},
+        {kVK_ANSI_KeypadPlus,   DEMO_KEY_KP_ADD},
+        {kVK_ANSI_KeypadMinus,  DEMO_KEY_KP_SUBTRACT},
+        {kVK_LeftArrow,         DEMO_KEY_LEFT},
+        {kVK_RightArrow,        DEMO_KEY_RIGHT},
+        {kVK_DownArrow,         DEMO_KEY_DOWN},
+        {kVK_UpArrow,           DEMO_KEY_UP},
     };
 
     vkey = NSEvent_keyCode(event);

@@ -38,6 +38,7 @@
 #define COBJMACROS
 #include <vkd3d_d3d12.h>
 #include <inttypes.h>
+#include <math.h>
 
 #ifdef __WIN32__
 #define DEMO_ASM_PUSHSECTION ".section rdata\n\t"
@@ -81,12 +82,14 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*x))
 
-#define DEMO_KEY_UNKNOWN    0x0000
-#define DEMO_KEY_ESCAPE     0xff1b
-#define DEMO_KEY_LEFT       0xff51
-#define DEMO_KEY_UP         0xff52
-#define DEMO_KEY_RIGHT      0xff53
-#define DEMO_KEY_DOWN       0xff54
+#define DEMO_KEY_UNKNOWN        0x0000
+#define DEMO_KEY_ESCAPE         0xff1b
+#define DEMO_KEY_LEFT           0xff51
+#define DEMO_KEY_UP             0xff52
+#define DEMO_KEY_RIGHT          0xff53
+#define DEMO_KEY_DOWN           0xff54
+#define DEMO_KEY_KP_ADD         0xffab
+#define DEMO_KEY_KP_SUBTRACT    0xffad
 
 struct demo_vec3
 {
@@ -101,6 +104,11 @@ struct demo_vec4
 struct demo_matrix
 {
     float m[4][4];
+};
+
+struct demo_patch
+{
+    uint16_t p[4][4];
 };
 
 struct demo_swapchain_desc
@@ -120,12 +128,63 @@ static inline void demo_vec3_set(struct demo_vec3 *v, float x, float y, float z)
     v->z = z;
 }
 
+static inline void demo_vec3_subtract(struct demo_vec3 *v, const struct demo_vec3 *a, const struct demo_vec3 *b)
+{
+    demo_vec3_set(v, a->x - b->x, a->y - b->y, a->z - b->z);
+}
+
+static inline float demo_vec3_dot(const struct demo_vec3 *a, const struct demo_vec3 *b)
+{
+    return a->x * b->x + a->y * b->y + a->z * b->z;
+}
+
+static inline float demo_vec3_length(const struct demo_vec3 *v)
+{
+    return sqrtf(demo_vec3_dot(v, v));
+}
+
+static inline void demo_vec3_scale(struct demo_vec3 *v, const struct demo_vec3 *a, float s)
+{
+    demo_vec3_set(v, a->x * s, a->y * s, a->z *s);
+}
+
+static inline void demo_vec3_normalise(struct demo_vec3 *v, const struct demo_vec3 *a)
+{
+    demo_vec3_scale(v, a, 1.0f / demo_vec3_length(a));
+}
+
+static inline void demo_vec3_cross(struct demo_vec3 *v, const struct demo_vec3 *a, const struct demo_vec3 *b)
+{
+    demo_vec3_set(v, a->y * b->z - a->z * b->y, a->z * b->x - a->x * b->z, a->x * b->y - a->y * b->x);
+}
+
 static inline void demo_vec4_set(struct demo_vec4 *v, float x, float y, float z, float w)
 {
     v->x = x;
     v->y = y;
     v->z = z;
     v->w = w;
+}
+
+static inline void demo_matrix_look_at_rh(struct demo_matrix *m, const struct demo_vec3 *eye,
+        const struct demo_vec3 *ref, const struct demo_vec3 *up)
+{
+    struct demo_vec3 f, s, t, u;
+
+    demo_vec3_subtract(&f, eye, ref);
+    demo_vec3_normalise(&f, &f);
+    demo_vec3_cross(&s, up, &f);
+    demo_vec3_normalise(&s, &s);
+    demo_vec3_cross(&u, &f, &s);
+    demo_vec3_set(&t, demo_vec3_dot(&s, eye), demo_vec3_dot(&u, eye), demo_vec3_dot(&f, eye));
+
+    *m = (struct demo_matrix)
+    {{
+        { s.x,  u.x,  f.x, 0.0f},
+        { s.y,  u.y,  f.y, 0.0f},
+        { s.z,  u.z,  f.z, 0.0f},
+        {-t.x, -t.y, -t.z, 1.0f},
+    }};
 }
 
 static inline void demo_matrix_multiply(struct demo_matrix *out,
