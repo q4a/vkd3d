@@ -28,7 +28,7 @@ draw quad
 probe (0, 0) rgba(-1, -2, 4, 0)
 
 
-% Casts don't actually perform base type changes, only the outtermost one, which
+% Casts don't actually perform base type changes, only the outermost one, which
 % I suspect is because the implicit cast on the assignment and not the cast itself.
 [pixel shader fail(sm>=4)]
 float4 main() : sv_target

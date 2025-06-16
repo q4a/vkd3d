@@ -1,0 +1,266 @@
+[require]
+shader model >= 4.0
+
+[pixel shader]
+float4 main(float4 pos : sv_position, float4 res : RESULT) : sv_target
+{
+    return res;
+}
+
+[input layout]
+0 r32g32-float POSITION
+1 r32-float CASCADE 0
+1 r32-float CASCADE 1
+1 r32g32-float CASCADE 2
+
+[vb 0]
+-1.0 -1.0
+-1.0  1.0
+ 1.0 -1.0
+ 1.0  1.0
+
+[vb 1]
+0.0  1.0  2.0 2.1
+0.0  1.0  2.0 2.1
+0.0  1.0  2.0 2.1
+0.0  1.0  2.0 2.1
+
+[vertex shader todo]
+struct apple
+{
+    float aa;  // Ends up as CASCADE0
+    float bb;  // Ends up as CASCADE1
+    float2 cc; // Ends up as CASCADE2
+};
+
+float4 main(float4 position : position, struct apple ap : CASCADE, out float4 res : RESULT) : sv_position
+{
+    res = float4(ap.aa, ap.bb, ap.cc);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(sm<6) draw triangle strip 4
+probe (0, 0) f32(0.0, 1.0, 2.0, 2.1)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32-float CASCADE 0
+1 r32-float CASCADE 1
+1 r32-float CASCADE 2
+1 r32-float CASCADE 3
+1 r32-float CASCADE 4
+1 r32g32-float CASCADE 5
+
+[vb 1]
+0.0  1.0  2.0  3.0  4.0  5.0 5.1
+0.0  1.0  2.0  3.0  4.0  5.0 5.1
+0.0  1.0  2.0  3.0  4.0  5.0 5.1
+0.0  1.0  2.0  3.0  4.0  5.0 5.1
+
+[vertex shader todo]
+struct apple
+{
+    float aa;    // Ends up as CASCADE0
+    float bb[4]; // End up as CASCADE1-4
+    float2 cc;   // Ends up as CASCADE5
+};
+
+float4 main(float4 position : position, struct apple ap : CASCADE, out float4 res : RESULT) : sv_position
+{
+    res = float4(ap.aa, ap.bb[2], ap.cc);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(sm<6) draw triangle strip 4
+probe (0, 0) f32(0.0, 3.0, 5.0, 5.1)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32g32-float CASCADE 0
+1 r32-float CASCADE 1
+1 r32g32-float CASCADE 2
+1 r32g32-float CASCADE 3
+
+[vb 1]
+0.0 0.1  1.0  2.0 2.1  3.0 3.1
+0.0 0.1  1.0  2.0 2.1  3.0 3.1
+0.0 0.1  1.0  2.0 2.1  3.0 3.1
+0.0 0.1  1.0  2.0 2.1  3.0 3.1
+
+% Test nested structs.
+[vertex shader todo]
+struct apple
+{
+    float aa;  // Gets CASCADE1
+    float2 bb; // Gets CASCADE2
+};
+
+struct banana
+{
+    float2 aa;       // Gets CASCADE0
+    struct apple ap; // Gets CASCADE1-2
+    float2 cc;       // Gets CASCADE3
+};
+
+float4 main(float4 position : position, struct banana ba : CASCADE, out float4 res : RESULT) : sv_position
+{
+    res = float4(ba.aa.y, ba.ap.bb, ba.cc.y);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(sm<6) draw triangle strip 4
+probe (0, 0) f32(0.1, 2.0, 2.1, 3.1)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32-float CASCADE 0
+1 r32-float CASCADE 1
+1 r32g32-float CASCADE 2
+1 r32-float CASCADE 3
+1 r32g32-float CASCADE 4
+1 r32-float CASCADE 5
+
+[vb 1]
+0.0  1.0  2.0 2.1  3.0  4.0 4.1  5.0
+0.0  1.0  2.0 2.1  3.0  4.0 4.1  5.0
+0.0  1.0  2.0 2.1  3.0  4.0 4.1  5.0
+0.0  1.0  2.0 2.1  3.0  4.0 4.1  5.0
+
+% Test nested struct array.
+[vertex shader todo]
+struct apple
+{
+    float aa;
+    float2 bb;
+};
+
+struct banana
+{
+    float dd;           // Gets CASCADE0
+    struct apple ap[2]; // Gets CASCADE1-4
+    float ee;           // Gets CASCADE5
+};
+
+float4 main(float4 position : position, struct banana ba : CASCADE, out float4 res : RESULT) : sv_position
+{
+    res = float4(ba.ap[0].aa, ba.ap[1].bb, ba.ee);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo draw triangle strip 4
+probe (0, 0) f32(1.0, 4.0, 4.1, 5.0)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32-float CASCADE 0
+1 r32g32-float CASCADE 1
+1 r32-float CASCADE 2
+1 r32g32-float CASCADE 3
+1 r32-float CASCADE 4
+1 r32g32-float CASCADE 5
+
+[vb 1]
+0.0  1.0 1.1  2.0  3.0 3.1  4.0  5.0 5.1
+0.0  1.0 1.1  2.0  3.0 3.1  4.0  5.0 5.1
+0.0  1.0 1.1  2.0  3.0 3.1  4.0  5.0 5.1
+0.0  1.0 1.1  2.0  3.0 3.1  4.0  5.0 5.1
+
+% Test array. The semantic indexes of each array element don't overlap.
+[vertex shader todo]
+struct apple
+{
+    float aa;
+    float2 bb;
+};
+
+float4 main(float4 position : position, struct apple ap[3] : CASCADE, out float4 res : RESULT) : sv_position
+{
+    res = float4(ap[0].aa, ap[1].bb, ap[2].aa);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo draw triangle strip 4
+probe (0, 0) f32(0.0, 3.0, 3.1, 4.0)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32-float CASCADE 0
+1 r32g32-float CASCADE 1
+
+[vb 1]
+0.0  1.0 1.1
+0.0  1.0 1.1
+0.0  1.0 1.1
+0.0  1.0 1.1
+
+% Test for overriding.
+[vertex shader todo]
+struct apple
+{
+    float aa;
+    float2 bb : INPLACE; // Gets overridden by CASCADE1, with a warning.
+};
+
+float4 main(float4 position : position, struct apple ap : CASCADE, out float4 res : RESULT) : sv_position
+{
+    res = float4(ap.aa, ap.bb, 0);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(sm<6) draw triangle strip 4
+probe (0, 0) f32(0.0, 1.0, 1.1, 0.0)
+
+
+[input layout]
+0 r32g32-float POSITION
+1 r32-float CASCADE 0
+1 r32-float CASCADE 1
+1 r32-float CASCADE 2
+
+[vb 1]
+0.0  1.0  2.0
+0.0  1.0  2.0
+0.0  1.0  2.0
+0.0  1.0  2.0
+
+% The outermost semantic overrides all others.
+[vertex shader todo]
+struct apple
+{
+    float aa : INPLACE; // Gets CASCADE1
+    float bb;           // Gets CASCADE2
+};
+
+struct banana
+{
+    float aa;                   // Gets CASCADE0
+    struct apple ap : INPLACE;
+};
+
+float4 main(float4 position : position, struct banana ba : CASCADE, out float4 res : RESULT) : sv_position
+{
+    res = float4(ba.aa, ba.ap.aa, ba.ap.bb, 0);
+    return float4(position.xy, 1.0, 1.0);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(sm<6) draw triangle strip 4
+probe (0, 0) f32(0.0, 1.0, 2.0, 0.0)
