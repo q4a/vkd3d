@@ -233,6 +233,20 @@ static bool divert_written_uniform_derefs_to_temp(struct hlsl_ctx *ctx, struct h
     return true;
 }
 
+static void warn_on_field_semantic(struct hlsl_ctx *ctx,
+        const struct hlsl_struct_field *field, const struct hlsl_semantic *outer)
+{
+    if (!field->semantic.name)
+        return;
+
+    if (!ascii_strcasecmp(field->semantic.name, outer->name) && field->semantic.index == outer->index)
+        return;
+
+    hlsl_warning(ctx, &field->loc, VKD3D_SHADER_WARNING_HLSL_OVERRIDDEN_SEMANTIC,
+            "Field semantic %s%u is overridden by outer semantic %s%u.\n",
+            field->semantic.name, field->semantic.index, outer->name, outer->index);
+}
+
 static void validate_field_semantic(struct hlsl_ctx *ctx, struct hlsl_struct_field *field)
 {
     if (!field->semantic.name && hlsl_is_numeric_type(hlsl_get_multiarray_element_type(field->type))
@@ -666,8 +680,6 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
             }
             else
             {
-                struct hlsl_semantic semantic_copy;
-
                 field = &type->e.record.fields[i];
                 if (hlsl_type_is_resource(field->type))
                     continue;
@@ -675,13 +687,25 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
                 element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
                 force_align = (i == 0);
 
-                validate_field_semantic(ctx, field);
+                if (semantic->name)
+                {
+                    warn_on_field_semantic(ctx, field, semantic);
 
-                if (!hlsl_clone_semantic(ctx, &semantic_copy, &field->semantic))
-                    continue;
-                append_output_copy_recurse(ctx, block, func, element_type, element_load,
-                        element_modifiers, &semantic_copy, stream_index, force_align, create);
-                hlsl_cleanup_semantic(&semantic_copy);
+                    append_output_copy_recurse(ctx, block, func, element_type, element_load,
+                            element_modifiers, semantic, stream_index, force_align, create);
+                }
+                else
+                {
+                    struct hlsl_semantic semantic_copy;
+
+                    validate_field_semantic(ctx, field);
+
+                    if (!hlsl_clone_semantic(ctx, &semantic_copy, &field->semantic))
+                        continue;
+                    append_output_copy_recurse(ctx, block, func, element_type, element_load,
+                            element_modifiers, &semantic_copy, stream_index, force_align, create);
+                    hlsl_cleanup_semantic(&semantic_copy);
+                }
             }
         }
     }
