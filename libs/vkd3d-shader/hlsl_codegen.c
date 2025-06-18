@@ -538,8 +538,6 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
             }
             else
             {
-                struct hlsl_semantic semantic_copy;
-
                 field = &type->e.record.fields[i];
                 if (hlsl_type_is_resource(field->type))
                 {
@@ -549,13 +547,24 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
                 force_align = (i == 0);
 
-                validate_field_semantic(ctx, field);
+                if (semantic->name)
+                {
+                    warn_on_field_semantic(ctx, field, semantic);
+                    prepend_input_copy_recurse(ctx, func, block, prim_index,
+                            element_load, element_modifiers, semantic, force_align);
+                }
+                else
+                {
+                    struct hlsl_semantic semantic_copy;
 
-                if (!hlsl_clone_semantic(ctx, &semantic_copy, &field->semantic))
-                    return;
-                prepend_input_copy_recurse(ctx, func, block, prim_index,
-                        element_load, element_modifiers, &semantic_copy, force_align);
-                hlsl_cleanup_semantic(&semantic_copy);
+                    validate_field_semantic(ctx, field);
+
+                    if (!(hlsl_clone_semantic(ctx, &semantic_copy, &field->semantic)))
+                        return;
+                    prepend_input_copy_recurse(ctx, func, block, prim_index,
+                            element_load, element_modifiers, &semantic_copy, force_align);
+                    hlsl_cleanup_semantic(&semantic_copy);
+                }
             }
         }
     }
