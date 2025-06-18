@@ -6696,6 +6696,8 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
 
     if (info_type != 'H' && info_type != 'v' && !sm6_value_is_register(value))
         return false;
+    if (!type && info_type != 'v')
+        return false;
 
     switch (info_type)
     {
