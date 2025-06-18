@@ -39,4 +39,4 @@ float4 main(float cc : SEMC, float aa : SEMA, float bb[2] : SEMB) : sv_target
 
 [test]
 bug(mvk & sm>=6) draw quad
-todo(sm<6) probe (0, 0) f32(300, 100, 200, 201)
+probe (0, 0) f32(300, 100, 200, 201)

@@ -13574,6 +13574,19 @@ static void process_entry_function(struct hlsl_ctx *ctx,
     lower_ir(ctx, lower_matrix_swizzles, body);
     lower_ir(ctx, lower_index_loads, body);
 
+    if (entry_func->return_var)
+    {
+        if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+            hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                    "Geometry shaders cannot return values.");
+        else if (entry_func->return_var->data_type->class != HLSL_CLASS_STRUCT
+                && !entry_func->return_var->semantic.name)
+            hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                    "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
+
+        append_output_var_copy(ctx, entry_func, entry_func->return_var);
+    }
+
     for (i = 0; i < entry_func->parameters.count; ++i)
     {
         var = entry_func->parameters.vars[i];
@@ -13678,18 +13691,9 @@ static void process_entry_function(struct hlsl_ctx *ctx,
             }
         }
     }
+
     if (entry_func->return_var)
     {
-        if (profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
-            hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
-                    "Geometry shaders cannot return values.");
-        else if (entry_func->return_var->data_type->class != HLSL_CLASS_STRUCT
-                && !entry_func->return_var->semantic.name)
-            hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
-                    "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
-
-        append_output_var_copy(ctx, entry_func, entry_func->return_var);
-
         if (profile->type == VKD3D_SHADER_TYPE_HULL && !ctx->is_patch_constant_func)
             ctx->output_control_point_type = entry_func->return_var->data_type;
     }
