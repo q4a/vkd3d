@@ -643,6 +643,7 @@ struct sm6_type
 
 enum sm6_value_type
 {
+    VALUE_TYPE_INVALID,
     VALUE_TYPE_FUNCTION,
     VALUE_TYPE_DATA,
     VALUE_TYPE_HANDLE,
@@ -652,7 +653,6 @@ enum sm6_value_type
     VALUE_TYPE_GROUPSHAREDMEM,
     VALUE_TYPE_CONSTANT,
     VALUE_TYPE_UNDEFINED,
-    VALUE_TYPE_INVALID,
 };
 
 struct sm6_index
@@ -2227,6 +2227,11 @@ static const char *sm6_parser_get_global_symbol_name(const struct sm6_parser *sm
 static inline bool sm6_value_is_function_dcl(const struct sm6_value *value)
 {
     return value->value_type == VALUE_TYPE_FUNCTION;
+}
+
+static bool sm6_value_is_invalid(const struct sm6_value *value)
+{
+    return value->value_type == VALUE_TYPE_INVALID;
 }
 
 static inline bool sm6_value_is_dx_intrinsic_dcl(const struct sm6_value *fn)
@@ -6732,7 +6737,7 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
         case 'V':
             return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.fouri32");
         case 'v':
-            return !type;
+            return sm6_value_is_invalid(value) && !type;
         case 'o':
             /* TODO: some type checking may be possible */
             return true;
