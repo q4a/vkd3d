@@ -6685,11 +6685,11 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
 };
 
 static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struct sm6_value *value, char info_type,
-        const struct sm6_type *ret_type, bool is_return)
+        const struct sm6_type *ret_type)
 {
     const struct sm6_type *type = value->type;
 
-    if (info_type != 'H' && !sm6_value_is_register(value))
+    if (info_type != 'H' && info_type != 'v' && !sm6_value_is_register(value))
         return false;
 
     switch (info_type)
@@ -6724,7 +6724,7 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
         case 'g':
             return sm6_type_is_floating_point(type);
         case 'H':
-            return (is_return || sm6_value_is_handle(value)) && type == sm6->handle_type;
+            return sm6_value_is_handle(value) && type == sm6->handle_type;
         case 'D':
             return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.Dimensions");
         case 'S':
@@ -6752,18 +6752,10 @@ static bool sm6_parser_validate_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_
 
     info = &sm6_dx_op_table[op];
 
-    VKD3D_ASSERT(info->ret_type[0]);
-    if (!sm6_parser_validate_operand_type(sm6, dst, info->ret_type[0], NULL, true))
-    {
-        WARN("Failed to validate return type for dx intrinsic id %u, '%s'.\n", op, name);
-        /* Return type validation failure is not so critical. We only need to set
-         * a data type for the SSA result. */
-    }
-
     for (i = 0; i < operand_count; ++i)
     {
         const struct sm6_value *value = operands[i];
-        if (!sm6_parser_validate_operand_type(sm6, value, info->operand_info[i], dst->type, false))
+        if (!sm6_parser_validate_operand_type(sm6, value, info->operand_info[i], dst->type))
         {
             WARN("Failed to validate operand %u for dx intrinsic id %u, '%s'.\n", i + 1, op, name);
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
@@ -6806,10 +6798,22 @@ static void sm6_parser_decode_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_op
         return;
     }
 
-    if (sm6_parser_validate_dx_op(sm6, op, name, operands, operand_count, dst))
-        sm6_dx_op_table[op].handler(sm6, op, operands, state);
-    else
+    if (!sm6_parser_validate_dx_op(sm6, op, name, operands, operand_count, dst))
+    {
         sm6_parser_emit_unhandled(sm6, state->ins, dst);
+        return;
+    }
+
+    sm6_dx_op_table[op].handler(sm6, op, operands, state);
+
+    VKD3D_ASSERT(sm6_dx_op_table[op].ret_type[0]);
+    if (!sm6_parser_validate_operand_type(sm6, dst, sm6_dx_op_table[op].ret_type[0], NULL))
+    {
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Failed to validate return type for dx intrinsic id %u, '%s'.", op, name);
+        /* Return type validation failure is not so critical. We only need to set
+         * a data type for the SSA result. */
+    }
 }
 
 static void sm6_parser_emit_call(struct sm6_parser *sm6, const struct dxil_record *record,
