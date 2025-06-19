@@ -438,7 +438,7 @@ static bool compile_d3d_code(struct vulkan_shader_runner *runner,
         binding->register_space = 0;
         binding->register_index = runner->r.samplers[i].slot;
         binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
-        binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
+        binding->flags = 0;
         binding->binding.set = 0;
         binding->binding.binding = runner->samplers[i].binding;
         binding->binding.count = 1;

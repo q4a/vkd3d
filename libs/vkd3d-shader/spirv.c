@@ -3522,8 +3522,12 @@ static struct vkd3d_shader_descriptor_binding spirv_compiler_get_descriptor_bind
         goto done;
     }
 
-    resource_type_flag = resource_type == VKD3D_SHADER_RESOURCE_BUFFER
-            ? VKD3D_SHADER_BINDING_FLAG_BUFFER : VKD3D_SHADER_BINDING_FLAG_IMAGE;
+    if (resource_type == VKD3D_SHADER_RESOURCE_NONE)
+        resource_type_flag = 0;
+    else if (resource_type == VKD3D_SHADER_RESOURCE_BUFFER)
+        resource_type_flag = VKD3D_SHADER_BINDING_FLAG_BUFFER;
+    else
+        resource_type_flag = VKD3D_SHADER_BINDING_FLAG_IMAGE;
 
     if (is_uav_counter)
     {
@@ -3567,7 +3571,7 @@ static struct vkd3d_shader_descriptor_binding spirv_compiler_get_descriptor_bind
         {
             const struct vkd3d_shader_resource_binding *current = &shader_interface->bindings[i];
 
-            if (!(current->flags & resource_type_flag))
+            if ((current->flags & resource_type_flag) != resource_type_flag)
                 continue;
 
             if (!spirv_compiler_check_shader_visibility(compiler, current->shader_visibility))
