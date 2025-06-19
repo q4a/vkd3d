@@ -224,6 +224,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/register-reservations-resources.shader_test \
 	tests/hlsl/register-reservations-space.shader_test \
 	tests/hlsl/return-implicit-conversion.shader_test \
+	tests/hlsl/return-semantics.shader_test \
 	tests/hlsl/return.shader_test \
 	tests/hlsl/round.shader_test \
 	tests/hlsl/rt-array-index.shader_test \
