@@ -136,6 +136,7 @@ static demo_key demo_key_from_win32_vkey(DWORD vkey)
         {VK_DOWN,       DEMO_KEY_DOWN},
         {VK_ADD,        DEMO_KEY_KP_ADD},
         {VK_SUBTRACT,   DEMO_KEY_KP_SUBTRACT},
+        {VK_F1,         DEMO_KEY_F1},
     };
     unsigned int i;
 

@@ -552,13 +552,17 @@ demos_vkd3d_gears_CFLAGS = $(DEMOS_CFLAGS)
 demos_vkd3d_gears_LDADD = $(DEMOS_LDADD) -lm
 demos/vkd3d_gears-gears.$(OBJEXT): demos/gears.hlsl
 
+teapot_shaders = \
+	demos/teapot.hlsl \
+	demos/text.hlsl
 demos_vkd3d_teapot_SOURCES = \
+	$(teapot_shaders) \
+	demos/etl16-unicode.h \
 	demos/teapot.c \
-	demos/teapot.h \
-	demos/teapot.hlsl
+	demos/teapot.h
 demos_vkd3d_teapot_CFLAGS = $(DEMOS_CFLAGS)
 demos_vkd3d_teapot_LDADD = $(DEMOS_LDADD) -lm
-demos/vkd3d_teapot-teapot.$(OBJEXT): demos/teapot.hlsl
+demos/vkd3d_teapot-teapot.$(OBJEXT): $(teapot_shaders)
 
 demos_vkd3d_triangle_SOURCES = demos/triangle.c demos/triangle.hlsl
 demos_vkd3d_triangle_CFLAGS = $(DEMOS_CFLAGS)
@@ -668,7 +672,7 @@ endif
 if BUILD_DEMOS
 CROSS32_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe)
 demos/gears.cross32.exe: demos/gears.hlsl
-demos/teapot.cross32.exe: demos/teapot.hlsl
+demos/teapot.cross32.exe: $(teapot_shaders)
 demos/triangle.cross32.exe: demos/triangle.hlsl
 endif
 
@@ -718,7 +722,7 @@ endif
 if BUILD_DEMOS
 CROSS64_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe)
 demos/gears.cross64.exe: demos/gears.hlsl
-demos/teapot.cross64.exe: demos/teapot.hlsl
+demos/teapot.cross64.exe: $(teapot_shaders)
 demos/triangle.cross64.exe: demos/triangle.hlsl
 endif
 

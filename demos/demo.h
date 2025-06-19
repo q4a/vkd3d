@@ -80,6 +80,16 @@
     extern const uint8_t name[]; \
     __asm__(DEMO_EMBED_ASM(DEMO_ASM_NAME(name), file))
 
+#if defined(__GNUC__) || defined(__clang__)
+# ifdef __MINGW_PRINTF_FORMAT
+#  define DEMO_PRINTF_FUNC(fmt, args) __attribute__((format(__MINGW_PRINTF_FORMAT, fmt, args)))
+# else
+#  define DEMO_PRINTF_FUNC(fmt, args) __attribute__((format(printf, fmt, args)))
+# endif
+#else
+# define DEMO_PRINTF_FUNC(fmt, args)
+#endif
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*x))
 
 #define DEMO_KEY_UNKNOWN        0x0000
@@ -90,6 +100,7 @@
 #define DEMO_KEY_DOWN           0xff54
 #define DEMO_KEY_KP_ADD         0xffab
 #define DEMO_KEY_KP_SUBTRACT    0xffad
+#define DEMO_KEY_F1             0xffbe
 
 struct demo_vec3
 {
@@ -99,6 +110,16 @@ struct demo_vec3
 struct demo_vec4
 {
     float x, y, z, w;
+};
+
+struct demo_uvec2
+{
+    uint32_t x, y;
+};
+
+struct demo_uvec4
+{
+    uint32_t x, y, z, w;
 };
 
 struct demo_matrix

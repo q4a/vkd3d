@@ -24,8 +24,10 @@
 #include "demo.h"
 
 #include "teapot.h"
+#include "etl16-unicode.h"
 
 DEMO_EMBED(teapot_hlsl, "teapot.hlsl");
+DEMO_EMBED(text_hlsl, "text.hlsl");
 
 struct teapot_fence
 {
@@ -39,6 +41,44 @@ struct teapot_cb_data
     float level;
 };
 
+struct demo_text_run
+{
+    struct demo_vec4 colour;
+    struct demo_uvec2 position;
+    unsigned int start_idx;         /* The start offset of the run in the "text_buffer" buffer. */
+    unsigned int char_count;
+    unsigned int reverse;
+    float scale;
+};
+
+struct demo_text_cb_data
+{
+    struct demo_uvec4 screen_size;
+    struct demo_uvec4 glyphs[96];
+};
+
+struct demo_text
+{
+    ID3D12Device *device;
+
+    ID3D12RootSignature *root_signature;
+    ID3D12CommandSignature *command_signature;
+    ID3D12PipelineState *pipeline_state;
+    ID3D12DescriptorHeap *srv_heap;
+    ID3D12Resource *argument_buffer, *text_cb, *text_buffer, *vb;
+    D3D12_VERTEX_BUFFER_VIEW vbv;
+
+    unsigned int screen_width, screen_height;
+    D3D12_DRAW_ARGUMENTS *draw_arguments;
+    struct demo_text_run *runs;
+    size_t run_count, runs_size;
+    char *text;
+    size_t char_count, text_size;
+
+    float scale;
+    bool reverse;
+};
+
 struct teapot
 {
     struct demo demo;
@@ -47,7 +87,10 @@ struct teapot
 
     unsigned int width, height;
     unsigned int tessellation_level;
+    unsigned int text_scale;
     float theta, phi;
+
+    bool display_help;
 
     D3D12_VIEWPORT vp;
     D3D12_RECT scissor_rect;
@@ -74,7 +117,300 @@ struct teapot
     struct teapot_fence fence;
 
     struct teapot_cb_data *cb_data;
+
+    struct demo_text text;
 };
+
+static ID3D12Resource *create_buffer(ID3D12Device *device, size_t size)
+{
+    D3D12_RESOURCE_DESC resource_desc;
+    D3D12_HEAP_PROPERTIES heap_desc;
+    ID3D12Resource *buffer;
+    HRESULT hr;
+
+    heap_desc.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heap_desc.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heap_desc.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heap_desc.CreationNodeMask = 1;
+    heap_desc.VisibleNodeMask = 1;
+
+    resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resource_desc.Alignment = 0;
+    resource_desc.Width = size;
+    resource_desc.Height = 1;
+    resource_desc.DepthOrArraySize = 1;
+    resource_desc.MipLevels = 1;
+    resource_desc.Format = DXGI_FORMAT_UNKNOWN;
+    resource_desc.SampleDesc.Count = 1;
+    resource_desc.SampleDesc.Quality = 0;
+    resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    hr = ID3D12Device_CreateCommittedResource(device, &heap_desc, D3D12_HEAP_FLAG_NONE, &resource_desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, (void **)&buffer);
+    assert(SUCCEEDED(hr));
+
+    return buffer;
+}
+
+static void demo_text_populate_command_list(struct demo_text *text, ID3D12GraphicsCommandList *command_list)
+{
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, text->pipeline_state);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, text->root_signature);
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
+            ID3D12Resource_GetGPUVirtualAddress(text->text_cb));
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &text->srv_heap);
+    ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, 1,
+            ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(text->srv_heap));
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 1, &text->vbv);
+
+    ID3D12GraphicsCommandList_ExecuteIndirect(command_list,
+            text->command_signature, 1, text->argument_buffer, 0, NULL, 0);
+}
+
+static void DEMO_PRINTF_FUNC(5, 6) demo_text_draw(struct demo_text *text,
+        const struct demo_vec4 *colour, int x, int y, const char *format, ...)
+{
+    struct demo_text_run *t;
+    va_list args;
+    size_t rem;
+    int rc;
+
+    for (;;)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
+        ID3D12Resource *text_buffer;
+        size_t text_size;
+        HRESULT hr;
+        char *p;
+
+        rem = text->text_size - text->char_count;
+        va_start(args, format);
+        rc = vsnprintf(&text->text[text->char_count], rem, format, args);
+        va_end(args);
+        if (rc >= 0 && (unsigned int)rc < rem)
+            break;
+
+        text_size = text->text_size * 2;
+        if (rc >= 0)
+            while (text_size < text->char_count + rc + 1)
+                text_size *= 2;
+
+        text_buffer = create_buffer(text->device, text_size);
+        hr = ID3D12Resource_Map(text_buffer, 0, &(D3D12_RANGE){0, 0}, (void **)&p);
+        assert(SUCCEEDED(hr));
+        memcpy(p, text->text, text->char_count);
+        ID3D12Resource_Unmap(text->text_buffer, 0, NULL);
+        ID3D12Resource_Release(text->text_buffer);
+        text->text_size = text_size;
+        text->text = p;
+        text->text_buffer = text_buffer;
+
+        srv_desc.Format = DXGI_FORMAT_R8_UINT;
+        srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv_desc.Buffer.FirstElement = 0;
+        srv_desc.Buffer.NumElements = text->text_size;
+        srv_desc.Buffer.StructureByteStride = 0;
+        srv_desc.Buffer.Flags = 0;
+        ID3D12Device_CreateShaderResourceView(text->device, text_buffer, &srv_desc,
+                ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(text->srv_heap));
+    }
+
+    if (text->run_count == text->runs_size)
+    {
+        struct demo_text_run *runs;
+        ID3D12Resource *vb;
+        size_t runs_size;
+        HRESULT hr;
+
+        runs_size = text->runs_size * 2;
+        vb = create_buffer(text->device, runs_size * sizeof(*runs));
+        hr = ID3D12Resource_Map(vb, 0, &(D3D12_RANGE){0, 0}, (void **)&runs);
+        assert(SUCCEEDED(hr));
+        memcpy(runs, text->runs, text->run_count * sizeof(*text->runs));
+        ID3D12Resource_Unmap(text->vb, 0, NULL);
+        ID3D12Resource_Release(text->vb);
+        text->runs_size = runs_size;
+        text->runs = runs;
+        text->vb = vb;
+
+        text->vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(vb);
+        text->vbv.SizeInBytes = runs_size * sizeof(*runs);
+    }
+
+    t = &text->runs[text->run_count++];
+    t->colour = *colour;
+    t->position.x = x < 0 ? text->screen_width + x : x;
+    t->position.y = y < 0 ? text->screen_height + y : y;
+    t->start_idx = text->char_count;
+    t->char_count = rc;
+    t->reverse = text->reverse;
+    t->scale = text->scale;
+
+    text->char_count += rc;
+}
+
+static void demo_text_init(struct demo_text *text, ID3D12Device *device,
+        unsigned int screen_width, unsigned int screen_height, unsigned int scale)
+{
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
+    D3D12_COMMAND_SIGNATURE_DESC signature_desc;
+    D3D12_INDIRECT_ARGUMENT_DESC argument_desc;
+    D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    D3D12_DESCRIPTOR_HEAP_DESC srv_heap_desc;
+    D3D12_DESCRIPTOR_RANGE descriptor_range;
+    D3D12_ROOT_PARAMETER root_parameters[2];
+    struct demo_text_cb_data *text_cb_data;
+    ID3DBlob *vs, *ps;
+    HRESULT hr;
+
+    static const D3D12_INPUT_ELEMENT_DESC il_desc[] =
+    {
+        {"COLOUR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+        {"POSITION", 0, DXGI_FORMAT_R32G32_UINT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+        {"IDX", 0, DXGI_FORMAT_R32_UINT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+        {"COUNT", 0, DXGI_FORMAT_R32_UINT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+        {"REVERSE", 0, DXGI_FORMAT_R32_UINT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+        {"SCALE", 0, DXGI_FORMAT_R32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+    };
+
+    text->device = device;
+    ID3D12Device_AddRef(device);
+
+    root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    root_parameters[0].Descriptor.ShaderRegister = 0;
+    root_parameters[0].Descriptor.RegisterSpace = 0;
+    root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptor_range.NumDescriptors = 1;
+    descriptor_range.BaseShaderRegister = 0;
+    descriptor_range.RegisterSpace = 0;
+    descriptor_range.OffsetInDescriptorsFromTableStart = 0;
+    root_parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    root_parameters[1].DescriptorTable.NumDescriptorRanges = 1;
+    root_parameters[1].DescriptorTable.pDescriptorRanges = &descriptor_range;
+    root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    memset(&root_signature_desc, 0, sizeof(root_signature_desc));
+    root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
+    root_signature_desc.pParameters = root_parameters;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+            | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS
+            | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS
+            | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+    hr = demo_create_root_signature(device, &root_signature_desc, &text->root_signature);
+    assert(SUCCEEDED(hr));
+
+    argument_desc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+    signature_desc.ByteStride = sizeof(D3D12_DRAW_ARGUMENTS);
+    signature_desc.NumArgumentDescs = 1;
+    signature_desc.pArgumentDescs = &argument_desc;
+    signature_desc.NodeMask = 0;
+
+    hr = ID3D12Device_CreateCommandSignature(text->device, &signature_desc,
+            NULL, &IID_ID3D12CommandSignature, (void **)&text->command_signature);
+    assert(SUCCEEDED(hr));
+
+    hr = D3DCompile(text_hlsl, text_hlsl_size, "text.hlsl", NULL, NULL, "vs_main", "vs_5_0", 0, 0, &vs, NULL);
+    assert(SUCCEEDED(hr));
+    hr = D3DCompile(text_hlsl, text_hlsl_size, "text.hlsl", NULL, NULL, "ps_main", "ps_5_0", 0, 0, &ps, NULL);
+    assert(SUCCEEDED(hr));
+
+    memset(&pso_desc, 0, sizeof(pso_desc));
+    pso_desc.InputLayout.pInputElementDescs = il_desc;
+    pso_desc.InputLayout.NumElements = ARRAY_SIZE(il_desc);
+    pso_desc.pRootSignature = text->root_signature;
+    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs);
+    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs);
+    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps);
+    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps);
+
+    demo_rasterizer_desc_init_default(&pso_desc.RasterizerState);
+    pso_desc.RasterizerState.FrontCounterClockwise = TRUE;
+    demo_blend_desc_init_default(&pso_desc.BlendState);
+    pso_desc.SampleMask = UINT_MAX;
+    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pso_desc.NumRenderTargets = 1;
+    pso_desc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
+    pso_desc.SampleDesc.Count = 1;
+
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&text->pipeline_state);
+    assert(SUCCEEDED(hr));
+
+    ID3D10Blob_Release(ps);
+    ID3D10Blob_Release(vs);
+
+    memset(&srv_heap_desc, 0, sizeof(srv_heap_desc));
+    srv_heap_desc.NumDescriptors = 1;
+    srv_heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    srv_heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    hr = ID3D12Device_CreateDescriptorHeap(device, &srv_heap_desc,
+            &IID_ID3D12DescriptorHeap, (void **)&text->srv_heap);
+    assert(SUCCEEDED(hr));
+
+    text->argument_buffer = create_buffer(device, sizeof(D3D12_DRAW_ARGUMENTS));
+    hr = ID3D12Resource_Map(text->argument_buffer, 0, &(D3D12_RANGE){0, 0}, (void **)&text->draw_arguments);
+    assert(SUCCEEDED(hr));
+
+    text->text_cb = create_buffer(device, sizeof(*text_cb_data));
+    hr = ID3D12Resource_Map(text->text_cb, 0, &(D3D12_RANGE){0, 0}, (void **)&text_cb_data);
+    assert(SUCCEEDED(hr));
+
+    text_cb_data->screen_size.x = screen_width;
+    text_cb_data->screen_size.y = screen_height;
+    text_cb_data->screen_size.z = scale;
+    memcpy(text_cb_data->glyphs, etl16_unicode, sizeof(etl16_unicode));
+
+    ID3D12Resource_Unmap(text->text_cb, 0, NULL);
+
+    text->text_size = 4096;
+    text->text_buffer = create_buffer(device, text->text_size);
+    hr = ID3D12Resource_Map(text->text_buffer, 0, &(D3D12_RANGE){0, 0}, (void **)&text->text);
+    assert(SUCCEEDED(hr));
+
+    srv_desc.Format = DXGI_FORMAT_R8_UINT;
+    srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srv_desc.Buffer.FirstElement = 0;
+    srv_desc.Buffer.NumElements = text->text_size;
+    srv_desc.Buffer.StructureByteStride = 0;
+    srv_desc.Buffer.Flags = 0;
+    ID3D12Device_CreateShaderResourceView(device, text->text_buffer, &srv_desc,
+            ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(text->srv_heap));
+
+    text->runs_size = 128;
+    text->vb = create_buffer(device, text->runs_size * sizeof(*text->runs));
+    hr = ID3D12Resource_Map(text->vb, 0, &(D3D12_RANGE){0, 0}, (void **)&text->runs);
+    assert(SUCCEEDED(hr));
+
+    text->vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(text->vb);
+    text->vbv.StrideInBytes = sizeof(*text->runs);
+    text->vbv.SizeInBytes = text->runs_size * sizeof(*text->runs);
+
+    text->screen_width = screen_width;
+    text->screen_height = screen_height;
+}
+
+static void demo_text_cleanup(struct demo_text *text)
+{
+    ID3D12Resource_Unmap(text->vb, 0, NULL);
+    ID3D12Resource_Release(text->vb);
+    ID3D12Resource_Unmap(text->text_buffer, 0, NULL);
+    ID3D12Resource_Release(text->text_buffer);
+    ID3D12Resource_Release(text->text_cb);
+    ID3D12Resource_Unmap(text->argument_buffer, 0, NULL);
+    ID3D12Resource_Release(text->argument_buffer);
+    ID3D12DescriptorHeap_Release(text->srv_heap);
+    ID3D12PipelineState_Release(text->pipeline_state);
+    ID3D12CommandSignature_Release(text->command_signature);
+    ID3D12RootSignature_Release(text->root_signature);
+    ID3D12Device_Release(text->device);
+}
 
 static void teapot_populate_command_list(struct teapot *teapot,
         ID3D12GraphicsCommandList *command_list, unsigned int rt_idx)
@@ -117,6 +453,8 @@ static void teapot_populate_command_list(struct teapot *teapot,
     ID3D12GraphicsCommandList_DrawIndexedInstanced(command_list, rotate_idx_count, 4, 0, 0, 0);
     flip_idx_count = ARRAY_SIZE(teapot_flip_patches) * 16;
     ID3D12GraphicsCommandList_DrawIndexedInstanced(command_list, flip_idx_count, 2, rotate_idx_count, 0, 0);
+
+    demo_text_populate_command_list(&teapot->text, command_list);
 
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
@@ -169,6 +507,41 @@ static void teapot_update_mvp(struct teapot *teapot)
     demo_matrix_perspective_rh(&projection, 2.0f, 2.0f * teapot->height / teapot->width, 5.0f, 160.0f);
     demo_matrix_look_at_rh(&world, &eye, &ref, &up);
     demo_matrix_multiply(&teapot->cb_data->mvp_matrix, &world, &projection);
+}
+
+static void teapot_update_text(struct teapot *teapot)
+{
+    unsigned int h = teapot->text_scale * 16;
+    struct demo_text *text = &teapot->text;
+    const char *platform, *device;
+    D3D12_DRAW_ARGUMENTS *a;
+    size_t pad, l;
+
+    static const struct demo_vec4 amber = {1.0f, 0.69f, 0.0f, 1.0f};
+
+    text->run_count = 0;
+    text->char_count = 0;
+    text->scale = teapot->text_scale;
+    text->reverse = true;
+
+    platform = demo_get_platform_name();
+    device = demo_swapchain_get_device_name(teapot->swapchain);
+    l = strlen(platform) + 2 + strlen(device);
+    pad = (teapot->width / (teapot->text_scale * 9)) + 1;
+    demo_text_draw(text, &amber, 0, -1 * h, "%s: %s%*s", platform, device, l < pad ? (int)(pad - l) : 0, "");
+    text->reverse = false;
+    if (teapot->display_help)
+    {
+        demo_text_draw(text, &amber, 0, 2 * h, "ESC: Exit");
+        demo_text_draw(text, &amber, 0, 1 * h, " F1: Toggle help");
+        demo_text_draw(text, &amber, 0, 0 * h, "-/+: Tessellation level (%u)", teapot->tessellation_level);
+    }
+
+    a = text->draw_arguments;
+    a->VertexCountPerInstance = 4;
+    a->InstanceCount = text->run_count;
+    a->StartVertexLocation = 0;
+    a->StartInstanceLocation = 0;
 }
 
 static void teapot_render_frame(struct teapot *teapot)
@@ -257,6 +630,7 @@ static void teapot_destroy_assets(struct teapot *teapot)
 {
     unsigned int i;
 
+    demo_text_cleanup(&teapot->text);
     teapot_fence_destroy(&teapot->fence);
     ID3D12Resource_Release(teapot->ib);
     ID3D12Resource_Release(teapot->vb);
@@ -282,8 +656,6 @@ static void teapot_fence_create(struct teapot_fence *fence, ID3D12Device *device
 
 static void teapot_load_mesh(struct teapot *teapot)
 {
-    D3D12_RESOURCE_DESC resource_desc;
-    D3D12_HEAP_PROPERTIES heap_desc;
     struct demo_patch *patches;
     struct demo_vec3 *vertices;
     size_t patch_count;
@@ -291,32 +663,8 @@ static void teapot_load_mesh(struct teapot *teapot)
 
     patch_count = ARRAY_SIZE(teapot_rotate_patches) + ARRAY_SIZE(teapot_flip_patches);
 
-    heap_desc.Type = D3D12_HEAP_TYPE_UPLOAD;
-    heap_desc.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heap_desc.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heap_desc.CreationNodeMask = 1;
-    heap_desc.VisibleNodeMask = 1;
-
-    resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resource_desc.Alignment = 0;
-    resource_desc.Width = sizeof(teapot_control_points);
-    resource_desc.Height = 1;
-    resource_desc.DepthOrArraySize = 1;
-    resource_desc.MipLevels = 1;
-    resource_desc.Format = DXGI_FORMAT_UNKNOWN;
-    resource_desc.SampleDesc.Count = 1;
-    resource_desc.SampleDesc.Quality = 0;
-    resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    hr = ID3D12Device_CreateCommittedResource(teapot->device, &heap_desc, D3D12_HEAP_FLAG_NONE, &resource_desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, (void **)&teapot->vb);
-    assert(SUCCEEDED(hr));
-
-    resource_desc.Width = patch_count * sizeof(*patches);
-    hr = ID3D12Device_CreateCommittedResource(teapot->device, &heap_desc, D3D12_HEAP_FLAG_NONE, &resource_desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, (void **)&teapot->ib);
-    assert(SUCCEEDED(hr));
+    teapot->vb = create_buffer(teapot->device, sizeof(teapot_control_points));
+    teapot->ib = create_buffer(teapot->device, patch_count * sizeof(*patches));
 
     hr = ID3D12Resource_Map(teapot->vb, 0, &(D3D12_RANGE){0, 0}, (void **)&vertices);
     assert(SUCCEEDED(hr));
@@ -344,8 +692,6 @@ static void teapot_load_assets(struct teapot *teapot)
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     D3D12_ROOT_PARAMETER root_parameters[1];
-    D3D12_RESOURCE_DESC resource_desc;
-    D3D12_HEAP_PROPERTIES heap_desc;
     ID3DBlob *vs, *hs, *ds, *ps;
     unsigned int i;
     HRESULT hr;
@@ -425,33 +771,15 @@ static void teapot_load_assets(struct teapot *teapot)
         assert(SUCCEEDED(hr));
     }
 
-    heap_desc.Type = D3D12_HEAP_TYPE_UPLOAD;
-    heap_desc.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heap_desc.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heap_desc.CreationNodeMask = 1;
-    heap_desc.VisibleNodeMask = 1;
-
-    resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resource_desc.Alignment = 0;
-    resource_desc.Width = sizeof(*teapot->cb_data);
-    resource_desc.Height = 1;
-    resource_desc.DepthOrArraySize = 1;
-    resource_desc.MipLevels = 1;
-    resource_desc.Format = DXGI_FORMAT_UNKNOWN;
-    resource_desc.SampleDesc.Count = 1;
-    resource_desc.SampleDesc.Quality = 0;
-    resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    hr = ID3D12Device_CreateCommittedResource(teapot->device, &heap_desc, D3D12_HEAP_FLAG_NONE, &resource_desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &IID_ID3D12Resource, (void **)&teapot->cb);
-    assert(SUCCEEDED(hr));
+    teapot->cb = create_buffer(teapot->device, sizeof(*teapot->cb_data));
 
     hr = ID3D12Resource_Map(teapot->cb, 0, &(D3D12_RANGE){0, 0}, (void **)&teapot->cb_data);
     assert(SUCCEEDED(hr));
     teapot_update_mvp(teapot);
     teapot->cb_data->level = teapot->tessellation_level;
 
+    demo_text_init(&teapot->text, teapot->device, teapot->width, teapot->height, teapot->text_scale);
+    teapot_update_text(teapot);
     teapot_load_mesh(teapot);
 
     teapot_fence_create(&teapot->fence, teapot->device);
@@ -468,11 +796,13 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
         case DEMO_KEY_KP_SUBTRACT:
             if (teapot->tessellation_level > 1)
                 teapot->cb_data->level = --teapot->tessellation_level;
+            teapot_update_text(teapot);
             break;
         case '=':
         case DEMO_KEY_KP_ADD:
             if (teapot->tessellation_level < D3D12_TESSELLATOR_MAX_TESSELLATION_FACTOR)
                 teapot->cb_data->level = ++teapot->tessellation_level;
+            teapot_update_text(teapot);
             break;
         case DEMO_KEY_ESCAPE:
             demo_window_destroy(window);
@@ -500,6 +830,10 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
             if (teapot->theta > M_PI)
                 teapot->theta -= 2.0f * M_PI;
             teapot_update_mvp(teapot);
+            break;
+        case DEMO_KEY_F1:
+            teapot->display_help = !teapot->display_help;
+            teapot_update_text(teapot);
             break;
         default:
             break;
@@ -537,9 +871,12 @@ static int teapot_main(void)
     teapot.width = width;
     teapot.height = height;
     teapot.tessellation_level = 4;
+    teapot.text_scale = (1.25 * dpi_y / 96.0) + 0.5;
 
     teapot.theta = M_PI / 2.0f;
     teapot.phi = -M_PI / 4.0f;
+
+    teapot.display_help = true;
 
     teapot.vp.Width = width;
     teapot.vp.Height = height;
