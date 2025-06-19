@@ -14,10 +14,10 @@ size (2d, 2, 2)
 1.0 0.0 0.0 1.0     1.0 0.0 1.0 1.0
 
 [vertex shader]
-float4 main(out float2 t : texcoord) : sv_position
+void main(out float2 t : texcoord, out float4 out_pos : sv_position)
 {
     t = float2(1, 1);
-    return float4(0, 0, 0, 1);
+    out_pos = float4(0, 0, 0, 1);
 }
 
 [pixel shader]
@@ -33,16 +33,16 @@ clear rtv 0  0 0 0 0
 point-size 30.0 1.0 64.0
 point-sprite off
 draw point list 1
-todo(sm>=4 & sm<6) probe (310, 230) f32(1, 0, 1, 1)
-todo(sm>=4 & sm<6) probe (330, 230) f32(1, 0, 1, 1)
-todo(sm>=4 & sm<6) probe (310, 250) f32(1, 0, 1, 1)
-todo(sm>=4 & sm<6) probe (330, 250) f32(1, 0, 1, 1)
+probe (310, 230) f32(1, 0, 1, 1)
+probe (330, 230) f32(1, 0, 1, 1)
+probe (310, 250) f32(1, 0, 1, 1)
+probe (330, 250) f32(1, 0, 1, 1)
 
 clear rtv 0  0 0 0 0
 point-size 30.0 1.0 64.0
 point-sprite on
 draw point list 1
-bug(mvk & sm>=4 & sm<6) probe (310, 230) f32(1, 1, 0, 1)
-bug(mvk & sm>=4 & sm<6) probe (330, 230) f32(0, 1, 1, 1)
-bug(mvk & sm>=4 & sm<6) probe (310, 250) f32(1, 0, 0, 1)
-bug(mvk & sm>=4 & sm<6) probe (330, 250) f32(1, 0, 1, 1)
+probe (310, 230) f32(1, 1, 0, 1)
+probe (330, 230) f32(0, 1, 1, 1)
+probe (310, 250) f32(1, 0, 0, 1)
+probe (330, 250) f32(1, 0, 1, 1)
