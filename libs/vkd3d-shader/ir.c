@@ -1167,6 +1167,83 @@ static enum vkd3d_result vsir_program_lower_imul(struct vsir_program *program,
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_udiv(struct vsir_program *program,
+        struct vkd3d_shader_instruction *udiv, struct vsir_transformation_context *ctx)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    size_t pos = udiv - instructions->elements;
+    struct vkd3d_shader_instruction *ins, *mov;
+    unsigned int count = 2;
+
+    if (udiv->dst_count != 2)
+    {
+        vkd3d_shader_error(ctx->message_context, &udiv->location,
+                VKD3D_SHADER_ERROR_VSIR_INVALID_DEST_COUNT,
+                "Internal compiler error: invalid destination count %u for UDIV.",
+                udiv->dst_count);
+        return VKD3D_ERROR;
+    }
+
+    if (udiv->dst[0].reg.type != VKD3DSPR_NULL)
+        ++count;
+    if (udiv->dst[1].reg.type != VKD3DSPR_NULL)
+        ++count;
+
+    if (!shader_instruction_array_insert_at(instructions, pos + 1, count))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    udiv = &instructions->elements[pos];
+
+    ins = &instructions->elements[pos + 1];
+
+    /* Save the sources in a SSA in case a destination collides with a source. */
+    mov = ins++;
+    if (!(vsir_instruction_init_with_params(program, mov, &udiv->location, VSIR_OP_MOV, 1, 1)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    mov->src[0] = udiv->src[0];
+    dst_param_init_ssa_vec4(&mov->dst[0], program->ssa_count, udiv->src[0].reg.data_type);
+
+    mov = ins++;
+    if (!(vsir_instruction_init_with_params(program, mov, &udiv->location, VSIR_OP_MOV, 1, 1)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    mov->src[0] = udiv->src[1];
+    dst_param_init_ssa_vec4(&mov->dst[0], program->ssa_count + 1, udiv->src[1].reg.data_type);
+
+    if (udiv->dst[0].reg.type != VKD3DSPR_NULL)
+    {
+        if (!(vsir_instruction_init_with_params(program, ins, &udiv->location, VSIR_OP_UDIV_SIMPLE, 1, 2)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        ins->flags = udiv->flags;
+
+        src_param_init_ssa_vec4(&ins->src[0], program->ssa_count, udiv->src[0].reg.data_type);
+        src_param_init_ssa_vec4(&ins->src[1], program->ssa_count + 1, udiv->src[1].reg.data_type);
+        ins->dst[0] = udiv->dst[0];
+
+        ++ins;
+    }
+
+    if (udiv->dst[1].reg.type != VKD3DSPR_NULL)
+    {
+        if (!(vsir_instruction_init_with_params(program, ins, &udiv->location, VSIR_OP_UREM, 1, 2)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        ins->flags = udiv->flags;
+
+        src_param_init_ssa_vec4(&ins->src[0], program->ssa_count, udiv->src[0].reg.data_type);
+        src_param_init_ssa_vec4(&ins->src[1], program->ssa_count + 1, udiv->src[1].reg.data_type);
+        ins->dst[0] = udiv->dst[1];
+
+        ++ins;
+    }
+
+    vkd3d_shader_instruction_make_nop(udiv);
+    program->ssa_count += 2;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *program,
         struct vkd3d_shader_instruction *sincos)
 {
@@ -1550,6 +1627,11 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VSIR_OP_IMUL:
             case VSIR_OP_UMUL:
                 if ((ret = vsir_program_lower_imul(program, ins, ctx)) < 0)
+                    return ret;
+                break;
+
+            case VSIR_OP_UDIV:
+                if ((ret = vsir_program_lower_udiv(program, ins, ctx)) < 0)
                     return ret;
                 break;
 

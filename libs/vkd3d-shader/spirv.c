@@ -8079,63 +8079,6 @@ static void spirv_compiler_emit_imad(struct spirv_compiler *compiler,
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
-static void spirv_compiler_emit_int_div(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    uint32_t type_id, val_id, src0_id, src1_id, condition_id, uint_max_id;
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_dst_param *dst = instruction->dst;
-    const struct vkd3d_shader_src_param *src = instruction->src;
-    unsigned int component_count = 0;
-
-    if (dst[0].reg.type != VKD3DSPR_NULL)
-    {
-        component_count = vsir_write_mask_component_count(dst[0].write_mask);
-        type_id = spirv_compiler_get_type_id_for_dst(compiler, &dst[0]);
-
-        src0_id = spirv_compiler_emit_load_src(compiler, &src[0], dst[0].write_mask);
-        src1_id = spirv_compiler_emit_load_src(compiler, &src[1], dst[0].write_mask);
-
-        condition_id = spirv_compiler_emit_int_to_bool(compiler,
-                VKD3D_SHADER_CONDITIONAL_OP_NZ, src[1].reg.data_type, component_count, src1_id);
-        if (dst[0].reg.data_type == VKD3D_DATA_UINT64)
-            uint_max_id = spirv_compiler_get_constant_uint64_vector(compiler, UINT64_MAX, component_count);
-        else
-            uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, 0xffffffff, component_count);
-
-        val_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, SpvOpUDiv, type_id, src0_id, src1_id);
-        /* The SPIR-V spec says: "The resulting value is undefined if Operand 2 is 0." */
-        val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, val_id, uint_max_id);
-
-        spirv_compiler_emit_store_dst(compiler, &dst[0], val_id);
-    }
-
-    if (dst[1].reg.type != VKD3DSPR_NULL)
-    {
-        if (!component_count || dst[0].write_mask != dst[1].write_mask)
-        {
-            component_count = vsir_write_mask_component_count(dst[1].write_mask);
-            type_id = spirv_compiler_get_type_id_for_dst(compiler, &dst[1]);
-
-            src0_id = spirv_compiler_emit_load_src(compiler, &src[0], dst[1].write_mask);
-            src1_id = spirv_compiler_emit_load_src(compiler, &src[1], dst[1].write_mask);
-
-            condition_id = spirv_compiler_emit_int_to_bool(compiler,
-                    VKD3D_SHADER_CONDITIONAL_OP_NZ, src[1].reg.data_type, component_count, src1_id);
-            if (dst[1].reg.data_type == VKD3D_DATA_UINT64)
-                uint_max_id = spirv_compiler_get_constant_uint64_vector(compiler, UINT64_MAX, component_count);
-            else
-                uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, 0xffffffff, component_count);
-        }
-
-        val_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, SpvOpUMod, type_id, src0_id, src1_id);
-        /* The SPIR-V spec says: "The resulting value is undefined if Operand 2 is 0." */
-        val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, val_id, uint_max_id);
-
-        spirv_compiler_emit_store_dst(compiler, &dst[1], val_id);
-    }
-}
-
 static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -10753,9 +10696,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             break;
         case VSIR_OP_IMAD:
             spirv_compiler_emit_imad(compiler, instruction);
-            break;
-        case VSIR_OP_UDIV:
-            spirv_compiler_emit_int_div(compiler, instruction);
             break;
         case VSIR_OP_DTOI:
         case VSIR_OP_FTOI:
