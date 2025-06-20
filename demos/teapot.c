@@ -91,6 +91,9 @@ struct teapot
     float theta, phi;
 
     bool display_help;
+    struct timeval last_text;
+    struct timeval frame_times[16];
+    size_t frame_count;
 
     D3D12_VIEWPORT vp;
     D3D12_RECT scissor_rect;
@@ -120,6 +123,11 @@ struct teapot
 
     struct demo_text text;
 };
+
+static double timeval_diff(const struct timeval *end, const struct timeval *start)
+{
+    return (end->tv_sec - start->tv_sec) + (end->tv_usec - start->tv_usec) / 1000000.0;
+}
 
 static ID3D12Resource *create_buffer(ID3D12Device *device, size_t size)
 {
@@ -509,7 +517,7 @@ static void teapot_update_mvp(struct teapot *teapot)
     demo_matrix_multiply(&teapot->cb_data->mvp_matrix, &world, &projection);
 }
 
-static void teapot_update_text(struct teapot *teapot)
+static void teapot_update_text(struct teapot *teapot, double fps)
 {
     unsigned int h = teapot->text_scale * 16;
     struct demo_text *text = &teapot->text;
@@ -530,6 +538,8 @@ static void teapot_update_text(struct teapot *teapot)
     pad = (teapot->width / (teapot->text_scale * 9)) + 1;
     demo_text_draw(text, &amber, 0, -1 * h, "%s: %s%*s", platform, device, l < pad ? (int)(pad - l) : 0, "");
     text->reverse = false;
+    if (teapot->frame_count >= ARRAY_SIZE(teapot->frame_times))
+        demo_text_draw(text, &amber, 0, -2 * h, "%.2f fps", fps);
     if (teapot->display_help)
     {
         demo_text_draw(text, &amber, 0, 2 * h, "ESC: Exit");
@@ -546,6 +556,19 @@ static void teapot_update_text(struct teapot *teapot)
 
 static void teapot_render_frame(struct teapot *teapot)
 {
+    size_t time_idx = teapot->frame_count % ARRAY_SIZE(teapot->frame_times);
+    struct timeval t;
+
+    gettimeofday(&t, NULL);
+    if (timeval_diff(&t, &teapot->last_text) > 0.1)
+    {
+        teapot_update_text(teapot, ARRAY_SIZE(teapot->frame_times) / timeval_diff(&t, &teapot->frame_times[time_idx]));
+        teapot->last_text = t;
+    }
+
+    teapot->frame_times[time_idx] = t;
+    ++teapot->frame_count;
+
     ID3D12CommandQueue_ExecuteCommandLists(teapot->command_queue, 1,
             (ID3D12CommandList **)&teapot->swapchain_images[teapot->rt_idx].command_list);
     demo_swapchain_present(teapot->swapchain);
@@ -779,7 +802,6 @@ static void teapot_load_assets(struct teapot *teapot)
     teapot->cb_data->level = teapot->tessellation_level;
 
     demo_text_init(&teapot->text, teapot->device, teapot->width, teapot->height, teapot->text_scale);
-    teapot_update_text(teapot);
     teapot_load_mesh(teapot);
 
     teapot_fence_create(&teapot->fence, teapot->device);
@@ -796,13 +818,11 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
         case DEMO_KEY_KP_SUBTRACT:
             if (teapot->tessellation_level > 1)
                 teapot->cb_data->level = --teapot->tessellation_level;
-            teapot_update_text(teapot);
             break;
         case '=':
         case DEMO_KEY_KP_ADD:
             if (teapot->tessellation_level < D3D12_TESSELLATOR_MAX_TESSELLATION_FACTOR)
                 teapot->cb_data->level = ++teapot->tessellation_level;
-            teapot_update_text(teapot);
             break;
         case DEMO_KEY_ESCAPE:
             demo_window_destroy(window);
@@ -833,7 +853,6 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
             break;
         case DEMO_KEY_F1:
             teapot->display_help = !teapot->display_help;
-            teapot_update_text(teapot);
             break;
         default:
             break;
