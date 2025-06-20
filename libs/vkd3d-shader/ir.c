@@ -2359,6 +2359,7 @@ struct io_normaliser_register_data
 struct io_normaliser
 {
     struct vkd3d_shader_message_context *message_context;
+    enum vkd3d_result result;
     struct vkd3d_shader_instruction_array instructions;
     enum vkd3d_shader_type shader_type;
     uint8_t major;
@@ -2862,7 +2863,7 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
 }
 
 static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_param,
-        struct io_normaliser *normaliser)
+        struct io_normaliser *normaliser, struct vkd3d_shader_instruction *ins)
 {
     unsigned int i, id_idx, reg_idx, write_mask, element_idx, component_idx;
     struct vkd3d_shader_register *reg = &src_param->reg;
@@ -2925,7 +2926,12 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
     id_idx = reg->idx_count - 1;
     write_mask = VKD3DSP_WRITEMASK_0 << vsir_swizzle_get_component(src_param->swizzle, 0);
     if (!shader_signature_find_element_for_reg(signature, reg_idx, write_mask, &element_idx))
-        vkd3d_unreachable();
+    {
+        vkd3d_shader_error(normaliser->message_context, &ins->location, VKD3D_SHADER_ERROR_VSIR_INVALID_SIGNATURE,
+                "Unable to resolve I/O register to a signature element.");
+        normaliser->result = VKD3D_ERROR_INVALID_SHADER;
+        return;
+    }
 
     e = &signature->elements[element_idx];
     if ((e->register_count > 1 || vsir_sysval_semantic_is_tess_factor(e->sysval_semantic)))
@@ -2962,7 +2968,7 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
             for (i = 0; i < ins->dst_count; ++i)
                 shader_dst_param_io_normalise(&ins->dst[i], normaliser);
             for (i = 0; i < ins->src_count; ++i)
-                shader_src_param_io_normalise(&ins->src[i], normaliser);
+                shader_src_param_io_normalise(&ins->src[i], normaliser, ins);
             break;
     }
 }
@@ -2970,7 +2976,7 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
 static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    struct io_normaliser normaliser = {ctx->message_context, program->instructions};
+    struct io_normaliser normaliser = {ctx->message_context, VKD3D_OK, program->instructions};
     struct vkd3d_shader_instruction *ins;
     enum vkd3d_result ret;
     unsigned int i;
@@ -3025,7 +3031,7 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
     program->instructions = normaliser.instructions;
     program->use_vocp = normaliser.use_vocp;
     program->normalisation_level = VSIR_NORMALISED_SM6;
-    return VKD3D_OK;
+    return normaliser.result;
 }
 
 struct flat_constant_def
