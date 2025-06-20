@@ -4536,6 +4536,9 @@ static enum vkd3d_shader_opcode map_binary_op(uint64_t code, const struct sm6_ty
             is_valid = is_int && !is_bool;
             break;
         case BINOP_UDIV:
+            op = VSIR_OP_UDIV_SIMPLE;
+            is_valid = is_int && !is_bool;
+            break;
         case BINOP_UREM:
             op = VSIR_OP_UDIV;
             is_valid = is_int && !is_bool;
@@ -4611,6 +4614,7 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
         case VSIR_OP_USHR:
         case VSIR_OP_IDIV:
         case VSIR_OP_UDIV:
+        case VSIR_OP_UDIV_SIMPLE:
         case VSIR_OP_IREM:
             silence_warning = !(flags & ~PEB_EXACT);
             break;

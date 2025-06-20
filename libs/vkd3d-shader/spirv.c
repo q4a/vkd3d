@@ -7548,6 +7548,7 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VSIR_OP_MUL,        SpvOpFMul},
         {VSIR_OP_NOT,        SpvOpNot},
         {VSIR_OP_OR,         SpvOpBitwiseOr},
+        {VSIR_OP_UDIV_SIMPLE, SpvOpUDiv},
         {VSIR_OP_USHR,       SpvOpShiftRightLogical},
         {VSIR_OP_UTOD,       SpvOpConvertUToF},
         {VSIR_OP_UTOF,       SpvOpConvertUToF},
@@ -7673,6 +7674,7 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
     {
         case VSIR_OP_IDIV:
         case VSIR_OP_IREM:
+        case VSIR_OP_UDIV_SIMPLE:
             check_zero = true;
             break;
 
@@ -10692,6 +10694,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VSIR_OP_MUL:
         case VSIR_OP_NOT:
         case VSIR_OP_OR:
+        case VSIR_OP_UDIV_SIMPLE:
         case VSIR_OP_USHR:
         case VSIR_OP_UTOD:
         case VSIR_OP_UTOF:

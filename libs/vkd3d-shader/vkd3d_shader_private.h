@@ -580,6 +580,7 @@ enum vkd3d_shader_opcode
     VSIR_OP_TEXREG2RGB,
     VSIR_OP_UBFE,
     VSIR_OP_UDIV,
+    VSIR_OP_UDIV_SIMPLE,
     VSIR_OP_UGE,
     VSIR_OP_ULT,
     VSIR_OP_UMAX,

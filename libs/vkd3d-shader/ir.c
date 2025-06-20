@@ -332,6 +332,7 @@ const char *vsir_opcode_get_name(enum vkd3d_shader_opcode op, const char *error)
         [VSIR_OP_TEXREG2RGB                      ] = "texreg2rgb",
         [VSIR_OP_UBFE                            ] = "ubfe",
         [VSIR_OP_UDIV                            ] = "udiv",
+        [VSIR_OP_UDIV_SIMPLE                     ] = "udiv_simple",
         [VSIR_OP_UGE                             ] = "uge",
         [VSIR_OP_ULT                             ] = "ult",
         [VSIR_OP_UMAX                            ] = "umax",
@@ -7927,6 +7928,7 @@ static bool vsir_src_is_masked(enum vkd3d_shader_opcode opcode, unsigned int src
         case VSIR_OP_TAN:
         case VSIR_OP_UBFE:
         case VSIR_OP_UDIV:
+        case VSIR_OP_UDIV_SIMPLE:
         case VSIR_OP_UGE:
         case VSIR_OP_ULT:
         case VSIR_OP_UMAX:
