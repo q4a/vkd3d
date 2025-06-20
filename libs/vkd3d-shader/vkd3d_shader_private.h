@@ -587,6 +587,7 @@ enum vkd3d_shader_opcode
     VSIR_OP_UMIN,
     VSIR_OP_UMUL,
     VSIR_OP_UNO,
+    VSIR_OP_UREM,
     VSIR_OP_USHR,
     VSIR_OP_UTOD,
     VSIR_OP_UTOF,

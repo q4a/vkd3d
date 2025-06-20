@@ -4540,7 +4540,7 @@ static enum vkd3d_shader_opcode map_binary_op(uint64_t code, const struct sm6_ty
             is_valid = is_int && !is_bool;
             break;
         case BINOP_UREM:
-            op = VSIR_OP_UDIV;
+            op = VSIR_OP_UREM;
             is_valid = is_int && !is_bool;
             break;
         case BINOP_XOR:
@@ -4613,9 +4613,9 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
         case VSIR_OP_ISHR:
         case VSIR_OP_USHR:
         case VSIR_OP_IDIV:
-        case VSIR_OP_UDIV:
         case VSIR_OP_UDIV_SIMPLE:
         case VSIR_OP_IREM:
+        case VSIR_OP_UREM:
             silence_warning = !(flags & ~PEB_EXACT);
             break;
         default:
@@ -4642,27 +4642,14 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
 
     dst->type = a->type;
 
-    if (handler_idx == VSIR_OP_UDIV)
+    if (handler_idx == VSIR_OP_ISHL || handler_idx == VSIR_OP_ISHR || handler_idx == VSIR_OP_USHR)
     {
-        struct vkd3d_shader_dst_param *dst_params = instruction_dst_params_alloc(ins, 2, sm6);
-        unsigned int index = code != BINOP_UDIV && code != BINOP_SDIV;
-
-        dst_param_init(&dst_params[0]);
-        dst_param_init(&dst_params[1]);
-        sm6_parser_init_ssa_value(sm6, dst);
-        sm6_register_from_value(&dst_params[index].reg, dst, sm6);
-        vsir_dst_param_init_null(&dst_params[index ^ 1]);
+        /* DXC emits AND instructions where necessary to mask shift counts.
+         * Shift binops do not imply masking the shift as the TPF equivalents
+         * do. */
+        ins->flags |= VKD3DSI_SHIFT_UNMASKED;
     }
-    else
-    {
-        if (handler_idx == VSIR_OP_ISHL || handler_idx == VSIR_OP_ISHR || handler_idx == VSIR_OP_USHR)
-        {
-            /* DXC emits AND instructions where necessary to mask shift counts. Shift binops
-             * do not imply masking the shift as the TPF equivalents do. */
-            ins->flags |= VKD3DSI_SHIFT_UNMASKED;
-        }
-        instruction_dst_param_init_ssa_scalar(ins, sm6);
-    }
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
 static const struct sm6_block *sm6_function_get_block(const struct sm6_function *function, uint64_t index,
