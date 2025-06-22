@@ -5180,6 +5180,8 @@ static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intr
     src_param->reg.data_type = vkd3d_data_type_from_sm6_type(type);
     if (data_type_is_64_bit(src_param->reg.data_type))
         src_param->swizzle = vsir_swizzle_64_from_32(src_param->swizzle);
+    else
+        register_convert_to_minimum_precision(&src_param->reg);
 
     instruction_dst_param_init_ssa_vector(ins, sm6_type_max_vector_size(type), sm6);
 }
