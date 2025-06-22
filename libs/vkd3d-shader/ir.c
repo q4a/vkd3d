@@ -9213,10 +9213,6 @@ static void vsir_validate_descriptor_indices(struct validation_context *ctx,
 static void vsir_validate_constbuffer_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
-    if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
-                "Invalid precision %#x for a CONSTBUFFER register.", reg->precision);
-
     if (reg->dimension != VSIR_DIMENSION_VEC4)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
                 "Invalid dimension %#x for a CONSTBUFFER register.", reg->dimension);
