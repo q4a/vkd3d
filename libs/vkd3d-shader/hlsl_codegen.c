@@ -7777,8 +7777,6 @@ static void validate_and_record_stream_outputs(struct hlsl_ctx *ctx)
             reported_invalid_index = true;
         }
     }
-
-    /* TODO: check that maxvertexcount * outputdatasize <= 1024. */
 }
 
 static void validate_max_output_size(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
