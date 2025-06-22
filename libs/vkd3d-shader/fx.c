@@ -938,8 +938,8 @@ static const struct fx_state fx_2_pass_states[] =
     { "WorldTransform",      HLSL_CLASS_PASS, HLSL_CLASS_MATRIX, FX_FLOAT, 4, 256, 125 },
     { "TextureTransform",    HLSL_CLASS_PASS, HLSL_CLASS_MATRIX, FX_FLOAT, 4, 8, 126 },
 
-    { "MaterialAmbient",   HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 127 },
-    { "MaterialDiffuse",   HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 128 },
+    { "MaterialDiffuse",   HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 127 },
+    { "MaterialAmbient",   HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 128 },
     { "MaterialSpecular",  HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 129 },
     { "MaterialEmissive",  HLSL_CLASS_PASS, HLSL_CLASS_VECTOR, FX_FLOAT, 4, 1, 130 },
     { "MaterialPower",     HLSL_CLASS_PASS, HLSL_CLASS_SCALAR, FX_FLOAT, 1, 1, 131 },
