@@ -10573,6 +10573,19 @@ static void vsir_validate_float_elementwise_operation(struct validation_context 
     vsir_validate_elementwise_operation(ctx, instruction, types);
 }
 
+static void vsir_validate_integer_elementwise_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_INT] = true,
+        [VKD3D_DATA_UINT] = true,
+        [VKD3D_DATA_UINT64] = true,
+    };
+
+    vsir_validate_elementwise_operation(ctx, instruction, types);
+}
+
 static void vsir_validate_logic_elementwise_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -11374,6 +11387,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_HS_DECLS] =                         {0,   0, vsir_validate_hull_shader_phase},
     [VSIR_OP_HS_FORK_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
     [VSIR_OP_HS_JOIN_PHASE] =                    {0,   0, vsir_validate_hull_shader_phase},
+    [VSIR_OP_IADD] =                             {1,   2, vsir_validate_integer_elementwise_operation},
     [VSIR_OP_DCL_GS_INSTANCES] =                 {0,   0, vsir_validate_dcl_gs_instances},
     [VSIR_OP_DCL_HS_MAX_TESSFACTOR] =            {0,   0, vsir_validate_dcl_hs_max_tessfactor},
     [VSIR_OP_DCL_INDEX_RANGE] =                  {0,   0, vsir_validate_dcl_index_range},
