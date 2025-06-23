@@ -2577,6 +2577,51 @@ static void test_signature_reflection(void)
         {"sv_position",               0, 2, D3D_NAME_POSITION,                  D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
     };
 
+    /* This test checks for many things:
+     * - The return variable is allocated first, its output semantic (GAMMA)
+     *   ends in o0.
+     * - The ap1[] elements get different OVERRIDE indexes (total of 6) thanks
+     *   to cascading, while the ap2[] elements get aliased (both use ALPHA0,
+     *   BETA0, and BETA1).
+     * - The cascading on ap3 starts at semantic index 2 and then goes up. */
+    static const char vs7_source[] =
+        "struct apple\n"
+        "{\n"
+        "    float4 a : ALPHA;\n"
+        "    float2 b[2] : BETA;\n"
+        "};\n"
+        "\n"
+        "float4 main(out float4 out_pos : sv_position,\n"
+        "        in struct apple ap1[2] : OVERRIDE, in struct apple ap2[2],\n"
+        "        out struct apple ap3 : OVERRIDE2) : GAMMA\n"
+        "{\n"
+        "    out_pos = float4(0, 0, 1, 1);\n"
+        "    ap3 = ap2[1];\n"
+        "    return 0;\n"
+        "}\n";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs7_inputs[] =
+    {
+        {"OVERRIDE", 0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+        {"OVERRIDE", 1, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0x0},
+        {"OVERRIDE", 2, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0x0},
+        {"OVERRIDE", 3, 3, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+        {"OVERRIDE", 4, 4, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0x0},
+        {"OVERRIDE", 5, 5, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0x0},
+        {"ALPHA",    0, 6, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"BETA",     0, 7, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0x3},
+        {"BETA",     1, 8, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0x3},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs7_outputs[] =
+    {
+        {"GAMMA",       0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+        {"sv_position", 0, 1, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+        {"OVERRIDE",    2, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x0},
+        {"OVERRIDE",    3, 3, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+        {"OVERRIDE",    4, 4, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3, 0xc},
+    };
+
     static const char ps13_source[] =
         "struct input\n"
         "{\n"
@@ -3196,6 +3241,7 @@ static void test_signature_reflection(void)
         {vs4_source,  "vs_4_0", false, vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs)},
         {vs5_source,  "vs_4_0", false, vs5_inputs, ARRAY_SIZE(vs5_inputs), vs5_outputs, ARRAY_SIZE(vs5_outputs)},
         {vs6_source,  "vs_4_0", false, vs6_inputs, ARRAY_SIZE(vs6_inputs), vs6_outputs, ARRAY_SIZE(vs6_outputs)},
+        {vs7_source,  "vs_4_0", false, vs7_inputs, ARRAY_SIZE(vs7_inputs), vs7_outputs, ARRAY_SIZE(vs7_outputs)},
         {ps13_source, "ps_4_0", false, ps13_inputs, ARRAY_SIZE(ps13_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple)},
         {ps14_source, "ps_4_0", false, ps14_inputs, ARRAY_SIZE(ps14_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple)},
         {ps15_source, "ps_4_1", false, ps15_inputs, ARRAY_SIZE(ps15_inputs), ps_outputs_simple, ARRAY_SIZE(ps_outputs_simple)},
