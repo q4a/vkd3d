@@ -8493,18 +8493,10 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
         {
             reg->type = VKD3DSPR_RESOURCE;
             reg->dimension = VSIR_DIMENSION_VEC4;
-            if (vkd3d_shader_ver_ge(version, 5, 1))
-            {
-                reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].id;
-                reg->idx[1].offset = var->regs[HLSL_REGSET_TEXTURES].index; /* FIXME: array index */
-                reg->idx_count = 2;
-            }
-            else
-            {
-                reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].index;
-                reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
-                reg->idx_count = 1;
-            }
+            reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].id;
+            reg->idx[1].offset = var->regs[HLSL_REGSET_TEXTURES].index;
+            reg->idx[1].offset += hlsl_offset_from_deref_safe(ctx, deref);
+            reg->idx_count = 2;
             VKD3D_ASSERT(regset == HLSL_REGSET_TEXTURES);
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -8512,18 +8504,10 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
         {
             reg->type = VKD3DSPR_UAV;
             reg->dimension = VSIR_DIMENSION_VEC4;
-            if (vkd3d_shader_ver_ge(version, 5, 1))
-            {
-                reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].id;
-                reg->idx[1].offset = var->regs[HLSL_REGSET_UAVS].index; /* FIXME: array index */
-                reg->idx_count = 2;
-            }
-            else
-            {
-                reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].index;
-                reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
-                reg->idx_count = 1;
-            }
+            reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].id;
+            reg->idx[1].offset = var->regs[HLSL_REGSET_UAVS].index;
+            reg->idx[1].offset += hlsl_offset_from_deref_safe(ctx, deref);
+            reg->idx_count = 2;
             VKD3D_ASSERT(regset == HLSL_REGSET_UAVS);
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -8531,18 +8515,10 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
         {
             reg->type = VKD3DSPR_SAMPLER;
             reg->dimension = VSIR_DIMENSION_NONE;
-            if (vkd3d_shader_ver_ge(version, 5, 1))
-            {
-                reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].id;
-                reg->idx[1].offset = var->regs[HLSL_REGSET_SAMPLERS].index; /* FIXME: array index */
-                reg->idx_count = 2;
-            }
-            else
-            {
-                reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].index;
-                reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
-                reg->idx_count = 1;
-            }
+            reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].id;
+            reg->idx[1].offset = var->regs[HLSL_REGSET_SAMPLERS].index;
+            reg->idx[1].offset += hlsl_offset_from_deref_safe(ctx, deref);
+            reg->idx_count = 2;
             VKD3D_ASSERT(regset == HLSL_REGSET_SAMPLERS);
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -8561,19 +8537,10 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
             VKD3D_ASSERT(data_type->class <= HLSL_CLASS_VECTOR);
             reg->type = VKD3DSPR_CONSTBUFFER;
             reg->dimension = VSIR_DIMENSION_VEC4;
-            if (vkd3d_shader_ver_ge(version, 5, 1))
-            {
-                reg->idx[0].offset = var->buffer->reg.id;
-                reg->idx[1].offset = var->buffer->reg.index; /* FIXME: array index */
-                reg->idx[2].offset = offset / 4;
-                reg->idx_count = 3;
-            }
-            else
-            {
-                reg->idx[0].offset = var->buffer->reg.index;
-                reg->idx[1].offset = offset / 4;
-                reg->idx_count = 2;
-            }
+            reg->idx[0].offset = var->buffer->reg.id;
+            reg->idx[1].offset = var->buffer->reg.index; /* FIXME: array index */
+            reg->idx[2].offset = offset / 4;
+            reg->idx_count = 3;
 
             if (deref->rel_offset.node)
             {

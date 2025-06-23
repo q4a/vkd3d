@@ -4046,6 +4046,39 @@ static void tpf_write_dcl_vertices_out(const struct tpf_compiler *tpf, unsigned 
     write_sm4_instruction(tpf, &instr);
 }
 
+/* Descriptor registers are stored in shader model 5.1 format regardless
+ * of the program's version. Convert them to the 4.0 format if necessary. */
+static void rewrite_descriptor_register(const struct tpf_compiler *tpf, struct vkd3d_shader_register *reg)
+{
+    if (vkd3d_shader_ver_ge(&tpf->program->shader_version, 5, 1))
+        return;
+
+    switch (reg->type)
+    {
+        case VKD3DSPR_CONSTBUFFER:
+            reg->idx[0] = reg->idx[1];
+            reg->idx[1] = reg->idx[2];
+            reg->idx_count = 2;
+            break;
+
+        case VKD3DSPR_RESOURCE:
+        case VKD3DSPR_SAMPLER:
+        case VKD3DSPR_UAV:
+            reg->idx[0] = reg->idx[1];
+            reg->idx_count = 1;
+            break;
+
+        default:
+            break;
+    }
+
+    for (unsigned int i = 0; i < reg->idx_count; ++i)
+    {
+        if (reg->idx[i].rel_addr)
+            rewrite_descriptor_register(tpf, &reg->idx[i].rel_addr->reg);
+    }
+}
+
 static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
 {
     struct sm4_instruction_modifier *modifier;
@@ -4082,6 +4115,7 @@ static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_
     for (unsigned int i = 0; i < ins->dst_count; ++i)
     {
         instr.dsts[i] = ins->dst[i];
+        rewrite_descriptor_register(tpf, &instr.dsts[i].reg);
 
         if (instr.dsts[i].modifiers & VKD3DSPDM_SATURATE)
         {
@@ -4092,7 +4126,10 @@ static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_
         }
     }
     for (unsigned int i = 0; i < ins->src_count; ++i)
+    {
         instr.srcs[i] = ins->src[i];
+        rewrite_descriptor_register(tpf, &instr.srcs[i].reg);
+    }
 
     if (ins->texel_offset.u || ins->texel_offset.v || ins->texel_offset.w)
     {
