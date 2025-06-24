@@ -929,7 +929,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
 
     if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBE
             || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY
-            || (ins->opcode != VKD3DSIH_LD2DMS
+            || (ins->opcode != VSIR_OP_LD2DMS
                     && (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
                     || resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_UNSUPPORTED,
@@ -970,7 +970,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     if (resource_type != VKD3D_SHADER_RESOURCE_BUFFER)
     {
         vkd3d_string_buffer_printf(read, ", ");
-        if (ins->opcode != VKD3DSIH_LD2DMS)
+        if (ins->opcode != VSIR_OP_LD2DMS)
             msl_print_src_with_type(read, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, VKD3D_DATA_UINT);
         else
             msl_print_src_with_type(read, gen, &ins->src[2], VKD3DSP_WRITEMASK_0, VKD3D_DATA_UINT);
@@ -1001,15 +1001,15 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     uint32_t coord_mask;
     struct msl_dst dst;
 
-    bias = ins->opcode == VKD3DSIH_SAMPLE_B;
-    compare = ins->opcode == VKD3DSIH_GATHER4_C || ins->opcode == VKD3DSIH_SAMPLE_C
-            || ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
-    dynamic_offset = ins->opcode == VKD3DSIH_GATHER4_PO;
-    gather = ins->opcode == VKD3DSIH_GATHER4 || ins->opcode == VKD3DSIH_GATHER4_C
-            || ins->opcode == VKD3DSIH_GATHER4_PO;
-    grad = ins->opcode == VKD3DSIH_SAMPLE_GRAD;
-    lod = ins->opcode == VKD3DSIH_SAMPLE_LOD;
-    lod_zero = ins->opcode == VKD3DSIH_SAMPLE_C_LZ;
+    bias = ins->opcode == VSIR_OP_SAMPLE_B;
+    compare = ins->opcode == VSIR_OP_GATHER4_C || ins->opcode == VSIR_OP_SAMPLE_C
+            || ins->opcode == VSIR_OP_SAMPLE_C_LZ;
+    dynamic_offset = ins->opcode == VSIR_OP_GATHER4_PO;
+    gather = ins->opcode == VSIR_OP_GATHER4 || ins->opcode == VSIR_OP_GATHER4_C
+            || ins->opcode == VSIR_OP_GATHER4_PO;
+    grad = ins->opcode == VSIR_OP_SAMPLE_GRAD;
+    lod = ins->opcode == VSIR_OP_SAMPLE_LOD;
+    lod_zero = ins->opcode == VSIR_OP_SAMPLE_C_LZ;
     offset = dynamic_offset || vkd3d_shader_instruction_has_texel_offset(ins);
 
     resource = &ins->src[1 + dynamic_offset];
@@ -1273,169 +1273,169 @@ static void msl_handle_instruction(struct msl_generator *gen, const struct vkd3d
 
     switch (ins->opcode)
     {
-        case VKD3DSIH_ADD:
-        case VKD3DSIH_IADD:
+        case VSIR_OP_ADD:
+        case VSIR_OP_IADD:
             msl_binop(gen, ins, "+");
             break;
-        case VKD3DSIH_AND:
+        case VSIR_OP_AND:
             msl_binop(gen, ins, "&");
             break;
-        case VKD3DSIH_BREAK:
+        case VSIR_OP_BREAK:
             msl_break(gen);
             break;
-        case VKD3DSIH_CASE:
+        case VSIR_OP_CASE:
             msl_case(gen, ins);
             break;
-        case VKD3DSIH_DCL_INDEXABLE_TEMP:
+        case VSIR_OP_DCL_INDEXABLE_TEMP:
             msl_dcl_indexable_temp(gen, ins);
             break;
-        case VKD3DSIH_NOP:
+        case VSIR_OP_NOP:
             break;
-        case VKD3DSIH_DEFAULT:
+        case VSIR_OP_DEFAULT:
             msl_default(gen);
             break;
-        case VKD3DSIH_DISCARD:
+        case VSIR_OP_DISCARD:
             msl_discard(gen, ins);
             break;
-        case VKD3DSIH_DIV:
+        case VSIR_OP_DIV:
             msl_binop(gen, ins, "/");
             break;
-        case VKD3DSIH_DP2:
+        case VSIR_OP_DP2:
             msl_dot(gen, ins, vkd3d_write_mask_from_component_count(2));
             break;
-        case VKD3DSIH_DP3:
+        case VSIR_OP_DP3:
             msl_dot(gen, ins, vkd3d_write_mask_from_component_count(3));
             break;
-        case VKD3DSIH_DP4:
+        case VSIR_OP_DP4:
             msl_dot(gen, ins, VKD3DSP_WRITEMASK_ALL);
             break;
-        case VKD3DSIH_ELSE:
+        case VSIR_OP_ELSE:
             msl_else(gen);
             break;
-        case VKD3DSIH_ENDIF:
-        case VKD3DSIH_ENDLOOP:
-        case VKD3DSIH_ENDSWITCH:
+        case VSIR_OP_ENDIF:
+        case VSIR_OP_ENDLOOP:
+        case VSIR_OP_ENDSWITCH:
             msl_end_block(gen);
             break;
-        case VKD3DSIH_EQO:
-        case VKD3DSIH_IEQ:
+        case VSIR_OP_EQO:
+        case VSIR_OP_IEQ:
             msl_relop(gen, ins, "==");
             break;
-        case VKD3DSIH_EXP:
+        case VSIR_OP_EXP:
             msl_intrinsic(gen, ins, "exp2");
             break;
-        case VKD3DSIH_FRC:
+        case VSIR_OP_FRC:
             msl_intrinsic(gen, ins, "fract");
             break;
-        case VKD3DSIH_FTOI:
+        case VSIR_OP_FTOI:
             msl_cast(gen, ins, "int");
             break;
-        case VKD3DSIH_FTOU:
+        case VSIR_OP_FTOU:
             msl_cast(gen, ins, "uint");
             break;
-        case VKD3DSIH_GATHER4:
-        case VKD3DSIH_GATHER4_C:
-        case VKD3DSIH_GATHER4_PO:
-        case VKD3DSIH_SAMPLE:
-        case VKD3DSIH_SAMPLE_B:
-        case VKD3DSIH_SAMPLE_C:
-        case VKD3DSIH_SAMPLE_C_LZ:
-        case VKD3DSIH_SAMPLE_GRAD:
-        case VKD3DSIH_SAMPLE_LOD:
+        case VSIR_OP_GATHER4:
+        case VSIR_OP_GATHER4_C:
+        case VSIR_OP_GATHER4_PO:
+        case VSIR_OP_SAMPLE:
+        case VSIR_OP_SAMPLE_B:
+        case VSIR_OP_SAMPLE_C:
+        case VSIR_OP_SAMPLE_C_LZ:
+        case VSIR_OP_SAMPLE_GRAD:
+        case VSIR_OP_SAMPLE_LOD:
             msl_sample(gen, ins);
             break;
-        case VKD3DSIH_GEO:
-        case VKD3DSIH_IGE:
+        case VSIR_OP_GEO:
+        case VSIR_OP_IGE:
             msl_relop(gen, ins, ">=");
             break;
-        case VKD3DSIH_IF:
+        case VSIR_OP_IF:
             msl_if(gen, ins);
             break;
-        case VKD3DSIH_ISHL:
+        case VSIR_OP_ISHL:
             msl_binop(gen, ins, "<<");
             break;
-        case VKD3DSIH_ISHR:
-        case VKD3DSIH_USHR:
+        case VSIR_OP_ISHR:
+        case VSIR_OP_USHR:
             msl_binop(gen, ins, ">>");
             break;
-        case VKD3DSIH_ILT:
-        case VKD3DSIH_LTO:
-        case VKD3DSIH_ULT:
+        case VSIR_OP_ILT:
+        case VSIR_OP_LTO:
+        case VSIR_OP_ULT:
             msl_relop(gen, ins, "<");
             break;
-        case VKD3DSIH_MAD:
+        case VSIR_OP_MAD:
             msl_intrinsic(gen, ins, "fma");
             break;
-        case VKD3DSIH_MAX:
+        case VSIR_OP_MAX:
             msl_intrinsic(gen, ins, "max");
             break;
-        case VKD3DSIH_MIN:
+        case VSIR_OP_MIN:
             msl_intrinsic(gen, ins, "min");
             break;
-        case VKD3DSIH_IMUL_LOW:
+        case VSIR_OP_IMUL_LOW:
             msl_binop(gen, ins, "*");
             break;
-        case VKD3DSIH_INE:
-        case VKD3DSIH_NEU:
+        case VSIR_OP_INE:
+        case VSIR_OP_NEU:
             msl_relop(gen, ins, "!=");
             break;
-        case VKD3DSIH_INEG:
+        case VSIR_OP_INEG:
             msl_unary_op(gen, ins, "-");
             break;
-        case VKD3DSIH_ITOF:
-        case VKD3DSIH_UTOF:
+        case VSIR_OP_ITOF:
+        case VSIR_OP_UTOF:
             msl_cast(gen, ins, "float");
             break;
-        case VKD3DSIH_LD:
-        case VKD3DSIH_LD2DMS:
+        case VSIR_OP_LD:
+        case VSIR_OP_LD2DMS:
             msl_ld(gen, ins);
             break;
-        case VKD3DSIH_LOG:
+        case VSIR_OP_LOG:
             msl_intrinsic(gen, ins, "log2");
             break;
-        case VKD3DSIH_LOOP:
+        case VSIR_OP_LOOP:
             msl_loop(gen);
             break;
-        case VKD3DSIH_MOV:
+        case VSIR_OP_MOV:
             msl_mov(gen, ins);
             break;
-        case VKD3DSIH_MOVC:
+        case VSIR_OP_MOVC:
             msl_movc(gen, ins);
             break;
-        case VKD3DSIH_MUL:
+        case VSIR_OP_MUL:
             msl_binop(gen, ins, "*");
             break;
-        case VKD3DSIH_NOT:
+        case VSIR_OP_NOT:
             msl_unary_op(gen, ins, "~");
             break;
-        case VKD3DSIH_OR:
+        case VSIR_OP_OR:
             msl_binop(gen, ins, "|");
             break;
-        case VKD3DSIH_RET:
+        case VSIR_OP_RET:
             msl_ret(gen, ins);
             break;
-        case VKD3DSIH_ROUND_NE:
+        case VSIR_OP_ROUND_NE:
             msl_intrinsic(gen, ins, "rint");
             break;
-        case VKD3DSIH_ROUND_NI:
+        case VSIR_OP_ROUND_NI:
             msl_intrinsic(gen, ins, "floor");
             break;
-        case VKD3DSIH_ROUND_PI:
+        case VSIR_OP_ROUND_PI:
             msl_intrinsic(gen, ins, "ceil");
             break;
-        case VKD3DSIH_ROUND_Z:
+        case VSIR_OP_ROUND_Z:
             msl_intrinsic(gen, ins, "trunc");
             break;
-        case VKD3DSIH_RSQ:
+        case VSIR_OP_RSQ:
             msl_intrinsic(gen, ins, "rsqrt");
             break;
-        case VKD3DSIH_SQRT:
+        case VSIR_OP_SQRT:
             msl_intrinsic(gen, ins, "sqrt");
             break;
-        case VKD3DSIH_SWITCH:
+        case VSIR_OP_SWITCH:
             msl_switch(gen, ins);
             break;
-        case VKD3DSIH_XOR:
+        case VSIR_OP_XOR:
             msl_binop(gen, ins, "^");
             break;
         default:
