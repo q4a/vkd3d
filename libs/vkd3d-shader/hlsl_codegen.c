@@ -10206,6 +10206,7 @@ static void sm4_generate_vsir_cast_from_bool(struct hlsl_ctx *ctx, struct vsir_p
 
     dst_param = &ins->dst[0];
     vsir_dst_from_hlsl_node(dst_param, ctx, instr);
+    ins->dst[0].reg.data_type = VKD3D_DATA_UINT;
 
     vsir_src_from_hlsl_node(&ins->src[0], ctx, operand, dst_param->write_mask);
 
