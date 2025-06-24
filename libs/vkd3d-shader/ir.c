@@ -10478,6 +10478,7 @@ static void vsir_validate_logic_elementwise_operation(struct validation_context 
 {
     static const bool types[VKD3D_DATA_COUNT] =
     {
+        [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
         [VKD3D_DATA_UINT64] = true,
         [VKD3D_DATA_BOOL] = true,
