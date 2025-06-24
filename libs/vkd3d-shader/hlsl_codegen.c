@@ -8020,8 +8020,19 @@ static void generate_vsir_signature_entry(struct hlsl_ctx *ctx, struct vsir_prog
         if ((!output && !var->last_read) || (output && !var->first_write))
             return;
 
-        if (!sm1_register_from_semantic_name(&program->shader_version,
+        if (sm1_register_from_semantic_name(&program->shader_version,
                 var->semantic.name, var->semantic.index, output, &sysval, &type, &register_index))
+        {
+            if (!vkd3d_shader_ver_ge(&program->shader_version, 3, 0))
+            {
+                if (type == VKD3DSPR_RASTOUT)
+                    register_index += SM1_RASTOUT_REGISTER_OFFSET;
+                else if (type == VKD3DSPR_ATTROUT
+                        || (type == VKD3DSPR_INPUT && program->shader_version.type == VKD3D_SHADER_TYPE_PIXEL))
+                    register_index += SM1_COLOR_REGISTER_OFFSET;
+            }
+        }
+        else
         {
             enum vkd3d_decl_usage usage;
             unsigned int usage_idx;

@@ -2076,6 +2076,13 @@ static void d3dbc_write_semantic_dcl(struct d3dbc_compiler *d3dbc,
         VKD3D_ASSERT(ret);
         reg.reg.type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
         reg.reg.idx[0].offset = element->register_index;
+        if (!vkd3d_shader_ver_ge(version, 3, 0))
+        {
+            if (reg.reg.idx[0].offset > SM1_RASTOUT_REGISTER_OFFSET)
+                reg.reg.idx[0].offset -= SM1_RASTOUT_REGISTER_OFFSET;
+            else if (reg.reg.idx[0].offset > SM1_COLOR_REGISTER_OFFSET)
+                reg.reg.idx[0].offset -= SM1_COLOR_REGISTER_OFFSET;
+        }
     }
 
     token = VKD3D_SM1_OP_DCL;
