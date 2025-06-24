@@ -590,9 +590,10 @@ static void shader_print_double_literal(struct vkd3d_d3d_asm_compiler *compiler,
 static void shader_print_int_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, int i, const char *suffix)
 {
+    /* Note that we need to handle INT_MIN here as well. */
     if (i < 0)
-        vkd3d_string_buffer_printf(&compiler->buffer, "%s-%s%d%s%s",
-                prefix, compiler->colours.literal, -i, compiler->colours.reset, suffix);
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s-%s%u%s%s",
+                prefix, compiler->colours.literal, -(unsigned int)i, compiler->colours.reset, suffix);
     else
         vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%d%s%s",
                 prefix, compiler->colours.literal, i, compiler->colours.reset, suffix);
