@@ -8192,7 +8192,7 @@ static enum vkd3d_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, 
         }
     }
 
-    vkd3d_unreachable();
+    return VKD3D_DATA_UNUSED;
 }
 
 static enum vkd3d_data_type vsir_data_type_from_hlsl_instruction(struct hlsl_ctx *ctx,
@@ -8495,6 +8495,8 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
     const struct vkd3d_shader_version *version = &program->shader_version;
     const struct hlsl_type *data_type = hlsl_deref_get_type(ctx, deref);
     const struct hlsl_ir_var *var = deref->var;
+
+    reg->data_type = vsir_data_type_from_hlsl_type(ctx, data_type);
 
     if (var->is_uniform)
     {
