@@ -7886,7 +7886,8 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
             || dst_reg_info.write_mask != src_reg_info.write_mask)
         goto general_implementation;
 
-    if (vkd3d_swizzle_is_equal(dst_reg_info.write_mask, src->swizzle, src_reg_info.write_mask))
+    if (dst_reg_info.write_mask == dst->write_mask
+            && vkd3d_swizzle_is_equal(dst_reg_info.write_mask, src->swizzle, src_reg_info.write_mask))
     {
         dst_id = spirv_compiler_get_register_id(compiler, &dst->reg);
         src_id = spirv_compiler_get_register_id(compiler, &src->reg);
