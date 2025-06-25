@@ -75,16 +75,47 @@ float4 main() : sv_target
 draw quad
 probe (0, 0) f32(0.25, 0.5, 0.25, 0)
 
-[require]
-options: backcompat
+[srv 0]
+size (cube, 2)
+0.0 0.0 0.0 0.0     0.0 0.0 0.0 0.0     0.0 0.0 0.0 0.0     1.0 0.0 0.0 0.0
+0.0 0.0 0.1 0.0     0.0 0.0 0.1 0.0     0.0 0.0 0.1 0.0     1.0 0.0 0.1 0.0
+0.0 0.0 0.2 0.0     0.0 0.0 0.2 0.0     0.0 0.0 0.2 0.0     1.0 0.0 0.2 0.0
+0.0 0.0 0.3 0.0     0.0 0.0 0.3 0.0     0.0 0.0 0.3 0.0     1.0 0.0 0.3 0.0
+0.0 0.0 0.4 0.0     0.0 0.0 0.4 0.0     0.0 0.0 0.4 0.0     1.0 0.0 0.4 0.0
+0.0 0.0 0.5 0.0     0.0 0.0 0.5 0.0     0.0 0.0 0.5 0.0     1.0 0.0 0.5 0.0
 
-[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
-samplerCUBE s;
+[pixel shader]
+sampler s;
+TextureCube t;
+float3 coords;
 
 float4 main() : sv_target
 {
-    return texCUBE(s, float3(0.0, 0.0, 0.0));
+    return t.Sample(s, coords);
 }
+
+[test]
+uniform 0 float4  1 0 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.0, 0)
+uniform 0 float4 -1 0 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.1, 0)
+uniform 0 float4 0  1 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.2, 0)
+uniform 0 float4 0 -1 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.3, 0)
+uniform 0 float4 0 0  1 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.4, 0)
+uniform 0 float4 0 0 -1 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.5, 0)
+
+[require]
+options: backcompat
 
 [pixel shader fail(sm>=5.1) todo(sm>=5.1)]
 sampler1D s;
@@ -208,6 +239,44 @@ float4 main() : sv_target
 [test]
 draw quad
 probe (0, 0) f32(0.25, 0.5, 0.25, 0)
+
+[srv 0]
+size (cube, 2)
+0.0 0.0 0.0 0.0     0.0 0.0 0.0 0.0     0.0 0.0 0.0 0.0     1.0 0.0 0.0 0.0
+0.0 0.0 0.1 0.0     0.0 0.0 0.1 0.0     0.0 0.0 0.1 0.0     1.0 0.0 0.1 0.0
+0.0 0.0 0.2 0.0     0.0 0.0 0.2 0.0     0.0 0.0 0.2 0.0     1.0 0.0 0.2 0.0
+0.0 0.0 0.3 0.0     0.0 0.0 0.3 0.0     0.0 0.0 0.3 0.0     1.0 0.0 0.3 0.0
+0.0 0.0 0.4 0.0     0.0 0.0 0.4 0.0     0.0 0.0 0.4 0.0     1.0 0.0 0.4 0.0
+0.0 0.0 0.5 0.0     0.0 0.0 0.5 0.0     0.0 0.0 0.5 0.0     1.0 0.0 0.5 0.0
+
+[pixel shader fail(sm>=5.1) todo(sm>=5.1)]
+samplerCUBE s;
+float3 coords;
+
+float4 main() : sv_target
+{
+    return texCUBE(s, coords);
+}
+
+[test]
+uniform 0 float4  1 0 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.0, 0)
+uniform 0 float4 -1 0 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.1, 0)
+uniform 0 float4 0  1 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.2, 0)
+uniform 0 float4 0 -1 0 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.3, 0)
+uniform 0 float4 0 0  1 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.4, 0)
+uniform 0 float4 0 0 -1 0
+draw quad
+probe (0, 0) f32(0.25, 0.0, 0.5, 0)
 
 [require]
 shader model >= 4.0
