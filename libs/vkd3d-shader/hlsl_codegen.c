@@ -1581,6 +1581,35 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, s
     return false;
 }
 
+/* Lowers loads from TGSMs to resource loads. */
+static bool lower_tgsm_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_resource_load_params params = {.type = HLSL_RESOURCE_LOAD};
+    const struct vkd3d_shader_location *loc = &instr->loc;
+    struct hlsl_ir_load *load;
+    struct hlsl_deref *deref;
+
+    if (instr->type != HLSL_IR_LOAD || !hlsl_is_numeric_type(instr->data_type))
+        return false;
+    load = hlsl_ir_load(instr);
+    deref = &load->src;
+
+    if (!deref->var->is_tgsm)
+        return false;
+
+    if (deref->path_len)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Load from indexed TGSM.");
+        return false;
+    }
+
+    params.resource = hlsl_block_add_simple_load(ctx, block, deref->var, loc);
+    params.format = instr->data_type;
+    params.coords = hlsl_block_add_uint_constant(ctx, block, 0, &instr->loc);
+    hlsl_block_add_resource_load(ctx, block, &params, loc);
+
+    return true;
+}
 /* Allocate a unique, ordered index to each instruction, which will be used for
  * copy propagation and computing liveness ranges.
  * Index 0 means unused, so start at 1. */
@@ -3412,10 +3441,10 @@ static bool validate_dereferences(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
         {
             struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
 
-            if (!load->resource.var->is_uniform)
+            if (!load->resource.var->is_uniform && !load->resource.var->is_tgsm)
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                        "Loaded resource must have a single uniform source.");
+                        "Loaded resource must have a single uniform or groupshared source.");
             }
             else if (validate_component_index_range_from_deref(ctx, &load->resource) == DEREF_VALIDATION_NOT_CONSTANT)
             {
@@ -6102,6 +6131,9 @@ static bool track_object_components_sampler_dim(struct hlsl_ctx *ctx, struct hls
 
     load = hlsl_ir_resource_load(instr);
     var = load->resource.var;
+
+    if (var->is_tgsm)
+        return false;
 
     regset = hlsl_deref_get_regset(ctx, &load->resource);
     if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
@@ -8957,6 +8989,15 @@ static bool sm4_generate_vsir_reg_from_deref(struct hlsl_ctx *ctx, struct vsir_p
             *writemask = hlsl_reg.writemask;
         }
     }
+    else if (var->is_tgsm)
+    {
+        VKD3D_ASSERT(var->regs[HLSL_REGSET_NUMERIC].allocated);
+        reg->type = VKD3DSPR_GROUPSHAREDMEM;
+        reg->dimension = VSIR_DIMENSION_VEC4;
+        reg->idx[0].offset = var->regs[HLSL_REGSET_NUMERIC].id;
+        reg->idx_count = 1;
+        *writemask = (1u << data_type->e.numeric.dimx) - 1;
+    }
     else
     {
         return sm4_generate_vsir_numeric_reg_from_deref(ctx, program, reg, writemask, deref);
@@ -11203,12 +11244,7 @@ static bool sm4_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
     struct vkd3d_shader_instruction *ins;
     struct hlsl_constant_value value;
 
-    if (load->src.var->is_tgsm)
-    {
-        hlsl_fixme(ctx, &instr->loc, "Load from groupshared variable.");
-        return false;
-    }
-
+    VKD3D_ASSERT(!load->src.var->is_tgsm);
     VKD3D_ASSERT(hlsl_is_numeric_type(type));
     if (type->e.numeric.type == HLSL_TYPE_BOOL && var_is_user_input(version, load->src.var))
     {
@@ -11361,7 +11397,6 @@ static bool sm4_generate_vsir_instr_ld(struct hlsl_ctx *ctx,
     const struct hlsl_type *resource_type = hlsl_deref_get_type(ctx, &load->resource);
     bool uav = (hlsl_deref_get_regset(ctx, &load->resource) == HLSL_REGSET_UAVS);
     const struct vkd3d_shader_version *version = &program->shader_version;
-    bool raw = resource_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER;
     const struct hlsl_ir_node *sample_index = load->sample_index.node;
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
@@ -11369,9 +11404,10 @@ static bool sm4_generate_vsir_instr_ld(struct hlsl_ctx *ctx,
     const struct hlsl_deref *resource = &load->resource;
     const struct hlsl_ir_node *instr = &load->node;
     enum hlsl_sampler_dim dim = load->sampling_dim;
+    bool tgsm = load->resource.var->is_tgsm;
     struct vkd3d_shader_instruction *ins;
     enum vkd3d_shader_opcode opcode;
-    bool multisampled;
+    bool multisampled, raw;
 
     VKD3D_ASSERT(load->load_type == HLSL_RESOURCE_LOAD);
 
@@ -11384,6 +11420,16 @@ static bool sm4_generate_vsir_instr_ld(struct hlsl_ctx *ctx,
     multisampled = resource_type->class == HLSL_CLASS_TEXTURE
             && (resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
             || resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY);
+
+    if (!tgsm)
+    {
+        raw = resource_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER;
+    }
+    else if (!(raw = hlsl_is_numeric_type(resource_type)))
+    {
+        hlsl_fixme(ctx, &load->node.loc, "Load from structured TGSM.");
+        return false;
+    }
 
     if (uav)
         opcode = VSIR_OP_LD_UAV_TYPED;
@@ -11405,7 +11451,7 @@ static bool sm4_generate_vsir_instr_ld(struct hlsl_ctx *ctx,
 
     vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
 
-    if (!uav)
+    if (!uav && !tgsm)
     {
         /* Mipmap level is in the last component in the IR, but needs to be in
          * the W component in the instruction. */
@@ -11676,7 +11722,7 @@ static bool sm4_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
         return false;
     }
 
-    if (!load->resource.var->is_uniform)
+    if (!load->resource.var->is_uniform && !load->resource.var->is_tgsm)
     {
         hlsl_fixme(ctx, &load->node.loc, "Load from non-uniform resource variable.");
         return false;
@@ -13907,6 +13953,8 @@ static void process_entry_function(struct hlsl_ctx *ctx, struct list *semantic_v
     lower_ir(ctx, lower_complex_casts, body);
     lower_ir(ctx, lower_matrix_swizzles, body);
     lower_ir(ctx, lower_index_loads, body);
+
+    lower_ir(ctx, lower_tgsm_loads, body);
 
     if (entry_func->return_var)
     {
