@@ -2383,6 +2383,19 @@ bool hlsl_index_chain_has_resource_access(struct hlsl_ir_index *index)
     return false;
 }
 
+bool hlsl_index_chain_has_tgsm_access(struct hlsl_ir_index *index)
+{
+    if (index->val.node->type == HLSL_IR_LOAD)
+    {
+        struct hlsl_ir_load *load = hlsl_ir_load(index->val.node);
+        return load->src.var->storage_modifiers & HLSL_STORAGE_GROUPSHARED;
+    }
+
+    if (index->val.node->type == HLSL_IR_INDEX)
+        return hlsl_index_chain_has_tgsm_access(hlsl_ir_index(index->val.node));
+    return false;
+}
+
 static struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc)
 {

@@ -5063,13 +5063,25 @@ static bool intrinsic_interlocked(struct hlsl_ctx *ctx, enum hlsl_interlocked_op
 
         if (hlsl_deref_get_type(ctx, &dst_deref)->class != HLSL_CLASS_UAV)
         {
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Interlocked targets must be UAV elements.");
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Interlocked targets must be UAV or groupshared elements.");
             return false;
         }
     }
+    else if (lhs->type == HLSL_IR_INDEX && hlsl_index_chain_has_tgsm_access(hlsl_ir_index(lhs)))
+    {
+        hlsl_fixme(ctx, loc, "Interlocked operations on indexed groupshared elements.");
+        return false;
+    }
+    else if (lhs->type == HLSL_IR_LOAD && (hlsl_ir_load(lhs)->src.var->storage_modifiers & HLSL_STORAGE_GROUPSHARED))
+    {
+        hlsl_init_simple_deref_from_var(&dst_deref, hlsl_ir_load(lhs)->src.var);
+        coords = hlsl_block_add_uint_constant(ctx, params->instrs, 0, loc);
+    }
     else
     {
-        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Interlocked targets must be UAV elements.");
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Interlocked targets must be UAV or groupshared elements.");
         return false;
     }
 

@@ -3537,10 +3537,10 @@ static bool validate_dereferences(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
         {
             struct hlsl_ir_interlocked *interlocked = hlsl_ir_interlocked(instr);
 
-            if (!interlocked->dst.var->is_uniform)
+            if (!interlocked->dst.var->is_uniform && !interlocked->dst.var->is_tgsm)
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                        "Accessed resource must have a single uniform source.");
+                        "Accessed resource must have a single uniform or groupshared source.");
             }
             else if (validate_component_index_range_from_deref(ctx, &interlocked->dst) == DEREF_VALIDATION_NOT_CONSTANT)
             {
