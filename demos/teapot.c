@@ -39,6 +39,7 @@ struct teapot_cb_data
 {
     struct demo_matrix mvp_matrix;
     float level;
+    unsigned int wireframe;
 };
 
 struct demo_text_run
@@ -90,7 +91,7 @@ struct teapot
     unsigned int text_scale;
     float theta, phi;
 
-    bool display_help;
+    bool display_help, wireframe;
     struct timeval last_text;
     struct timeval frame_times[16];
     size_t frame_count;
@@ -107,12 +108,12 @@ struct teapot
         ID3D12CommandAllocator *command_allocator;
         ID3D12GraphicsCommandList *command_list;
     } *swapchain_images;
-    ID3D12DescriptorHeap *rtv_heap;
+    ID3D12DescriptorHeap *rtv_heap, *dsv_heap;
     unsigned int rtv_descriptor_size;
 
     ID3D12RootSignature *root_signature;
     ID3D12PipelineState *pipeline_state;
-    ID3D12Resource *cb, *vb, *ib;
+    ID3D12Resource *ds, *cb, *vb, *ib;
     D3D12_VERTEX_BUFFER_VIEW vbv;
     D3D12_INDEX_BUFFER_VIEW ibv;
 
@@ -423,8 +424,8 @@ static void demo_text_cleanup(struct demo_text *text)
 static void teapot_populate_command_list(struct teapot *teapot,
         ID3D12GraphicsCommandList *command_list, unsigned int rt_idx)
 {
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle, dsv_handle;
     size_t rotate_idx_count, flip_idx_count;
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle;
     D3D12_RESOURCE_BARRIER barrier;
     HRESULT hr;
 
@@ -449,10 +450,13 @@ static void teapot_populate_command_list(struct teapot *teapot,
 
     rtv_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(teapot->rtv_heap);
     rtv_handle.ptr += rt_idx * teapot->rtv_descriptor_size;
-    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &rtv_handle, FALSE, NULL);
+    dsv_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(teapot->dsv_heap);
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &rtv_handle, FALSE, &dsv_handle);
 
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle,
             (float[]){1.00f * 0.1f, 0.69f * 0.1f, 0.00f, 1.0f}, 0, NULL);
+    ID3D12GraphicsCommandList_ClearDepthStencilView(command_list,
+            dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_16_CONTROL_POINT_PATCHLIST);
     ID3D12GraphicsCommandList_IASetIndexBuffer(command_list, &teapot->ibv);
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 1, &teapot->vbv);
@@ -542,9 +546,10 @@ static void teapot_update_text(struct teapot *teapot, double fps)
         demo_text_draw(text, &amber, 0, -2 * h, "%.2f fps", fps);
     if (teapot->display_help)
     {
-        demo_text_draw(text, &amber, 0, 2 * h, "ESC: Exit");
-        demo_text_draw(text, &amber, 0, 1 * h, " F1: Toggle help");
-        demo_text_draw(text, &amber, 0, 0 * h, "-/+: Tessellation level (%u)", teapot->tessellation_level);
+        demo_text_draw(text, &amber, 0, 3 * h, "ESC: Exit");
+        demo_text_draw(text, &amber, 0, 2 * h, " F1: Toggle help");
+        demo_text_draw(text, &amber, 0, 1 * h, "-/+: Tessellation level (%u)", teapot->tessellation_level);
+        demo_text_draw(text, &amber, 0, 0 * h, "  W: Toggle wireframe (%s)", teapot->wireframe ? "on" : "off");
     }
 
     a = text->draw_arguments;
@@ -579,6 +584,7 @@ static void teapot_destroy_pipeline(struct teapot *teapot)
 {
     unsigned int i;
 
+    ID3D12DescriptorHeap_Release(teapot->dsv_heap);
     ID3D12DescriptorHeap_Release(teapot->rtv_heap);
     for (i = 0; i < demo_swapchain_get_back_buffer_count(teapot->swapchain); ++i)
     {
@@ -642,6 +648,13 @@ static void teapot_load_pipeline(struct teapot *teapot)
                 &IID_ID3D12CommandAllocator, (void **)&teapot->swapchain_images[i].command_allocator);
         assert(SUCCEEDED(hr));
     }
+
+    heap_desc.NumDescriptors = 1;
+    heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+    heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    hr = ID3D12Device_CreateDescriptorHeap(teapot->device, &heap_desc,
+            &IID_ID3D12DescriptorHeap, (void **)&teapot->dsv_heap);
+    assert(SUCCEEDED(hr));
 }
 
 static void teapot_fence_destroy(struct teapot_fence *teapot_fence)
@@ -659,6 +672,7 @@ static void teapot_destroy_assets(struct teapot *teapot)
     ID3D12Resource_Release(teapot->vb);
     ID3D12Resource_Unmap(teapot->cb, 0, NULL);
     ID3D12Resource_Release(teapot->cb);
+    ID3D12Resource_Release(teapot->ds);
     for (i = 0; i < demo_swapchain_get_back_buffer_count(teapot->swapchain); ++i)
     {
         ID3D12GraphicsCommandList_Release(teapot->swapchain_images[i].command_list);
@@ -715,7 +729,11 @@ static void teapot_load_assets(struct teapot *teapot)
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     D3D12_ROOT_PARAMETER root_parameters[1];
-    ID3DBlob *vs, *hs, *ds, *ps;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle;
+    D3D12_RESOURCE_DESC resource_desc;
+    ID3DBlob *vs, *hs, *ds, *gs, *ps;
+    D3D12_HEAP_PROPERTIES heap_desc;
+    D3D12_CLEAR_VALUE clear_value;
     unsigned int i;
     HRESULT hr;
 
@@ -734,8 +752,7 @@ static void teapot_load_assets(struct teapot *teapot)
     root_signature_desc.pParameters = root_parameters;
     root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
             | D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS
-            | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS
-            | D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+            | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
     hr = demo_create_root_signature(teapot->device, &root_signature_desc, &teapot->root_signature);
     assert(SUCCEEDED(hr));
 
@@ -747,6 +764,9 @@ static void teapot_load_assets(struct teapot *teapot)
     assert(SUCCEEDED(hr));
     hr = D3DCompile(teapot_hlsl, teapot_hlsl_size, "teapot.hlsl",
             NULL, NULL, "ds_main", "ds_5_0", 0, 0, &ds, NULL);
+    assert(SUCCEEDED(hr));
+    hr = D3DCompile(teapot_hlsl, teapot_hlsl_size, "teapot.hlsl",
+            NULL, NULL, "gs_main", "gs_5_0", 0, 0, &gs, NULL);
     assert(SUCCEEDED(hr));
     hr = D3DCompile(teapot_hlsl, teapot_hlsl_size, "teapot.hlsl",
             NULL, NULL, "ps_main", "ps_5_0", 0, 0, &ps, NULL);
@@ -762,24 +782,31 @@ static void teapot_load_assets(struct teapot *teapot)
     pso_desc.HS.BytecodeLength = ID3D10Blob_GetBufferSize(hs);
     pso_desc.DS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ds);
     pso_desc.DS.BytecodeLength = ID3D10Blob_GetBufferSize(ds);
+    pso_desc.GS.pShaderBytecode = ID3D10Blob_GetBufferPointer(gs);
+    pso_desc.GS.BytecodeLength = ID3D10Blob_GetBufferSize(gs);
     pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps);
     pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps);
 
     demo_rasterizer_desc_init_default(&pso_desc.RasterizerState);
-    pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
     pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     pso_desc.RasterizerState.FrontCounterClockwise = TRUE;
     demo_blend_desc_init_default(&pso_desc.BlendState);
+    pso_desc.DepthStencilState.DepthEnable = TRUE;
+    pso_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    pso_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    pso_desc.DepthStencilState.StencilEnable = FALSE;
     pso_desc.SampleMask = UINT_MAX;
     pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
     pso_desc.NumRenderTargets = 1;
     pso_desc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
+    pso_desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     pso_desc.SampleDesc.Count = 1;
     hr = ID3D12Device_CreateGraphicsPipelineState(teapot->device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&teapot->pipeline_state);
     assert(SUCCEEDED(hr));
 
     ID3D10Blob_Release(ps);
+    ID3D10Blob_Release(gs);
     ID3D10Blob_Release(ds);
     ID3D10Blob_Release(hs);
     ID3D10Blob_Release(vs);
@@ -794,12 +821,42 @@ static void teapot_load_assets(struct teapot *teapot)
         assert(SUCCEEDED(hr));
     }
 
+    heap_desc.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heap_desc.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heap_desc.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heap_desc.CreationNodeMask = 1;
+    heap_desc.VisibleNodeMask = 1;
+
+    resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resource_desc.Alignment = 0;
+    resource_desc.Width = teapot->width;
+    resource_desc.Height = teapot->height;
+    resource_desc.DepthOrArraySize = 1;
+    resource_desc.MipLevels = 1;
+    resource_desc.Format = DXGI_FORMAT_D32_FLOAT;
+    resource_desc.SampleDesc.Count = 1;
+    resource_desc.SampleDesc.Quality = 0;
+    resource_desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resource_desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    clear_value.Format = DXGI_FORMAT_D32_FLOAT;
+    clear_value.DepthStencil.Depth = 1.0f;
+    clear_value.DepthStencil.Stencil = 0;
+
+    hr = ID3D12Device_CreateCommittedResource(teapot->device, &heap_desc, D3D12_HEAP_FLAG_NONE, &resource_desc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE, &clear_value, &IID_ID3D12Resource, (void **)&teapot->ds);
+    assert(SUCCEEDED(hr));
+
+    dsv_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(teapot->dsv_heap);
+    ID3D12Device_CreateDepthStencilView(teapot->device, teapot->ds, NULL, dsv_handle);
+
     teapot->cb = create_buffer(teapot->device, sizeof(*teapot->cb_data));
 
     hr = ID3D12Resource_Map(teapot->cb, 0, &(D3D12_RANGE){0, 0}, (void **)&teapot->cb_data);
     assert(SUCCEEDED(hr));
     teapot_update_mvp(teapot);
     teapot->cb_data->level = teapot->tessellation_level;
+    teapot->cb_data->wireframe = teapot->wireframe;
 
     demo_text_init(&teapot->text, teapot->device, teapot->width, teapot->height, teapot->text_scale);
     teapot_load_mesh(teapot);
@@ -823,6 +880,9 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
         case DEMO_KEY_KP_ADD:
             if (teapot->tessellation_level < D3D12_TESSELLATOR_MAX_TESSELLATION_FACTOR)
                 teapot->cb_data->level = ++teapot->tessellation_level;
+            break;
+        case 'w':
+            teapot->cb_data->wireframe = teapot->wireframe = !teapot->wireframe;
             break;
         case DEMO_KEY_ESCAPE:
             demo_window_destroy(window);
@@ -889,7 +949,7 @@ static int teapot_main(void)
 
     teapot.width = width;
     teapot.height = height;
-    teapot.tessellation_level = 4;
+    teapot.tessellation_level = 10;
     teapot.text_scale = (1.25 * dpi_y / 96.0) + 0.5;
 
     teapot.theta = M_PI / 2.0f;
