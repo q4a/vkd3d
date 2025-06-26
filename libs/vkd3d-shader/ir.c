@@ -2057,11 +2057,14 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
 struct hull_flattener
 {
     struct vkd3d_shader_instruction_array instructions;
+    struct vsir_program *program;
 
     unsigned int instance_count;
     unsigned int phase_body_idx;
     enum vkd3d_shader_opcode phase;
     struct vkd3d_shader_location last_ret_location;
+    unsigned int *ssa_map;
+    unsigned int orig_ssa_count;
 };
 
 static bool flattener_is_in_fork_or_join_phase(const struct hull_flattener *flattener)
@@ -2132,41 +2135,66 @@ static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normal
     }
 }
 
-static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_register *reg,
-        unsigned int instance_id)
+static void flattener_fixup_ssa_register(struct hull_flattener *normaliser,
+        struct vkd3d_shader_register *reg, unsigned int instance_id)
+{
+    unsigned int id;
+
+    if (!register_is_ssa(reg))
+        return;
+
+    /* No need to alter the first copy, they are already not conflicting. */
+    if (instance_id == 0)
+        return;
+
+    id = reg->idx[0].offset;
+    VKD3D_ASSERT(id < normaliser->orig_ssa_count);
+    if (normaliser->ssa_map[id] == UINT_MAX)
+        normaliser->ssa_map[id] = normaliser->program->ssa_count++;
+    reg->idx[0].offset = normaliser->ssa_map[id];
+}
+
+static void flattener_fixup_register_indices(struct hull_flattener *normaliser,
+        struct vkd3d_shader_register *reg, unsigned int instance_id)
 {
     unsigned int i;
 
+    flattener_fixup_ssa_register(normaliser, reg, instance_id);
+
     for (i = 0; i < reg->idx_count; ++i)
     {
-        if (reg->idx[i].rel_addr && shader_register_is_phase_instance_id(&reg->idx[i].rel_addr->reg))
+        if (reg->idx[i].rel_addr)
         {
-            reg->idx[i].rel_addr = NULL;
-            reg->idx[i].offset += instance_id;
+            flattener_fixup_ssa_register(normaliser, &reg->idx[i].rel_addr->reg, instance_id);
+            if (shader_register_is_phase_instance_id(&reg->idx[i].rel_addr->reg))
+            {
+                reg->idx[i].rel_addr = NULL;
+                reg->idx[i].offset += instance_id;
+            }
         }
     }
 }
 
-static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_instruction *ins,
-        unsigned int instance_id)
+static void flattener_fixup_registers(struct hull_flattener *normaliser,
+        struct vkd3d_shader_instruction *ins, unsigned int instance_id)
 {
     struct vkd3d_shader_register *reg;
     unsigned int i;
 
     for (i = 0; i < ins->src_count; ++i)
     {
-        reg = (struct vkd3d_shader_register *)&ins->src[i].reg;
+        reg = &ins->src[i].reg;
         if (shader_register_is_phase_instance_id(reg))
         {
             vsir_register_init(reg, VKD3DSPR_IMMCONST, reg->data_type, 0);
             reg->u.immconst_u32[0] = instance_id;
             continue;
         }
-        shader_register_eliminate_phase_addressing(reg, instance_id);
+        flattener_fixup_register_indices(normaliser, reg, instance_id);
     }
 
     for (i = 0; i < ins->dst_count; ++i)
-        shader_register_eliminate_phase_addressing(&ins->dst[i].reg, instance_id);
+        flattener_fixup_register_indices(normaliser, &ins->dst[i].reg, instance_id);
 }
 
 static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normaliser,
@@ -2210,8 +2238,11 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
         /* Replace each reference to the instance id with a constant instance id. */
         for (j = 0; j < loc->instance_count; ++j)
         {
+            if (j != 0)
+                memset(normaliser->ssa_map, 0xff, normaliser->orig_ssa_count * sizeof(*normaliser->ssa_map));
+
             for (k = 0; k < loc->instruction_count; ++k)
-                shader_instruction_eliminate_phase_instance_id(
+                flattener_fixup_registers(normaliser,
                         &normaliser->instructions.elements[loc->index + loc->instruction_count * j + k], j);
         }
     }
@@ -2222,7 +2253,7 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
 static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    struct hull_flattener flattener = {program->instructions};
+    struct hull_flattener flattener = {program->instructions, program};
     struct vkd3d_shader_instruction_array *instructions;
     struct shader_phase_location_array locations;
     enum vkd3d_result result = VKD3D_OK;
@@ -2236,7 +2267,16 @@ static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_pro
     bitmap_clear(program->io_dcls, VKD3DSPR_FORKINSTID);
     bitmap_clear(program->io_dcls, VKD3DSPR_JOININSTID);
 
-    if ((result = flattener_flatten_phases(&flattener, &locations)) < 0)
+    flattener.orig_ssa_count = program->ssa_count;
+    if (!(flattener.ssa_map = vkd3d_calloc(flattener.orig_ssa_count, sizeof(*flattener.ssa_map))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    result = flattener_flatten_phases(&flattener, &locations);
+
+    vkd3d_free(flattener.ssa_map);
+    flattener.ssa_map = NULL;
+
+    if (result < 0)
         return result;
 
     if (flattener.phase != VSIR_OP_INVALID)
