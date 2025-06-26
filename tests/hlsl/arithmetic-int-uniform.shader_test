@@ -247,6 +247,60 @@ uniform 0 int64_t2 5000000000 -7000000000
 draw quad
 probe (0, 0) rgba (5.0e9, 7.0e9, 0.0, 0.0)
 
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    return float4(x == y, y == x, x != y, y != x);
+}
+
+[test]
+uniform 0 int64_t2 42000000000 5000000000
+draw quad
+probe (0, 0) f32(0.0, 0.0, 1.0, 1.0)
+uniform 0 int64_t2 42000000000 42000000000
+draw quad
+probe (0, 0) f32(1.0, 1.0, 0.0, 0.0)
+
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    return float4(x <= y, y <= x, x >= y, y >= x);
+}
+
+[test]
+uniform 0 int64_t2 42000000000 5000000000
+draw quad
+probe (0, 0) f32(0.0, 1.0, 1.0, 0.0)
+uniform 0 int64_t2 42000000000 42000000000
+draw quad
+probe (0, 0) f32(1.0, 1.0, 1.0, 1.0)
+
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    return float4(x < y, y < x, x > y, y > x);
+}
+
+[test]
+uniform 0 int64_t2 42000000000 5000000000
+draw quad
+probe (0, 0) f32(0.0, 1.0, 1.0, 0.0)
+uniform 0 int64_t2 42000000000 42000000000
+draw quad
+probe (0, 0) f32(0.0, 0.0, 0.0, 0.0)
+
 [require]
 shader model >= 4.0
 
