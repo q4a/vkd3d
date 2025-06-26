@@ -857,6 +857,11 @@ static GLuint create_shader(struct gl_runner *runner, enum shader_type shader_ty
             name = "tessellation evaluation";
             break;
 
+        case SHADER_TYPE_GS:
+            gl_shader_type = GL_GEOMETRY_SHADER;
+            name = "geometry";
+            break;
+
         case SHADER_TYPE_CS:
             gl_shader_type = GL_COMPUTE_SHADER;
             name = "compute";
@@ -1055,7 +1060,7 @@ static GLenum get_compare_op_gl(D3D12_COMPARISON_FUNC op)
 static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Blob **vs_blob)
 {
     ID3D10Blob *fs_blob, *hs_blob = NULL, *ds_blob = NULL, *gs_blob = NULL;
-    GLuint program_id, vs_id, fs_id, hs_id = 0, ds_id = 0;
+    GLuint program_id, vs_id, fs_id, hs_id = 0, ds_id = 0, gs_id = 0;
     bool succeeded;
     GLint status;
 
@@ -1108,6 +1113,14 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
         ds_blob = NULL;
     }
 
+    if (gs_blob)
+    {
+        if (!(gs_id = create_shader(runner, SHADER_TYPE_GS, gs_blob)))
+            goto fail;
+        ID3D10Blob_Release(gs_blob);
+        gs_blob = NULL;
+    }
+
     /* TODO: compile and use the gs blobs too, but currently this
      * point is not reached because compile_hlsl() fails on these. */
 
@@ -1118,11 +1131,15 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
         glAttachShader(program_id, hs_id);
     if (ds_id)
         glAttachShader(program_id, ds_id);
+    if (gs_id)
+        glAttachShader(program_id, gs_id);
     glLinkProgram(program_id);
     glGetProgramiv(program_id, GL_LINK_STATUS, &status);
     ok(status, "Failed to link program.\n");
     trace_info_log(program_id, true);
 
+    if (gs_id)
+        glDeleteShader(gs_id);
     if (ds_id)
         glDeleteShader(ds_id);
     if (hs_id)

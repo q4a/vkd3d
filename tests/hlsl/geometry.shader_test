@@ -60,9 +60,9 @@ float4 main(struct ps_data ps_input) : SV_Target
 }
 
 [test]
-draw point list 1
+todo(glsl) draw point list 1
 bug(mvk) probe rtv 0 (320, 190) rgba(0.0, 0.0, 0.0, 0.0)
 bug(mvk) probe rtv 0 (255, 240) rgba(0.0, 0.0, 0.0, 0.0)
-bug(opengl & llvmpipe | mvk) probe rtv 0 (320, 240) rgba(0.0, 1.0, 1.0, 1.0)
+bug(mvk) probe rtv 0 (320, 240) rgba(0.0, 1.0, 1.0, 1.0)
 bug(mvk) probe rtv 0 (385, 240) rgba(0.0, 0.0, 0.0, 0.0)
 bug(mvk) probe rtv 0 (320, 290) rgba(0.0, 0.0, 0.0, 0.0)
