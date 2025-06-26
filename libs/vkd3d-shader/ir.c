@@ -669,12 +669,6 @@ static void src_param_init_ssa_float(struct vkd3d_shader_src_param *src, unsigne
     src_param_init_ssa_scalar(src, idx, VKD3D_DATA_FLOAT);
 }
 
-static void src_param_init_ssa_vec4(struct vkd3d_shader_src_param *src, unsigned int idx,
-        enum vkd3d_data_type data_type)
-{
-    src_param_init_ssa(src, idx, data_type, VSIR_DIMENSION_VEC4);
-}
-
 static void src_param_init_ssa_float4(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
     src_param_init_ssa(src, idx, VKD3D_DATA_FLOAT, VSIR_DIMENSION_VEC4);
@@ -757,12 +751,6 @@ static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned
 static void dst_param_init_ssa_float(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
     dst_param_init_ssa_scalar(dst, idx, VKD3D_DATA_FLOAT);
-}
-
-static void dst_param_init_ssa_vec4(struct vkd3d_shader_dst_param *dst, unsigned int idx,
-        enum vkd3d_data_type data_type)
-{
-    dst_param_init_ssa(dst, idx, data_type, VSIR_DIMENSION_VEC4);
 }
 
 static void dst_param_init_ssa_float4(struct vkd3d_shader_dst_param *dst, unsigned int idx)
@@ -1219,14 +1207,14 @@ static enum vkd3d_result vsir_program_lower_udiv(struct vsir_program *program,
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     mov->src[0] = udiv->src[0];
-    dst_param_init_ssa_vec4(&mov->dst[0], program->ssa_count, udiv->src[0].reg.data_type);
+    dst_param_init_ssa(&mov->dst[0], program->ssa_count, udiv->src[0].reg.data_type, udiv->src[0].reg.dimension);
 
     mov = ins++;
     if (!(vsir_instruction_init_with_params(program, mov, &udiv->location, VSIR_OP_MOV, 1, 1)))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     mov->src[0] = udiv->src[1];
-    dst_param_init_ssa_vec4(&mov->dst[0], program->ssa_count + 1, udiv->src[1].reg.data_type);
+    dst_param_init_ssa(&mov->dst[0], program->ssa_count + 1, udiv->src[1].reg.data_type, udiv->src[1].reg.dimension);
 
     if (udiv->dst[0].reg.type != VKD3DSPR_NULL)
     {
@@ -1235,8 +1223,10 @@ static enum vkd3d_result vsir_program_lower_udiv(struct vsir_program *program,
 
         ins->flags = udiv->flags;
 
-        src_param_init_ssa_vec4(&ins->src[0], program->ssa_count, udiv->src[0].reg.data_type);
-        src_param_init_ssa_vec4(&ins->src[1], program->ssa_count + 1, udiv->src[1].reg.data_type);
+        src_param_init_ssa(&ins->src[0], program->ssa_count,
+                udiv->src[0].reg.data_type, udiv->src[0].reg.dimension);
+        src_param_init_ssa(&ins->src[1], program->ssa_count + 1,
+                udiv->src[1].reg.data_type, udiv->src[1].reg.dimension);
         ins->dst[0] = udiv->dst[0];
 
         ++ins;
@@ -1249,8 +1239,10 @@ static enum vkd3d_result vsir_program_lower_udiv(struct vsir_program *program,
 
         ins->flags = udiv->flags;
 
-        src_param_init_ssa_vec4(&ins->src[0], program->ssa_count, udiv->src[0].reg.data_type);
-        src_param_init_ssa_vec4(&ins->src[1], program->ssa_count + 1, udiv->src[1].reg.data_type);
+        src_param_init_ssa(&ins->src[0], program->ssa_count,
+                udiv->src[0].reg.data_type, udiv->src[0].reg.dimension);
+        src_param_init_ssa(&ins->src[1], program->ssa_count + 1,
+                udiv->src[1].reg.data_type, udiv->src[1].reg.dimension);
         ins->dst[0] = udiv->dst[1];
 
         ++ins;
