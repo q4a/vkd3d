@@ -1709,43 +1709,6 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
     return VKD3D_OK;
 }
 
-static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_register *reg,
-        unsigned int instance_id)
-{
-    unsigned int i;
-
-    for (i = 0; i < reg->idx_count; ++i)
-    {
-        if (reg->idx[i].rel_addr && shader_register_is_phase_instance_id(&reg->idx[i].rel_addr->reg))
-        {
-            reg->idx[i].rel_addr = NULL;
-            reg->idx[i].offset += instance_id;
-        }
-    }
-}
-
-static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_instruction *ins,
-        unsigned int instance_id)
-{
-    struct vkd3d_shader_register *reg;
-    unsigned int i;
-
-    for (i = 0; i < ins->src_count; ++i)
-    {
-        reg = (struct vkd3d_shader_register *)&ins->src[i].reg;
-        if (shader_register_is_phase_instance_id(reg))
-        {
-            vsir_register_init(reg, VKD3DSPR_IMMCONST, reg->data_type, 0);
-            reg->u.immconst_u32[0] = instance_id;
-            continue;
-        }
-        shader_register_eliminate_phase_addressing(reg, instance_id);
-    }
-
-    for (i = 0; i < ins->dst_count; ++i)
-        shader_register_eliminate_phase_addressing(&ins->dst[i].reg, instance_id);
-}
-
 /* Ensure that the program closes with a ret. sm1 programs do not, by default.
  * Many of our IR passes rely on this in order to insert instructions at the
  * end of execution. */
@@ -2167,6 +2130,43 @@ static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normal
         loc->instance_count = normaliser->instance_count;
         loc->instruction_count = index - normaliser->phase_body_idx;
     }
+}
+
+static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_register *reg,
+        unsigned int instance_id)
+{
+    unsigned int i;
+
+    for (i = 0; i < reg->idx_count; ++i)
+    {
+        if (reg->idx[i].rel_addr && shader_register_is_phase_instance_id(&reg->idx[i].rel_addr->reg))
+        {
+            reg->idx[i].rel_addr = NULL;
+            reg->idx[i].offset += instance_id;
+        }
+    }
+}
+
+static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_instruction *ins,
+        unsigned int instance_id)
+{
+    struct vkd3d_shader_register *reg;
+    unsigned int i;
+
+    for (i = 0; i < ins->src_count; ++i)
+    {
+        reg = (struct vkd3d_shader_register *)&ins->src[i].reg;
+        if (shader_register_is_phase_instance_id(reg))
+        {
+            vsir_register_init(reg, VKD3DSPR_IMMCONST, reg->data_type, 0);
+            reg->u.immconst_u32[0] = instance_id;
+            continue;
+        }
+        shader_register_eliminate_phase_addressing(reg, instance_id);
+    }
+
+    for (i = 0; i < ins->dst_count; ++i)
+        shader_register_eliminate_phase_addressing(&ins->dst[i].reg, instance_id);
 }
 
 static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normaliser,
