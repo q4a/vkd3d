@@ -10603,13 +10603,18 @@ static void vsir_validate_comparison_operation(struct validation_context *ctx,
                 "Invalid data type %#x for result of comparison operation \"%s\" (%#x).",
                 dst_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
 
-    if (instruction->src_count < 1)
+    if (instruction->src_count == 0)
         return;
 
     src_data_type = instruction->src[0].reg.data_type;
 
     if (src_data_type >= VKD3D_DATA_COUNT)
         return;
+
+    if (!types[src_data_type])
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid data type %#x for comparison operation \"%s\" (%#x).",
+                src_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
 
     for (i = 1; i < instruction->src_count; ++i)
     {
