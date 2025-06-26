@@ -2056,7 +2056,6 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
 
 struct hull_flattener
 {
-    struct vkd3d_shader_instruction_array instructions;
     struct vsir_program *program;
 
     unsigned int instance_count;
@@ -2089,7 +2088,7 @@ struct shader_phase_location_array
 static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normaliser,
         unsigned int index, struct shader_phase_location_array *locations)
 {
-    struct vkd3d_shader_instruction *ins = &normaliser->instructions.elements[index];
+    struct vkd3d_shader_instruction *ins = &normaliser->program->instructions.elements[index];
     struct shader_phase_location *loc;
     bool b;
 
@@ -2200,23 +2199,24 @@ static void flattener_fixup_registers(struct hull_flattener *normaliser,
 static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normaliser,
         struct shader_phase_location_array *locations)
 {
+    struct vkd3d_shader_instruction_array *instructions = &normaliser->program->instructions;
     struct shader_phase_location *loc;
     unsigned int i, j, k, end, count;
 
     for (i = 0, count = 0; i < locations->count; ++i)
         count += (locations->locations[i].instance_count - 1) * locations->locations[i].instruction_count;
 
-    if (!shader_instruction_array_reserve(&normaliser->instructions, normaliser->instructions.count + count))
+    if (!shader_instruction_array_reserve(instructions, instructions->count + count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    end = normaliser->instructions.count;
-    normaliser->instructions.count += count;
+    end = instructions->count;
+    instructions->count += count;
 
     for (i = locations->count; i > 0; --i)
     {
         loc = &locations->locations[i - 1];
         j = loc->index + loc->instruction_count;
-        memmove(&normaliser->instructions.elements[j + count], &normaliser->instructions.elements[j],
-                (end - j) * sizeof(*normaliser->instructions.elements));
+        memmove(&instructions->elements[j + count], &instructions->elements[j],
+                (end - j) * sizeof(*instructions->elements));
         end = j;
         count -= (loc->instance_count - 1) * loc->instruction_count;
         loc->index += count;
@@ -2230,7 +2230,7 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
         {
             for (k = 0; k < loc->instruction_count; ++k)
             {
-                if (!shader_instruction_array_clone_instruction(&normaliser->instructions,
+                if (!shader_instruction_array_clone_instruction(instructions,
                         loc->index + loc->instruction_count * j + k, loc->index + k))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
             }
@@ -2243,7 +2243,7 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
 
             for (k = 0; k < loc->instruction_count; ++k)
                 flattener_fixup_registers(normaliser,
-                        &normaliser->instructions.elements[loc->index + loc->instruction_count * j + k], j);
+                        &instructions->elements[loc->index + loc->instruction_count * j + k], j);
         }
     }
 
@@ -2253,13 +2253,11 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
 static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    struct hull_flattener flattener = {program->instructions, program};
-    struct vkd3d_shader_instruction_array *instructions;
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     struct shader_phase_location_array locations;
+    struct hull_flattener flattener = {program};
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
-
-    instructions = &flattener.instructions;
 
     flattener.phase = VSIR_OP_INVALID;
     for (i = 0, locations.count = 0; i < instructions->count; ++i)
@@ -2281,13 +2279,12 @@ static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_pro
 
     if (flattener.phase != VSIR_OP_INVALID)
     {
-        if (!shader_instruction_array_reserve(&flattener.instructions, flattener.instructions.count + 1))
+        if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
             return VKD3D_ERROR_OUT_OF_MEMORY;
         vsir_instruction_init(&instructions->elements[instructions->count++],
                 &flattener.last_ret_location, VSIR_OP_RET);
     }
 
-    program->instructions = flattener.instructions;
     return result;
 }
 
