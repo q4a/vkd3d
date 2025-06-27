@@ -3910,6 +3910,23 @@ static void tpf_dcl_texture(const struct tpf_compiler *tpf, const struct vkd3d_s
     write_sm4_instruction(tpf, &instr);
 }
 
+static void tpf_dcl_tgsm_raw(const struct tpf_compiler *tpf, const struct vkd3d_shader_instruction *ins)
+{
+    const struct vkd3d_shader_tgsm_raw *tgsm = &ins->declaration.tgsm_raw;
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_DCL_TGSM_RAW,
+
+        .dsts[0] = tgsm->reg,
+        .dst_count = 1,
+
+        .idx[0] = tgsm->byte_count,
+        .idx_count = 1,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
 static void write_sm4_dcl_global_flags(const struct tpf_compiler *tpf, uint32_t flags)
 {
     struct sm4_instruction instr =
@@ -4197,6 +4214,10 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
 
         case VSIR_OP_DCL_SAMPLER:
             tpf_dcl_sampler(tpf, ins);
+            break;
+
+        case VSIR_OP_DCL_TGSM_RAW:
+            tpf_dcl_tgsm_raw(tpf, ins);
             break;
 
         case VSIR_OP_DCL:

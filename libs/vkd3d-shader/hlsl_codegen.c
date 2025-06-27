@@ -12577,6 +12577,34 @@ static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
     }
 }
 
+static void sm4_generate_vsir_add_dcl_tgsm(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct hlsl_ir_var *var)
+{
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!hlsl_is_numeric_type(var->data_type))
+    {
+        hlsl_fixme(ctx, &var->loc, "Structured TGSM declaration.");
+        return;
+    }
+
+    if (!(ins = generate_vsir_add_program_instruction(ctx, program, &var->loc, VSIR_OP_DCL_TGSM_RAW, 0, 0)))
+    {
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+
+    dst_param = &ins->declaration.tgsm_raw.reg;
+
+    vsir_dst_param_init(dst_param, VKD3DSPR_GROUPSHAREDMEM, VSIR_DATA_F32, 1);
+    dst_param->reg.dimension = VSIR_DIMENSION_NONE;
+    dst_param->reg.idx[0].offset = var->regs[HLSL_REGSET_NUMERIC].id;
+
+    ins->declaration.tgsm_raw.byte_count = var->data_type->reg_size[HLSL_REGSET_NUMERIC] * 4;
+    ins->declaration.tgsm_raw.zero_init = false;
+}
+
 static void sm4_generate_vsir_add_dcl_stream(struct hlsl_ctx *ctx,
         struct vsir_program *program, const struct hlsl_ir_var *var)
 {
@@ -12659,7 +12687,7 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx,
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_tgsm && var->regs[HLSL_REGSET_NUMERIC].allocated)
-            hlsl_fixme(ctx, &var->loc, "Groupshared variable.");
+            sm4_generate_vsir_add_dcl_tgsm(ctx, program, var);
     }
 
     if (version->type == VKD3D_SHADER_TYPE_GEOMETRY && version->major >= 5)
