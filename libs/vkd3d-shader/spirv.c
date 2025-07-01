@@ -3020,7 +3020,7 @@ struct ssa_register_info
 struct spirv_compiler
 {
     struct vkd3d_spirv_builder spirv_builder;
-    const struct vsir_program *program;
+    struct vsir_program *program;
 
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_location location;
@@ -3150,7 +3150,7 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
     vkd3d_free(compiler);
 }
 
-static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *program,
+static struct spirv_compiler *spirv_compiler_create(struct vsir_program *program,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, uint64_t config_flags)
 {
@@ -11019,11 +11019,12 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vsir_program *program = compiler->program;
-    struct vkd3d_shader_instruction_array instructions;
+    struct vsir_program *program = compiler->program;
     enum vkd3d_shader_spirv_environment environment;
+    struct vkd3d_shader_instruction *ins;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i, max_element_count;
+    struct vsir_program_iterator it;
 
     max_element_count = max(program->output_signature.element_count, program->patch_constant_signature.element_count);
     if (!(compiler->output_info = vkd3d_calloc(max_element_count, sizeof(*compiler->output_info))))
@@ -11071,8 +11072,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if (program->block_count && !spirv_compiler_init_blocks(compiler, program->block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    instructions = program->instructions;
-
     compiler->use_vocp = program->use_vocp;
     compiler->block_names = program->block_names;
     compiler->block_name_count = program->block_name_count;
@@ -11087,9 +11086,10 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if (compiler->shader_type != VKD3D_SHADER_TYPE_HULL)
         spirv_compiler_emit_shader_signature_outputs(compiler);
 
-    for (i = 0; i < instructions.count && result >= 0; ++i)
+    it = vsir_program_iterator(&program->instructions);
+    for (ins = vsir_program_iterator_head(&it); ins && result >= 0; ins = vsir_program_iterator_next(&it))
     {
-        result = spirv_compiler_handle_instruction(compiler, &instructions.elements[i]);
+        result = spirv_compiler_handle_instruction(compiler, ins);
     }
 
     if (result < 0)
