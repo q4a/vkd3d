@@ -3401,6 +3401,11 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
 
         if (!desc->ps.pShaderBytecode)
         {
+            for (i = 0; i < rt_count; i++)
+            {
+                graphics->blend_attachments[i].colorWriteMask = 0;
+            }
+
             if (FAILED(hr = create_shader_stage(device, &graphics->stages[graphics->stage_count],
                     VK_SHADER_STAGE_FRAGMENT_BIT, &default_ps, NULL)))
                 goto fail;
