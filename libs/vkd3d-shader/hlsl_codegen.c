@@ -201,7 +201,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
         vkd3d_free(new_name);
         return;
     }
-    list_add_before(&uniform->scope_entry, &temp->scope_entry);
+    list_add_tail(&ctx->dummy_scope->vars, &temp->scope_entry);
 
     uniform->temp_copy = temp;
 
