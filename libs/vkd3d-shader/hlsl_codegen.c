@@ -186,30 +186,34 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
 {
     struct hlsl_ir_node *store;
     struct hlsl_ir_load *load;
-    struct hlsl_ir_var *temp;
-    char *new_name;
 
     uniform->is_uniform = 1;
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
 
-    if (!(new_name = hlsl_sprintf_alloc(ctx, "<temp-%s>", uniform->name)))
-        return;
-
-    if (!(temp = hlsl_new_var(ctx, new_name, uniform->data_type,
-            &uniform->loc, NULL, uniform->storage_modifiers, NULL)))
+    if (!uniform->temp_copy)
     {
-        vkd3d_free(new_name);
-        return;
-    }
-    list_add_tail(&ctx->dummy_scope->vars, &temp->scope_entry);
+        struct hlsl_ir_var *temp;
+        char *new_name;
 
-    uniform->temp_copy = temp;
+        if (!(new_name = hlsl_sprintf_alloc(ctx, "<temp-%s>", uniform->name)))
+            return;
+
+        if (!(temp = hlsl_new_var(ctx, new_name, uniform->data_type,
+                &uniform->loc, NULL, uniform->storage_modifiers, NULL)))
+        {
+            vkd3d_free(new_name);
+            return;
+        }
+        list_add_tail(&ctx->dummy_scope->vars, &temp->scope_entry);
+
+        uniform->temp_copy = temp;
+    }
 
     if (!(load = hlsl_new_var_load(ctx, uniform, &uniform->loc)))
         return;
     list_add_head(&block->instrs, &load->node.entry);
 
-    if (!(store = hlsl_new_simple_store(ctx, temp, &load->node)))
+    if (!(store = hlsl_new_simple_store(ctx, uniform->temp_copy, &load->node)))
         return;
     list_add_after(&load->node.entry, &store->entry);
 }
