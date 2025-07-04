@@ -4066,20 +4066,23 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
     }
 }
 
-void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func)
+void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func,
+        const char *description, const struct hlsl_block *processed_block)
 {
     struct vkd3d_string_buffer buffer;
     size_t i;
 
     vkd3d_string_buffer_init(&buffer);
-    vkd3d_string_buffer_printf(&buffer, "Dumping function %s.\n", func->func->name);
+    vkd3d_string_buffer_printf(&buffer, "Dumping %s \"%s\".\n", description, func->func->name);
     vkd3d_string_buffer_printf(&buffer, "Function parameters:\n");
     for (i = 0; i < func->parameters.count; ++i)
     {
         dump_ir_var(ctx, &buffer, func->parameters.vars[i]);
         vkd3d_string_buffer_printf(&buffer, "\n");
     }
-    if (func->has_body)
+    if (processed_block)
+        dump_block(ctx, &buffer, processed_block);
+    else if (func->has_body)
         dump_block(ctx, &buffer, &func->body);
 
     vkd3d_string_buffer_trace(&buffer);

@@ -5294,7 +5294,7 @@ static void dump_function(struct rb_entry *entry, void *context)
     LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
     {
         if (decl->has_body)
-            hlsl_dump_function(ctx, decl);
+            hlsl_dump_function(ctx, decl, "function", NULL);
     }
 }
 
@@ -13957,7 +13957,12 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
 
     if (TRACE_ON())
+    {
         rb_for_each_entry(&ctx->functions, dump_function, ctx);
+        hlsl_dump_function(ctx, entry_func, "processed entry point", &body);
+        if (profile->type == VKD3D_SHADER_TYPE_HULL)
+            hlsl_dump_function(ctx, ctx->patch_constant_func, "processed patch-constant function", &patch_body);
+    }
 
     if (ctx->result)
         return ctx->result;
