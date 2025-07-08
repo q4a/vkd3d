@@ -5336,6 +5336,8 @@ static void fx_4_parse_state_object_initializer(struct fx_parser *parser, uint32
                             vkd3d_string_buffer_printf(&parser->buffer, "0x%.2x", value.u);
                         else if (state->type == FX_UINT)
                             vkd3d_string_buffer_printf(&parser->buffer, "%u", value.u);
+                        else if (state->type == FX_BOOL)
+                            vkd3d_string_buffer_printf(&parser->buffer, "%s", value.u ? "true" : "false");
                         else if (state->type == FX_FLOAT)
                             vkd3d_string_buffer_printf(&parser->buffer, "%g", value.f);
 
