@@ -2277,7 +2277,7 @@ static uint32_t write_fx_4_state_numeric_value(struct hlsl_ir_constant *value, s
         }
 
         put_u32_unaligned(buffer, type);
-        put_u32_unaligned(buffer, value->value.u[i].u);
+        put_u32_unaligned(buffer, get_fx_default_numeric_value(data_type, value->value.u[i].u));
     }
 
     return offset;
