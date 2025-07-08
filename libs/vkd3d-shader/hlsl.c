@@ -2998,7 +2998,6 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
     decl->return_type = return_type;
     decl->parameters = *parameters;
     decl->loc = *loc;
-    list_init(&decl->extern_vars);
 
     if (!hlsl_types_are_equal(return_type, ctx->builtin_types.Void))
     {
