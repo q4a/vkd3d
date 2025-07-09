@@ -2062,7 +2062,7 @@ struct hlsl_ir_node *hlsl_block_add_load_component(struct hlsl_ctx *ctx, struct 
     return &load->node;
 }
 
-static struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
+static struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_resource_load *load;
@@ -2098,13 +2098,18 @@ static struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     load->sampling_dim = params->sampling_dim;
     if (load->sampling_dim == HLSL_SAMPLER_DIM_GENERIC)
         load->sampling_dim = hlsl_deref_get_type(ctx, &load->resource)->sampler_dim;
-    return &load->node;
+    return load;
 }
 
 struct hlsl_ir_node *hlsl_block_add_resource_load(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc)
 {
-    return append_new_instr(ctx, block, hlsl_new_resource_load(ctx, params, loc));
+    struct hlsl_ir_resource_load *load = hlsl_new_resource_load(ctx, params, loc);
+
+    if (load && load->sampling_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+        hlsl_src_from_node(&load->byte_offset, hlsl_block_add_uint_constant(ctx, block, 0, loc));
+
+    return append_new_instr(ctx, block, &load->node);
 }
 
 static struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, enum hlsl_resource_store_type type,
@@ -2648,6 +2653,7 @@ static struct hlsl_ir_node *clone_resource_load(struct hlsl_ctx *ctx,
         vkd3d_free(dst);
         return NULL;
     }
+    clone_src(map, &dst->byte_offset, &src->byte_offset);
     clone_src(map, &dst->coords, &src->coords);
     clone_src(map, &dst->lod, &src->lod);
     clone_src(map, &dst->ddx, &src->ddx);
@@ -2982,6 +2988,17 @@ bool hlsl_clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block, const 
 
     ret = clone_block(ctx, dst_block, src_block, &map);
     vkd3d_free(map.instrs);
+    return ret;
+}
+
+struct hlsl_ir_node *hlsl_clone_instr(struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr)
+{
+    struct clone_instr_map map = {0};
+    struct hlsl_ir_node *ret;
+
+    ret = clone_instr(ctx, &map, instr);
+    vkd3d_free(map.instrs);
+
     return ret;
 }
 
@@ -3764,6 +3781,11 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     dump_deref(buffer, &load->resource);
     vkd3d_string_buffer_printf(buffer, ", sampler = ");
     dump_deref(buffer, &load->sampler);
+    if (load->byte_offset.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", byte_offset = ");
+        dump_src(buffer, &load->byte_offset);
+    }
     if (load->coords.node)
     {
         vkd3d_string_buffer_printf(buffer, ", coords = ");
@@ -4232,6 +4254,7 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 {
     hlsl_cleanup_deref(&load->sampler);
     hlsl_cleanup_deref(&load->resource);
+    hlsl_src_remove(&load->byte_offset);
     hlsl_src_remove(&load->coords);
     hlsl_src_remove(&load->lod);
     hlsl_src_remove(&load->ddx);

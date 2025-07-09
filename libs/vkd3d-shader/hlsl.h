@@ -893,7 +893,7 @@ struct hlsl_ir_resource_load
     struct hlsl_ir_node node;
     enum hlsl_resource_load_type load_type;
     struct hlsl_deref resource, sampler;
-    struct hlsl_src coords, lod, ddx, ddy, cmp, sample_index, texel_offset;
+    struct hlsl_src byte_offset, coords, lod, ddx, ddy, cmp, sample_index, texel_offset;
     enum hlsl_sampler_dim sampling_dim;
 };
 
@@ -1609,6 +1609,7 @@ struct hlsl_ir_node *hlsl_block_add_unary_expr(struct hlsl_ctx *ctx, struct hlsl
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc);
 void hlsl_block_cleanup(struct hlsl_block *block);
 bool hlsl_clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block, const struct hlsl_block *src_block);
+struct hlsl_ir_node *hlsl_clone_instr(struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr);
 
 void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func,
         const char *description, const struct hlsl_block *processed_block);

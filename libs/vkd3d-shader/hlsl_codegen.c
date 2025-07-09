@@ -94,6 +94,134 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
     return base_offset;
 }
 
+static unsigned int base_type_get_byte_size(enum hlsl_base_type t)
+{
+    switch (t)
+    {
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_MIN16UINT:
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+        case HLSL_TYPE_BOOL:
+            return 4;
+
+        case HLSL_TYPE_DOUBLE:
+            return 8;
+    }
+
+    return 0;
+}
+
+static unsigned int hlsl_type_get_packed_alignment(const struct hlsl_type *type)
+{
+    unsigned int max_align, i;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            return base_type_get_byte_size(type->e.numeric.type);
+
+        case HLSL_CLASS_ARRAY:
+            return hlsl_type_get_packed_alignment(type->e.array.type);
+
+        case HLSL_CLASS_STRUCT:
+            for (i = 0, max_align = 0; i < type->e.record.field_count; ++i)
+            {
+                struct hlsl_struct_field *field = &type->e.record.fields[i];
+
+                max_align = max(max_align, hlsl_type_get_packed_alignment(field->type));
+            }
+
+            return max_align;
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static unsigned int hlsl_type_get_packed_size(const struct hlsl_type *type)
+{
+    unsigned int size, i;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+            return type->e.numeric.dimx * base_type_get_byte_size(type->e.numeric.type);
+
+        case HLSL_CLASS_MATRIX:
+            return type->e.numeric.dimx * type->e.numeric.dimy * base_type_get_byte_size(type->e.numeric.type);
+
+        case HLSL_CLASS_ARRAY:
+            return type->e.array.elements_count * hlsl_type_get_packed_size(type->e.array.type);
+
+        case HLSL_CLASS_STRUCT:
+            for (i = 0, size = 0; i < type->e.record.field_count; ++i)
+            {
+                struct hlsl_struct_field *field = &type->e.record.fields[i];
+
+                size = align(size, hlsl_type_get_packed_alignment(field->type))
+                        + hlsl_type_get_packed_size(field->type);
+            }
+            size = align(size, hlsl_type_get_packed_alignment(type));
+
+            return size;
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static struct hlsl_ir_node *hlsl_block_add_packed_index_offset_append(struct hlsl_ctx *ctx,
+        struct hlsl_block *block, struct hlsl_ir_node *prev_offset, struct hlsl_ir_node *idx,
+        struct hlsl_type *type, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *idx_offset = NULL, *c;
+    unsigned int field_idx, offset, size, i;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_VECTOR:
+            c = hlsl_block_add_uint_constant(ctx, block, base_type_get_byte_size(type->e.numeric.type), loc);
+            idx_offset = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_MUL, c, idx);
+            break;
+
+        case HLSL_CLASS_MATRIX:
+            size = base_type_get_byte_size(type->e.numeric.type) * hlsl_type_minor_size(type);
+            c = hlsl_block_add_uint_constant(ctx, block, size, loc);
+            idx_offset = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_MUL, c, idx);
+            break;
+
+        case HLSL_CLASS_ARRAY:
+            size = hlsl_type_get_packed_size(type->e.array.type);
+            c = hlsl_block_add_uint_constant(ctx, block, size, loc);
+            idx_offset = hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_MUL, c, idx);
+            break;
+
+        case HLSL_CLASS_STRUCT:
+            field_idx = hlsl_ir_constant(idx)->value.u[0].u;
+            for (i = 0, offset = 0; i < field_idx; ++i)
+            {
+                struct hlsl_struct_field *field = &type->e.record.fields[i];
+
+                offset = align(offset, hlsl_type_get_packed_alignment(field->type))
+                        + hlsl_type_get_packed_size(field->type);
+            }
+
+            offset = align(offset, hlsl_type_get_packed_alignment(type->e.record.fields[field_idx].type));
+            idx_offset = hlsl_block_add_uint_constant(ctx, block, offset, loc);
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    return hlsl_block_add_binary_expr(ctx, block, HLSL_OP2_ADD, idx_offset, prev_offset);
+}
+
 /* TODO: remove when no longer needed, only used for replace_deref_path_with_offset() */
 static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *deref, unsigned int *offset_component, const struct vkd3d_shader_location *loc)
@@ -1306,6 +1434,73 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         params.format = val->data_type->e.resource.format;
         hlsl_block_add_resource_load(ctx, block, &params, &instr->loc);
         return true;
+    }
+
+    if (val->type == HLSL_IR_RESOURCE_LOAD)
+    {
+        struct hlsl_ir_resource_load *parent = hlsl_ir_resource_load(index->val.node);
+
+        if (parent->sampling_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+        {
+            if (hlsl_index_is_noncontiguous(index))
+            {
+                /* For column major matrices, since we have to output a row,
+                 * we need to emit dimx loads. */
+                struct hlsl_ir_node *mat = index->val.node;
+                struct hlsl_deref row_deref;
+
+                if (!(var = hlsl_new_synthetic_var(ctx, "row", instr->data_type, &instr->loc)))
+                    return false;
+                hlsl_init_simple_deref_from_var(&row_deref, var);
+
+                for (unsigned int i = 0; i < mat->data_type->e.numeric.dimx; ++i)
+                {
+                    struct hlsl_type *type = parent->node.data_type;
+                    struct hlsl_ir_node *c, *c_offset, *idx_offset;
+                    struct hlsl_ir_resource_load *column_load;
+
+                    c = hlsl_block_add_uint_constant(ctx, block, i, &instr->loc);
+                    c_offset = hlsl_block_add_packed_index_offset_append(ctx,
+                            block, parent->byte_offset.node, c, type, &instr->loc);
+                    type = hlsl_get_element_type_from_path_index(ctx, type, c);
+
+                    idx_offset = hlsl_block_add_packed_index_offset_append(ctx,
+                            block, c_offset, index->idx.node, type, &instr->loc);
+                    type = hlsl_get_element_type_from_path_index(ctx, type, c_offset);
+
+                    column_load = hlsl_ir_resource_load(hlsl_clone_instr(ctx, &parent->node));
+
+                    hlsl_src_remove(&column_load->byte_offset);
+                    hlsl_src_from_node(&column_load->byte_offset, idx_offset);
+                    column_load->node.data_type = type;
+
+                    hlsl_block_add_instr(block, &column_load->node);
+
+                    hlsl_block_add_store_component(ctx, block, &row_deref, i, &column_load->node);
+                }
+
+                hlsl_block_add_simple_load(ctx, block, var, &instr->loc);
+            }
+            else
+            {
+                struct hlsl_type *type = parent->node.data_type;
+                struct hlsl_ir_resource_load *appended_load;
+                struct hlsl_ir_node *idx_offset;
+
+                idx_offset = hlsl_block_add_packed_index_offset_append(ctx, block,
+                        parent->byte_offset.node, index->idx.node, type, &instr->loc);
+                appended_load = hlsl_ir_resource_load(hlsl_clone_instr(ctx, &parent->node));
+                type = hlsl_get_element_type_from_path_index(ctx, type, index->idx.node);
+
+                hlsl_src_remove(&appended_load->byte_offset);
+                hlsl_src_from_node(&appended_load->byte_offset, idx_offset);
+                appended_load->node.data_type = type;
+
+                hlsl_block_add_instr(block, &appended_load->node);
+            }
+
+            return true;
+        }
     }
 
     if (!(var = hlsl_new_synthetic_var(ctx, "index-val", val->data_type, &instr->loc)))
@@ -5486,6 +5681,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
                 deref_mark_last_read(&load->sampler, last_read);
             }
 
+            if (load->byte_offset.node)
+                load->byte_offset.node->last_read = last_read;
             if (load->coords.node)
                 load->coords.node->last_read = last_read;
             if (load->texel_offset.node)
@@ -12167,6 +12364,9 @@ static enum vsir_data_type sm4_generate_vsir_get_format_type(const struct hlsl_t
 {
     const struct hlsl_type *format = type->e.resource.format;
 
+    if (type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+        return VSIR_DATA_MIXED;
+
     switch (format->e.numeric.type)
     {
         case HLSL_TYPE_DOUBLE:
@@ -12494,6 +12694,9 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
 static enum D3D_RESOURCE_RETURN_TYPE sm4_data_type(const struct hlsl_type *type)
 {
     const struct hlsl_type *format = type->e.resource.format;
+
+    if (type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+        return D3D_RETURN_TYPE_MIXED;
 
     switch (format->e.numeric.type)
     {
