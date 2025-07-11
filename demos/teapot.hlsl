@@ -22,7 +22,7 @@ cbuffer teapot_cb : register(b0)
 {
     float4x4 mvp_matrix;
     float level;
-    uint wireframe;
+    uint wireframe, flat;
 };
 
 struct control_point
@@ -165,6 +165,14 @@ void gs_main(triangle struct gs_in i[3], inout TriangleStream<struct ps_in> stre
     v[2].pos = i[2].pos;
     v[2].normal = i[2].normal;
     v[2].barycentric = float2(0.0, 0.0);
+
+    if (flat)
+    {
+        n = normalize(cross(i[1].pos - i[0].pos, i[2].pos - i[0].pos));
+        v[0].normal = n;
+        v[1].normal = n;
+        v[2].normal = n;
+    }
 
     stream.Append(v[0]);
     stream.Append(v[1]);

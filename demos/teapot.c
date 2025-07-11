@@ -39,7 +39,7 @@ struct teapot_cb_data
 {
     struct demo_matrix mvp_matrix;
     float level;
-    unsigned int wireframe;
+    unsigned int wireframe, flat;
 };
 
 struct demo_text_run
@@ -91,7 +91,7 @@ struct teapot
     unsigned int text_scale;
     float theta, phi;
 
-    bool display_help, wireframe;
+    bool display_help, flat, wireframe;
     struct timeval last_text;
     struct timeval frame_times[16];
     size_t frame_count;
@@ -546,9 +546,10 @@ static void teapot_update_text(struct teapot *teapot, double fps)
         demo_text_draw(text, &amber, 0, -2 * h, "%.2f fps", fps);
     if (teapot->display_help)
     {
-        demo_text_draw(text, &amber, 0, 3 * h, "ESC: Exit");
-        demo_text_draw(text, &amber, 0, 2 * h, " F1: Toggle help");
-        demo_text_draw(text, &amber, 0, 1 * h, "-/+: Tessellation level (%u)", teapot->tessellation_level);
+        demo_text_draw(text, &amber, 0, 4 * h, "ESC: Exit");
+        demo_text_draw(text, &amber, 0, 3 * h, " F1: Toggle help");
+        demo_text_draw(text, &amber, 0, 2 * h, "-/+: Tessellation level (%u)", teapot->tessellation_level);
+        demo_text_draw(text, &amber, 0, 1 * h, "  F: Toggle flat shading (%s)", teapot->flat ? "on" : "off");
         demo_text_draw(text, &amber, 0, 0 * h, "  W: Toggle wireframe (%s)", teapot->wireframe ? "on" : "off");
     }
 
@@ -751,8 +752,7 @@ static void teapot_load_assets(struct teapot *teapot)
     root_signature_desc.NumParameters = 1;
     root_signature_desc.pParameters = root_parameters;
     root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
-            | D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS
-            | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+            | D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS;
     hr = demo_create_root_signature(teapot->device, &root_signature_desc, &teapot->root_signature);
     assert(SUCCEEDED(hr));
 
@@ -857,6 +857,7 @@ static void teapot_load_assets(struct teapot *teapot)
     teapot_update_mvp(teapot);
     teapot->cb_data->level = teapot->tessellation_level;
     teapot->cb_data->wireframe = teapot->wireframe;
+    teapot->cb_data->flat = teapot->flat;
 
     demo_text_init(&teapot->text, teapot->device, teapot->width, teapot->height, teapot->text_scale);
     teapot_load_mesh(teapot);
@@ -880,6 +881,9 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
         case DEMO_KEY_KP_ADD:
             if (teapot->tessellation_level < D3D12_TESSELLATOR_MAX_TESSELLATION_FACTOR)
                 teapot->cb_data->level = ++teapot->tessellation_level;
+            break;
+        case 'f':
+            teapot->cb_data->flat = teapot->flat = !teapot->flat;
             break;
         case 'w':
             teapot->cb_data->wireframe = teapot->wireframe = !teapot->wireframe;

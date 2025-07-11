@@ -177,6 +177,7 @@ static demo_key demo_key_from_nsevent(id event)
     enum vkey
     {
         kVK_ANSI_A              = 0x00,
+        kVK_ANSI_F              = 0x03,
         kVK_ANSI_W              = 0x0d,
         kVK_ANSI_Equal          = 0x18,
         kVK_ANSI_Minus          = 0x1b,
@@ -199,6 +200,7 @@ static demo_key demo_key_from_nsevent(id event)
     lookup[] =
     {
         {kVK_ANSI_A,            'a'},
+        {kVK_ANSI_F,            'f'},
         {kVK_ANSI_W,            'w'},
         {kVK_ANSI_Equal,        '='},
         {kVK_ANSI_Minus,        '-'},
