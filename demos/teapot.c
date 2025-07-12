@@ -90,11 +90,13 @@ struct teapot
     unsigned int tessellation_level;
     unsigned int text_scale;
     float theta, phi;
+    float theta_dir;
 
-    bool display_help, flat, wireframe;
+    bool animate, display_help, flat, wireframe;
     struct timeval last_text;
     struct timeval frame_times[16];
     size_t frame_count;
+    double t_animate;
 
     D3D12_VIEWPORT vp;
     D3D12_RECT scissor_rect;
@@ -546,9 +548,10 @@ static void teapot_update_text(struct teapot *teapot, double fps)
         demo_text_draw(text, &amber, 0, -2 * h, "%.2f fps", fps);
     if (teapot->display_help)
     {
-        demo_text_draw(text, &amber, 0, 4 * h, "ESC: Exit");
-        demo_text_draw(text, &amber, 0, 3 * h, " F1: Toggle help");
-        demo_text_draw(text, &amber, 0, 2 * h, "-/+: Tessellation level (%u)", teapot->tessellation_level);
+        demo_text_draw(text, &amber, 0, 5 * h, "ESC: Exit");
+        demo_text_draw(text, &amber, 0, 4 * h, " F1: Toggle help");
+        demo_text_draw(text, &amber, 0, 3 * h, "-/+: Tessellation level (%u)", teapot->tessellation_level);
+        demo_text_draw(text, &amber, 0, 2 * h, "  A: Toggle animation (%s)", teapot->animate ? "on" : "off");
         demo_text_draw(text, &amber, 0, 1 * h, "  F: Toggle flat shading (%s)", teapot->flat ? "on" : "off");
         demo_text_draw(text, &amber, 0, 0 * h, "  W: Toggle wireframe (%s)", teapot->wireframe ? "on" : "off");
     }
@@ -558,6 +561,73 @@ static void teapot_update_text(struct teapot *teapot, double fps)
     a->InstanceCount = text->run_count;
     a->StartVertexLocation = 0;
     a->StartInstanceLocation = 0;
+}
+
+static void teapot_animate(struct teapot *teapot, const struct timeval *tv)
+{
+    double dt = timeval_diff(tv, &teapot->frame_times[(teapot->frame_count - 1) % ARRAY_SIZE(teapot->frame_times)]);
+    double t = tv->tv_sec + tv->tv_usec / 1000000.0;
+
+    static const double max_theta = 150.0 * M_PI / 180.0;
+    static const double min_theta = 30.0 * M_PI / 180.0;
+    static const double theta_speed = 10.0; /* °/s */
+    static const double phi_speed = -20.0; /* °/s */
+
+    static bool recover;
+
+
+    if (teapot->theta > max_theta || teapot->theta < -M_PI / 2.0)
+    {
+        teapot->theta_dir = 2.0f;
+        recover = true;
+    }
+    else if (teapot->theta < min_theta)
+    {
+        teapot->theta_dir = -2.0f;
+        recover = true;
+    }
+
+    if (recover)
+    {
+        double offset = dt * teapot->theta_dir * theta_speed * M_PI / 180.0;
+        teapot->theta -= offset;
+        if (fabs(teapot->theta - M_PI / 2.0) < fabs(offset))
+        {
+            teapot->t_animate = -1.0;
+            recover = false;
+        }
+    }
+    else
+    {
+        double theta_range = max_theta - min_theta;
+        double d;
+
+        if (teapot->t_animate < 0.0)
+        {
+            /* Calculate "t" from current "theta" and "theta_dir". */
+            d = (teapot->theta - min_theta) / theta_range;
+            d = acos(d * 2.0 - 1.0);
+            if (teapot->theta_dir < 0.0f)
+                d = 2.0 * M_PI - d;
+            d = (theta_range / M_PI) / ((theta_speed / d) * M_PI / 180.0);
+            teapot->t_animate = t - d;
+        }
+
+        d = ((t - teapot->t_animate) * theta_speed * M_PI / 180.0) / (theta_range / M_PI);
+        d = (cos(fmod(d, 2.0 * M_PI)) + 1.0) / 2.0;
+        d = d * theta_range + min_theta;
+        teapot->theta_dir = teapot->theta - d;
+        teapot->theta = d;
+    }
+
+    if (teapot->theta < -M_PI)
+        teapot->theta += 2.0 * M_PI;
+
+    teapot->phi += (phi_speed * M_PI / 180.0) * dt;
+    if (teapot->phi > M_PI)
+        teapot->phi -= 2.0 * M_PI;
+
+    teapot_update_mvp(teapot);
 }
 
 static void teapot_render_frame(struct teapot *teapot)
@@ -570,6 +640,12 @@ static void teapot_render_frame(struct teapot *teapot)
     {
         teapot_update_text(teapot, ARRAY_SIZE(teapot->frame_times) / timeval_diff(&t, &teapot->frame_times[time_idx]));
         teapot->last_text = t;
+    }
+
+    if (teapot->animate && teapot->frame_count)
+    {
+        teapot_animate(teapot, &t);
+        teapot_update_mvp(teapot);
     }
 
     teapot->frame_times[time_idx] = t;
@@ -882,6 +958,10 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
             if (teapot->tessellation_level < D3D12_TESSELLATOR_MAX_TESSELLATION_FACTOR)
                 teapot->cb_data->level = ++teapot->tessellation_level;
             break;
+        case 'a':
+            if ((teapot->animate = !teapot->animate))
+                teapot->t_animate = -1.0;
+            break;
         case 'f':
             teapot->cb_data->flat = teapot->flat = !teapot->flat;
             break;
@@ -907,12 +987,14 @@ static void teapot_key_press(struct demo_window *window, demo_key key, void *use
             teapot->theta -= M_PI / 36.0f;
             if (teapot->theta < -M_PI)
                 teapot->theta += 2.0f * M_PI;
+            teapot->t_animate = -1.0;
             teapot_update_mvp(teapot);
             break;
         case DEMO_KEY_DOWN:
             teapot->theta += M_PI / 36.0f;
             if (teapot->theta > M_PI)
                 teapot->theta -= 2.0f * M_PI;
+            teapot->t_animate = -1.0;
             teapot_update_mvp(teapot);
             break;
         case DEMO_KEY_F1:
@@ -956,10 +1038,12 @@ static int teapot_main(void)
     teapot.tessellation_level = 10;
     teapot.text_scale = (1.25 * dpi_y / 96.0) + 0.5;
 
+    teapot.t_animate = -1.0;
     teapot.theta = M_PI / 2.0f;
     teapot.phi = -M_PI / 4.0f;
 
     teapot.display_help = true;
+    teapot.animate = true;
 
     teapot.vp.Width = width;
     teapot.vp.Height = height;
