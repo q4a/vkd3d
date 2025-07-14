@@ -1796,13 +1796,6 @@ static void msl_generate_output_struct_declarations(struct msl_generator *gen)
             continue;
         }
 
-        if (e->interpolation_mode != VKD3DSIM_NONE)
-        {
-            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
-                    "Internal compiler error: Unhandled interpolation mode %#x.", e->interpolation_mode);
-            continue;
-        }
-
         if(e->register_count > 1)
         {
             msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
