@@ -76,7 +76,7 @@ float4 main(float4 position : position, struct apple ap : CASCADE, out float4 re
 
 [test]
 clear rtv 0 0.0 0.0 0.0 0.0
-draw triangle strip 4
+todo(msl & sm>=6) draw triangle strip 4
 probe (0, 0) f32(0.0, 3.0, 5.0, 5.1)
 
 

@@ -403,7 +403,10 @@ static bool compile_shader(struct metal_runner *runner, enum shader_type type, s
     info.next = &interface_info;
     info.source.code = ID3D10Blob_GetBufferPointer(runner->d3d_blobs[type]);
     info.source.size = ID3D10Blob_GetBufferSize(runner->d3d_blobs[type]);
-    info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+    if (runner->r.minimum_shader_model < SHADER_MODEL_6_0)
+        info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+    else
+        info.source_type = VKD3D_SHADER_SOURCE_DXBC_DXIL;
     info.target_type = VKD3D_SHADER_TARGET_MSL;
     info.options = options;
     info.option_count = ARRAY_SIZE(options);
@@ -1111,11 +1114,8 @@ static bool metal_runner_init(struct metal_runner *runner)
     }
 
     runner->caps.runner = "Metal";
-    runner->caps.compiler = HLSL_COMPILER;
     runner->caps.tags[0] = "msl";
     runner->caps.tag_count = 1;
-    runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
-    runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
 
     return true;
 }
@@ -1126,15 +1126,33 @@ static void metal_runner_cleanup(struct metal_runner *runner)
     [runner->device release];
 }
 
-void run_shader_tests_metal(void)
+void run_shader_tests_metal(void *dxc_compiler)
 {
+    bool skip_sm4 = test_skipping_execution("Metal", HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    bool skip_sm6 = test_skipping_execution("Metal", "dxcompiler", SHADER_MODEL_6_0, SHADER_MODEL_6_2);
     struct metal_runner runner;
 
-    if (test_skipping_execution("Metal", HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_1))
+    if (skip_sm4 && skip_sm6)
         return;
 
     if (!metal_runner_init(&runner))
         return;
-    run_shader_tests(&runner.r, &runner.caps, &metal_runner_ops, NULL);
+
+    if (!skip_sm4)
+    {
+        runner.caps.compiler = HLSL_COMPILER;
+        runner.caps.minimum_shader_model = SHADER_MODEL_4_0;
+        runner.caps.maximum_shader_model = SHADER_MODEL_5_1;
+        run_shader_tests(&runner.r, &runner.caps, &metal_runner_ops, NULL);
+    }
+
+    if (dxc_compiler && !skip_sm6)
+    {
+        runner.caps.compiler = "dxcompiler";
+        runner.caps.minimum_shader_model = SHADER_MODEL_6_0;
+        runner.caps.maximum_shader_model = SHADER_MODEL_6_2;
+        run_shader_tests(&runner.r, &runner.caps, &metal_runner_ops, dxc_compiler);
+    }
+
     metal_runner_cleanup(&runner);
 }

@@ -9,20 +9,20 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1 2 3 4
-todo(glsl) draw quad
+todo(glsl | msl & sm>=6) draw quad
 probe (0, 0) rgba (1, 2, 3, 4)
 uniform 0 float4 9 8 7 6
-todo(glsl) draw quad
+todo(glsl | msl & sm>=6) draw quad
 probe (0, 0) rgba (9, 8, 7, 6)
 uniform 0 float4 -1 8 7 6
-todo(glsl) draw quad
+todo(glsl | msl & sm>=6) draw quad
 probe (0, 0) rgba (9, 8, 7, 6)
 uniform 0 float4 9 0 7 6
-todo(glsl) draw quad
+todo(glsl | msl & sm>=6) draw quad
 probe (0, 0) rgba (9, 0, 7, 6)
 uniform 0 float4 3 -8 3 0
-todo(glsl) draw quad
+todo(glsl | msl & sm>=6) draw quad
 probe (0, 0) rgba (9, 0, 7, 6)
 uniform 0 float4 3 3 3 -1
-todo(glsl) draw quad
+todo(glsl | msl & sm>=6) draw quad
 probe (0, 0) rgba (9, 0, 7, 6)

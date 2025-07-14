@@ -24,7 +24,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 % sm6 seems to ignore profile qualifiers entirely.
 if(sm>=6) probe (0,0) rgba (1, 1, 1, 99)
 if(sm<6)  probe (0,0) rgba (0, 0, 0, 99)
@@ -39,7 +39,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 if(sm>=6) probe (0,0) rgba (1, 1, 1, 99)
 if(sm<6)  probe (0,0) rgba (0, 0, 0, 99)
 
@@ -53,7 +53,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) rgba (1, 1, 1, 99)
 
 
@@ -93,7 +93,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) rgba (1, 1, 1, 99)
 
 
@@ -106,7 +106,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) rgba (1, 1, 1, 99)
 
 
@@ -128,7 +128,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 if(sm>=6) probe (0,0) rgba (1, 1, 1, 99)
 if(sm<6)  probe (0,0) rgba (0, 0, 0, 99)
 
@@ -142,7 +142,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) rgba (2, 2, 2, 99)
 
 % The documentation explicitly gives this case as an example, implying that a
@@ -163,7 +163,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 if(sm>=6) probe (0,0) rgba (2, 2, 2, 99)
 if(sm<6)  probe (0,0) rgba (1, 1, 1, 99)
 
@@ -177,7 +177,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) rgba (2, 2, 2, 99)
 
 
@@ -190,7 +190,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) rgba (2, 2, 2, 99)
 
 
@@ -203,7 +203,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) rgba (2, 2, 2, 99)
 
 
@@ -257,7 +257,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) rgba (1, 1, 1, 99)
 
 % Bracket exprs should still parse correctly.
@@ -271,7 +271,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 if(sm>=6) probe (0, 0) rgba(0, 0, 0, 99)
 if(sm<6) probe (0, 0) rgba(1, 1, 1, 99)
 

@@ -33,7 +33,7 @@ float4 main() : sv_target1
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe uav 2 (0) rgba (11.1, 12.2, 13.3, 14.4)
 probe uav 2 (1) rgba (15.5, 16.6, 17.7, 18.8)
 
@@ -153,7 +153,7 @@ float4 main() : sv_target1
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe uav 2 (0) i32(11, -12, 13, -14)
 probe uav 2 (1) i32(-15, 16, -17, 18)
 
@@ -175,7 +175,7 @@ float4 main() : sv_target1
 }
 
 [test]
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe uav 2 (0) i32(11)
 probe uav 2 (1) i32(12)
 

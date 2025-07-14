@@ -99,7 +99,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 float4 5.0 -7.0 0.0 -10.0
 draw quad
-probe (0, 0) rgba (5.0, 7.0, 0.0, 10.0)
+todo(msl & sm>=6) probe (0, 0) f32(5.0, 7.0, 0.0, 10.0)
 
 [pixel shader]
 uniform float4 a;
@@ -244,7 +244,7 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 int64_t2 5000000000 -7000000000
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) rgba (5.0e9, 7.0e9, 0.0, 0.0)
 
 [pixel shader]
@@ -325,7 +325,7 @@ uniform 0 uint 0
 uniform 4 uint 0
 uniform 8 uint 0xffd
 uniform 12 uint 1
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) i32(1, -0xfff, 0xffe, -0xffe)
 
 [pixel shader]
@@ -344,14 +344,14 @@ uniform 4 uint 0xffe
 % i is allocated differently between SM4-5 and SM6
 uniform 5 uint 2
 uniform 8 uint 2
-draw quad
+todo(msl & sm>=6) draw quad
 % In D3D12 with SM5 all reads to the array return 0
 if(sm>=6 | !d3d12) probe (0, 0) u32(0xfffff803, 0x1ffd, 0, 0)
 uniform 0 uint 0
 uniform 4 uint 0
 uniform 5 uint 0
 uniform 8 uint 0
-draw quad
+todo(msl & sm>=6) draw quad
 if(sm>=6 | !d3d12) probe (0, 0) u32(1, 2, 0, 0)
 
 [pixel shader]
@@ -368,7 +368,7 @@ uniform 0 uint 7
 uniform 4 uint 0xfffffff7
 uniform 8 uint 0xfffffff9
 uniform 12 uint 9
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) i32(-21, -45, 21, 45)
 
 [pixel shader fail todo]

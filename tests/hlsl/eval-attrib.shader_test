@@ -40,7 +40,7 @@ float4 main(float4 pos : SV_Position, uint sample_idx : SV_SampleIndex) : SV_Tar
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-draw triangle list 3
+todo(msl & sm>=6) draw triangle list 3
 todo(vulkan | opengl | d3d12) probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 todo(vulkan | opengl | d3d12) probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
 todo(vulkan | opengl | d3d12) probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)
@@ -72,7 +72,7 @@ float4 main(centroid float4 pos : SV_Position, uint sample_idx : SV_SampleIndex)
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(glsl) draw triangle list 3
+todo(glsl | msl & sm>=6) draw triangle list 3
 todo probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 todo(vulkan | opengl | d3d12) probe (638,   0) rgba(0.0, 0.0, 0.0, 0.0)
 todo probe (  0, 478) rgba(0.25, 0.25, 0.25, 0.25)
@@ -98,7 +98,7 @@ float4 main(sample float4 pos : SV_Position, uint sample_idx : SV_SampleIndex) :
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle list 3
+todo(sm<6 | msl) draw triangle list 3
 probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
 probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)
@@ -117,7 +117,7 @@ float4 main(float4 pos : SV_Position, float2 attr : ATTR, uint sample_idx : SV_S
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-draw triangle list 3
+todo(msl & sm>=6) draw triangle list 3
 probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
 probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)
@@ -181,7 +181,7 @@ float4 main(float4 pos : SV_Position, sample float2 attr : ATTR,
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle list 3
+todo(sm<6 | msl) draw triangle list 3
 probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
 probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)
@@ -211,7 +211,7 @@ float4 main(float4 pos : SV_Position, float2 attr : ATTR,
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle list 3
+todo(sm<6 | msl) draw triangle list 3
 todo(llvmpipe) probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 probe (638,   0) rgba(0.0, 0.0, 0.0, 0.0)
 probe (  0, 478) rgba(0.25, 0.25, 0.25, 0.25)
@@ -252,7 +252,7 @@ float4 main(float4 pos : SV_Position, float2 attr : ATTR,
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle list 3
+todo(sm<6 | msl) draw triangle list 3
 probe (  0,   0) rgba(0.25, 0.25, 0.25, 0.25)
 probe (639,   0) rgba(0.0, 0.0, 0.0, 0.0)
 probe (  0, 479) rgba(0.25, 0.25, 0.25, 0.25)

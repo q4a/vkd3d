@@ -67,7 +67,7 @@ void main(uint local_idx : SV_GroupIndex)
 }
 
 [test]
-todo(sm<6) dispatch 1 1 1
+todo(sm<6 | msl) dispatch 1 1 1
 probe uav 0 (0) u32(0xcafef00d)
 probe uav 0 (1) u32(0xcafef00d)
 probe uav 0 (2) u32(0xcafef00d)
@@ -99,7 +99,7 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 }
 
 [test]
-todo(sm<6) dispatch 4 1 1
+todo(sm<6 | msl) dispatch 4 1 1
 probe uav 1 (0) u32(0)
 probe uav 1 (1) u32(33)
 probe uav 1 (2) u32(66)
@@ -129,7 +129,7 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 }
 
 [test]
-todo(sm<6) dispatch 4 1 1
+todo(sm<6 | msl) dispatch 4 1 1
 probe uav 1 (0) i32(0)
 probe uav 1 (1) i32(-31)
 probe uav 1 (2) i32(-62)
@@ -191,7 +191,7 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID,
 
 [test]
 uniform 0 uint 1
-todo(sm<6) dispatch 2 1 1
+todo(sm<6 | msl) dispatch 2 1 1
 probe uav 1 (0)  f32(0.0)
 probe uav 1 (1)  f32(0.0)
 probe uav 1 (2)  f32(0.0)
@@ -234,7 +234,7 @@ void main(uint local_idx : SV_GroupIndex)
 }
 
 [test]
-todo(sm<6) dispatch 1 1 1
+todo(sm<6 | msl) dispatch 1 1 1
 probe uav 1 (0) u32(39)
 
 [uav 0]
@@ -263,7 +263,7 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 }
 
 [test]
-todo(sm<6) dispatch 2 1 1
+todo(sm<6 | msl) dispatch 2 1 1
 probe uav 0 (0) u32(0x18)
 probe uav 0 (1) u32(0x18)
 probe uav 0 (2) u32(0x38)
@@ -305,7 +305,7 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 }
 
 [test]
-todo(sm<6) dispatch 2 1 1
+todo(sm<6 | msl) dispatch 2 1 1
 probe uav 0 (0) u32(0x14321)
 probe uav 0 (1) u32(0x14321)
 probe uav 0 (2) u32(0x14321)

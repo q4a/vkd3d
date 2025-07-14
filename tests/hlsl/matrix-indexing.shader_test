@@ -120,7 +120,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 2
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) rgba (8, 9, 10, 11)
 
 
@@ -136,5 +136,5 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 3
-draw quad
+todo(msl & sm>=6) draw quad
 probe (0, 0) rgba (12, 13, 14, 15)

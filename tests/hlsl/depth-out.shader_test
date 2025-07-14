@@ -65,14 +65,14 @@ uniform 0 float4 0.75 0.75 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 depth greater equal
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) f32(0.0, 1.0, 0.0, 1.0)
 probe dsv (0,0) f32(0.75)
 
 uniform 0 float4 0.75 0.375 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) f32(1.0, 1.0, 1.0, 1.0)
 probe dsv (0,0) f32(0.5)
 
@@ -91,20 +91,20 @@ uniform 0 float4 0.75 0.75 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 depth greater equal
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) f32(0.0, 1.0, 0.0, 1.0)
 probe dsv (0,0) f32(0.75)
 
 uniform 0 float4 0.375 0.625 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) f32(0.0, 1.0, 0.0, 1.0)
 probe dsv (0,0) f32(0.625)
 
 uniform 0 float4 0.375 0.375 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
-todo(sm<6) draw quad
+todo(sm<6 | msl) draw quad
 probe (0, 0) f32(1.0, 1.0, 1.0, 1.0)
 probe dsv (0,0) f32(0.5)

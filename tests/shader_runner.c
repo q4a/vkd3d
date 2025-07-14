@@ -2808,7 +2808,7 @@ START_TEST(shader_runner)
     run_shader_tests_gl();
 # endif
 # ifdef HAVE_METAL
-    run_shader_tests_metal();
+    run_shader_tests_metal(dxc);
 # endif
     run_shader_tests_vulkan();
     run_shader_tests_d3d12(dxc);

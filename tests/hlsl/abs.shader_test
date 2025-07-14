@@ -26,10 +26,10 @@ float4 main() : sv_target
 [test]
 uniform 0 float 2.0
 draw quad
-probe (0, 0) rgba(2, 8, 3, 1)
+todo(msl & sm>=6) probe (0, 0) f32(2, 8, 3, 1)
 uniform 0 float -1.0
 draw quad
-probe (0, 0) rgba(1, 8, 3, 1)
+todo(msl & sm>=6) probe (0, 0) f32(1, 8, 3, 1)
 
 [pixel shader]
 uniform float4 u;

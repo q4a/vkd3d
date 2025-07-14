@@ -36,7 +36,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 uint4 1 0 0 0
 draw quad
-probe (0, 0) rgba (2, -6, 2, -6)
+todo(msl & sm>=6) probe (0, 0) f32(2, -6, 2, -6)
 
 [pixel shader]
 uniform uint4 nonconst;
@@ -73,7 +73,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 uint4 2 0 0 0
 draw quad
-probe (0, 0) rgba (20, -48, 20, -48)
+todo(msl & sm>=6) probe (0, 0) f32(20, -48, 20, -48)
 
 [pixel shader fail]
 % Make sure that bitshifts DON'T work with floats

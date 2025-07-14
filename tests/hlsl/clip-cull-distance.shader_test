@@ -48,7 +48,7 @@ float4 main(const in float4 position : SV_Position) : SV_Target
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
 
 [vb 1]
@@ -59,7 +59,7 @@ probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
 
 [vb 1]
@@ -70,7 +70,7 @@ probe (0, 0, 640, 480) rgba(0.0, 1.0, 0.0, 1.0)
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe (0, 0, 640, 480) rgba(1.0, 1.0, 1.0, 1.0)
 
 [vb 1]
@@ -81,7 +81,7 @@ probe (0, 0, 640, 480) rgba(1.0, 1.0, 1.0, 1.0)
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe rtv 0 (160, 240) rgba(0.0, 1.0, 0.0, 1.0)
 probe rtv 0 (480, 240) rgba(1.0, 1.0, 1.0, 1.0)
 
@@ -93,7 +93,7 @@ probe rtv 0 (480, 240) rgba(1.0, 1.0, 1.0, 1.0)
 
 [test]
 clear rtv 0 1.0 1.0 1.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe rtv 0 (320, 120) rgba(0.0, 1.0, 0.0, 1.0)
 probe rtv 0 (320, 360) rgba(1.0, 1.0, 1.0, 1.0)
 
@@ -122,7 +122,7 @@ void main(uint id : SV_VertexID, out vs_out o)
 
 [test]
 clear rtv 0 1.0 1.0 0.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe rtv 0 (160, 120) rgba(0.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 240) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 360) rgba(1.0, 1.0, 0.0, 1.0)
@@ -158,7 +158,7 @@ void main(uint id : SV_VertexID, out vs_out o)
 
 [test]
 clear rtv 0 1.0 1.0 0.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe rtv 0 (160, 120) rgba(0.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 240) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 360) rgba(1.0, 1.0, 0.0, 1.0)
@@ -195,7 +195,7 @@ void main(uint id : SV_VertexID, out vs_out o)
 
 [test]
 clear rtv 0 1.0 1.0 0.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe rtv 0 (160, 120) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 240) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 360) rgba(1.0, 1.0, 0.0, 1.0)
@@ -236,7 +236,7 @@ void main(uint id : SV_VertexID, out vs_out o)
 
 [test]
 clear rtv 0 1.0 1.0 0.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe rtv 0 (160, 120) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 240) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 360) rgba(1.0, 1.0, 0.0, 1.0)
@@ -284,7 +284,7 @@ void main(uint id : SV_VertexID, out vs_out o)
 
 [test]
 clear rtv 0 1.0 1.0 0.0 1.0
-todo(sm<6) draw triangle strip 4
+todo(sm<6 | msl) draw triangle strip 4
 probe rtv 0 (160, 120) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 240) rgba(1.0, 1.0, 0.0, 1.0)
 probe rtv 0 (160, 360) rgba(1.0, 1.0, 0.0, 1.0)
