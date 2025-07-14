@@ -8589,6 +8589,7 @@ static void temp_allocator_set_src(struct temp_allocator *allocator, struct vkd3
         return;
 
     src->reg.type = VKD3DSPR_TEMP;
+    src->reg.dimension = VSIR_DIMENSION_VEC4;
     src->reg.idx[0].offset = reg->temp_id;
     src->swizzle = vsir_combine_swizzles(vsir_swizzle_from_writemask(reg->allocated_mask), src->swizzle);
 }
@@ -8676,6 +8677,7 @@ static void temp_allocator_set_dst(struct temp_allocator *allocator,
         return;
 
     dst->reg.type = VKD3DSPR_TEMP;
+    dst->reg.dimension = VSIR_DIMENSION_VEC4;
     dst->reg.idx[0].offset = reg->temp_id;
     if (reg->allocated_mask != dst->write_mask)
     {
