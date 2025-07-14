@@ -1115,7 +1115,7 @@ static bool metal_runner_init(struct metal_runner *runner)
     runner->caps.tags[0] = "msl";
     runner->caps.tag_count = 1;
     runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
-    runner->caps.maximum_shader_model = SHADER_MODEL_5_0;
+    runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
 
     return true;
 }
@@ -1130,7 +1130,7 @@ void run_shader_tests_metal(void)
 {
     struct metal_runner runner;
 
-    if (test_skipping_execution("Metal", HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_0))
+    if (test_skipping_execution("Metal", HLSL_COMPILER, SHADER_MODEL_4_0, SHADER_MODEL_5_1))
         return;
 
     if (!metal_runner_init(&runner))
