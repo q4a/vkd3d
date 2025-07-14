@@ -8537,11 +8537,11 @@ static uint8_t get_available_writemask(const struct temp_allocator *allocator,
     return writemask;
 }
 
-static void temp_allocator_allocate(struct temp_allocator *allocator, struct liveness_tracker *tracker,
+static bool temp_allocator_allocate(struct temp_allocator *allocator, struct liveness_tracker *tracker,
         struct temp_allocator_reg *reg, const struct liveness_tracker_reg *liveness_reg, uint32_t base_id)
 {
     if (!liveness_reg->written)
-        return;
+        return false;
 
     for (uint32_t id = base_id;; ++id)
     {
@@ -8554,7 +8554,7 @@ static void temp_allocator_allocate(struct temp_allocator *allocator, struct liv
             {
                 reg->temp_id = id;
                 reg->allocated_mask = liveness_reg->mask;
-                return;
+                return true;
             }
         }
         else
@@ -8567,7 +8567,7 @@ static void temp_allocator_allocate(struct temp_allocator *allocator, struct liv
             {
                 reg->temp_id = id;
                 reg->allocated_mask = vsir_combine_write_masks(available_mask, liveness_reg->mask);
-                return;
+                return true;
             }
         }
     }
@@ -8735,10 +8735,10 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
         const struct liveness_tracker_reg *liveness_reg = &tracker.ssa_regs[i];
         struct temp_allocator_reg *reg = &allocator.ssa_regs[i];
 
-        temp_allocator_allocate(&allocator, &tracker, reg, liveness_reg, program->temp_count);
-        TRACE("Allocated r%u%s to sr%u (liveness %u-%u).\n",
-                reg->temp_id, debug_vsir_writemask(reg->allocated_mask), i,
-                liveness_reg->first_write, liveness_reg->last_access);
+        if (temp_allocator_allocate(&allocator, &tracker, reg, liveness_reg, program->temp_count))
+            TRACE("Allocated r%u%s to sr%u (liveness %u-%u).\n",
+                    reg->temp_id, debug_vsir_writemask(reg->allocated_mask), i,
+                    liveness_reg->first_write, liveness_reg->last_access);
         ++allocator.allocated_ssa_count;
     }
 
