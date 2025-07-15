@@ -7498,6 +7498,7 @@ static void test_draw_depth_no_ps(void)
     ID3D12Resource *vb;
     HRESULT hr;
 
+    static const struct vec4 clear_colour = {0.25f, 0.5f, 0.75f, 1.0f};
     static const D3D12_INPUT_ELEMENT_DESC layout_desc[] =
     {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
@@ -7523,7 +7524,10 @@ static void test_draw_depth_no_ps(void)
     vs = shader_bytecode_from_blob(vs_bytecode);
 
     memset(&desc, 0, sizeof(desc));
-    desc.no_render_target = true;
+    desc.rt_width = 640;
+    desc.rt_height = 480;
+    desc.rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    desc.no_root_signature = true;
     if (!init_test_context(&context, &desc))
     {
         ID3D10Blob_Release(vs_bytecode);
@@ -7539,8 +7543,6 @@ static void test_draw_depth_no_ps(void)
     vbv.SizeInBytes = sizeof(quad);
 
     init_depth_stencil(&ds, context.device, 640, 480, 1, 1, DXGI_FORMAT_D32_FLOAT, 0, NULL);
-    set_viewport(&context.viewport, 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 1.0f);
-    set_rect(&context.scissor_rect, 0, 0, 640, 480);
 
     context.root_signature = create_empty_root_signature(context.device,
             D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -7548,7 +7550,8 @@ static void test_draw_depth_no_ps(void)
     input_layout.NumElements = ARRAY_SIZE(layout_desc);
     init_pipeline_state_desc(&pso_desc, context.root_signature, 0,  &vs, NULL, &input_layout);
     memset(&pso_desc.PS, 0, sizeof(pso_desc.PS));
-    pso_desc.NumRenderTargets = 0;
+    pso_desc.NumRenderTargets = 1;
+    pso_desc.RTVFormats[0] = context.render_target_desc.Format;
     pso_desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     pso_desc.DepthStencilState.DepthEnable = true;
     pso_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
@@ -7559,8 +7562,9 @@ static void test_draw_depth_no_ps(void)
 
     ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, ds.dsv_handle,
             D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&clear_colour, 0, NULL);
 
-    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 0, NULL, false, &ds.dsv_handle);
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, &ds.dsv_handle);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -7571,7 +7575,11 @@ static void test_draw_depth_no_ps(void)
 
     transition_resource_state(command_list, ds.texture,
             D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     check_sub_resource_float(ds.texture, 0, queue, command_list, 0.5f, 1);
+    reset_command_list(command_list, context.allocator);
+    check_sub_resource_vec4(context.render_target, 0, queue, command_list, &clear_colour, 0);
 
     destroy_depth_stencil(&ds);
     ID3D12Resource_Release(vb);
