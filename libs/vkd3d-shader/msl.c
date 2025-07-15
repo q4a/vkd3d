@@ -1402,8 +1402,9 @@ static void msl_ret(struct msl_generator *gen, const struct vkd3d_shader_instruc
 
 static void msl_dcl_indexable_temp(struct msl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
+    const char *type = ins->declaration.indexable_temp.component_count == 4 ? "vkd3d_vec4" : "vkd3d_scalar";
     msl_print_indent(gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(gen->buffer, "vkd3d_vec4 x%u[%u];\n",
+    vkd3d_string_buffer_printf(gen->buffer, "%s x%u[%u];\n", type,
             ins->declaration.indexable_temp.register_idx,
             ins->declaration.indexable_temp.register_size);
 }
@@ -2034,6 +2035,11 @@ static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader
     if (gen->program->global_flags & ~(VKD3DSGF_REFACTORING_ALLOWED | VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL))
         msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                 "Internal compiler error: Unhandled global flags %#"PRIx64".", (uint64_t)gen->program->global_flags);
+
+    vkd3d_string_buffer_printf(gen->buffer, "union vkd3d_scalar\n{\n");
+    vkd3d_string_buffer_printf(gen->buffer, "    uint u;\n");
+    vkd3d_string_buffer_printf(gen->buffer, "    int i;\n");
+    vkd3d_string_buffer_printf(gen->buffer, "    float f;\n};\n\n");
 
     vkd3d_string_buffer_printf(gen->buffer, "union vkd3d_vec4\n{\n");
     vkd3d_string_buffer_printf(gen->buffer, "    uint4 u;\n");
