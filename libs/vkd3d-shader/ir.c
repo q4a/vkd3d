@@ -11318,6 +11318,19 @@ static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3
     vsir_validate_cast_operation(ctx, instruction, src_types, dst_types);
 }
 
+static void vsir_validate_itoi(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_INT] = true,
+        [VKD3D_DATA_UINT] = true,
+        [VKD3D_DATA_UINT64] = true,
+        [VKD3D_DATA_BOOL] = true,
+    };
+
+    vsir_validate_cast_operation(ctx, instruction, types, types);
+}
+
 static void vsir_validate_label(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
@@ -11560,6 +11573,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_ISINF] =                            {1,   1, vsir_validate_float_comparison_operation},
     [VSIR_OP_ISNAN] =                            {1,   1, vsir_validate_float_comparison_operation},
     [VSIR_OP_ITOF] =                             {1,   1, vsir_validate_itof},
+    [VSIR_OP_ITOI] =                             {1,   1, vsir_validate_itoi},
     [VSIR_OP_LABEL] =                            {0,   1, vsir_validate_label},
     [VSIR_OP_LOOP] =                             {0, ~0u, vsir_validate_loop},
     [VSIR_OP_NOP] =                              {0,   0, vsir_validate_nop},
