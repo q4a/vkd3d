@@ -1024,24 +1024,22 @@ static enum vkd3d_result vsir_program_lower_ifc(struct vsir_program *program,
 }
 
 static enum vkd3d_result vsir_program_lower_texkill(struct vsir_program *program,
-        struct vkd3d_shader_instruction *texkill, unsigned int *tmp_idx)
+        struct vsir_program_iterator *it, unsigned int *tmp_idx)
 {
     const unsigned int components_read = 3 + (program->shader_version.major >= 2);
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    size_t pos = texkill - instructions->elements;
-    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_instruction *ins, *texkill;
     unsigned int j;
 
-    if (!shader_instruction_array_insert_at(instructions, pos + 1, components_read + 1))
+    if (!vsir_program_iterator_insert_after(it, components_read + 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    texkill = &instructions->elements[pos];
+    texkill = vsir_program_iterator_current(it);
 
     if (*tmp_idx == ~0u)
         *tmp_idx = program->temp_count++;
 
     /* tmp = ins->src[0] < 0  */
 
-    ins = &instructions->elements[pos + 1];
+    ins = vsir_program_iterator_next(it);
     if (!vsir_instruction_init_with_params(program, ins, &texkill->location, VSIR_OP_LTO, 1, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
@@ -1065,7 +1063,7 @@ static enum vkd3d_result vsir_program_lower_texkill(struct vsir_program *program
 
     for (j = 1; j < components_read; ++j)
     {
-        ins = &instructions->elements[pos + 1 + j];
+        ins = vsir_program_iterator_next(it);
         if (!(vsir_instruction_init_with_params(program, ins, &texkill->location, VSIR_OP_OR, 1, 2)))
             return VKD3D_ERROR_OUT_OF_MEMORY;
 
@@ -1086,7 +1084,7 @@ static enum vkd3d_result vsir_program_lower_texkill(struct vsir_program *program
 
     /* discard_nz tmp.x */
 
-    ins = &instructions->elements[pos + 1 + components_read];
+    ins = vsir_program_iterator_next(it);
     if (!(vsir_instruction_init_with_params(program, ins, &texkill->location, VSIR_OP_DISCARD, 0, 1)))
         return VKD3D_ERROR_OUT_OF_MEMORY;
     ins->flags = VKD3D_SHADER_CONDITIONAL_OP_NZ;
@@ -1595,7 +1593,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 break;
 
             case VSIR_OP_TEXKILL:
-                if ((ret = vsir_program_lower_texkill(program, ins, &tmp_idx)) < 0)
+                if ((ret = vsir_program_lower_texkill(program, &it, &tmp_idx)) < 0)
                     return ret;
                 break;
 
