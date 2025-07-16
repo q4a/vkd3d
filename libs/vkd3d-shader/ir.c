@@ -10748,6 +10748,32 @@ static void vsir_validate_integer_comparison_operation(struct validation_context
     vsir_validate_comparison_operation(ctx, instruction, types);
 }
 
+static void vsir_validate_cast_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction,
+        const bool src_types[VKD3D_DATA_COUNT], const bool dst_types[VKD3D_DATA_COUNT])
+{
+    enum vkd3d_data_type dst_data_type, src_data_type;
+
+    if (instruction->dst_count < 1 || instruction->src_count < 1)
+        return;
+
+    dst_data_type = instruction->dst[0].reg.data_type;
+    src_data_type = instruction->src[0].reg.data_type;
+
+    if (src_data_type >= VKD3D_DATA_COUNT || dst_data_type >= VKD3D_DATA_COUNT)
+        return;
+
+    if (!src_types[src_data_type])
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid source data type %#x for cast operation \"%s\" (%#x).",
+                src_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+
+    if (!dst_types[dst_data_type])
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid destination data type %#x for cast operation \"%s\" (%#x).",
+                dst_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+}
+
 static void vsir_validate_branch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     size_t i;
@@ -11273,6 +11299,25 @@ static void vsir_validate_ifc(struct validation_context *ctx, const struct vkd3d
     vsir_validator_push_block(ctx, VSIR_OP_IF);
 }
 
+static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool src_types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_INT] = true,
+        [VKD3D_DATA_UINT] = true,
+        [VKD3D_DATA_UINT64] = true,
+        [VKD3D_DATA_BOOL] = true,
+    };
+    static const bool dst_types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_FLOAT] = true,
+        [VKD3D_DATA_DOUBLE] = true,
+        [VKD3D_DATA_HALF] = true,
+    };
+
+    vsir_validate_cast_operation(ctx, instruction, src_types, dst_types);
+}
+
 static void vsir_validate_label(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     vsir_validate_cf_type(ctx, instruction, VSIR_CF_BLOCKS);
@@ -11514,6 +11559,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_ISHR] =                             {1,   2, vsir_validate_integer_elementwise_operation},
     [VSIR_OP_ISINF] =                            {1,   1, vsir_validate_float_comparison_operation},
     [VSIR_OP_ISNAN] =                            {1,   1, vsir_validate_float_comparison_operation},
+    [VSIR_OP_ITOF] =                             {1,   1, vsir_validate_itof},
     [VSIR_OP_LABEL] =                            {0,   1, vsir_validate_label},
     [VSIR_OP_LOOP] =                             {0, ~0u, vsir_validate_loop},
     [VSIR_OP_NOP] =                              {0,   0, vsir_validate_nop},
