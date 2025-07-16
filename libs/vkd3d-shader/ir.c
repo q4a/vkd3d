@@ -11512,6 +11512,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_ISFINITE] =                         {1,   1, vsir_validate_float_comparison_operation},
     [VSIR_OP_ISHL] =                             {1,   2, vsir_validate_integer_elementwise_operation},
     [VSIR_OP_ISHR] =                             {1,   2, vsir_validate_integer_elementwise_operation},
+    [VSIR_OP_ISINF] =                            {1,   1, vsir_validate_float_comparison_operation},
     [VSIR_OP_LABEL] =                            {0,   1, vsir_validate_label},
     [VSIR_OP_LOOP] =                             {0, ~0u, vsir_validate_loop},
     [VSIR_OP_NOP] =                              {0,   0, vsir_validate_nop},
