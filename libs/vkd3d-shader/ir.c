@@ -11304,6 +11304,22 @@ static void vsir_validate_ftoi(struct validation_context *ctx, const struct vkd3
     vsir_validate_cast_operation(ctx, instruction, src_types, dst_types);
 }
 
+static void vsir_validate_ftou(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
+{
+    static const bool src_types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_FLOAT] = true,
+        [VKD3D_DATA_DOUBLE] = true,
+        [VKD3D_DATA_HALF] = true,
+    };
+    static const bool dst_types[VKD3D_DATA_COUNT] =
+    {
+        [VKD3D_DATA_UINT] = true,
+    };
+
+    vsir_validate_cast_operation(ctx, instruction, src_types, dst_types);
+}
+
 static void vsir_validate_if(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
@@ -11564,6 +11580,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_FRC] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_FREM] =                             {1,   2, vsir_validate_float_elementwise_operation},
     [VSIR_OP_FTOI] =                             {1,   1, vsir_validate_ftoi},
+    [VSIR_OP_FTOU] =                             {1,   1, vsir_validate_ftou},
     [VSIR_OP_GEO] =                              {1,   2, vsir_validate_float_comparison_operation},
     [VSIR_OP_GEU] =                              {1,   2, vsir_validate_float_comparison_operation},
     [VSIR_OP_HCOS] =                             {1,   1, vsir_validate_float_elementwise_operation},
