@@ -1456,6 +1456,14 @@ static inline struct vkd3d_shader_instruction *vsir_program_iterator_next(
     return vsir_program_iterator_current(iterator);
 }
 
+/* When insertion takes place, argument `it' is updated to point to the same
+ * instruction as before the insertion, but all other iterators and pointers
+ * to the same container are invalidated and cannot be used any more. */
+static inline bool vsir_program_iterator_insert_after(struct vsir_program_iterator *it, unsigned int count)
+{
+    return shader_instruction_array_insert_at(it->array, it->idx + 1, count);
+}
+
 enum vkd3d_shader_config_flags
 {
     VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION = 0x00000001,

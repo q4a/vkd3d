@@ -971,18 +971,16 @@ static enum vkd3d_result vsir_program_normalize_addr(struct vsir_program *progra
 }
 
 static enum vkd3d_result vsir_program_lower_ifc(struct vsir_program *program,
-        struct vkd3d_shader_instruction *ifc, unsigned int *tmp_idx,
+        struct vsir_program_iterator *it, unsigned int *tmp_idx,
         struct vkd3d_shader_message_context *message_context)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    size_t pos = ifc - instructions->elements;
-    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_instruction *ifc, *ins;
     enum vkd3d_shader_opcode opcode;
     bool swap;
 
-    if (!shader_instruction_array_insert_at(instructions, pos + 1, 2))
+    if (!vsir_program_iterator_insert_after(it, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    ifc = &instructions->elements[pos];
+    ifc = vsir_program_iterator_current(it);
 
     if (*tmp_idx == ~0u)
         *tmp_idx = program->temp_count++;
@@ -996,7 +994,7 @@ static enum vkd3d_result vsir_program_lower_ifc(struct vsir_program *program,
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
 
-    ins = &instructions->elements[pos + 1];
+    ins = vsir_program_iterator_next(it);
     if (!vsir_instruction_init_with_params(program, ins, &ifc->location, opcode, 1, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
@@ -1009,7 +1007,7 @@ static enum vkd3d_result vsir_program_lower_ifc(struct vsir_program *program,
     ins->src[1] = ifc->src[!swap];
 
     /* Create new if instruction using the previous result. */
-    ins = &instructions->elements[pos + 2];
+    ins = vsir_program_iterator_next(it);
     if (!vsir_instruction_init_with_params(program, ins, &ifc->location, VSIR_OP_IF, 0, 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
     ins->flags = VKD3D_SHADER_CONDITIONAL_OP_NZ;
@@ -1592,7 +1590,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
         switch (ins->opcode)
         {
             case VSIR_OP_IFC:
-                if ((ret = vsir_program_lower_ifc(program, ins, &tmp_idx, message_context)) < 0)
+                if ((ret = vsir_program_lower_ifc(program, &it, &tmp_idx, message_context)) < 0)
                     return ret;
                 break;
 
