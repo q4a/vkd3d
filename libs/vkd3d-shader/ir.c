@@ -1579,14 +1579,15 @@ static enum vkd3d_result vsir_program_lower_dcl_output(struct vsir_program *prog
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
-    unsigned int tmp_idx = ~0u, i;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int tmp_idx = ~0u;
     enum vkd3d_result ret;
 
-    for (i = 0; i < instructions->count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &instructions->elements[i];
+        size_t idx = it.idx;
 
         switch (ins->opcode)
         {
@@ -1704,6 +1705,8 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             default:
                 break;
         }
+
+        it.idx = idx;
     }
 
     return VKD3D_OK;

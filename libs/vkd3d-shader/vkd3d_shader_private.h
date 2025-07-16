@@ -1419,6 +1419,43 @@ bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_
         unsigned int dst, unsigned int src);
 void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions);
 
+struct vsir_program_iterator
+{
+    struct vkd3d_shader_instruction_array *array;
+    size_t idx;
+};
+
+static inline struct vsir_program_iterator vsir_program_iterator(struct vkd3d_shader_instruction_array *array)
+{
+    return (struct vsir_program_iterator){ .array = array };
+}
+
+static inline struct vkd3d_shader_instruction *vsir_program_iterator_current(
+        struct vsir_program_iterator *iterator)
+{
+    if (iterator->idx >= iterator->array->count)
+        return NULL;
+
+    return &iterator->array->elements[iterator->idx];
+}
+
+static inline struct vkd3d_shader_instruction *vsir_program_iterator_head(
+        struct vsir_program_iterator *iterator)
+{
+    iterator->idx = 0;
+
+    return vsir_program_iterator_current(iterator);
+}
+
+static inline struct vkd3d_shader_instruction *vsir_program_iterator_next(
+        struct vsir_program_iterator *iterator)
+{
+    if (iterator->idx < iterator->array->count)
+        ++iterator->idx;
+
+    return vsir_program_iterator_current(iterator);
+}
+
 enum vkd3d_shader_config_flags
 {
     VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION = 0x00000001,
