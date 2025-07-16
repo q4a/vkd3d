@@ -1107,25 +1107,24 @@ static enum vkd3d_result vsir_program_lower_texkill(struct vsir_program *program
  * not fused for "precise" operations."
  * Windows drivers seem to conform with the latter, for SM 4-5 and SM 6. */
 static enum vkd3d_result vsir_program_lower_precise_mad(struct vsir_program *program,
-        struct vkd3d_shader_instruction *mad, unsigned int *tmp_idx)
+        struct vsir_program_iterator *it, unsigned int *tmp_idx)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    struct vkd3d_shader_instruction *mul_ins, *add_ins;
-    size_t pos = mad - instructions->elements;
+    struct vkd3d_shader_instruction *mad, *mul_ins, *add_ins;
     struct vkd3d_shader_dst_param *mul_dst;
+
+    mad = vsir_program_iterator_current(it);
 
     if (!(mad->flags & VKD3DSI_PRECISE_XYZW))
         return VKD3D_OK;
 
-    if (!shader_instruction_array_insert_at(instructions, pos + 1, 1))
+    if (!vsir_program_iterator_insert_after(it, 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    mad = &instructions->elements[pos];
 
     if (*tmp_idx == ~0u)
         *tmp_idx = program->temp_count++;
 
-    mul_ins = &instructions->elements[pos];
-    add_ins = &instructions->elements[pos + 1];
+    mul_ins = vsir_program_iterator_current(it);
+    add_ins = vsir_program_iterator_next(it);
 
     mul_ins->opcode = VSIR_OP_MUL;
     mul_ins->src_count = 2;
@@ -1598,7 +1597,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 break;
 
             case VSIR_OP_MAD:
-                if ((ret = vsir_program_lower_precise_mad(program, ins, &tmp_idx)) < 0)
+                if ((ret = vsir_program_lower_precise_mad(program, &it, &tmp_idx)) < 0)
                     return ret;
                 break;
 
