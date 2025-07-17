@@ -1378,27 +1378,30 @@ static enum vkd3d_result vsir_program_lower_sm4_sincos(struct vsir_program *prog
 }
 
 static enum vkd3d_result vsir_program_lower_texldp(struct vsir_program *program,
-        struct vkd3d_shader_instruction *tex, unsigned int *tmp_idx)
+        struct vsir_program_iterator *it, unsigned int *tmp_idx)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    struct vkd3d_shader_location *location = &tex->location;
-    struct vkd3d_shader_instruction *div_ins, *tex_ins;
-    size_t pos = tex - instructions->elements;
+    struct vkd3d_shader_instruction *div_ins, *tex, *tex_ins;
+    struct vsir_program_iterator it2;
     unsigned int w_comp;
+
+    tex = vsir_program_iterator_current(it);
 
     w_comp = vsir_swizzle_get_component(tex->src[0].swizzle, 3);
 
-    if (!shader_instruction_array_insert_at(instructions, pos + 1, 2))
+    if (!vsir_program_iterator_insert_after(it, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    tex = &instructions->elements[pos];
+    tex = vsir_program_iterator_current(it);
 
     if (*tmp_idx == ~0u)
         *tmp_idx = program->temp_count++;
 
-    div_ins = &instructions->elements[pos + 1];
-    tex_ins = &instructions->elements[pos + 2];
+    /* Do not increment `it', because we need to scan the generated instructions
+     * again to lower TEXLD. */
+    it2 = *it;
+    div_ins = vsir_program_iterator_next(&it2);
+    tex_ins = vsir_program_iterator_next(&it2);
 
-    if (!vsir_instruction_init_with_params(program, div_ins, location, VSIR_OP_DIV, 1, 2))
+    if (!vsir_instruction_init_with_params(program, div_ins, &tex->location, VSIR_OP_DIV, 1, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     vsir_dst_param_init(&div_ins->dst[0], VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
@@ -1411,7 +1414,7 @@ static enum vkd3d_result vsir_program_lower_texldp(struct vsir_program *program,
     div_ins->src[1] = tex->src[0];
     div_ins->src[1].swizzle = vkd3d_shader_create_swizzle(w_comp, w_comp, w_comp, w_comp);
 
-    if (!vsir_instruction_init_with_params(program, tex_ins, location, VSIR_OP_TEXLD, 1, 2))
+    if (!vsir_instruction_init_with_params(program, tex_ins, &tex->location, VSIR_OP_TEXLD, 1, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     tex_ins->dst[0] = tex->dst[0];
@@ -1575,8 +1578,6 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
 
     for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        size_t idx = it.idx;
-
         switch (ins->opcode)
         {
             case VSIR_OP_IFC:
@@ -1652,7 +1653,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VSIR_OP_TEXLD:
                 if (ins->flags == VKD3DSI_TEXLD_PROJECT)
                 {
-                    if ((ret = vsir_program_lower_texldp(program, ins, &tmp_idx)) < 0)
+                    if ((ret = vsir_program_lower_texldp(program, &it, &tmp_idx)) < 0)
                         return ret;
                 }
                 else
@@ -1693,8 +1694,6 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             default:
                 break;
         }
-
-        it.idx = idx;
     }
 
     return VKD3D_OK;
