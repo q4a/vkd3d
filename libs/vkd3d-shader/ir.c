@@ -11604,6 +11604,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_ITOF] =                             {1,   1, vsir_validate_itof},
     [VSIR_OP_ITOI] =                             {1,   1, vsir_validate_itoi},
     [VSIR_OP_LABEL] =                            {0,   1, vsir_validate_label},
+    [VSIR_OP_LOG] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_LOOP] =                             {0, ~0u, vsir_validate_loop},
     [VSIR_OP_NOP] =                              {0,   0, vsir_validate_nop},
     [VSIR_OP_PHI] =                              {1, ~0u, vsir_validate_phi},
