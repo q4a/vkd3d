@@ -717,7 +717,6 @@ enum vsir_data_type
     VKD3D_DATA_MIXED,
     VKD3D_DATA_CONTINUED,
     VKD3D_DATA_UNUSED,
-    VKD3D_DATA_UINT8,
     VKD3D_DATA_UINT64,
     VKD3D_DATA_BOOL,
     VKD3D_DATA_UINT16,
@@ -728,12 +727,14 @@ enum vsir_data_type
 
     VSIR_DATA_I32,
 
+    VSIR_DATA_U8,
+
     VSIR_DATA_TYPE_COUNT,
 };
 
 static inline bool data_type_is_integer(enum vsir_data_type data_type)
 {
-    return data_type == VSIR_DATA_I32 || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT16
+    return data_type == VSIR_DATA_I32 || data_type == VSIR_DATA_U8 || data_type == VKD3D_DATA_UINT16
             || data_type == VKD3D_DATA_UINT || data_type == VKD3D_DATA_UINT64;
 }
 
