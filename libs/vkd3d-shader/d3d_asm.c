@@ -397,12 +397,12 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
         [VKD3D_DATA_UNUSED   ] = "<unused>",
         [VKD3D_DATA_UINT64   ] = "uint64",
         [VKD3D_DATA_BOOL     ] = "bool",
-        [VKD3D_DATA_UINT16   ] = "uint16",
         [VSIR_DATA_F16      ] = "half",
         [VSIR_DATA_F32      ] = "float",
         [VSIR_DATA_F64      ] = "double",
         [VSIR_DATA_I32      ] = "int",
         [VSIR_DATA_U8       ] = "uint8",
+        [VSIR_DATA_U16      ] = "uint16",
     };
 
     if (type < ARRAY_SIZE(data_type_names))

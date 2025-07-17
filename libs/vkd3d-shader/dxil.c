@@ -2484,7 +2484,7 @@ static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
             case 8:
                 return VSIR_DATA_U8;
             case 16:
-                return VKD3D_DATA_UINT16;
+                return VSIR_DATA_U16;
             case 32:
                 return VKD3D_DATA_UINT;
             case 64:
@@ -2572,7 +2572,7 @@ static void register_convert_to_minimum_precision(struct vkd3d_shader_register *
             }
             break;
 
-        case VKD3D_DATA_UINT16:
+        case VSIR_DATA_U16:
             reg->data_type = VKD3D_DATA_UINT;
             reg->precision = VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16;
             if (reg->type == VKD3DSPR_IMMCONST)
@@ -3254,7 +3254,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
             icb->data_type = VSIR_DATA_F32;
             break;
 
-        case VKD3D_DATA_UINT16:
+        case VSIR_DATA_U16:
             for (i = 0; i < count; ++i)
                 icb->data[i] = (int16_t)operands[i];
             icb->data_type = VKD3D_DATA_UINT;

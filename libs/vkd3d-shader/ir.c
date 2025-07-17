@@ -9886,7 +9886,7 @@ static void vsir_validate_io_src_param(struct validation_context *ctx,
 
 #define U64_BIT (1u << VKD3D_DATA_UINT64)
 #define U32_BIT (1u << VKD3D_DATA_UINT)
-#define U16_BIT (1u << VKD3D_DATA_UINT16)
+#define U16_BIT (1u << VSIR_DATA_U16)
 
 static void vsir_validate_src_param(struct validation_context *ctx,
         const struct vkd3d_shader_src_param *src)
