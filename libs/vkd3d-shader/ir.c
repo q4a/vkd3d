@@ -10724,6 +10724,7 @@ static void vsir_validate_float_comparison_operation(struct validation_context *
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VSIR_DATA_F32] = true,
+        [VSIR_DATA_F64] = true,
     };
 
     vsir_validate_comparison_operation(ctx, instruction, types);
@@ -11606,6 +11607,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_LABEL] =                            {0,   1, vsir_validate_label},
     [VSIR_OP_LOG] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_LOOP] =                             {0, ~0u, vsir_validate_loop},
+    [VSIR_OP_LTO] =                              {1,   2, vsir_validate_float_comparison_operation},
     [VSIR_OP_NOP] =                              {0,   0, vsir_validate_nop},
     [VSIR_OP_PHI] =                              {1, ~0u, vsir_validate_phi},
     [VSIR_OP_REP] =                              {0,   1, vsir_validate_rep},
