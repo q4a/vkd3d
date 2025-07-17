@@ -7592,7 +7592,7 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
     VKD3D_ASSERT(src->reg.data_type == VKD3D_DATA_BOOL && dst->reg.data_type != VKD3D_DATA_BOOL);
 
     val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
-    if (dst->reg.data_type == VKD3D_DATA_HALF || dst->reg.data_type == VKD3D_DATA_FLOAT)
+    if (dst->reg.data_type == VSIR_DATA_F16 || dst->reg.data_type == VKD3D_DATA_FLOAT)
     {
         val_id = spirv_compiler_emit_bool_to_float(compiler, 1, val_id, instruction->opcode == VSIR_OP_ITOF);
     }

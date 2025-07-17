@@ -2499,7 +2499,7 @@ static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
         switch (type->u.width)
         {
             case 16:
-                return VKD3D_DATA_HALF;
+                return VSIR_DATA_F16;
             case 32:
                 return VKD3D_DATA_FLOAT;
             case 64:
@@ -2562,7 +2562,7 @@ static void register_convert_to_minimum_precision(struct vkd3d_shader_register *
 
     switch (reg->data_type)
     {
-        case VKD3D_DATA_HALF:
+        case VSIR_DATA_F16:
             reg->data_type = VKD3D_DATA_FLOAT;
             reg->precision = VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_16;
             if (reg->type == VKD3DSPR_IMMCONST)
@@ -3248,7 +3248,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
     count = type->u.array.count;
     switch (icb->data_type)
     {
-        case VKD3D_DATA_HALF:
+        case VSIR_DATA_F16:
             for (i = 0; i < count; ++i)
                 icb->data[i] = half_to_float(operands[i]);
             icb->data_type = VKD3D_DATA_FLOAT;

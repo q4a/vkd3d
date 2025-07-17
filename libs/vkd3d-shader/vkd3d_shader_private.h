@@ -724,7 +724,8 @@ enum vsir_data_type
     VKD3D_DATA_UINT64,
     VKD3D_DATA_BOOL,
     VKD3D_DATA_UINT16,
-    VKD3D_DATA_HALF,
+
+    VSIR_DATA_F16,
 
     VSIR_DATA_TYPE_COUNT,
 };
@@ -742,7 +743,7 @@ static inline bool data_type_is_bool(enum vsir_data_type data_type)
 
 static inline bool data_type_is_floating_point(enum vsir_data_type data_type)
 {
-    return data_type == VKD3D_DATA_HALF || data_type == VKD3D_DATA_FLOAT || data_type == VKD3D_DATA_DOUBLE;
+    return data_type == VSIR_DATA_F16 || data_type == VKD3D_DATA_FLOAT || data_type == VKD3D_DATA_DOUBLE;
 }
 
 static inline bool data_type_is_64_bit(enum vsir_data_type data_type)
@@ -1789,7 +1790,7 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
 {
     switch (data_type)
     {
-        case VKD3D_DATA_HALF: /* Minimum precision. TODO: native 16-bit */
+        case VSIR_DATA_F16: /* Minimum precision. TODO: native 16-bit */
         case VKD3D_DATA_FLOAT:
         case VKD3D_DATA_UNORM:
         case VKD3D_DATA_SNORM:

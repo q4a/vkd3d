@@ -9777,7 +9777,7 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
         {
             case VKD3D_DATA_FLOAT:
             case VKD3D_DATA_DOUBLE:
-            case VKD3D_DATA_HALF:
+            case VSIR_DATA_F16:
                 break;
 
             default:
@@ -9885,7 +9885,7 @@ static void vsir_validate_io_src_param(struct validation_context *ctx,
 
 #define F64_BIT (1u << VKD3D_DATA_DOUBLE)
 #define F32_BIT (1u << VKD3D_DATA_FLOAT)
-#define F16_BIT (1u << VKD3D_DATA_HALF)
+#define F16_BIT (1u << VSIR_DATA_F16)
 
 #define I32_BIT (1u << VKD3D_DATA_INT)
 
@@ -11287,7 +11287,7 @@ static void vsir_validate_ftoi(struct validation_context *ctx, const struct vkd3
     {
         [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
-        [VKD3D_DATA_HALF] = true,
+        [VSIR_DATA_F16] = true,
     };
     static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
@@ -11304,7 +11304,7 @@ static void vsir_validate_ftou(struct validation_context *ctx, const struct vkd3
     {
         [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
-        [VKD3D_DATA_HALF] = true,
+        [VSIR_DATA_F16] = true,
     };
     static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
@@ -11339,7 +11339,7 @@ static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3
     {
         [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
-        [VKD3D_DATA_HALF] = true,
+        [VSIR_DATA_F16] = true,
     };
 
     vsir_validate_cast_operation(ctx, instruction, src_types, dst_types);

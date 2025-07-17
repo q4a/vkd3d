@@ -8243,7 +8243,7 @@ static enum vsir_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, c
             case HLSL_TYPE_FLOAT:
                 return VKD3D_DATA_FLOAT;
             case HLSL_TYPE_HALF:
-                return VKD3D_DATA_HALF;
+                return VSIR_DATA_F16;
             case HLSL_TYPE_INT:
                 return VKD3D_DATA_INT;
             case HLSL_TYPE_UINT:
