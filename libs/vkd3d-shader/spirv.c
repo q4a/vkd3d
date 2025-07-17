@@ -4491,7 +4491,7 @@ static uint32_t spirv_compiler_emit_int_to_bool(struct spirv_compiler *compiler,
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_BOOL, component_count);
     op = condition & VKD3D_SHADER_CONDITIONAL_OP_Z ? SpvOpIEqual : SpvOpINotEqual;
     return vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, op, type_id, val_id,
-            data_type == VKD3D_DATA_UINT64
+            data_type == VSIR_DATA_U64
             ? spirv_compiler_get_constant_uint64_vector(compiler, 0, component_count)
             : spirv_compiler_get_constant_uint_vector(compiler, 0, component_count));
 }
@@ -4716,7 +4716,7 @@ static uint32_t spirv_compiler_emit_constant_array(struct spirv_compiler *compil
                         &icb->data[component_count * i]);
             break;
         case VSIR_DATA_F64:
-        case VKD3D_DATA_UINT64:
+        case VSIR_DATA_U64:
         {
             uint64_t *data = (uint64_t *)icb->data;
             for (i = 0; i < element_count; ++i)
@@ -7604,7 +7604,7 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
     {
         val_id = spirv_compiler_emit_bool_to_int(compiler, 1, val_id, instruction->opcode == VSIR_OP_ITOI);
     }
-    else if (dst->reg.data_type == VKD3D_DATA_UINT64)
+    else if (dst->reg.data_type == VSIR_DATA_U64)
     {
         val_id = spirv_compiler_emit_bool_to_int64(compiler, 1, val_id, instruction->opcode == VSIR_OP_ITOI);
     }
@@ -7630,7 +7630,7 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
     SpvOp op = SpvOpMax;
     bool check_zero;
 
-    if (src->reg.data_type == VKD3D_DATA_UINT64 && instruction->opcode == VSIR_OP_COUNTBITS)
+    if (src->reg.data_type == VSIR_DATA_U64 && instruction->opcode == VSIR_OP_COUNTBITS)
     {
         /* At least some drivers support this anyway, but if validation is enabled it will fail. */
         FIXME("Unsupported 64-bit source for bit count.\n");
@@ -7700,7 +7700,7 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
         condition_id = spirv_compiler_emit_int_to_bool(compiler,
                 VKD3D_SHADER_CONDITIONAL_OP_NZ, src[1].reg.data_type, component_count, src_ids[1]);
 
-        if (dst[0].reg.data_type == VKD3D_DATA_UINT64)
+        if (dst[0].reg.data_type == VSIR_DATA_U64)
             uint_max_id = spirv_compiler_get_constant_uint64_vector(compiler, UINT64_MAX, component_count);
         else
             uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, UINT_MAX, component_count);
@@ -7815,7 +7815,7 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
     unsigned int i, component_count;
     enum GLSLstd450 glsl_inst;
 
-    if (src[0].reg.data_type == VKD3D_DATA_UINT64 && (instruction->opcode == VSIR_OP_FIRSTBIT_HI
+    if (src[0].reg.data_type == VSIR_DATA_U64 && (instruction->opcode == VSIR_OP_FIRSTBIT_HI
             || instruction->opcode == VSIR_OP_FIRSTBIT_LO || instruction->opcode == VSIR_OP_FIRSTBIT_SHI))
     {
         /* At least some drivers support this anyway, but if validation is enabled it will fail. */
@@ -8225,7 +8225,7 @@ static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *comp
 
     component_type = vkd3d_component_type_from_data_type(dst->reg.data_type);
     type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
-    size = (src[src_count - 1].reg.data_type == VKD3D_DATA_UINT64) ? 0x40 : 0x20;
+    size = (src[src_count - 1].reg.data_type == VSIR_DATA_U64) ? 0x40 : 0x20;
     mask_id = spirv_compiler_get_constant_uint(compiler, size - 1);
     size_id = spirv_compiler_get_constant_uint(compiler, size);
 

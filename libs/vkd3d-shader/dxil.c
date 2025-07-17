@@ -2488,7 +2488,7 @@ static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
             case 32:
                 return VSIR_DATA_U32;
             case 64:
-                return VKD3D_DATA_UINT64;
+                return VSIR_DATA_U64;
             default:
                 FIXME("Unhandled width %u.\n", type->u.width);
                 return VSIR_DATA_U32;
@@ -3267,7 +3267,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
             break;
 
         case VSIR_DATA_F64:
-        case VKD3D_DATA_UINT64:
+        case VSIR_DATA_U64:
             data64 = (uint64_t *)icb->data;
             for (i = 0; i < count; ++i)
                 data64[i] = operands[i];
@@ -8442,9 +8442,9 @@ static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_
                     continue;
                 }
 
-                if (src_params[0].reg.data_type == VKD3D_DATA_UINT64)
+                if (src_params[0].reg.data_type == VSIR_DATA_U64)
                 {
-                    vsir_src_param_init(&src_params[count], VKD3DSPR_IMMCONST64, VKD3D_DATA_UINT64, 0);
+                    vsir_src_param_init(&src_params[count], VKD3DSPR_IMMCONST64, VSIR_DATA_U64, 0);
                     src_params[count++].reg.u.immconst_u64[0] = switch_case->value;
                 }
                 else
