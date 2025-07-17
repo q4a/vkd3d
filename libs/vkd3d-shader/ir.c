@@ -1248,23 +1248,20 @@ static enum vkd3d_result vsir_program_lower_udiv(struct vsir_program *program,
 }
 
 static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *program,
-        struct vkd3d_shader_instruction *sincos)
+        struct vsir_program_iterator *it)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    size_t pos = sincos - instructions->elements;
-    struct vkd3d_shader_instruction *ins, *mov;
+    struct vkd3d_shader_instruction *ins, *mov, *sincos;
     unsigned int s, count;
 
+    sincos = vsir_program_iterator_current(it);
     count = 1 + vkd3d_popcount(sincos->dst[0].write_mask & (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1));
 
-    if (!shader_instruction_array_insert_at(instructions, pos + 1, count))
+    if (!vsir_program_iterator_insert_after(it, count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    sincos = &instructions->elements[pos];
-
-    ins = &instructions->elements[pos + 1];
+    sincos = vsir_program_iterator_current(it);
 
     /* Save the source in a SSA in case a destination collides with the source. */
-    mov = ins++;
+    mov = vsir_program_iterator_next(it);
     if (!(vsir_instruction_init_with_params(program, mov, &sincos->location, VSIR_OP_MOV, 1, 1)))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
@@ -1278,6 +1275,8 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
 
     if (sincos->dst->write_mask & VKD3DSP_WRITEMASK_1)
     {
+        ins = vsir_program_iterator_next(it);
+
         if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VSIR_OP_SIN, 1, 1)))
             return VKD3D_ERROR_OUT_OF_MEMORY;
 
@@ -1287,12 +1286,12 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
 
         ins->dst[0] = *sincos->dst;
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_1;
-
-        ++ins;
     }
 
     if (sincos->dst->write_mask & VKD3DSP_WRITEMASK_0)
     {
+        ins = vsir_program_iterator_next(it);
+
         if (!(vsir_instruction_init_with_params(program, ins, &sincos->location, VSIR_OP_COS, 1, 1)))
             return VKD3D_ERROR_OUT_OF_MEMORY;
 
@@ -1302,8 +1301,6 @@ static enum vkd3d_result vsir_program_lower_sm1_sincos(struct vsir_program *prog
 
         ins->dst[0] = *sincos->dst;
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_0;
-
-        ++ins;
     }
 
     vkd3d_shader_instruction_make_nop(sincos);
@@ -1644,7 +1641,7 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VSIR_OP_SINCOS:
                 if (ins->dst_count == 1)
                 {
-                    if ((ret = vsir_program_lower_sm1_sincos(program, ins)) < 0)
+                    if ((ret = vsir_program_lower_sm1_sincos(program, &it)) < 0)
                         return ret;
                 }
                 else
