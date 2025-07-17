@@ -397,7 +397,7 @@ static uint32_t combine_field_storage_modifiers(uint32_t modifiers, uint32_t fie
 
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         struct hlsl_block *block, uint32_t prim_index, struct hlsl_ir_load *lhs,
-        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
+        uint32_t modifiers, struct hlsl_semantic *semantic, bool force_align)
 {
     struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
     struct vkd3d_shader_location *loc = &lhs->node.loc;
@@ -441,9 +441,10 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
                 return;
             prim_type_src->modifiers = var->data_type->modifiers & HLSL_PRIMITIVE_MODIFIERS_MASK;
 
-            if (!(input = add_semantic_var(ctx, func, var, prim_type_src,
-                    modifiers, semantic, semantic_index + i, 0, false, force_align, true, loc)))
+            if (!(input = add_semantic_var(ctx, func, var, prim_type_src, modifiers,
+                    semantic, semantic->index, 0, false, force_align, true, loc)))
                 return;
+            ++semantic->index;
             hlsl_init_simple_deref_from_var(&prim_deref, input);
 
             idx = hlsl_block_add_uint_constant(ctx, block, prim_index, &var->loc);
@@ -455,8 +456,9 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         else
         {
             if (!(input = add_semantic_var(ctx, func, var, vector_type_src,
-                    modifiers, semantic, semantic_index + i, 0, false, force_align, true, loc)))
+                    modifiers, semantic, semantic->index, 0, false, force_align, true, loc)))
                 return;
+            ++semantic->index;
 
             if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
                 return;
@@ -482,7 +484,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
 
 static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         struct hlsl_block *block, uint32_t prim_index, struct hlsl_ir_load *lhs,
-        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index, bool force_align)
+        uint32_t modifiers, struct hlsl_semantic *semantic, bool force_align)
 {
     struct vkd3d_shader_location *loc = &lhs->node.loc;
     struct hlsl_type *type = lhs->node.data_type;
@@ -494,37 +496,13 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
     {
         struct hlsl_ir_load *element_load;
         struct hlsl_struct_field *field;
-        uint32_t elem_semantic_index;
 
         for (i = 0; i < hlsl_type_element_count(type); ++i)
         {
             uint32_t element_modifiers;
 
-            if (type->class == HLSL_CLASS_ARRAY)
-            {
-                elem_semantic_index = semantic_index
-                        + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
-                element_modifiers = modifiers;
-                force_align = true;
-
-                if (hlsl_type_is_primitive_array(type))
-                    prim_index = i;
-            }
-            else
-            {
-                field = &type->e.record.fields[i];
-                if (hlsl_type_is_resource(field->type))
-                {
-                    hlsl_fixme(ctx, &field->loc, "Prepend uniform copies for resource components within structs.");
-                    continue;
-                }
-                validate_field_semantic(ctx, field);
-                semantic = &field->semantic;
-                elem_semantic_index = semantic->index;
-                loc = &field->loc;
-                element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
-                force_align = (i == 0);
-            }
+            if (type->class == HLSL_CLASS_STRUCT)
+                loc = &type->e.record.fields[i].loc;
 
             c = hlsl_block_add_uint_constant(ctx, block, i, &var->loc);
 
@@ -533,13 +511,43 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
                 return;
             hlsl_block_add_instr(block, &element_load->node);
 
-            prepend_input_copy_recurse(ctx, func, block, prim_index, element_load,
-                    element_modifiers, semantic, elem_semantic_index, force_align);
+            if (type->class == HLSL_CLASS_ARRAY)
+            {
+                element_modifiers = modifiers;
+                force_align = true;
+
+                if (hlsl_type_is_primitive_array(type))
+                    prim_index = i;
+
+                prepend_input_copy_recurse(ctx, func, block, prim_index,
+                        element_load, element_modifiers, semantic, force_align);
+            }
+            else
+            {
+                struct hlsl_semantic semantic_copy;
+
+                field = &type->e.record.fields[i];
+                if (hlsl_type_is_resource(field->type))
+                {
+                    hlsl_fixme(ctx, &field->loc, "Prepend uniform copies for resource components within structs.");
+                    continue;
+                }
+                element_modifiers = combine_field_storage_modifiers(modifiers, field->storage_modifiers);
+                force_align = (i == 0);
+
+                validate_field_semantic(ctx, field);
+
+                if (!hlsl_clone_semantic(ctx, &semantic_copy, &field->semantic))
+                    return;
+                prepend_input_copy_recurse(ctx, func, block, prim_index,
+                        element_load, element_modifiers, &semantic_copy, force_align);
+                hlsl_cleanup_semantic(&semantic_copy);
+            }
         }
     }
     else
     {
-        prepend_input_copy(ctx, func, block, prim_index, lhs, modifiers, semantic, semantic_index, force_align);
+        prepend_input_copy(ctx, func, block, prim_index, lhs, modifiers, semantic, force_align);
     }
 }
 
@@ -547,6 +555,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_ir_func
  * and copy the former to the latter, so that writes to input variables work. */
 static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func, struct hlsl_ir_var *var)
 {
+    struct hlsl_semantic semantic_copy;
     struct hlsl_ir_load *load;
     struct hlsl_block block;
 
@@ -557,8 +566,13 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function
         return;
     hlsl_block_add_instr(&block, &load->node);
 
-    prepend_input_copy_recurse(ctx, func, &block, 0, load, var->storage_modifiers,
-            &var->semantic, var->semantic.index, false);
+    if (!hlsl_clone_semantic(ctx, &semantic_copy, &var->semantic))
+    {
+        hlsl_block_cleanup(&block);
+        return;
+    }
+    prepend_input_copy_recurse(ctx, func, &block, 0, load, var->storage_modifiers, &semantic_copy, false);
+    hlsl_cleanup_semantic(&semantic_copy);
 
     list_move_head(&func->body.instrs, &block.instrs);
 }
