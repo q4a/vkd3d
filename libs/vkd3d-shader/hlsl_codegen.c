@@ -288,10 +288,10 @@ static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hls
 
 static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         struct hlsl_ir_var *var, struct hlsl_type *type, uint32_t modifiers, struct hlsl_semantic *semantic,
-        uint32_t index, uint32_t stream_index, bool output, bool force_align, bool create,
-        const struct vkd3d_shader_location *loc)
+        uint32_t stream_index, bool output, bool force_align, bool create, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_semantic new_semantic;
+    uint32_t index = semantic->index;
     struct hlsl_ir_var *ext_var;
     const char *prefix;
     char *new_name;
@@ -441,8 +441,8 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
                 return;
             prim_type_src->modifiers = var->data_type->modifiers & HLSL_PRIMITIVE_MODIFIERS_MASK;
 
-            if (!(input = add_semantic_var(ctx, func, var, prim_type_src, modifiers,
-                    semantic, semantic->index, 0, false, force_align, true, loc)))
+            if (!(input = add_semantic_var(ctx, func, var, prim_type_src,
+                    modifiers, semantic, 0, false, force_align, true, loc)))
                 return;
             ++semantic->index;
             hlsl_init_simple_deref_from_var(&prim_deref, input);
@@ -456,7 +456,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_ir_function_dec
         else
         {
             if (!(input = add_semantic_var(ctx, func, var, vector_type_src,
-                    modifiers, semantic, semantic->index, 0, false, force_align, true, loc)))
+                    modifiers, semantic, 0, false, force_align, true, loc)))
                 return;
             ++semantic->index;
 
@@ -608,8 +608,8 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_var *output;
         struct hlsl_ir_node *load;
 
-        if (!(output = add_semantic_var(ctx, func, var, vector_type,
-                modifiers, semantic, semantic->index, stream_index, true, force_align, create, loc)))
+        if (!(output = add_semantic_var(ctx, func, var, vector_type, modifiers,
+                semantic, stream_index, true, force_align, create, loc)))
             return;
         ++semantic->index;
 
