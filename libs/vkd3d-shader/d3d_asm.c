@@ -388,7 +388,6 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
 {
     static const char *const data_type_names[] =
     {
-        [VKD3D_DATA_INT      ] = "int",
         [VKD3D_DATA_UINT     ] = "uint",
         [VKD3D_DATA_UNORM    ] = "unorm",
         [VKD3D_DATA_SNORM    ] = "snorm",
@@ -403,6 +402,7 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
         [VSIR_DATA_F16      ] = "half",
         [VSIR_DATA_F32      ] = "float",
         [VSIR_DATA_F64      ] = "double",
+        [VSIR_DATA_I32      ] = "int",
     };
 
     if (type < ARRAY_SIZE(data_type_names))
@@ -736,7 +736,7 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
                         else
                             shader_print_float_literal(compiler, "", reg->u.immconst_f32[0], "");
                         break;
-                    case VKD3D_DATA_INT:
+                    case VSIR_DATA_I32:
                         shader_print_int_literal(compiler, "", reg->u.immconst_u32[0], "");
                         break;
                     case VKD3D_DATA_UINT:
@@ -768,7 +768,7 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
                             shader_print_float_literal(compiler, ", ", reg->u.immconst_f32[3], "");
                         }
                         break;
-                    case VKD3D_DATA_INT:
+                    case VSIR_DATA_I32:
                         shader_print_int_literal(compiler, "", reg->u.immconst_u32[0], "");
                         shader_print_int_literal(compiler, ", ", reg->u.immconst_u32[1], "");
                         shader_print_int_literal(compiler, ", ", reg->u.immconst_u32[2], "");

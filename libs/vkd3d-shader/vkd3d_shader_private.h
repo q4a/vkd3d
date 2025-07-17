@@ -710,7 +710,6 @@ enum vkd3d_shader_register_precision
 
 enum vsir_data_type
 {
-    VKD3D_DATA_INT,
     VKD3D_DATA_UINT,
     VKD3D_DATA_UNORM,
     VKD3D_DATA_SNORM,
@@ -727,12 +726,14 @@ enum vsir_data_type
     VSIR_DATA_F32,
     VSIR_DATA_F64,
 
+    VSIR_DATA_I32,
+
     VSIR_DATA_TYPE_COUNT,
 };
 
 static inline bool data_type_is_integer(enum vsir_data_type data_type)
 {
-    return data_type == VKD3D_DATA_INT || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT16
+    return data_type == VSIR_DATA_I32 || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT16
             || data_type == VKD3D_DATA_UINT || data_type == VKD3D_DATA_UINT64;
 }
 
@@ -1799,11 +1800,11 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
             return VKD3D_SHADER_COMPONENT_FLOAT;
         case VSIR_DATA_F64:
             return VKD3D_SHADER_COMPONENT_DOUBLE;
+        case VSIR_DATA_I32:
+            return VKD3D_SHADER_COMPONENT_INT;
         case VKD3D_DATA_UINT16: /* Minimum precision. TODO: native 16-bit */
         case VKD3D_DATA_UINT:
             return VKD3D_SHADER_COMPONENT_UINT;
-        case VKD3D_DATA_INT:
-            return VKD3D_SHADER_COMPONENT_INT;
         case VKD3D_DATA_UINT64:
             return VKD3D_SHADER_COMPONENT_UINT64;
         case VKD3D_DATA_BOOL:
@@ -1825,7 +1826,7 @@ static inline enum vsir_data_type vsir_data_type_from_component_type(enum vkd3d_
         case VKD3D_SHADER_COMPONENT_UINT:
             return VKD3D_DATA_UINT;
         case VKD3D_SHADER_COMPONENT_INT:
-            return VKD3D_DATA_INT;
+            return VSIR_DATA_I32;
         case VKD3D_SHADER_COMPONENT_DOUBLE:
             return VSIR_DATA_F64;
         default:

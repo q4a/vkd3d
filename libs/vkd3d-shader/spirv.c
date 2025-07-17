@@ -4709,7 +4709,7 @@ static uint32_t spirv_compiler_emit_constant_array(struct spirv_compiler *compil
     switch (icb->data_type)
     {
         case VSIR_DATA_F32:
-        case VKD3D_DATA_INT:
+        case VSIR_DATA_I32:
         case VKD3D_DATA_UINT:
             for (i = 0; i < element_count; ++i)
                 elements[i] = spirv_compiler_get_constant(compiler, component_type, component_count,

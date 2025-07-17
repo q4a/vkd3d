@@ -9044,9 +9044,9 @@ static const enum vsir_data_type data_type_table[] =
 {
     [COMPONENT_TYPE_INVALID]     = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_I1]          = VKD3D_DATA_UNUSED,
-    [COMPONENT_TYPE_I16]         = VKD3D_DATA_INT,
+    [COMPONENT_TYPE_I16]         = VSIR_DATA_I32,
     [COMPONENT_TYPE_U16]         = VKD3D_DATA_UINT,
-    [COMPONENT_TYPE_I32]         = VKD3D_DATA_INT,
+    [COMPONENT_TYPE_I32]         = VSIR_DATA_I32,
     [COMPONENT_TYPE_U32]         = VKD3D_DATA_UINT,
     [COMPONENT_TYPE_I64]         = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_U64]         = VKD3D_DATA_UNUSED,

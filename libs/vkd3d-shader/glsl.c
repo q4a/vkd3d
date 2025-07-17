@@ -345,7 +345,7 @@ static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vk
     {
         switch (dst_data_type)
         {
-            case VKD3D_DATA_INT:
+            case VSIR_DATA_I32:
                 vkd3d_string_buffer_printf(dst, "floatBitsToInt(%s)", src);
                 return;
             case VKD3D_DATA_UINT:
@@ -363,7 +363,7 @@ static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vk
             case VSIR_DATA_F32:
                 vkd3d_string_buffer_printf(dst, "uintBitsToFloat(%s)", src);
                 return;
-            case VKD3D_DATA_INT:
+            case VSIR_DATA_I32:
                 if (size == 1)
                     vkd3d_string_buffer_printf(dst, "int(%s)", src);
                 else
@@ -522,7 +522,7 @@ static void VKD3D_PRINTF_FUNC(4, 0) shader_glsl_vprint_assignment(struct vkd3d_g
         case VSIR_DATA_F32:
             close = false;
             break;
-        case VKD3D_DATA_INT:
+        case VSIR_DATA_I32:
             vkd3d_string_buffer_printf(buffer, "intBitsToFloat(");
             break;
         case VKD3D_DATA_UINT:
@@ -1167,7 +1167,7 @@ static void shader_glsl_store_uav_typed(struct vkd3d_glsl_generator *gen, const 
             case VKD3D_DATA_UINT:
                 vkd3d_string_buffer_printf(image_data, "uvec4(");
                 break;
-            case VKD3D_DATA_INT:
+            case VSIR_DATA_I32:
                 vkd3d_string_buffer_printf(image_data, "ivec4(");
                 break;
             default:
@@ -1770,7 +1770,7 @@ static void shader_glsl_generate_uav_declaration(struct vkd3d_glsl_generator *ge
             image_type_prefix = "u";
             read_format = "r32ui";
             break;
-        case VKD3D_DATA_INT:
+        case VSIR_DATA_I32:
             image_type_prefix = "i";
             read_format = "r32i";
             break;
@@ -1998,13 +1998,13 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
         case VKD3D_DATA_UINT:
             sampler_type_prefix = "u";
             break;
-        case VKD3D_DATA_INT:
-            sampler_type_prefix = "i";
-            break;
         case VSIR_DATA_F32:
         case VKD3D_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             sampler_type_prefix = "";
+            break;
+        case VSIR_DATA_I32:
+            sampler_type_prefix = "i";
             break;
         default:
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,

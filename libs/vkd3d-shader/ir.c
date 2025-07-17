@@ -9882,7 +9882,7 @@ static void vsir_validate_io_src_param(struct validation_context *ctx,
 #define F32_BIT (1u << VSIR_DATA_F32)
 #define F16_BIT (1u << VSIR_DATA_F16)
 
-#define I32_BIT (1u << VKD3D_DATA_INT)
+#define I32_BIT (1u << VSIR_DATA_I32)
 
 #define U64_BIT (1u << VKD3D_DATA_UINT64)
 #define U32_BIT (1u << VKD3D_DATA_UINT)
@@ -10640,9 +10640,9 @@ static void vsir_validate_integer_elementwise_operation(struct validation_contex
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
         [VKD3D_DATA_UINT64] = true,
+        [VSIR_DATA_I32] = true,
     };
 
     vsir_validate_elementwise_operation(ctx, instruction, types);
@@ -10653,10 +10653,10 @@ static void vsir_validate_logic_elementwise_operation(struct validation_context 
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
         [VKD3D_DATA_UINT64] = true,
         [VKD3D_DATA_BOOL] = true,
+        [VSIR_DATA_I32] = true,
     };
 
     vsir_validate_elementwise_operation(ctx, instruction, types);
@@ -10730,9 +10730,9 @@ static void vsir_validate_integer_comparison_operation(struct validation_context
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
         [VKD3D_DATA_UINT64] = true,
+        [VSIR_DATA_I32] = true,
     };
 
     vsir_validate_comparison_operation(ctx, instruction, types);
@@ -11287,8 +11287,8 @@ static void vsir_validate_ftoi(struct validation_context *ctx, const struct vkd3
     };
     static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
+        [VSIR_DATA_I32] = true,
     };
 
     vsir_validate_cast_operation(ctx, instruction, src_types, dst_types);
@@ -11326,10 +11326,10 @@ static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3
 {
     static const bool src_types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
         [VKD3D_DATA_UINT64] = true,
         [VKD3D_DATA_BOOL] = true,
+        [VSIR_DATA_I32] = true,
     };
     static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
@@ -11345,10 +11345,10 @@ static void vsir_validate_itoi(struct validation_context *ctx, const struct vkd3
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
         [VKD3D_DATA_UINT64] = true,
         [VKD3D_DATA_BOOL] = true,
+        [VSIR_DATA_I32] = true,
     };
 
     vsir_validate_cast_operation(ctx, instruction, types, types);

@@ -8245,7 +8245,7 @@ static enum vsir_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, c
             case HLSL_TYPE_HALF:
                 return VSIR_DATA_F16;
             case HLSL_TYPE_INT:
-                return VKD3D_DATA_INT;
+                return VSIR_DATA_I32;
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
             case HLSL_TYPE_MIN16UINT:
@@ -11163,7 +11163,7 @@ static bool sm4_generate_vsir_instr_ld(struct hlsl_ctx *ctx,
     {
         if (sample_index->type == HLSL_IR_CONSTANT)
             vsir_src_from_hlsl_constant_value(&ins->src[2], ctx,
-                    &hlsl_ir_constant(sample_index)->value, VKD3D_DATA_INT, 1, 0);
+                    &hlsl_ir_constant(sample_index)->value, VSIR_DATA_I32, 1, 0);
         else if (version->major == 4 && version->minor == 0)
             hlsl_error(ctx, &sample_index->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Expected literal sample index.");
         else
@@ -12185,7 +12185,7 @@ static enum vsir_data_type sm4_generate_vsir_get_format_type(const struct hlsl_t
             return VSIR_DATA_F32;
 
         case HLSL_TYPE_INT:
-            return VKD3D_DATA_INT;
+            return VSIR_DATA_I32;
 
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_MIN16UINT:

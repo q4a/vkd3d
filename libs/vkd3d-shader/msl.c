@@ -142,7 +142,7 @@ static void msl_print_resource_datatype(struct msl_generator *gen,
         case VKD3D_DATA_SNORM:
             vkd3d_string_buffer_printf(buffer, "float");
             break;
-        case VKD3D_DATA_INT:
+        case VSIR_DATA_I32:
             vkd3d_string_buffer_printf(buffer, "int");
             break;
         case VKD3D_DATA_UINT:
@@ -165,7 +165,7 @@ static void msl_print_register_datatype(struct vkd3d_string_buffer *buffer,
         case VSIR_DATA_F32:
             vkd3d_string_buffer_printf(buffer, "f");
             break;
-        case VKD3D_DATA_INT:
+        case VSIR_DATA_I32:
             vkd3d_string_buffer_printf(buffer, "i");
             break;
         case VKD3D_DATA_UINT:
@@ -1312,7 +1312,7 @@ static void msl_store_uav_typed(struct msl_generator *gen, const struct vkd3d_sh
             case VKD3D_DATA_UINT:
                 vkd3d_string_buffer_printf(image_data, "uint4(");
                 break;
-            case VKD3D_DATA_INT:
+            case VSIR_DATA_I32:
                 vkd3d_string_buffer_printf(image_data, "int4(");
                 break;
             default:

@@ -753,7 +753,7 @@ static const enum vsir_data_type data_type_table[] =
     /* 0 */                         VSIR_DATA_F32,
     /* VKD3D_SM4_DATA_UNORM */      VKD3D_DATA_UNORM,
     /* VKD3D_SM4_DATA_SNORM */      VKD3D_DATA_SNORM,
-    /* VKD3D_SM4_DATA_INT */        VKD3D_DATA_INT,
+    /* VKD3D_SM4_DATA_INT */        VSIR_DATA_I32,
     /* VKD3D_SM4_DATA_UINT */       VKD3D_DATA_UINT,
     /* VKD3D_SM4_DATA_FLOAT */      VSIR_DATA_F32,
     /* VKD3D_SM4_DATA_MIXED */      VKD3D_DATA_MIXED,
@@ -1432,7 +1432,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
     /*
      * d -> VSIR_DATA_F64
      * f -> VSIR_DATA_F32
-     * i -> VKD3D_DATA_INT
+     * i -> VSIR_DATA_I32
      * u -> VKD3D_DATA_UINT
      * O -> VKD3D_DATA_OPAQUE
      * R -> VKD3D_DATA_RESOURCE
@@ -1994,7 +1994,7 @@ static enum vsir_data_type map_data_type(char t)
         case 'f':
             return VSIR_DATA_F32;
         case 'i':
-            return VKD3D_DATA_INT;
+            return VSIR_DATA_I32;
         case 'u':
             return VKD3D_DATA_UINT;
         case 'O':
@@ -2024,7 +2024,7 @@ static bool shader_sm4_read_reg_idx(struct vkd3d_shader_sm4_parser *priv, const 
             reg_idx->offset = *(*ptr)++;
         else
             reg_idx->offset = 0;
-        shader_sm4_read_src_param(priv, ptr, end, VKD3D_DATA_INT, rel_addr);
+        shader_sm4_read_src_param(priv, ptr, end, VSIR_DATA_I32, rel_addr);
     }
     else
     {
