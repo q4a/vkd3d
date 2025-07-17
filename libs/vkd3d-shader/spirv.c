@@ -4059,9 +4059,9 @@ static const struct
 }
 parameter_data_type_map[] =
 {
-    [VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32]      = {VKD3D_DATA_FLOAT, 1},
+    [VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32]      = {VSIR_DATA_F32, 1},
     [VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32]       = {VKD3D_DATA_UINT,  1},
-    [VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32_VEC4] = {VKD3D_DATA_FLOAT, 4},
+    [VKD3D_SHADER_PARAMETER_DATA_TYPE_FLOAT32_VEC4] = {VSIR_DATA_F32, 4},
 };
 
 static uint32_t spirv_compiler_emit_shader_parameter(struct spirv_compiler *compiler,
@@ -4708,7 +4708,7 @@ static uint32_t spirv_compiler_emit_constant_array(struct spirv_compiler *compil
 
     switch (icb->data_type)
     {
-        case VKD3D_DATA_FLOAT:
+        case VSIR_DATA_F32:
         case VKD3D_DATA_INT:
         case VKD3D_DATA_UINT:
             for (i = 0; i < element_count; ++i)
@@ -5511,7 +5511,7 @@ static uint32_t spirv_compiler_get_invocation_id(struct spirv_compiler *compiler
 
     VKD3D_ASSERT(compiler->shader_type == VKD3D_SHADER_TYPE_HULL);
 
-    vsir_register_init(&r, VKD3DSPR_OUTPOINTID, VKD3D_DATA_FLOAT, 0);
+    vsir_register_init(&r, VKD3DSPR_OUTPOINTID, VSIR_DATA_F32, 0);
     return spirv_compiler_get_register_id(compiler, &r);
 }
 
@@ -5800,7 +5800,7 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
     {
         struct vkd3d_shader_register dst_reg;
 
-        vsir_register_init(&dst_reg, reg_type, VKD3D_DATA_FLOAT, 1);
+        vsir_register_init(&dst_reg, reg_type, VSIR_DATA_F32, 1);
         dst_reg.idx[0].offset = element_idx;
 
         type_id = vkd3d_spirv_get_type_id(builder, component_type, input_component_count);
@@ -6502,7 +6502,7 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
      * scope is specified, e.g. DXIL alloca. */
     storage_class = temp->has_function_scope ? SpvStorageClassFunction : SpvStorageClassPrivate;
 
-    vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VKD3D_DATA_FLOAT, 1);
+    vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VSIR_DATA_F32, 1);
     reg.idx[0].offset = temp->register_idx;
 
     /* Alignment is supported only in the Kernel execution model and is an optimisation only. */
@@ -6742,7 +6742,7 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
     struct vkd3d_symbol reg_symbol;
     unsigned int size;
 
-    vsir_register_init(&reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 3);
+    vsir_register_init(&reg, VKD3DSPR_CONSTBUFFER, VSIR_DATA_F32, 3);
     reg.idx[0].offset = descriptor->register_id;
     reg.idx[1].offset = range->first;
     reg.idx[2].offset = range->last;
@@ -6802,7 +6802,7 @@ static void spirv_compiler_emit_dcl_immediate_constant_buffer(struct spirv_compi
     vkd3d_spirv_build_op_name(builder, icb_id, "icb");
 
     /* Set an index count of 2 so vkd3d_symbol_make_register() uses idx[0] as a buffer id. */
-    vsir_register_init(&reg, VKD3DSPR_IMMCONSTBUFFER, VKD3D_DATA_FLOAT, 2);
+    vsir_register_init(&reg, VKD3DSPR_IMMCONSTBUFFER, VSIR_DATA_F32, 2);
     reg.idx[0].offset = icb->register_idx;
     vkd3d_symbol_make_register(&reg_symbol, &reg);
     vkd3d_symbol_set_register_info(&reg_symbol, icb_id, SpvStorageClassPrivate,
@@ -6821,7 +6821,7 @@ static void spirv_compiler_emit_sampler_declaration(struct spirv_compiler *compi
     struct vkd3d_symbol reg_symbol;
     uint32_t type_id, var_id;
 
-    vsir_register_init(&reg, VKD3DSPR_SAMPLER, VKD3D_DATA_FLOAT, 1);
+    vsir_register_init(&reg, VKD3DSPR_SAMPLER, VSIR_DATA_F32, 1);
     reg.idx[0].offset = descriptor->register_id;
 
     vkd3d_symbol_make_sampler(&reg_symbol, &reg);
@@ -7002,7 +7002,7 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
     struct vkd3d_symbol resource_symbol;
     struct vkd3d_shader_register reg;
 
-    vsir_register_init(&reg, is_uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VKD3D_DATA_FLOAT, 1);
+    vsir_register_init(&reg, is_uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VSIR_DATA_F32, 1);
     reg.idx[0].offset = descriptor->register_id;
 
     if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS && sample_count == 1)
@@ -7592,7 +7592,7 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
     VKD3D_ASSERT(src->reg.data_type == VKD3D_DATA_BOOL && dst->reg.data_type != VKD3D_DATA_BOOL);
 
     val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
-    if (dst->reg.data_type == VSIR_DATA_F16 || dst->reg.data_type == VKD3D_DATA_FLOAT)
+    if (dst->reg.data_type == VSIR_DATA_F16 || dst->reg.data_type == VSIR_DATA_F32)
     {
         val_id = spirv_compiler_emit_bool_to_float(compiler, 1, val_id, instruction->opcode == VSIR_OP_ITOF);
     }
@@ -10952,14 +10952,14 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
 
     if (compiler->program->has_point_size)
     {
-        vsir_dst_param_init(&dst, VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+        vsir_dst_param_init(&dst, VKD3DSPR_RASTOUT, VSIR_DATA_F32, 1);
         dst.reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
         spirv_compiler_emit_io_register(compiler, &dst);
     }
 
     if (compiler->program->has_point_coord)
     {
-        vsir_dst_param_init(&dst, VKD3DSPR_POINT_COORD, VKD3D_DATA_FLOAT, 0);
+        vsir_dst_param_init(&dst, VKD3DSPR_POINT_COORD, VSIR_DATA_F32, 0);
         spirv_compiler_emit_io_register(compiler, &dst);
     }
 
@@ -10970,7 +10970,7 @@ static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler)
         if (bitmap_is_set(compiler->program->io_dcls, i)
                 || (compiler->program->shader_version.type == VKD3D_SHADER_TYPE_HULL && i == VKD3DSPR_OUTPOINTID))
         {
-            vsir_dst_param_init(&dst, i, VKD3D_DATA_FLOAT, 0);
+            vsir_dst_param_init(&dst, i, VSIR_DATA_F32, 0);
             spirv_compiler_emit_io_register(compiler, &dst);
         }
     }

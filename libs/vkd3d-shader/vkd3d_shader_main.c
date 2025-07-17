@@ -1145,7 +1145,7 @@ static void vkd3d_shader_scan_combined_sampler_declaration(
     vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, &semantic->resource.reg.reg,
             &semantic->resource.range, VKD3D_SHADER_RESOURCE_NONE, VKD3D_DATA_UNUSED);
     vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, &semantic->resource.reg.reg,
-            &semantic->resource.range, semantic->resource_type, VKD3D_DATA_FLOAT);
+            &semantic->resource.range, semantic->resource_type, VSIR_DATA_F32);
 }
 
 const struct vkd3d_shader_descriptor_info1 *vkd3d_shader_find_descriptor(
@@ -1534,7 +1534,7 @@ static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_t
             return VKD3D_SHADER_RESOURCE_DATA_INT;
         case VKD3D_DATA_UINT:
             return VKD3D_SHADER_RESOURCE_DATA_UINT;
-        case VKD3D_DATA_FLOAT:
+        case VSIR_DATA_F32:
             return VKD3D_SHADER_RESOURCE_DATA_FLOAT;
         case VKD3D_DATA_MIXED:
             return VKD3D_SHADER_RESOURCE_DATA_MIXED;

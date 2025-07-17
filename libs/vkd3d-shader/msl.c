@@ -137,7 +137,7 @@ static void msl_print_resource_datatype(struct msl_generator *gen,
 {
     switch (data_type)
     {
-        case VKD3D_DATA_FLOAT:
+        case VSIR_DATA_F32:
         case VKD3D_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             vkd3d_string_buffer_printf(buffer, "float");
@@ -162,7 +162,7 @@ static void msl_print_register_datatype(struct vkd3d_string_buffer *buffer,
     vkd3d_string_buffer_printf(buffer, ".");
     switch (data_type)
     {
-        case VKD3D_DATA_FLOAT:
+        case VSIR_DATA_F32:
             vkd3d_string_buffer_printf(buffer, "f");
             break;
         case VKD3D_DATA_INT:
@@ -528,12 +528,12 @@ static void msl_print_bitcast(struct vkd3d_string_buffer *dst, struct msl_genera
     bool write_cast = false;
 
     if (dst_data_type == VKD3D_DATA_UNORM || dst_data_type == VKD3D_DATA_SNORM)
-        dst_data_type = VKD3D_DATA_FLOAT;
+        dst_data_type = VSIR_DATA_F32;
 
     switch (src_data_type)
     {
         case MSL_DATA_FLOAT:
-            write_cast = dst_data_type != VKD3D_DATA_FLOAT;
+            write_cast = dst_data_type != VSIR_DATA_F32;
             break;
 
         case MSL_DATA_UINT:
@@ -975,7 +975,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
                 "Internal compiler error: Undeclared resource descriptor %u.", resource_id);
         resource_space = 0;
         resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
-        data_type = VKD3D_DATA_FLOAT;
+        data_type = VSIR_DATA_F32;
     }
 
     if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_CUBE
@@ -1086,7 +1086,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
                 "Internal compiler error: Undeclared resource descriptor %u.", resource_id);
         resource_space = 0;
         resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
-        data_type = VKD3D_DATA_FLOAT;
+        data_type = VSIR_DATA_F32;
     }
 
     if (resource_type == VKD3D_SHADER_RESOURCE_BUFFER
@@ -1280,7 +1280,7 @@ static void msl_store_uav_typed(struct msl_generator *gen, const struct vkd3d_sh
                 "Internal compiler error: Undeclared UAV descriptor %u.", uav_id);
         uav_space = 0;
         resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
-        data_type = VKD3D_DATA_FLOAT;
+        data_type = VSIR_DATA_F32;
     }
 
     if (!(resource_type_info = msl_get_resource_type_info(resource_type)))
@@ -1319,7 +1319,7 @@ static void msl_store_uav_typed(struct msl_generator *gen, const struct vkd3d_sh
                 msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
                         "Internal compiler error: Unhandled data type %#x.", data_type);
                 /* fall through */
-            case VKD3D_DATA_FLOAT:
+            case VSIR_DATA_F32:
             case VKD3D_DATA_UNORM:
             case VKD3D_DATA_SNORM:
                 vkd3d_string_buffer_printf(image_data, "float4(");
@@ -1888,7 +1888,7 @@ static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
                 break;
 
             case VKD3D_SHADER_SV_POSITION:
-                msl_print_register_datatype(buffer, gen, VKD3D_DATA_FLOAT);
+                msl_print_register_datatype(buffer, gen, VSIR_DATA_F32);
                 msl_print_write_mask(buffer, e->mask);
                 vkd3d_string_buffer_printf(buffer, " = float4(input.position.xyz, 1.0f / input.position.w)");
                 break;

@@ -666,12 +666,12 @@ static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned
 
 static void src_param_init_ssa_float(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    src_param_init_ssa_scalar(src, idx, VKD3D_DATA_FLOAT);
+    src_param_init_ssa_scalar(src, idx, VSIR_DATA_F32);
 }
 
 static void src_param_init_ssa_float4(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    src_param_init_ssa(src, idx, VKD3D_DATA_FLOAT, VSIR_DIMENSION_VEC4);
+    src_param_init_ssa(src, idx, VSIR_DATA_F32, VSIR_DIMENSION_VEC4);
 }
 
 static void src_param_init_temp_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
@@ -682,13 +682,13 @@ static void src_param_init_temp_bool(struct vkd3d_shader_src_param *src, unsigne
 
 static void src_param_init_temp_float(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    vsir_src_param_init(src, VKD3DSPR_TEMP, VSIR_DATA_F32, 1);
     src->reg.idx[0].offset = idx;
 }
 
 static void src_param_init_temp_float4(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    vsir_src_param_init(src, VKD3DSPR_TEMP, VSIR_DATA_F32, 1);
     src->reg.dimension = VSIR_DIMENSION_VEC4;
     src->swizzle = VKD3D_SHADER_NO_SWIZZLE;
     src->reg.idx[0].offset = idx;
@@ -750,12 +750,12 @@ static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned
 
 static void dst_param_init_ssa_float(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
-    dst_param_init_ssa_scalar(dst, idx, VKD3D_DATA_FLOAT);
+    dst_param_init_ssa_scalar(dst, idx, VSIR_DATA_F32);
 }
 
 static void dst_param_init_ssa_float4(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
-    dst_param_init_ssa(dst, idx, VKD3D_DATA_FLOAT, VSIR_DIMENSION_VEC4);
+    dst_param_init_ssa(dst, idx, VSIR_DATA_F32, VSIR_DIMENSION_VEC4);
 }
 
 static void dst_param_init_temp_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
@@ -766,7 +766,7 @@ static void dst_param_init_temp_bool(struct vkd3d_shader_dst_param *dst, unsigne
 
 static void dst_param_init_temp_float4(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
-    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VSIR_DATA_F32, 1);
     dst->reg.idx[0].offset = idx;
     dst->reg.dimension = VSIR_DIMENSION_VEC4;
 }
@@ -858,7 +858,7 @@ static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op,
         case VKD3D_SHADER_REL_OP_LT:
         case VKD3D_SHADER_REL_OP_GT:
             *requires_swap = (rel_op == VKD3D_SHADER_REL_OP_GT);
-            if (data_type == VKD3D_DATA_FLOAT)
+            if (data_type == VSIR_DATA_F32)
             {
                 *opcode = VSIR_OP_LTO;
                 return true;
@@ -868,7 +868,7 @@ static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op,
         case VKD3D_SHADER_REL_OP_GE:
         case VKD3D_SHADER_REL_OP_LE:
             *requires_swap = (rel_op == VKD3D_SHADER_REL_OP_LE);
-            if (data_type == VKD3D_DATA_FLOAT)
+            if (data_type == VSIR_DATA_F32)
             {
                 *opcode = VSIR_OP_GEO;
                 return true;
@@ -877,7 +877,7 @@ static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op,
 
         case VKD3D_SHADER_REL_OP_EQ:
             *requires_swap = false;
-            if (data_type == VKD3D_DATA_FLOAT)
+            if (data_type == VSIR_DATA_F32)
             {
                 *opcode = VSIR_OP_EQO;
                 return true;
@@ -886,7 +886,7 @@ static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op,
 
         case VKD3D_SHADER_REL_OP_NE:
             *requires_swap = false;
-            if (data_type == VKD3D_DATA_FLOAT)
+            if (data_type == VSIR_DATA_F32)
             {
                 *opcode = VSIR_OP_NEO;
                 return true;
@@ -928,7 +928,7 @@ static enum vkd3d_result vsir_program_normalize_addr(struct vsir_program *progra
             ins2 = &program->instructions.elements[i + 1];
 
             ins->opcode = VSIR_OP_ROUND_NE;
-            vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+            vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VSIR_DATA_F32, 1);
             ins->dst[0].reg.idx[0].offset = tmp_idx;
             ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
 
@@ -940,7 +940,7 @@ static enum vkd3d_result vsir_program_normalize_addr(struct vsir_program *progra
             ins2->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
             ins2->dst[0].write_mask = ins->dst[0].write_mask;
 
-            vsir_register_init(&ins2->src[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+            vsir_register_init(&ins2->src[0].reg, VKD3DSPR_TEMP, VSIR_DATA_F32, 1);
             ins2->src[0].reg.idx[0].offset = tmp_idx;
             ins2->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
             ins2->src[0].swizzle = vsir_swizzle_from_writemask(ins2->dst[0].write_mask);
@@ -1050,7 +1050,7 @@ static enum vkd3d_result vsir_program_lower_texkill(struct vsir_program *program
 
     ins->src[0].reg = texkill->src[0].reg;
     ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
-    vsir_register_init(&ins->src[1].reg, VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+    vsir_register_init(&ins->src[1].reg, VKD3DSPR_IMMCONST, VSIR_DATA_F32, 0);
     ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
     ins->src[1].reg.u.immconst_f32[0] = 0.0f;
     ins->src[1].reg.u.immconst_f32[1] = 0.0f;
@@ -1404,7 +1404,7 @@ static enum vkd3d_result vsir_program_lower_texldp(struct vsir_program *program,
     if (!vsir_instruction_init_with_params(program, div_ins, &tex->location, VSIR_OP_DIV, 1, 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    vsir_dst_param_init(&div_ins->dst[0], VKD3DSPR_TEMP, VKD3D_DATA_FLOAT, 1);
+    vsir_dst_param_init(&div_ins->dst[0], VKD3DSPR_TEMP, VSIR_DATA_F32, 1);
     div_ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
     div_ins->dst[0].reg.idx[0].offset = *tmp_idx;
     div_ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL;
@@ -1792,11 +1792,11 @@ static enum vkd3d_result vsir_program_ensure_diffuse(struct vsir_program *progra
     ins = &program->instructions.elements[i];
 
     vsir_instruction_init_with_params(program, ins, &no_loc, VSIR_OP_MOV, 1, 1);
-    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_ATTROUT, VKD3D_DATA_FLOAT, 1);
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_ATTROUT, VSIR_DATA_F32, 1);
     ins->dst[0].reg.idx[0].offset = 0;
     ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
     ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL & ~program->diffuse_written_mask;
-    vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+    vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VSIR_DATA_F32, 0);
     ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
     for (i = 0; i < 4; ++i)
         ins->src[0].reg.u.immconst_f32[i] = 1.0f;
@@ -2016,8 +2016,8 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
             e = &signature->elements[j];
 
             vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
-            dst_param_init_output(&ins->dst[0], VKD3D_DATA_FLOAT, e->register_index, e->mask);
-            vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+            dst_param_init_output(&ins->dst[0], VSIR_DATA_F32, e->register_index, e->mask);
+            vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VSIR_DATA_F32, 0);
             ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
             ++ins;
         }
@@ -6832,7 +6832,7 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
             vsir_instruction_init_with_params(program, ins, &loc, opcodes[compare_func].float_opcode, 1, 2);
             src_param_init_temp_float(&ins->src[opcodes[compare_func].swap ? 1 : 0], colour_temp);
             src_param_init_parameter(&ins->src[opcodes[compare_func].swap ? 0 : 1],
-                    VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF, VKD3D_DATA_FLOAT);
+                    VKD3D_SHADER_PARAMETER_NAME_ALPHA_TEST_REF, VSIR_DATA_F32);
             break;
 
         case VKD3D_SHADER_PARAMETER_DATA_TYPE_UINT32:
@@ -6865,7 +6865,7 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
 
     ++ins;
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
-    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VKD3D_DATA_FLOAT, 1);
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VSIR_DATA_F32, 1);
     ins->dst[0].reg.idx[0].offset = colour_signature_idx;
     ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
     ins->dst[0].write_mask = program->output_signature.elements[colour_signature_idx].mask;
@@ -6982,11 +6982,11 @@ static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *prog
 
         vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_DP4, 1, 2);
         src_param_init_temp_float4(&ins->src[0], position_temp);
-        src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_CLIP_PLANE_0 + i, VKD3D_DATA_FLOAT);
+        src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_CLIP_PLANE_0 + i, VSIR_DATA_F32);
         ins->src[1].swizzle = VKD3D_SHADER_NO_SWIZZLE;
         ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
 
-        vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VKD3D_DATA_FLOAT, 1);
+        vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VSIR_DATA_F32, 1);
         if (output_idx < 4)
             ins->dst[0].reg.idx[0].offset = low_signature_idx;
         else
@@ -6999,7 +6999,7 @@ static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *prog
     }
 
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
-    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VKD3D_DATA_FLOAT, 1);
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VSIR_DATA_F32, 1);
     ins->dst[0].reg.idx[0].offset = position_signature_idx;
     ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
     ins->dst[0].write_mask = program->output_signature.elements[position_signature_idx].mask;
@@ -7152,9 +7152,9 @@ static enum vkd3d_result insert_point_size_before_ret(struct vsir_program *progr
     ins = &program->instructions.elements[pos];
 
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
-    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+    vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VSIR_DATA_F32, 1);
     ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
-    src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE, VKD3D_DATA_FLOAT);
+    src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE, VSIR_DATA_F32);
 
     *ret_pos = pos + 1;
     return VKD3D_OK;
@@ -7288,7 +7288,7 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
         {
             vsir_instruction_init_with_params(program, ins, loc, VSIR_OP_MAX, 1, 2);
             src_param_init_ssa_float(&ins->src[0], ssa_value);
-            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MIN, VKD3D_DATA_FLOAT);
+            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MIN, VSIR_DATA_F32);
             if (max_parameter)
             {
                 dst_param_init_ssa_float(&ins->dst[0], program->ssa_count);
@@ -7296,7 +7296,7 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
             }
             else
             {
-                vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+                vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VSIR_DATA_F32, 1);
                 ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
             }
             ++ins;
@@ -7307,8 +7307,8 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
         {
             vsir_instruction_init_with_params(program, ins, loc, VSIR_OP_MIN, 1, 2);
             src_param_init_ssa_float(&ins->src[0], ssa_value);
-            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MAX, VKD3D_DATA_FLOAT);
-            vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VKD3D_DATA_FLOAT, 1);
+            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MAX, VSIR_DATA_F32);
+            vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VSIR_DATA_F32, 1);
             ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
 
             ++i;
@@ -7485,7 +7485,7 @@ static enum vkd3d_result vsir_program_insert_point_coord(struct vsir_program *pr
         vsir_instruction_init_with_params(program, ins, &no_loc, VSIR_OP_MOV, 1, 1);
         dst_param_init_temp_float4(&ins->dst[0], coord_temp);
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1;
-        vsir_src_param_init(&ins->src[0], VKD3DSPR_POINT_COORD, VKD3D_DATA_FLOAT, 0);
+        vsir_src_param_init(&ins->src[0], VKD3DSPR_POINT_COORD, VSIR_DATA_F32, 0);
         ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
         ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
         ++ins;
@@ -7493,7 +7493,7 @@ static enum vkd3d_result vsir_program_insert_point_coord(struct vsir_program *pr
         vsir_instruction_init_with_params(program, ins, &no_loc, VSIR_OP_MOV, 1, 1);
         dst_param_init_temp_float4(&ins->dst[0], coord_temp);
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_2 | VKD3DSP_WRITEMASK_3;
-        vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+        vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VSIR_DATA_F32, 0);
         ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
         ++ins;
 
@@ -7563,8 +7563,8 @@ static enum vkd3d_result insert_fragment_fog_before_ret(struct vsir_program *pro
 
             vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_ADD, 1, 2);
             dst_param_init_ssa_float(&ins->dst[0], ssa_temp);
-            src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_FOG_END, VKD3D_DATA_FLOAT);
-            vsir_src_param_init(&ins->src[1], VKD3DSPR_INPUT, VKD3D_DATA_FLOAT, 1);
+            src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_FOG_END, VSIR_DATA_F32);
+            vsir_src_param_init(&ins->src[1], VKD3DSPR_INPUT, VSIR_DATA_F32, 1);
             ins->src[1].reg.idx[0].offset = fog_signature_idx;
             ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
             ins->src[1].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
@@ -7574,7 +7574,7 @@ static enum vkd3d_result insert_fragment_fog_before_ret(struct vsir_program *pro
             dst_param_init_ssa_float(&ins->dst[0], ssa_factor);
             ins->dst[0].modifiers = VKD3DSPDM_SATURATE;
             src_param_init_ssa_float(&ins->src[0], ssa_temp);
-            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_FOG_SCALE, VKD3D_DATA_FLOAT);
+            src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_FOG_SCALE, VSIR_DATA_F32);
             break;
 
         case VKD3D_SHADER_FOG_FRAGMENT_EXP:
@@ -7595,8 +7595,8 @@ static enum vkd3d_result insert_fragment_fog_before_ret(struct vsir_program *pro
 
             vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MUL, 1, 2);
             dst_param_init_ssa_float(&ins->dst[0], ssa_temp);
-            src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_FOG_SCALE, VKD3D_DATA_FLOAT);
-            vsir_src_param_init(&ins->src[1], VKD3DSPR_INPUT, VKD3D_DATA_FLOAT, 1);
+            src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_FOG_SCALE, VSIR_DATA_F32);
+            vsir_src_param_init(&ins->src[1], VKD3DSPR_INPUT, VSIR_DATA_F32, 1);
             ins->src[1].reg.idx[0].offset = fog_signature_idx;
             ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
             ins->src[1].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
@@ -7628,8 +7628,8 @@ static enum vkd3d_result insert_fragment_fog_before_ret(struct vsir_program *pro
 
             vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MUL, 1, 2);
             dst_param_init_ssa_float(&ins->dst[0], ssa_temp);
-            src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_FOG_SCALE, VKD3D_DATA_FLOAT);
-            vsir_src_param_init(&ins->src[1], VKD3DSPR_INPUT, VKD3D_DATA_FLOAT, 1);
+            src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_FOG_SCALE, VSIR_DATA_F32);
+            vsir_src_param_init(&ins->src[1], VKD3DSPR_INPUT, VSIR_DATA_F32, 1);
             ins->src[1].reg.idx[0].offset = fog_signature_idx;
             ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
             ins->src[1].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
@@ -7659,15 +7659,15 @@ static enum vkd3d_result insert_fragment_fog_before_ret(struct vsir_program *pro
     vsir_instruction_init_with_params(program, ++ins, &loc, VSIR_OP_ADD, 1, 2);
     dst_param_init_ssa_float4(&ins->dst[0], program->ssa_count++);
     src_param_init_temp_float4(&ins->src[0], colour_temp);
-    src_param_init_parameter_vec4(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_FOG_COLOUR, VKD3D_DATA_FLOAT);
+    src_param_init_parameter_vec4(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_FOG_COLOUR, VSIR_DATA_F32);
     ins->src[1].modifiers = VKD3DSPSM_NEG;
 
     vsir_instruction_init_with_params(program, ++ins, &loc, VSIR_OP_MAD, 1, 3);
-    dst_param_init_output(&ins->dst[0], VKD3D_DATA_FLOAT, colour_signature_idx,
+    dst_param_init_output(&ins->dst[0], VSIR_DATA_F32, colour_signature_idx,
             program->output_signature.elements[colour_signature_idx].mask);
     src_param_init_ssa_float4(&ins->src[0], program->ssa_count - 1);
     src_param_init_ssa_float(&ins->src[1], ssa_factor);
-    src_param_init_parameter_vec4(&ins->src[2], VKD3D_SHADER_PARAMETER_NAME_FOG_COLOUR, VKD3D_DATA_FLOAT);
+    src_param_init_parameter_vec4(&ins->src[2], VKD3D_SHADER_PARAMETER_NAME_FOG_COLOUR, VSIR_DATA_F32);
 
     return VKD3D_OK;
 }
@@ -7809,7 +7809,7 @@ static enum vkd3d_result insert_vertex_fog_before_ret(struct vsir_program *progr
 
     /* Write the fog output. */
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
-    dst_param_init_output(&ins->dst[0], VKD3D_DATA_FLOAT, fog_signature_idx, 0x1);
+    dst_param_init_output(&ins->dst[0], VSIR_DATA_F32, fog_signature_idx, 0x1);
     src_param_init_temp_float4(&ins->src[0], temp);
     if (source == VKD3D_SHADER_FOG_SOURCE_Z)
         ins->src[0].swizzle = VKD3D_SHADER_SWIZZLE(Z, Z, Z, Z);
@@ -9775,9 +9775,9 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
     {
         switch (dst->reg.data_type)
         {
-            case VKD3D_DATA_FLOAT:
             case VKD3D_DATA_DOUBLE:
             case VSIR_DATA_F16:
+            case VSIR_DATA_F32:
                 break;
 
             default:
@@ -9799,7 +9799,7 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
         case 13:
         case 14:
         case 15:
-            if (dst->reg.data_type != VKD3D_DATA_FLOAT)
+            if (dst->reg.data_type != VSIR_DATA_F32)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                         "Invalid data type %#x for destination with shift.", dst->reg.data_type);
             break;
@@ -9884,7 +9884,7 @@ static void vsir_validate_io_src_param(struct validation_context *ctx,
 }
 
 #define F64_BIT (1u << VKD3D_DATA_DOUBLE)
-#define F32_BIT (1u << VKD3D_DATA_FLOAT)
+#define F32_BIT (1u << VSIR_DATA_F32)
 #define F16_BIT (1u << VSIR_DATA_F16)
 
 #define I32_BIT (1u << VKD3D_DATA_INT)
@@ -10634,7 +10634,7 @@ static void vsir_validate_float_elementwise_operation(struct validation_context 
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_FLOAT] = true,
+        [VSIR_DATA_F32] = true,
     };
 
     vsir_validate_elementwise_operation(ctx, instruction, types);
@@ -10723,7 +10723,7 @@ static void vsir_validate_float_comparison_operation(struct validation_context *
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_FLOAT] = true,
+        [VSIR_DATA_F32] = true,
     };
 
     vsir_validate_comparison_operation(ctx, instruction, types);
@@ -11285,9 +11285,9 @@ static void vsir_validate_ftoi(struct validation_context *ctx, const struct vkd3
 {
     static const bool src_types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
         [VSIR_DATA_F16] = true,
+        [VSIR_DATA_F32] = true,
     };
     static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
@@ -11302,9 +11302,9 @@ static void vsir_validate_ftou(struct validation_context *ctx, const struct vkd3
 {
     static const bool src_types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
         [VSIR_DATA_F16] = true,
+        [VSIR_DATA_F32] = true,
     };
     static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
@@ -11337,9 +11337,9 @@ static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3
     };
     static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
         [VSIR_DATA_F16] = true,
+        [VSIR_DATA_F32] = true,
     };
 
     vsir_validate_cast_operation(ctx, instruction, src_types, dst_types);

@@ -388,7 +388,6 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
 {
     static const char *const data_type_names[] =
     {
-        [VKD3D_DATA_FLOAT    ] = "float",
         [VKD3D_DATA_INT      ] = "int",
         [VKD3D_DATA_UINT     ] = "uint",
         [VKD3D_DATA_UNORM    ] = "unorm",
@@ -403,6 +402,7 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
         [VKD3D_DATA_BOOL     ] = "bool",
         [VKD3D_DATA_UINT16   ] = "uint16",
         [VSIR_DATA_F16      ] = "half",
+        [VSIR_DATA_F32      ] = "float",
     };
 
     if (type < ARRAY_SIZE(data_type_names))
@@ -730,7 +730,7 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
             case VSIR_DIMENSION_SCALAR:
                 switch (reg->data_type)
                 {
-                    case VKD3D_DATA_FLOAT:
+                    case VSIR_DATA_F32:
                         if (untyped)
                             shader_print_untyped_literal(compiler, "", reg->u.immconst_u32[0], "");
                         else
@@ -752,7 +752,7 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
             case VSIR_DIMENSION_VEC4:
                 switch (reg->data_type)
                 {
-                    case VKD3D_DATA_FLOAT:
+                    case VSIR_DATA_F32:
                         if (untyped)
                         {
                             shader_print_untyped_literal(compiler, "", reg->u.immconst_u32[0], "");
@@ -1684,10 +1684,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
                 shader_print_int_literal(compiler, ",", ins->texel_offset.w, ")");
             }
 
-            if (ins->resource_data_type[0] != VKD3D_DATA_FLOAT
-                    || ins->resource_data_type[1] != VKD3D_DATA_FLOAT
-                    || ins->resource_data_type[2] != VKD3D_DATA_FLOAT
-                    || ins->resource_data_type[3] != VKD3D_DATA_FLOAT)
+            if (ins->resource_data_type[0] != VSIR_DATA_F32
+                    || ins->resource_data_type[1] != VSIR_DATA_F32
+                    || ins->resource_data_type[2] != VSIR_DATA_F32
+                    || ins->resource_data_type[3] != VSIR_DATA_F32)
                 shader_dump_resource_data_type(compiler, ins->resource_data_type);
 
             for (i = 0; i < ins->dst_count; ++i)

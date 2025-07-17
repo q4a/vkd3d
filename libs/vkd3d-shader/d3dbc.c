@@ -563,7 +563,7 @@ static void d3dbc_parse_register(struct vkd3d_shader_sm1_parser *d3dbc,
 
     reg_type = parse_register_type(d3dbc, param, &index_offset);
     idx_count = idx_count_from_reg_type(reg_type);
-    vsir_register_init(reg, reg_type, VKD3D_DATA_FLOAT, idx_count);
+    vsir_register_init(reg, reg_type, VSIR_DATA_F32, idx_count);
     reg->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     reg->non_uniform = false;
     if (idx_count == 1)
@@ -1088,10 +1088,10 @@ static void shader_sm1_read_semantic(struct vkd3d_shader_sm1_parser *sm1,
     {
         semantic->resource_type = resource_type_table[resource_type];
     }
-    semantic->resource_data_type[0] = VKD3D_DATA_FLOAT;
-    semantic->resource_data_type[1] = VKD3D_DATA_FLOAT;
-    semantic->resource_data_type[2] = VKD3D_DATA_FLOAT;
-    semantic->resource_data_type[3] = VKD3D_DATA_FLOAT;
+    semantic->resource_data_type[0] = VSIR_DATA_F32;
+    semantic->resource_data_type[1] = VSIR_DATA_F32;
+    semantic->resource_data_type[2] = VSIR_DATA_F32;
+    semantic->resource_data_type[3] = VSIR_DATA_F32;
     shader_sm1_parse_dst_param(sm1, dst_token, NULL, &semantic->resource.reg);
     range = &semantic->resource.range;
     range->space = 0;
@@ -1272,10 +1272,10 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
 
     ins->resource_type = VKD3D_SHADER_RESOURCE_NONE;
     ins->resource_stride = 0;
-    ins->resource_data_type[0] = VKD3D_DATA_FLOAT;
-    ins->resource_data_type[1] = VKD3D_DATA_FLOAT;
-    ins->resource_data_type[2] = VKD3D_DATA_FLOAT;
-    ins->resource_data_type[3] = VKD3D_DATA_FLOAT;
+    ins->resource_data_type[0] = VSIR_DATA_F32;
+    ins->resource_data_type[1] = VSIR_DATA_F32;
+    ins->resource_data_type[2] = VSIR_DATA_F32;
+    ins->resource_data_type[3] = VSIR_DATA_F32;
     memset(&ins->texel_offset, 0, sizeof(ins->texel_offset));
 
     p = *ptr;
@@ -1295,7 +1295,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
     else if (ins->opcode == VSIR_OP_DEF)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
-        shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_VEC4, VKD3D_DATA_FLOAT);
+        shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_VEC4, VSIR_DATA_F32);
         shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
     else if (ins->opcode == VSIR_OP_DEFB)
