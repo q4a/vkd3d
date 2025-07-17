@@ -145,7 +145,7 @@ static void msl_print_resource_datatype(struct msl_generator *gen,
         case VSIR_DATA_I32:
             vkd3d_string_buffer_printf(buffer, "int");
             break;
-        case VKD3D_DATA_UINT:
+        case VSIR_DATA_U32:
             vkd3d_string_buffer_printf(buffer, "uint");
             break;
         default:
@@ -168,7 +168,7 @@ static void msl_print_register_datatype(struct vkd3d_string_buffer *buffer,
         case VSIR_DATA_I32:
             vkd3d_string_buffer_printf(buffer, "i");
             break;
-        case VKD3D_DATA_UINT:
+        case VSIR_DATA_U32:
             vkd3d_string_buffer_printf(buffer, "u");
             break;
         default:
@@ -537,7 +537,7 @@ static void msl_print_bitcast(struct vkd3d_string_buffer *dst, struct msl_genera
             break;
 
         case MSL_DATA_UINT:
-            write_cast = dst_data_type != VKD3D_DATA_UINT;
+            write_cast = dst_data_type != VSIR_DATA_U32;
             break;
 
         case MSL_DATA_UNION:
@@ -1012,19 +1012,19 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     vkd3d_string_buffer_printf(read, "as_type<uint4>(");
     msl_print_srv_name(read, gen, srv_binding, resource_type_info, data_type, false);
     vkd3d_string_buffer_printf(read, ".read(");
-    msl_print_src_with_type(read, gen, &ins->src[0], coord_mask, VKD3D_DATA_UINT);
+    msl_print_src_with_type(read, gen, &ins->src[0], coord_mask, VSIR_DATA_U32);
     if (resource_type_info->array)
     {
         vkd3d_string_buffer_printf(read, ", ");
-        msl_print_src_with_type(read, gen, &ins->src[0], coord_mask + 1, VKD3D_DATA_UINT);
+        msl_print_src_with_type(read, gen, &ins->src[0], coord_mask + 1, VSIR_DATA_U32);
     }
     if (resource_type != VKD3D_SHADER_RESOURCE_BUFFER)
     {
         vkd3d_string_buffer_printf(read, ", ");
         if (ins->opcode != VSIR_OP_LD2DMS)
-            msl_print_src_with_type(read, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, VKD3D_DATA_UINT);
+            msl_print_src_with_type(read, gen, &ins->src[0], VKD3DSP_WRITEMASK_3, VSIR_DATA_U32);
         else
-            msl_print_src_with_type(read, gen, &ins->src[2], VKD3DSP_WRITEMASK_0, VKD3D_DATA_UINT);
+            msl_print_src_with_type(read, gen, &ins->src[2], VKD3DSP_WRITEMASK_0, VSIR_DATA_U32);
     }
     vkd3d_string_buffer_printf(read, "))");
     msl_print_swizzle(read, ins->src[1].swizzle, ins->dst[0].write_mask);
@@ -1168,7 +1168,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     msl_dst_init(&dst, gen, ins, &ins->dst[0]);
     sample = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    if (ins->dst[0].reg.data_type == VKD3D_DATA_UINT)
+    if (ins->dst[0].reg.data_type == VSIR_DATA_U32)
         vkd3d_string_buffer_printf(sample, "as_type<uint4>(");
     msl_print_srv_name(sample, gen, srv_binding, resource_type_info, data_type, compare);
     if (gather && compare)
@@ -1238,7 +1238,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
         vkd3d_string_buffer_printf(sample, ", component::%c", "xyzw"[component_idx]);
     }
     vkd3d_string_buffer_printf(sample, ")");
-    if (ins->dst[0].reg.data_type == VKD3D_DATA_UINT)
+    if (ins->dst[0].reg.data_type == VSIR_DATA_U32)
         vkd3d_string_buffer_printf(sample, ")");
     if (!compare || gather)
         msl_print_swizzle(sample, resource->swizzle, ins->dst[0].write_mask);
@@ -1309,7 +1309,7 @@ static void msl_store_uav_typed(struct msl_generator *gen, const struct vkd3d_sh
     {
         switch (data_type)
         {
-            case VKD3D_DATA_UINT:
+            case VSIR_DATA_U32:
                 vkd3d_string_buffer_printf(image_data, "uint4(");
                 break;
             case VSIR_DATA_I32:
@@ -1333,7 +1333,7 @@ static void msl_store_uav_typed(struct msl_generator *gen, const struct vkd3d_sh
     msl_print_indent(gen->buffer, gen->indent);
     msl_print_uav_name(gen->buffer, gen, uav_binding, resource_type_info, data_type);
     vkd3d_string_buffer_printf(gen->buffer, ".write(%s, ", image_data->buffer);
-    msl_print_src_with_type(gen->buffer, gen, &ins->src[0], coord_mask, VKD3D_DATA_UINT);
+    msl_print_src_with_type(gen->buffer, gen, &ins->src[0], coord_mask, VSIR_DATA_U32);
     vkd3d_string_buffer_printf(gen->buffer, ");\n");
 
     vkd3d_string_buffer_release(&gen->string_buffers, image_data);
@@ -1894,19 +1894,19 @@ static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
                 break;
 
             case VKD3D_SHADER_SV_VERTEX_ID:
-                msl_print_register_datatype(buffer, gen, VKD3D_DATA_UINT);
+                msl_print_register_datatype(buffer, gen, VSIR_DATA_U32);
                 msl_print_write_mask(buffer, e->mask);
                 vkd3d_string_buffer_printf(buffer, " = uint4(vertex_id, 0u, 0u, 0u)");
                 break;
 
             case VKD3D_SHADER_SV_IS_FRONT_FACE:
-                msl_print_register_datatype(buffer, gen, VKD3D_DATA_UINT);
+                msl_print_register_datatype(buffer, gen, VSIR_DATA_U32);
                 msl_print_write_mask(buffer, e->mask);
                 vkd3d_string_buffer_printf(buffer, " = uint4(input.is_front_face ? 0xffffffffu : 0u, 0, 0, 0)");
                 break;
 
             case VKD3D_SHADER_SV_SAMPLE_INDEX:
-                msl_print_register_datatype(buffer, gen, VKD3D_DATA_UINT);
+                msl_print_register_datatype(buffer, gen, VSIR_DATA_U32);
                 msl_print_write_mask(buffer, e->mask);
                 vkd3d_string_buffer_printf(buffer, " = uint4(input.sample_index, 0u, 0u, 0u)");
                 break;

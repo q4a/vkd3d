@@ -2486,12 +2486,12 @@ static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
             case 16:
                 return VSIR_DATA_U16;
             case 32:
-                return VKD3D_DATA_UINT;
+                return VSIR_DATA_U32;
             case 64:
                 return VKD3D_DATA_UINT64;
             default:
                 FIXME("Unhandled width %u.\n", type->u.width);
-                return VKD3D_DATA_UINT;
+                return VSIR_DATA_U32;
         }
     }
     else if (type->class == TYPE_CLASS_FLOAT)
@@ -2511,7 +2511,7 @@ static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
     }
 
     FIXME("Unhandled type %u.\n", type->class);
-    return VKD3D_DATA_UINT;
+    return VSIR_DATA_U32;
 }
 
 /* Based on the implementation in the OpenGL Mathematics library. */
@@ -2573,7 +2573,7 @@ static void register_convert_to_minimum_precision(struct vkd3d_shader_register *
             break;
 
         case VSIR_DATA_U16:
-            reg->data_type = VKD3D_DATA_UINT;
+            reg->data_type = VSIR_DATA_U32;
             reg->precision = VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16;
             if (reg->type == VKD3DSPR_IMMCONST)
             {
@@ -2668,7 +2668,7 @@ static void sm6_parser_init_ssa_value(struct sm6_parser *sm6, struct sm6_value *
 
 static void register_make_constant_uint(struct vkd3d_shader_register *reg, unsigned int value)
 {
-    vsir_register_init(reg, VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
+    vsir_register_init(reg, VKD3DSPR_IMMCONST, VSIR_DATA_U32, 0);
     reg->u.immconst_u32[0] = value;
 }
 
@@ -2815,7 +2815,7 @@ static bool instruction_dst_param_init_uint_temp_vector(struct vkd3d_shader_inst
     if (!(param = instruction_dst_params_alloc(ins, 1, sm6)))
         return false;
 
-    vsir_dst_param_init(param, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+    vsir_dst_param_init(param, VKD3DSPR_TEMP, VSIR_DATA_U32, 1);
     param->write_mask = VKD3DSP_WRITEMASK_ALL;
     param->reg.idx[0].offset = 0;
     param->reg.dimension = VSIR_DIMENSION_VEC4;
@@ -3257,11 +3257,11 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
         case VSIR_DATA_U16:
             for (i = 0; i < count; ++i)
                 icb->data[i] = (int16_t)operands[i];
-            icb->data_type = VKD3D_DATA_UINT;
+            icb->data_type = VSIR_DATA_U32;
             break;
 
         case VSIR_DATA_F32:
-        case VKD3D_DATA_UINT:
+        case VSIR_DATA_U32:
             for (i = 0; i < count; ++i)
                 icb->data[i] = operands[i];
             break;
@@ -5224,7 +5224,7 @@ static void sm6_parser_emit_dx_input_register_mov(struct sm6_parser *sm6, struct
 static void sm6_parser_emit_dx_coverage(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
-    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_COVERAGE, VKD3D_DATA_UINT, false);
+    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_COVERAGE, VSIR_DATA_U32, false);
 }
 
 static const struct sm6_descriptor_info *sm6_parser_get_descriptor(struct sm6_parser *sm6,
@@ -5483,11 +5483,11 @@ static void sm6_parser_emit_dx_compute_builtin(struct sm6_parser *sm6, enum dx_i
             vkd3d_unreachable();
     }
 
-    sm6_parser_dcl_register_builtin(sm6, VSIR_OP_DCL_INPUT, reg_type, VKD3D_DATA_UINT, component_count);
+    sm6_parser_dcl_register_builtin(sm6, VSIR_OP_DCL_INPUT, reg_type, VSIR_DATA_U32, component_count);
     vsir_instruction_init(ins, &sm6->p.location, VSIR_OP_MOV);
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    vsir_register_init(&src_param->reg, reg_type, VKD3D_DATA_UINT, 0);
+    vsir_register_init(&src_param->reg, reg_type, VSIR_DATA_U32, 0);
     src_param->reg.dimension = VSIR_DIMENSION_VEC4;
     if (component_count > 1)
         component_idx = sm6_value_get_constant_uint(operands[0], sm6);
@@ -5722,13 +5722,13 @@ static void sm6_parser_emit_dx_make_double(struct sm6_parser *sm6, enum dx_intri
 static void sm6_parser_emit_dx_output_control_point_id(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
-    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_OUTPOINTID, VKD3D_DATA_UINT, true);
+    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_OUTPOINTID, VSIR_DATA_U32, true);
 }
 
 static void sm6_parser_emit_dx_primitive_id(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
-    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_PRIMID, VKD3D_DATA_UINT, true);
+    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_PRIMID, VSIR_DATA_U32, true);
 }
 
 static enum vkd3d_shader_opcode dx_map_quad_op(enum dxil_quad_op_kind op)
@@ -5876,7 +5876,7 @@ static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_
     if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
         return;
     src_params_init_from_operands(src_params, &operands[1], operand_count - 1, sm6);
-    data.data_type = VKD3D_DATA_UINT;
+    data.data_type = VSIR_DATA_U32;
     src_param_init_vector_from_reg(&src_params[operand_count - 1], &data);
 
     dst_param = instruction_dst_params_alloc(ins, 1, sm6);
@@ -6544,7 +6544,7 @@ static void sm6_parser_emit_dx_wave_builtin(struct sm6_parser *sm6, enum dx_intr
             vkd3d_unreachable();
     }
 
-    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, type, VKD3D_DATA_UINT, true);
+    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, type, VSIR_DATA_U32, true);
 }
 
 struct sm6_dx_opcode_info
@@ -8455,7 +8455,7 @@ static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_
                         vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
                                 "Truncating 64-bit switch case value %"PRIx64" to 32 bits.", switch_case->value);
                     }
-                    vsir_src_param_init(&src_params[count], VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
+                    vsir_src_param_init(&src_params[count], VKD3DSPR_IMMCONST, VSIR_DATA_U32, 0);
                     src_params[count++].reg.u.immconst_u32[0] = switch_case->value;
                 }
                 vsir_src_param_init_label(&src_params[count++], case_block->id);
@@ -9045,9 +9045,9 @@ static const enum vsir_data_type data_type_table[] =
     [COMPONENT_TYPE_INVALID]     = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_I1]          = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_I16]         = VSIR_DATA_I32,
-    [COMPONENT_TYPE_U16]         = VKD3D_DATA_UINT,
+    [COMPONENT_TYPE_U16]         = VSIR_DATA_U32,
     [COMPONENT_TYPE_I32]         = VSIR_DATA_I32,
-    [COMPONENT_TYPE_U32]         = VKD3D_DATA_UINT,
+    [COMPONENT_TYPE_U32]         = VSIR_DATA_U32,
     [COMPONENT_TYPE_I64]         = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_U64]         = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_F16]         = VSIR_DATA_F32,

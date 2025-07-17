@@ -1120,7 +1120,7 @@ static void vkd3d_shader_scan_constant_buffer_declaration(struct vkd3d_shader_sc
     struct vkd3d_shader_descriptor_info1 *d;
 
     if (!(d = vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV,
-            &cb->src.reg, &cb->range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT)))
+            &cb->src.reg, &cb->range, VKD3D_SHADER_RESOURCE_BUFFER, VSIR_DATA_U32)))
         return;
     d->buffer_size = cb->size;
 }
@@ -1305,12 +1305,12 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VSIR_OP_DCL_RESOURCE_RAW:
         case VSIR_OP_DCL_UAV_RAW:
             vkd3d_shader_scan_resource_declaration(context, &instruction->declaration.raw_resource.resource,
-                    VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT, 0, 0, true, instruction->flags);
+                    VKD3D_SHADER_RESOURCE_BUFFER, VSIR_DATA_U32, 0, 0, true, instruction->flags);
             break;
         case VSIR_OP_DCL_RESOURCE_STRUCTURED:
         case VSIR_OP_DCL_UAV_STRUCTURED:
             vkd3d_shader_scan_resource_declaration(context, &instruction->declaration.structured_resource.resource,
-                    VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT, 0,
+                    VKD3D_SHADER_RESOURCE_BUFFER, VSIR_DATA_U32, 0,
                     instruction->declaration.structured_resource.byte_stride, false, instruction->flags);
             break;
         case VSIR_OP_DCL_TESSELLATOR_OUTPUT_PRIMITIVE:
@@ -1530,8 +1530,6 @@ static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_t
             return VKD3D_SHADER_RESOURCE_DATA_UNORM;
         case VKD3D_DATA_SNORM:
             return VKD3D_SHADER_RESOURCE_DATA_SNORM;
-        case VKD3D_DATA_UINT:
-            return VKD3D_SHADER_RESOURCE_DATA_UINT;
         case VKD3D_DATA_MIXED:
             return VKD3D_SHADER_RESOURCE_DATA_MIXED;
         case VKD3D_DATA_CONTINUED:
@@ -1544,6 +1542,8 @@ static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_t
             return VKD3D_SHADER_RESOURCE_DATA_DOUBLE;
         case VSIR_DATA_I32:
             return VKD3D_SHADER_RESOURCE_DATA_INT;
+        case VSIR_DATA_U32:
+            return VKD3D_SHADER_RESOURCE_DATA_UINT;
         default:
             ERR("Invalid resource data type %#x.\n", data_type);
             return VKD3D_SHADER_RESOURCE_DATA_FLOAT;
@@ -1647,8 +1647,8 @@ static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_sh
 
         if (size)
         {
-            if ((d = vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &reg,
-                    &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT)))
+            if ((d = vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV,
+                    &reg, &range, VKD3D_SHADER_RESOURCE_BUFFER, VSIR_DATA_U32)))
                 d->buffer_size = size * 16;
         }
     }

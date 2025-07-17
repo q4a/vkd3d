@@ -8249,7 +8249,7 @@ static enum vsir_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, c
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
             case HLSL_TYPE_MIN16UINT:
-                return VKD3D_DATA_UINT;
+                return VSIR_DATA_U32;
         }
     }
 
@@ -10267,12 +10267,12 @@ static void sm4_generate_vsir_cast_from_bool(struct hlsl_ctx *ctx, struct vsir_p
 
     dst_param = &ins->dst[0];
     vsir_dst_from_hlsl_node(dst_param, ctx, instr);
-    ins->dst[0].reg.data_type = VKD3D_DATA_UINT;
+    ins->dst[0].reg.data_type = VSIR_DATA_U32;
 
     vsir_src_from_hlsl_node(&ins->src[0], ctx, operand, dst_param->write_mask);
 
     value.u[0].u = bits;
-    vsir_src_from_hlsl_constant_value(&ins->src[1], ctx, &value, VKD3D_DATA_UINT, 1, 0);
+    vsir_src_from_hlsl_constant_value(&ins->src[1], ctx, &value, VSIR_DATA_U32, 1, 0);
 }
 
 static bool sm4_generate_vsir_instr_expr_cast(struct hlsl_ctx *ctx,
@@ -10969,10 +10969,10 @@ static bool sm4_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
 
         memset(&value, 0xff, sizeof(value));
         vsir_src_from_hlsl_constant_value(&ins->src[1], ctx, &value,
-                VKD3D_DATA_UINT, type->e.numeric.dimx, dst_param->write_mask);
+                VSIR_DATA_U32, type->e.numeric.dimx, dst_param->write_mask);
         memset(&value, 0x00, sizeof(value));
         vsir_src_from_hlsl_constant_value(&ins->src[2], ctx, &value,
-                VKD3D_DATA_UINT, type->e.numeric.dimx, dst_param->write_mask);
+                VSIR_DATA_U32, type->e.numeric.dimx, dst_param->write_mask);
     }
     else
     {
@@ -11646,7 +11646,7 @@ static void sm4_generate_vsir_instr_switch(struct hlsl_ctx *ctx,
 
             if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VSIR_OP_CASE, 0, 1)))
                 return;
-            vsir_src_from_hlsl_constant_value(&ins->src[0], ctx, &value, VKD3D_DATA_UINT, 1, VKD3DSP_WRITEMASK_ALL);
+            vsir_src_from_hlsl_constant_value(&ins->src[0], ctx, &value, VSIR_DATA_U32, 1, VKD3DSP_WRITEMASK_ALL);
         }
 
         sm4_generate_vsir_block(ctx, &cas->body, program);
@@ -12190,7 +12190,7 @@ static enum vsir_data_type sm4_generate_vsir_get_format_type(const struct hlsl_t
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_MIN16UINT:
         case HLSL_TYPE_UINT:
-            return VKD3D_DATA_UINT;
+            return VSIR_DATA_U32;
     }
 
     vkd3d_unreachable();

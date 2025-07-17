@@ -754,7 +754,7 @@ static const enum vsir_data_type data_type_table[] =
     /* VKD3D_SM4_DATA_UNORM */      VKD3D_DATA_UNORM,
     /* VKD3D_SM4_DATA_SNORM */      VKD3D_DATA_SNORM,
     /* VKD3D_SM4_DATA_INT */        VSIR_DATA_I32,
-    /* VKD3D_SM4_DATA_UINT */       VKD3D_DATA_UINT,
+    /* VKD3D_SM4_DATA_UINT */       VSIR_DATA_U32,
     /* VKD3D_SM4_DATA_FLOAT */      VSIR_DATA_F32,
     /* VKD3D_SM4_DATA_MIXED */      VKD3D_DATA_MIXED,
     /* VKD3D_SM4_DATA_DOUBLE */     VSIR_DATA_F64,
@@ -795,7 +795,7 @@ static bool shader_sm4_read_register_space(struct vkd3d_shader_sm4_parser *priv,
 static void shader_sm4_read_conditional_op(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
-    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_UINT, &ins->src[0]);
+    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VSIR_DATA_U32, &ins->src[0]);
     ins->flags = (opcode_token & VKD3D_SM4_CONDITIONAL_NZ) ?
             VKD3D_SHADER_CONDITIONAL_OP_NZ : VKD3D_SHADER_CONDITIONAL_OP_Z;
 }
@@ -803,7 +803,7 @@ static void shader_sm4_read_conditional_op(struct vkd3d_shader_instruction *ins,
 static void shader_sm4_read_case_condition(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
-    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_UINT, &ins->src[0]);
+    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VSIR_DATA_U32, &ins->src[0]);
     if (ins->src[0].reg.type != VKD3DSPR_IMMCONST)
     {
         FIXME("Switch case value is not a 32-bit constant.\n");
@@ -1433,7 +1433,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
      * d -> VSIR_DATA_F64
      * f -> VSIR_DATA_F32
      * i -> VSIR_DATA_I32
-     * u -> VKD3D_DATA_UINT
+     * u -> VSIR_DATA_U32
      * O -> VKD3D_DATA_OPAQUE
      * R -> VKD3D_DATA_RESOURCE
      * S -> VKD3D_DATA_SAMPLER
@@ -1996,7 +1996,7 @@ static enum vsir_data_type map_data_type(char t)
         case 'i':
             return VSIR_DATA_I32;
         case 'u':
-            return VKD3D_DATA_UINT;
+            return VSIR_DATA_U32;
         case 'O':
             return VKD3D_DATA_OPAQUE;
         case '*':

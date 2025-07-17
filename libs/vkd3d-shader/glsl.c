@@ -348,7 +348,7 @@ static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vk
             case VSIR_DATA_I32:
                 vkd3d_string_buffer_printf(dst, "floatBitsToInt(%s)", src);
                 return;
-            case VKD3D_DATA_UINT:
+            case VSIR_DATA_U32:
                 vkd3d_string_buffer_printf(dst, "floatBitsToUint(%s)", src);
                 return;
             default:
@@ -356,7 +356,7 @@ static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vk
         }
     }
 
-    if (src_data_type == VKD3D_DATA_UINT)
+    if (src_data_type == VSIR_DATA_U32)
     {
         switch (dst_data_type)
         {
@@ -395,7 +395,7 @@ static void shader_glsl_print_src(struct vkd3d_string_buffer *buffer, struct vkd
                 "Internal compiler error: Unhandled 'non-uniform' modifier.");
 
     if (reg->type == VKD3DSPR_IMMCONST || reg->type == VKD3DSPR_THREADID)
-        src_data_type = VKD3D_DATA_UINT;
+        src_data_type = VSIR_DATA_U32;
     else
         src_data_type = VSIR_DATA_F32;
 
@@ -525,7 +525,7 @@ static void VKD3D_PRINTF_FUNC(4, 0) shader_glsl_vprint_assignment(struct vkd3d_g
         case VSIR_DATA_I32:
             vkd3d_string_buffer_printf(buffer, "intBitsToFloat(");
             break;
-        case VKD3D_DATA_UINT:
+        case VSIR_DATA_U32:
             vkd3d_string_buffer_printf(buffer, "uintBitsToFloat(");
             break;
     }
@@ -1164,11 +1164,11 @@ static void shader_glsl_store_uav_typed(struct vkd3d_glsl_generator *gen, const 
     {
         switch (data_type)
         {
-            case VKD3D_DATA_UINT:
-                vkd3d_string_buffer_printf(image_data, "uvec4(");
-                break;
             case VSIR_DATA_I32:
                 vkd3d_string_buffer_printf(image_data, "ivec4(");
+                break;
+            case VSIR_DATA_U32:
+                vkd3d_string_buffer_printf(image_data, "uvec4(");
                 break;
             default:
                 vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -1766,13 +1766,13 @@ static void shader_glsl_generate_uav_declaration(struct vkd3d_glsl_generator *ge
 
     switch (uav->resource_data_type)
     {
-        case VKD3D_DATA_UINT:
-            image_type_prefix = "u";
-            read_format = "r32ui";
-            break;
         case VSIR_DATA_I32:
             image_type_prefix = "i";
             read_format = "r32i";
+            break;
+        case VSIR_DATA_U32:
+            image_type_prefix = "u";
+            read_format = "r32ui";
             break;
         default:
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
@@ -1995,9 +1995,6 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
 
     switch (srv->resource_data_type)
     {
-        case VKD3D_DATA_UINT:
-            sampler_type_prefix = "u";
-            break;
         case VSIR_DATA_F32:
         case VKD3D_DATA_UNORM:
         case VKD3D_DATA_SNORM:
@@ -2005,6 +2002,9 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
             break;
         case VSIR_DATA_I32:
             sampler_type_prefix = "i";
+            break;
+        case VSIR_DATA_U32:
+            sampler_type_prefix = "u";
             break;
         default:
             vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
