@@ -748,7 +748,7 @@ static const enum vkd3d_shader_resource_type resource_type_table[] =
     /* VKD3D_SM4_RESOURCE_STRUCTURED_BUFFER */    VKD3D_SHADER_RESOURCE_BUFFER,
 };
 
-static const enum vkd3d_data_type data_type_table[] =
+static const enum vsir_data_type data_type_table[] =
 {
     /* 0 */                         VKD3D_DATA_FLOAT,
     /* VKD3D_SM4_DATA_UNORM */      VKD3D_DATA_UNORM,
@@ -770,9 +770,9 @@ static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *sm4)
 }
 
 static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
-        const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_src_param *src_param);
+        const uint32_t *end, enum vsir_data_type data_type, struct vkd3d_shader_src_param *src_param);
 static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
-        const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_dst_param *dst_param);
+        const uint32_t *end, enum vsir_data_type data_type, struct vkd3d_shader_dst_param *dst_param);
 
 static bool shader_sm4_read_register_space(struct vkd3d_shader_sm4_parser *priv,
         const uint32_t **ptr, const uint32_t *end, unsigned int *register_space)
@@ -873,7 +873,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins, u
     enum vkd3d_sm4_resource_type resource_type;
     const uint32_t *end = &tokens[token_count];
     enum vkd3d_sm4_data_type data_type;
-    enum vkd3d_data_type reg_data_type;
+    enum vsir_data_type reg_data_type;
     uint32_t components;
     unsigned int i;
 
@@ -1985,7 +1985,7 @@ static enum vkd3d_sm4_stat_field get_stat_field_from_sm4_opcode(
     return field_info->field;
 }
 
-static enum vkd3d_data_type map_data_type(char t)
+static enum vsir_data_type map_data_type(char t)
 {
     switch (t)
     {
@@ -2036,7 +2036,7 @@ static bool shader_sm4_read_reg_idx(struct vkd3d_shader_sm4_parser *priv, const 
 }
 
 static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr, const uint32_t *end,
-        enum vkd3d_data_type data_type, struct vkd3d_shader_register *param, enum vkd3d_shader_src_modifier *modifier)
+        enum vsir_data_type data_type, struct vkd3d_shader_register *param, enum vkd3d_shader_src_modifier *modifier)
 {
     const struct vkd3d_sm4_register_type_info *register_type_info;
     enum vkd3d_shader_register_type vsir_register_type;
@@ -2354,7 +2354,7 @@ static bool shader_sm4_validate_input_output_register(struct vkd3d_shader_sm4_pa
 }
 
 static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
-        const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_src_param *src_param)
+        const uint32_t *end, enum vsir_data_type data_type, struct vkd3d_shader_src_param *src_param)
 {
     unsigned int dimension, mask;
     uint32_t token;
@@ -2442,7 +2442,7 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
 }
 
 static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
-        const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_dst_param *dst_param)
+        const uint32_t *end, enum vsir_data_type data_type, struct vkd3d_shader_dst_param *dst_param)
 {
     enum vkd3d_sm4_swizzle_type swizzle_type;
     enum vkd3d_shader_src_modifier modifier;
@@ -3838,7 +3838,7 @@ static void tpf_dcl_sampler(const struct tpf_compiler *tpf, const struct vkd3d_s
     write_sm4_instruction(tpf, &instr);
 }
 
-static uint32_t pack_resource_data_type(const enum vkd3d_data_type *resource_data_type)
+static uint32_t pack_resource_data_type(const enum vsir_data_type *resource_data_type)
 {
     unsigned int i, k, type = 0;
 

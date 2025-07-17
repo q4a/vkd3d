@@ -2568,7 +2568,7 @@ static uint32_t vkd3d_spirv_get_type_id(struct vkd3d_spirv_builder *builder,
 }
 
 static uint32_t vkd3d_spirv_get_type_id_for_data_type(struct vkd3d_spirv_builder *builder,
-        enum vkd3d_data_type data_type, unsigned int component_count)
+        enum vsir_data_type data_type, unsigned int component_count)
 {
     enum vkd3d_shader_component_type component_type;
 
@@ -3012,7 +3012,7 @@ struct vkd3d_hull_shader_variables
 
 struct ssa_register_info
 {
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     uint8_t write_mask;
     uint32_t id;
 };
@@ -3985,7 +3985,7 @@ static uint32_t spirv_compiler_alloc_spec_constant_id(struct spirv_compiler *com
 
 static uint32_t spirv_compiler_emit_spec_constant(struct spirv_compiler *compiler,
         enum vkd3d_shader_parameter_name name, uint32_t spec_id,
-        enum vkd3d_data_type type, unsigned int component_count)
+        enum vsir_data_type type, unsigned int component_count)
 {
     uint32_t scalar_type_id, vector_type_id, id, default_value, components[4];
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
@@ -4024,7 +4024,7 @@ static uint32_t spirv_compiler_emit_spec_constant(struct spirv_compiler *compile
 
 static uint32_t spirv_compiler_get_spec_constant(struct spirv_compiler *compiler,
         enum vkd3d_shader_parameter_name name, uint32_t spec_id,
-        enum vkd3d_data_type type, unsigned int component_count)
+        enum vsir_data_type type, unsigned int component_count)
 {
     unsigned int i;
 
@@ -4038,7 +4038,7 @@ static uint32_t spirv_compiler_get_spec_constant(struct spirv_compiler *compiler
 }
 
 static uint32_t spirv_compiler_get_buffer_parameter(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_parameter1 *parameter, enum vkd3d_data_type type, unsigned int component_count)
+        const struct vkd3d_shader_parameter1 *parameter, enum vsir_data_type type, unsigned int component_count)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     unsigned int index = parameter - compiler->program->parameters;
@@ -4054,7 +4054,7 @@ static uint32_t spirv_compiler_get_buffer_parameter(struct spirv_compiler *compi
 
 static const struct
 {
-    enum vkd3d_data_type type;
+    enum vsir_data_type type;
     unsigned int component_count;
 }
 parameter_data_type_map[] =
@@ -4065,7 +4065,7 @@ parameter_data_type_map[] =
 };
 
 static uint32_t spirv_compiler_emit_shader_parameter(struct spirv_compiler *compiler,
-        enum vkd3d_shader_parameter_name name, enum vkd3d_data_type type, unsigned int component_count)
+        enum vkd3d_shader_parameter_name name, enum vsir_data_type type, unsigned int component_count)
 {
     const struct vkd3d_shader_parameter1 *parameter;
 
@@ -4479,7 +4479,7 @@ static uint32_t spirv_compiler_emit_vector_shuffle(struct spirv_compiler *compil
 }
 
 static uint32_t spirv_compiler_emit_int_to_bool(struct spirv_compiler *compiler,
-        enum vkd3d_shader_conditional_op condition, enum vkd3d_data_type data_type,
+        enum vkd3d_shader_conditional_op condition, enum vsir_data_type data_type,
         unsigned int component_count, uint32_t val_id)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
@@ -4903,7 +4903,7 @@ static uint32_t spirv_compiler_emit_load_src_with_type(struct spirv_compiler *co
 {
     struct vkd3d_shader_src_param src_param = *src;
 
-    src_param.reg.data_type = vkd3d_data_type_from_component_type(component_type);
+    src_param.reg.data_type = vsir_data_type_from_component_type(component_type);
     return spirv_compiler_emit_load_src(compiler, &src_param, write_mask);
 }
 
@@ -5083,7 +5083,7 @@ static void spirv_compiler_emit_store_dst_swizzled(struct spirv_compiler *compil
     /* XXX: The register data type could be fixed by the shader parser. For SM5
      * shaders the data types are stored in instructions modifiers.
      */
-    typed_dst.reg.data_type = vkd3d_data_type_from_component_type(component_type);
+    typed_dst.reg.data_type = vsir_data_type_from_component_type(component_type);
     spirv_compiler_emit_store_dst(compiler, &typed_dst, val_id);
 }
 

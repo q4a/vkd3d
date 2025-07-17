@@ -1084,7 +1084,7 @@ static void vkd3d_shader_scan_record_uav_atomic_op(struct vkd3d_shader_scan_cont
 static struct vkd3d_shader_descriptor_info1 *vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *context,
         enum vkd3d_shader_descriptor_type type, const struct vkd3d_shader_register *reg,
         const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
-        enum vkd3d_data_type resource_data_type)
+        enum vsir_data_type resource_data_type)
 {
     struct vkd3d_shader_scan_descriptor_info1 *info = context->scan_descriptor_info;
     struct vkd3d_shader_descriptor_info1 *d;
@@ -1235,7 +1235,7 @@ static void vkd3d_shader_scan_combined_sampler_usage(struct vkd3d_shader_scan_co
 
 static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_resource *resource, enum vkd3d_shader_resource_type resource_type,
-        enum vkd3d_data_type resource_data_type, unsigned int sample_count,
+        enum vsir_data_type resource_data_type, unsigned int sample_count,
         unsigned int structure_stride, bool raw, uint32_t flags)
 {
     struct vkd3d_shader_descriptor_info1 *d;
@@ -1522,7 +1522,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
     return VKD3D_OK;
 }
 
-static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_type(enum vkd3d_data_type data_type)
+static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_type(enum vsir_data_type data_type)
 {
     switch (data_type)
     {

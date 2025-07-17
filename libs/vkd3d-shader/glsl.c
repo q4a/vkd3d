@@ -328,7 +328,7 @@ static void glsl_src_cleanup(struct glsl_src *src, struct vkd3d_string_buffer_ca
 }
 
 static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vkd3d_glsl_generator *gen,
-        const char *src, enum vkd3d_data_type dst_data_type, enum vkd3d_data_type src_data_type, unsigned int size)
+        const char *src, enum vsir_data_type dst_data_type, enum vsir_data_type src_data_type, unsigned int size)
 {
     if (dst_data_type == VKD3D_DATA_UNORM || dst_data_type == VKD3D_DATA_SNORM)
         dst_data_type = VKD3D_DATA_FLOAT;
@@ -381,11 +381,11 @@ static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vk
 }
 
 static void shader_glsl_print_src(struct vkd3d_string_buffer *buffer, struct vkd3d_glsl_generator *gen,
-        const struct vkd3d_shader_src_param *vsir_src, uint32_t mask, enum vkd3d_data_type data_type)
+        const struct vkd3d_shader_src_param *vsir_src, uint32_t mask, enum vsir_data_type data_type)
 {
     const struct vkd3d_shader_register *reg = &vsir_src->reg;
     struct vkd3d_string_buffer *register_name, *str;
-    enum vkd3d_data_type src_data_type;
+    enum vsir_data_type src_data_type;
     unsigned int size;
 
     register_name = vkd3d_string_buffer_get(&gen->string_buffers);
@@ -492,7 +492,7 @@ static void shader_glsl_print_subscript(struct vkd3d_string_buffer *buffer, stru
 }
 
 static void VKD3D_PRINTF_FUNC(4, 0) shader_glsl_vprint_assignment(struct vkd3d_glsl_generator *gen,
-        struct glsl_dst *dst, enum vkd3d_data_type data_type, const char *format, va_list args)
+        struct glsl_dst *dst, enum vsir_data_type data_type, const char *format, va_list args)
 {
     struct vkd3d_string_buffer *buffer = gen->buffer;
     uint32_t modifiers = dst->vsir->modifiers;
@@ -550,7 +550,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) shader_glsl_print_assignment(
 }
 
 static void VKD3D_PRINTF_FUNC(4, 5) shader_glsl_print_assignment_ext(struct vkd3d_glsl_generator *gen,
-        struct glsl_dst *dst, enum vkd3d_data_type data_type, const char *format, ...)
+        struct glsl_dst *dst, enum vsir_data_type data_type, const char *format, ...)
 {
     va_list args;
 
@@ -797,7 +797,7 @@ static void shader_glsl_ld(struct vkd3d_glsl_generator *gen, const struct vkd3d_
     const struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_resource_type resource_type;
     struct vkd3d_string_buffer *fetch;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     struct glsl_src coord;
     struct glsl_dst dst;
     uint32_t coord_mask;
@@ -912,7 +912,7 @@ static void shader_glsl_sample(struct vkd3d_glsl_generator *gen, const struct vk
     enum vkd3d_shader_resource_type resource_type;
     unsigned int component_idx, coord_size;
     struct vkd3d_string_buffer *sample;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     struct glsl_dst dst;
 
     bias = ins->opcode == VSIR_OP_SAMPLE_B;
@@ -1061,7 +1061,7 @@ static void shader_glsl_load_uav_typed(struct vkd3d_glsl_generator *gen, const s
     enum vkd3d_shader_resource_type resource_type;
     unsigned int uav_id, uav_idx, uav_space;
     struct vkd3d_string_buffer *load;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     struct glsl_src coord;
     struct glsl_dst dst;
     uint32_t coord_mask;
@@ -1121,7 +1121,7 @@ static void shader_glsl_store_uav_typed(struct vkd3d_glsl_generator *gen, const 
     enum vkd3d_shader_resource_type resource_type;
     unsigned int uav_id, uav_idx, uav_space;
     struct vkd3d_string_buffer *image_data;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     struct glsl_src image_coord;
     uint32_t coord_mask;
 

@@ -8225,7 +8225,7 @@ static void generate_vsir_signature(struct hlsl_ctx *ctx,
     }
 }
 
-static enum vkd3d_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type)
+static enum vsir_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type)
 {
     if (hlsl_version_lt(ctx, 4, 0))
         return VKD3D_DATA_FLOAT;
@@ -8256,7 +8256,7 @@ static enum vkd3d_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, 
     return VKD3D_DATA_UNUSED;
 }
 
-static enum vkd3d_data_type vsir_data_type_from_hlsl_instruction(struct hlsl_ctx *ctx,
+static enum vsir_data_type vsir_data_type_from_hlsl_instruction(struct hlsl_ctx *ctx,
         const struct hlsl_ir_node *instr)
 {
     return vsir_data_type_from_hlsl_type(ctx, instr->data_type);
@@ -8455,7 +8455,7 @@ static struct vkd3d_shader_instruction *generate_vsir_add_program_instruction(
 
 static void vsir_src_from_hlsl_constant_value(struct vkd3d_shader_src_param *src,
         struct hlsl_ctx *ctx, const struct hlsl_constant_value *value,
-        enum vkd3d_data_type type, unsigned int width, unsigned int map_writemask)
+        enum vsir_data_type type, unsigned int width, unsigned int map_writemask)
 {
     unsigned int i, j;
 
@@ -12167,7 +12167,7 @@ static enum vkd3d_shader_resource_type sm4_generate_vsir_get_resource_type(const
     }
 }
 
-static enum vkd3d_data_type sm4_generate_vsir_get_format_type(const struct hlsl_type *type)
+static enum vsir_data_type sm4_generate_vsir_get_format_type(const struct hlsl_type *type)
 {
     const struct hlsl_type *format = type->e.resource.format;
 

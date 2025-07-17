@@ -882,9 +882,9 @@ struct sm6_descriptor_info
     struct vkd3d_shader_register_range range;
     enum vkd3d_shader_resource_type resource_type;
     enum dxil_resource_kind kind;
-    enum vkd3d_data_type resource_data_type;
+    enum vsir_data_type resource_data_type;
     enum vkd3d_shader_register_type reg_type;
-    enum vkd3d_data_type reg_data_type;
+    enum vsir_data_type reg_data_type;
 };
 
 struct sm6_parser
@@ -2467,13 +2467,13 @@ static struct vkd3d_shader_dst_param *instruction_dst_params_alloc(struct vkd3d_
 }
 
 static void register_init_with_id(struct vkd3d_shader_register *reg,
-        enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type, unsigned int id)
+        enum vkd3d_shader_register_type reg_type, enum vsir_data_type data_type, unsigned int id)
 {
     vsir_register_init(reg, reg_type, data_type, 1);
     reg->idx[0].offset = id;
 }
 
-static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type *type)
+static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
 {
     if (type->class == TYPE_CLASS_INTEGER)
     {
@@ -2594,10 +2594,10 @@ static void sm6_register_from_value(struct vkd3d_shader_register *reg, const str
         struct sm6_parser *sm6)
 {
     const struct sm6_type *scalar_type;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
 
     scalar_type = sm6_type_get_scalar_type(value->type, 0);
-    data_type = vkd3d_data_type_from_sm6_type(scalar_type);
+    data_type = vsir_data_type_from_dxil(scalar_type);
 
     switch (value->value_type)
     {
@@ -3237,7 +3237,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
     dst->u.data = icb;
 
     icb->register_idx = sm6->icb_count++;
-    icb->data_type = vkd3d_data_type_from_sm6_type(elem_type);
+    icb->data_type = vsir_data_type_from_dxil(elem_type);
     icb->element_count = type->u.array.count;
     icb->component_count = 1;
     icb->is_null = !operands;
@@ -3690,7 +3690,7 @@ static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const stru
         unsigned int count, unsigned int alignment, bool has_function_scope, unsigned int init,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
-    enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
+    enum vsir_data_type data_type = vsir_data_type_from_dxil(elem_type);
 
     if (ins)
         vsir_instruction_init(ins, &sm6->p.location, VSIR_OP_DCL_INDEXABLE_TEMP);
@@ -4078,7 +4078,7 @@ static void dst_param_io_init(struct vkd3d_shader_dst_param *param,
     param->shift = 0;
     /* DXIL types do not have signedness. Load signed elements as unsigned. */
     component_type = e->component_type == VKD3D_SHADER_COMPONENT_INT ? VKD3D_SHADER_COMPONENT_UINT : e->component_type;
-    vsir_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(component_type), 0);
+    vsir_register_init(&param->reg, reg_type, vsir_data_type_from_component_type(component_type), 0);
     param->reg.dimension = VSIR_DIMENSION_VEC4;
 }
 
@@ -5169,7 +5169,7 @@ static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intr
 
     type = sm6_type_get_scalar_type(dst->type, 0);
     VKD3D_ASSERT(type);
-    src_param->reg.data_type = vkd3d_data_type_from_sm6_type(type);
+    src_param->reg.data_type = vsir_data_type_from_dxil(type);
     if (data_type_is_64_bit(src_param->reg.data_type))
         src_param->swizzle = vsir_swizzle_64_from_32(src_param->swizzle);
     else
@@ -5179,7 +5179,7 @@ static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intr
 }
 
 static void sm6_parser_dcl_register_builtin(struct sm6_parser *sm6, enum vkd3d_shader_opcode handler_idx,
-        enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type, unsigned int component_count)
+        enum vkd3d_shader_register_type reg_type, enum vsir_data_type data_type, unsigned int component_count)
 {
     struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_instruction *ins;
@@ -5194,8 +5194,8 @@ static void sm6_parser_dcl_register_builtin(struct sm6_parser *sm6, enum vkd3d_s
     }
 }
 
-static void sm6_parser_emit_dx_input_register_mov(struct sm6_parser *sm6,
-        struct vkd3d_shader_instruction *ins, enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type)
+static void sm6_parser_emit_dx_input_register_mov(struct sm6_parser *sm6, struct vkd3d_shader_instruction *ins,
+        enum vkd3d_shader_register_type reg_type, enum vsir_data_type data_type)
 {
     struct vkd3d_shader_src_param *src_param;
 
@@ -9031,7 +9031,7 @@ static enum vkd3d_shader_resource_type shader_resource_type_from_dxil_resource_k
     }
 }
 
-static const enum vkd3d_data_type data_type_table[] =
+static const enum vsir_data_type data_type_table[] =
 {
     [COMPONENT_TYPE_INVALID]     = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_I1]          = VKD3D_DATA_UNUSED,
@@ -9054,10 +9054,10 @@ static const enum vkd3d_data_type data_type_table[] =
     [COMPONENT_TYPE_PACKEDU8X32] = VKD3D_DATA_UNUSED,
 };
 
-static enum vkd3d_data_type vkd3d_data_type_from_dxil_component_type(enum dxil_component_type type,
+static enum vsir_data_type vsir_data_type_from_dxil_component_type(enum dxil_component_type type,
         struct sm6_parser *sm6)
 {
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
 
     if (type >= ARRAY_SIZE(data_type_table) || (data_type = data_type_table[type]) == VKD3D_DATA_UNUSED)
     {
@@ -9072,7 +9072,7 @@ static enum vkd3d_data_type vkd3d_data_type_from_dxil_component_type(enum dxil_c
 
 struct resource_additional_values
 {
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     unsigned int byte_stride;
 };
 
@@ -9113,7 +9113,7 @@ static bool resources_load_additional_values(struct resource_additional_values *
                             "An untyped resource has type %u.", value);
                     return false;
                 }
-                info->data_type = vkd3d_data_type_from_dxil_component_type(value, sm6);
+                info->data_type = vsir_data_type_from_dxil_component_type(value, sm6);
                 break;
 
             case RESOURCE_TAG_ELEMENT_STRIDE:
@@ -9241,8 +9241,8 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
 }
 
 static void init_resource_declaration(struct vkd3d_shader_resource *resource,
-        enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type, unsigned int id,
-        const struct vkd3d_shader_register_range *range)
+        enum vkd3d_shader_register_type reg_type, enum vsir_data_type data_type,
+        unsigned int id, const struct vkd3d_shader_register_range *range)
 {
     struct vkd3d_shader_dst_param *param = &resource->reg;
 

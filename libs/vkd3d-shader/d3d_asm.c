@@ -384,7 +384,7 @@ static void shader_print_resource_type(struct vkd3d_d3d_asm_compiler *compiler, 
                 compiler->colours.error, type, compiler->colours.reset);
 }
 
-static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_data_type type)
+static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum vsir_data_type type)
 {
     static const char *const data_type_names[] =
     {
@@ -412,7 +412,7 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
                 compiler->colours.error, type, compiler->colours.reset);
 }
 
-static void shader_dump_resource_data_type(struct vkd3d_d3d_asm_compiler *compiler, const enum vkd3d_data_type *type)
+static void shader_dump_resource_data_type(struct vkd3d_d3d_asm_compiler *compiler, const enum vsir_data_type *type)
 {
     int i;
 

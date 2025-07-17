@@ -133,7 +133,7 @@ static void msl_print_indent(struct vkd3d_string_buffer *buffer, unsigned int in
 }
 
 static void msl_print_resource_datatype(struct msl_generator *gen,
-        struct vkd3d_string_buffer *buffer, enum vkd3d_data_type data_type)
+        struct vkd3d_string_buffer *buffer, enum vsir_data_type data_type)
 {
     switch (data_type)
     {
@@ -157,7 +157,7 @@ static void msl_print_resource_datatype(struct msl_generator *gen,
 }
 
 static void msl_print_register_datatype(struct vkd3d_string_buffer *buffer,
-        struct msl_generator *gen, enum vkd3d_data_type data_type)
+        struct msl_generator *gen, enum vsir_data_type data_type)
 {
     vkd3d_string_buffer_printf(buffer, ".");
     switch (data_type)
@@ -345,7 +345,7 @@ static void msl_print_sampler_name(struct vkd3d_string_buffer *buffer, unsigned 
 }
 
 static void msl_print_srv_name(struct vkd3d_string_buffer *buffer, struct msl_generator *gen, unsigned int binding,
-        const struct msl_resource_type_info *resource_type_info, enum vkd3d_data_type resource_data_type, bool compare)
+        const struct msl_resource_type_info *resource_type_info, enum vsir_data_type resource_data_type, bool compare)
 {
     vkd3d_string_buffer_printf(buffer, "descriptors[%u].as<%s%s%s<",
             binding, compare ? "depth" : "texture", resource_type_info->type_suffix,
@@ -355,7 +355,7 @@ static void msl_print_srv_name(struct vkd3d_string_buffer *buffer, struct msl_ge
 }
 
 static void msl_print_uav_name(struct vkd3d_string_buffer *buffer, struct msl_generator *gen, unsigned int binding,
-        const struct msl_resource_type_info *resource_type_info, enum vkd3d_data_type resource_data_type)
+        const struct msl_resource_type_info *resource_type_info, enum vsir_data_type resource_data_type)
 {
     vkd3d_string_buffer_printf(buffer, "descriptors[%u].as<texture%s%s<",
             binding, resource_type_info->type_suffix,
@@ -523,7 +523,7 @@ static void msl_src_cleanup(struct msl_src *src, struct vkd3d_string_buffer_cach
 }
 
 static void msl_print_bitcast(struct vkd3d_string_buffer *dst, struct msl_generator *gen, const char *src,
-        enum vkd3d_data_type dst_data_type, enum msl_data_type src_data_type, enum vsir_dimension dimension)
+        enum vsir_data_type dst_data_type, enum msl_data_type src_data_type, enum vsir_dimension dimension)
 {
     bool write_cast = false;
 
@@ -561,7 +561,7 @@ static void msl_print_bitcast(struct vkd3d_string_buffer *dst, struct msl_genera
 }
 
 static void msl_print_src_with_type(struct vkd3d_string_buffer *buffer, struct msl_generator *gen,
-    const struct vkd3d_shader_src_param *vsir_src, uint32_t mask, enum vkd3d_data_type data_type)
+    const struct vkd3d_shader_src_param *vsir_src, uint32_t mask, enum vsir_data_type data_type)
 {
     const struct vkd3d_shader_register *reg = &vsir_src->reg;
     struct vkd3d_string_buffer *register_name, *str;
@@ -947,7 +947,7 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     const struct vkd3d_shader_descriptor_binding *binding;
     enum vkd3d_shader_resource_type resource_type;
     struct vkd3d_string_buffer *read;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     unsigned int srv_binding;
     uint32_t coord_mask;
     struct msl_dst dst;
@@ -1047,7 +1047,7 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     enum vkd3d_shader_resource_type resource_type;
     unsigned int srv_binding, sampler_binding;
     struct vkd3d_string_buffer *sample;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     unsigned int component_idx;
     uint32_t coord_mask;
     struct msl_dst dst;
@@ -1257,7 +1257,7 @@ static void msl_store_uav_typed(struct msl_generator *gen, const struct vkd3d_sh
     enum vkd3d_shader_resource_type resource_type;
     unsigned int uav_id, uav_idx, uav_space;
     struct vkd3d_string_buffer *image_data;
-    enum vkd3d_data_type data_type;
+    enum vsir_data_type data_type;
     unsigned int uav_binding;
     uint32_t coord_mask;
 
@@ -1882,7 +1882,7 @@ static void msl_generate_entrypoint_prologue(struct msl_generator *gen)
         switch (e->sysval_semantic)
         {
             case VKD3D_SHADER_SV_NONE:
-                msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
+                msl_print_register_datatype(buffer, gen, vsir_data_type_from_component_type(e->component_type));
                 msl_print_write_mask(buffer, e->mask);
                 vkd3d_string_buffer_printf(buffer, " = input.shader_in_%u", i);
                 break;
@@ -1944,7 +1944,7 @@ static void msl_generate_entrypoint_epilogue(struct msl_generator *gen)
                 vkd3d_string_buffer_printf(buffer, "    output.shader_out_%u", i);
                 msl_print_write_mask(buffer, e->mask);
                 vkd3d_string_buffer_printf(buffer, " = %s_out[%u]", gen->prefix, e->register_index);
-                msl_print_register_datatype(buffer, gen, vkd3d_data_type_from_component_type(e->component_type));
+                msl_print_register_datatype(buffer, gen, vsir_data_type_from_component_type(e->component_type));
                 msl_print_write_mask(buffer, e->mask);
                 break;
             case VKD3D_SHADER_SV_DEPTH:

@@ -555,7 +555,7 @@ static uint32_t vsir_combine_swizzles(uint32_t first, uint32_t second)
 }
 
 void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
-        enum vkd3d_data_type data_type, unsigned int idx_count)
+        enum vsir_data_type data_type, unsigned int idx_count)
 {
     reg->type = reg_type;
     reg->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
@@ -581,7 +581,7 @@ static inline bool shader_register_is_phase_instance_id(const struct vkd3d_shade
 }
 
 void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d_shader_register_type reg_type,
-        enum vkd3d_data_type data_type, unsigned int idx_count)
+        enum vsir_data_type data_type, unsigned int idx_count)
 {
     vsir_register_init(&param->reg, reg_type, data_type, idx_count);
     param->swizzle = 0;
@@ -597,7 +597,7 @@ static void src_param_init_const_uint(struct vkd3d_shader_src_param *src, uint32
 static void vsir_src_param_init_io(struct vkd3d_shader_src_param *src,
         enum vkd3d_shader_register_type reg_type, const struct signature_element *e, unsigned int idx_count)
 {
-    vsir_src_param_init(src, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
+    vsir_src_param_init(src, reg_type, vsir_data_type_from_component_type(e->component_type), idx_count);
     src->reg.dimension = VSIR_DIMENSION_VEC4;
     src->swizzle = vsir_swizzle_from_writemask(e->mask);
 }
@@ -609,13 +609,13 @@ void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned in
     param->reg.idx[0].offset = label_id;
 }
 
-static void src_param_init_parameter(struct vkd3d_shader_src_param *src, uint32_t idx, enum vkd3d_data_type type)
+static void src_param_init_parameter(struct vkd3d_shader_src_param *src, uint32_t idx, enum vsir_data_type type)
 {
     vsir_src_param_init(src, VKD3DSPR_PARAMETER, type, 1);
     src->reg.idx[0].offset = idx;
 }
 
-static void src_param_init_parameter_vec4(struct vkd3d_shader_src_param *src, uint32_t idx, enum vkd3d_data_type type)
+static void src_param_init_parameter_vec4(struct vkd3d_shader_src_param *src, uint32_t idx, enum vsir_data_type type)
 {
     vsir_src_param_init(src, VKD3DSPR_PARAMETER, type, 1);
     src->reg.idx[0].offset = idx;
@@ -641,7 +641,7 @@ static void vsir_src_param_init_sampler(struct vkd3d_shader_src_param *src, unsi
 }
 
 static void src_param_init_ssa(struct vkd3d_shader_src_param *src, unsigned int idx,
-        enum vkd3d_data_type data_type, enum vsir_dimension dimension)
+        enum vsir_data_type data_type, enum vsir_dimension dimension)
 {
     vsir_src_param_init(src, VKD3DSPR_SSA, data_type, 1);
     src->reg.idx[0].offset = idx;
@@ -653,8 +653,8 @@ static void src_param_init_ssa(struct vkd3d_shader_src_param *src, unsigned int 
     }
 }
 
-static void src_param_init_ssa_scalar(struct vkd3d_shader_src_param *src, unsigned int idx,
-        enum vkd3d_data_type data_type)
+static void src_param_init_ssa_scalar(struct vkd3d_shader_src_param *src,
+        unsigned int idx, enum vsir_data_type data_type)
 {
     src_param_init_ssa(src, idx, data_type, VSIR_DIMENSION_SCALAR);
 }
@@ -701,7 +701,7 @@ static void src_param_init_temp_uint(struct vkd3d_shader_src_param *src, unsigne
 }
 
 void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader_register_type reg_type,
-        enum vkd3d_data_type data_type, unsigned int idx_count)
+        enum vsir_data_type data_type, unsigned int idx_count)
 {
     vsir_register_init(&param->reg, reg_type, data_type, idx_count);
     param->write_mask = VKD3DSP_WRITEMASK_0;
@@ -712,7 +712,7 @@ void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader
 static void vsir_dst_param_init_io(struct vkd3d_shader_dst_param *dst, enum vkd3d_shader_register_type reg_type,
         const struct signature_element *e, unsigned int idx_count)
 {
-    vsir_dst_param_init(dst, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
+    vsir_dst_param_init(dst, reg_type, vsir_data_type_from_component_type(e->component_type), idx_count);
     dst->reg.dimension = VSIR_DIMENSION_VEC4;
     dst->write_mask = e->mask;
 }
@@ -725,7 +725,7 @@ void vsir_dst_param_init_null(struct vkd3d_shader_dst_param *dst)
 }
 
 static void dst_param_init_ssa(struct vkd3d_shader_dst_param *dst, unsigned int idx,
-        enum vkd3d_data_type data_type, enum vsir_dimension dimension)
+        enum vsir_data_type data_type, enum vsir_dimension dimension)
 {
     vsir_dst_param_init(dst, VKD3DSPR_SSA, data_type, 1);
     dst->reg.idx[0].offset = idx;
@@ -737,8 +737,8 @@ static void dst_param_init_ssa(struct vkd3d_shader_dst_param *dst, unsigned int 
     }
 }
 
-static void dst_param_init_ssa_scalar(struct vkd3d_shader_dst_param *dst, unsigned int idx,
-        enum vkd3d_data_type data_type)
+static void dst_param_init_ssa_scalar(struct vkd3d_shader_dst_param *dst,
+        unsigned int idx, enum vsir_data_type data_type)
 {
     dst_param_init_ssa(dst, idx, data_type, VSIR_DIMENSION_SCALAR);
 }
@@ -778,7 +778,7 @@ static void dst_param_init_temp_uint(struct vkd3d_shader_dst_param *dst, unsigne
 }
 
 static void dst_param_init_output(struct vkd3d_shader_dst_param *dst,
-        enum vkd3d_data_type data_type, uint32_t idx, uint32_t write_mask)
+        enum vsir_data_type data_type, uint32_t idx, uint32_t write_mask)
 {
     vsir_dst_param_init(dst, VKD3DSPR_OUTPUT, data_type, 1);
     dst->reg.idx[0].offset = idx;
@@ -850,8 +850,8 @@ static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *i
     vsir_instruction_init(ins, &location, VSIR_OP_NOP);
 }
 
-static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op, enum vkd3d_data_type data_type,
-        enum vkd3d_shader_opcode *opcode, bool *requires_swap)
+static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op,
+        enum vsir_data_type data_type, enum vkd3d_shader_opcode *opcode, bool *requires_swap)
 {
     switch (rel_op)
     {
@@ -7819,7 +7819,7 @@ static enum vkd3d_result insert_vertex_fog_before_ret(struct vsir_program *progr
 
     /* Write the position or specular output. */
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
-    dst_param_init_output(&ins->dst[0], vkd3d_data_type_from_component_type(e->component_type),
+    dst_param_init_output(&ins->dst[0], vsir_data_type_from_component_type(e->component_type),
             source_signature_idx, e->mask);
     src_param_init_temp_float4(&ins->src[0], temp);
     ++ins;
@@ -8840,7 +8840,7 @@ struct validation_context
     struct validation_context_ssa_data
     {
         enum vsir_dimension dimension;
-        enum vkd3d_data_type data_type;
+        enum vsir_data_type data_type;
         size_t first_seen;
         uint32_t write_mask;
         uint32_t read_mask;
@@ -9544,7 +9544,7 @@ static void vsir_validate_register(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION, "Invalid register precision %#x.",
                 reg->precision);
 
-    if (reg->data_type >= VKD3D_DATA_COUNT)
+    if (reg->data_type >= VSIR_DATA_TYPE_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE, "Invalid register data type %#x.",
                 reg->data_type);
 
@@ -10486,7 +10486,7 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
                     "Descriptor %u has invalid resource type %#x for descriptor type %#x.",
                     i, descriptor->resource_type, descriptor->type);
 
-        if (descriptor->resource_data_type >= VKD3D_DATA_COUNT)
+        if (descriptor->resource_data_type >= VSIR_DATA_TYPE_COUNT)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                     "Descriptor %u has invalid resource data type %#x.", i, descriptor->resource_data_type);
         else if ((descriptor->resource_data_type == VKD3D_DATA_UNUSED)
@@ -10589,9 +10589,9 @@ static void vsir_validate_hull_shader_phase(struct validation_context *ctx,
 }
 
 static void vsir_validate_elementwise_operation(struct validation_context *ctx,
-        const struct vkd3d_shader_instruction *instruction, const bool types[VKD3D_DATA_COUNT])
+        const struct vkd3d_shader_instruction *instruction, const bool types[VSIR_DATA_TYPE_COUNT])
 {
-    enum vkd3d_data_type dst_data_type;
+    enum vsir_data_type dst_data_type;
     unsigned int i;
 
     if (instruction->dst_count < 1)
@@ -10599,7 +10599,7 @@ static void vsir_validate_elementwise_operation(struct validation_context *ctx,
 
     dst_data_type = instruction->dst[0].reg.data_type;
 
-    if (dst_data_type >= VKD3D_DATA_COUNT)
+    if (dst_data_type >= VSIR_DATA_TYPE_COUNT)
         return;
 
     if (!types[dst_data_type])
@@ -10621,7 +10621,7 @@ static void vsir_validate_elementwise_operation(struct validation_context *ctx,
 static void vsir_validate_double_elementwise_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_DOUBLE] = true,
     };
@@ -10632,7 +10632,7 @@ static void vsir_validate_double_elementwise_operation(struct validation_context
 static void vsir_validate_float_elementwise_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_FLOAT] = true,
     };
@@ -10643,7 +10643,7 @@ static void vsir_validate_float_elementwise_operation(struct validation_context 
 static void vsir_validate_integer_elementwise_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
@@ -10656,7 +10656,7 @@ static void vsir_validate_integer_elementwise_operation(struct validation_contex
 static void vsir_validate_logic_elementwise_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
@@ -10668,9 +10668,9 @@ static void vsir_validate_logic_elementwise_operation(struct validation_context 
 }
 
 static void vsir_validate_comparison_operation(struct validation_context *ctx,
-        const struct vkd3d_shader_instruction *instruction, const bool types[VKD3D_DATA_COUNT])
+        const struct vkd3d_shader_instruction *instruction, const bool types[VSIR_DATA_TYPE_COUNT])
 {
-    enum vkd3d_data_type dst_data_type, src_data_type;
+    enum vsir_data_type dst_data_type, src_data_type;
     unsigned int i;
 
     if (instruction->dst_count < 1)
@@ -10688,7 +10688,7 @@ static void vsir_validate_comparison_operation(struct validation_context *ctx,
 
     src_data_type = instruction->src[0].reg.data_type;
 
-    if (src_data_type >= VKD3D_DATA_COUNT)
+    if (src_data_type >= VSIR_DATA_TYPE_COUNT)
         return;
 
     if (!types[src_data_type])
@@ -10710,7 +10710,7 @@ static void vsir_validate_comparison_operation(struct validation_context *ctx,
 static void vsir_validate_double_comparison_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_DOUBLE] = true,
     };
@@ -10721,7 +10721,7 @@ static void vsir_validate_double_comparison_operation(struct validation_context 
 static void vsir_validate_float_comparison_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_FLOAT] = true,
     };
@@ -10732,7 +10732,7 @@ static void vsir_validate_float_comparison_operation(struct validation_context *
 static void vsir_validate_integer_comparison_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
@@ -10744,9 +10744,9 @@ static void vsir_validate_integer_comparison_operation(struct validation_context
 
 static void vsir_validate_cast_operation(struct validation_context *ctx,
         const struct vkd3d_shader_instruction *instruction,
-        const bool src_types[VKD3D_DATA_COUNT], const bool dst_types[VKD3D_DATA_COUNT])
+        const bool src_types[VSIR_DATA_TYPE_COUNT], const bool dst_types[VSIR_DATA_TYPE_COUNT])
 {
-    enum vkd3d_data_type dst_data_type, src_data_type;
+    enum vsir_data_type dst_data_type, src_data_type;
 
     if (instruction->dst_count < 1 || instruction->src_count < 1)
         return;
@@ -10754,7 +10754,7 @@ static void vsir_validate_cast_operation(struct validation_context *ctx,
     dst_data_type = instruction->dst[0].reg.data_type;
     src_data_type = instruction->src[0].reg.data_type;
 
-    if (src_data_type >= VKD3D_DATA_COUNT || dst_data_type >= VKD3D_DATA_COUNT)
+    if (src_data_type >= VSIR_DATA_TYPE_COUNT || dst_data_type >= VSIR_DATA_TYPE_COUNT)
         return;
 
     if (!src_types[src_data_type])
@@ -11283,13 +11283,13 @@ static void vsir_validate_endswitch(struct validation_context *ctx, const struct
 
 static void vsir_validate_ftoi(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool src_types[VKD3D_DATA_COUNT] =
+    static const bool src_types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
         [VKD3D_DATA_HALF] = true,
     };
-    static const bool dst_types[VKD3D_DATA_COUNT] =
+    static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
@@ -11300,13 +11300,13 @@ static void vsir_validate_ftoi(struct validation_context *ctx, const struct vkd3
 
 static void vsir_validate_ftou(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool src_types[VKD3D_DATA_COUNT] =
+    static const bool src_types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
         [VKD3D_DATA_HALF] = true,
     };
-    static const bool dst_types[VKD3D_DATA_COUNT] =
+    static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_UINT] = true,
     };
@@ -11328,14 +11328,14 @@ static void vsir_validate_ifc(struct validation_context *ctx, const struct vkd3d
 
 static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool src_types[VKD3D_DATA_COUNT] =
+    static const bool src_types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,
         [VKD3D_DATA_UINT64] = true,
         [VKD3D_DATA_BOOL] = true,
     };
-    static const bool dst_types[VKD3D_DATA_COUNT] =
+    static const bool dst_types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_FLOAT] = true,
         [VKD3D_DATA_DOUBLE] = true,
@@ -11347,7 +11347,7 @@ static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3
 
 static void vsir_validate_itoi(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
-    static const bool types[VKD3D_DATA_COUNT] =
+    static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
         [VKD3D_DATA_INT] = true,
         [VKD3D_DATA_UINT] = true,

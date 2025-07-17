@@ -1101,7 +1101,7 @@ static void shader_sm1_read_semantic(struct vkd3d_shader_sm1_parser *sm1,
 }
 
 static void shader_sm1_read_immconst(struct vkd3d_shader_sm1_parser *sm1, const uint32_t **ptr,
-        struct vkd3d_shader_src_param *src_param, enum vsir_dimension dimension, enum vkd3d_data_type data_type)
+        struct vkd3d_shader_src_param *src_param, enum vsir_dimension dimension, enum vsir_data_type data_type)
 {
     unsigned int count = dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
 
