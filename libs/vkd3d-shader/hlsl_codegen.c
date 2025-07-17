@@ -8239,7 +8239,7 @@ static enum vsir_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, c
         switch (type->e.numeric.type)
         {
             case HLSL_TYPE_DOUBLE:
-                return VKD3D_DATA_DOUBLE;
+                return VSIR_DATA_F64;
             case HLSL_TYPE_FLOAT:
                 return VSIR_DATA_F32;
             case HLSL_TYPE_HALF:
@@ -12174,7 +12174,7 @@ static enum vsir_data_type sm4_generate_vsir_get_format_type(const struct hlsl_t
     switch (format->e.numeric.type)
     {
         case HLSL_TYPE_DOUBLE:
-            return VKD3D_DATA_DOUBLE;
+            return VSIR_DATA_F64;
 
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_HALF:

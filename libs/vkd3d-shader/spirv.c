@@ -4715,7 +4715,7 @@ static uint32_t spirv_compiler_emit_constant_array(struct spirv_compiler *compil
                 elements[i] = spirv_compiler_get_constant(compiler, component_type, component_count,
                         &icb->data[component_count * i]);
             break;
-        case VKD3D_DATA_DOUBLE:
+        case VSIR_DATA_F64:
         case VKD3D_DATA_UINT64:
         {
             uint64_t *data = (uint64_t *)icb->data;
@@ -5029,7 +5029,7 @@ static uint32_t spirv_compiler_emit_sat(struct spirv_compiler *compiler,
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id, zero_id, one_id;
 
-    if (reg->data_type == VKD3D_DATA_DOUBLE)
+    if (reg->data_type == VSIR_DATA_F64)
     {
         zero_id = spirv_compiler_get_constant_double_vector(compiler, 0.0, component_count);
         one_id = spirv_compiler_get_constant_double_vector(compiler, 1.0, component_count);
@@ -7596,7 +7596,7 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
     {
         val_id = spirv_compiler_emit_bool_to_float(compiler, 1, val_id, instruction->opcode == VSIR_OP_ITOF);
     }
-    else if (dst->reg.data_type == VKD3D_DATA_DOUBLE)
+    else if (dst->reg.data_type == VSIR_DATA_F64)
     {
         /* ITOD is not supported. Frontends which emit bool casts must use ITOF for double. */
         val_id = spirv_compiler_emit_bool_to_double(compiler, 1, val_id, instruction->opcode == VSIR_OP_ITOF);
@@ -8051,7 +8051,7 @@ static void spirv_compiler_emit_rcp(struct spirv_compiler *compiler,
     type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
 
     src_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
-    if (src->reg.data_type == VKD3D_DATA_DOUBLE)
+    if (src->reg.data_type == VSIR_DATA_F64)
         div_id = spirv_compiler_get_constant_double_vector(compiler, 1.0, component_count);
     else
         div_id = spirv_compiler_get_constant_float_vector(compiler, 1.0f, component_count);
@@ -8101,7 +8101,7 @@ static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
 
     component_count = vsir_write_mask_component_count(dst->write_mask);
 
-    if (src->reg.data_type == VKD3D_DATA_DOUBLE)
+    if (src->reg.data_type == VSIR_DATA_F64)
     {
         write_mask = vkd3d_write_mask_from_component_count(component_count);
         int_min_id = spirv_compiler_get_constant_double_vector(compiler, -2147483648.0, component_count);
@@ -8157,7 +8157,7 @@ static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
 
     component_count = vsir_write_mask_component_count(dst->write_mask);
 
-    if (src->reg.data_type == VKD3D_DATA_DOUBLE)
+    if (src->reg.data_type == VSIR_DATA_F64)
     {
         write_mask = vkd3d_write_mask_from_component_count(component_count);
         zero_id = spirv_compiler_get_constant_double_vector(compiler, 0.0, component_count);

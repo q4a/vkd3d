@@ -394,7 +394,6 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
         [VKD3D_DATA_SNORM    ] = "snorm",
         [VKD3D_DATA_OPAQUE   ] = "opaque",
         [VKD3D_DATA_MIXED    ] = "mixed",
-        [VKD3D_DATA_DOUBLE   ] = "double",
         [VKD3D_DATA_CONTINUED] = "<continued>",
         [VKD3D_DATA_UNUSED   ] = "<unused>",
         [VKD3D_DATA_UINT8    ] = "uint8",
@@ -403,6 +402,7 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
         [VKD3D_DATA_UINT16   ] = "uint16",
         [VSIR_DATA_F16      ] = "half",
         [VSIR_DATA_F32      ] = "float",
+        [VSIR_DATA_F64      ] = "double",
     };
 
     if (type < ARRAY_SIZE(data_type_names))
@@ -800,7 +800,7 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
         /* A double2 vector is treated as a float4 vector in enum vsir_dimension. */
         if (reg->dimension == VSIR_DIMENSION_SCALAR || reg->dimension == VSIR_DIMENSION_VEC4)
         {
-            if (reg->data_type == VKD3D_DATA_DOUBLE)
+            if (reg->data_type == VSIR_DATA_F64)
             {
                 shader_print_double_literal(compiler, "", reg->u.immconst_f64[0], "");
                 if (reg->dimension == VSIR_DIMENSION_VEC4)

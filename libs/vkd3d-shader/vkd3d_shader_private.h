@@ -716,7 +716,6 @@ enum vsir_data_type
     VKD3D_DATA_SNORM,
     VKD3D_DATA_OPAQUE,
     VKD3D_DATA_MIXED,
-    VKD3D_DATA_DOUBLE,
     VKD3D_DATA_CONTINUED,
     VKD3D_DATA_UNUSED,
     VKD3D_DATA_UINT8,
@@ -726,6 +725,7 @@ enum vsir_data_type
 
     VSIR_DATA_F16,
     VSIR_DATA_F32,
+    VSIR_DATA_F64,
 
     VSIR_DATA_TYPE_COUNT,
 };
@@ -743,12 +743,12 @@ static inline bool data_type_is_bool(enum vsir_data_type data_type)
 
 static inline bool data_type_is_floating_point(enum vsir_data_type data_type)
 {
-    return data_type == VSIR_DATA_F16 || data_type == VSIR_DATA_F32 || data_type == VKD3D_DATA_DOUBLE;
+    return data_type == VSIR_DATA_F16 || data_type == VSIR_DATA_F32 || data_type == VSIR_DATA_F64;
 }
 
 static inline bool data_type_is_64_bit(enum vsir_data_type data_type)
 {
-    return data_type == VKD3D_DATA_DOUBLE || data_type == VKD3D_DATA_UINT64;
+    return data_type == VSIR_DATA_F64 || data_type == VKD3D_DATA_UINT64;
 }
 
 enum vsir_dimension
@@ -1795,13 +1795,13 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
         case VKD3D_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             return VKD3D_SHADER_COMPONENT_FLOAT;
+        case VSIR_DATA_F64:
+            return VKD3D_SHADER_COMPONENT_DOUBLE;
         case VKD3D_DATA_UINT16: /* Minimum precision. TODO: native 16-bit */
         case VKD3D_DATA_UINT:
             return VKD3D_SHADER_COMPONENT_UINT;
         case VKD3D_DATA_INT:
             return VKD3D_SHADER_COMPONENT_INT;
-        case VKD3D_DATA_DOUBLE:
-            return VKD3D_SHADER_COMPONENT_DOUBLE;
         case VKD3D_DATA_UINT64:
             return VKD3D_SHADER_COMPONENT_UINT64;
         case VKD3D_DATA_BOOL:
@@ -1825,7 +1825,7 @@ static inline enum vsir_data_type vsir_data_type_from_component_type(enum vkd3d_
         case VKD3D_SHADER_COMPONENT_INT:
             return VKD3D_DATA_INT;
         case VKD3D_SHADER_COMPONENT_DOUBLE:
-            return VKD3D_DATA_DOUBLE;
+            return VSIR_DATA_F64;
         default:
             FIXME("Unhandled component type %#x.\n", component_type);
             return VSIR_DATA_F32;

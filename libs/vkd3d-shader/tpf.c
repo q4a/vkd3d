@@ -757,7 +757,7 @@ static const enum vsir_data_type data_type_table[] =
     /* VKD3D_SM4_DATA_UINT */       VKD3D_DATA_UINT,
     /* VKD3D_SM4_DATA_FLOAT */      VSIR_DATA_F32,
     /* VKD3D_SM4_DATA_MIXED */      VKD3D_DATA_MIXED,
-    /* VKD3D_SM4_DATA_DOUBLE */     VKD3D_DATA_DOUBLE,
+    /* VKD3D_SM4_DATA_DOUBLE */     VSIR_DATA_F64,
     /* VKD3D_SM4_DATA_CONTINUED */  VKD3D_DATA_CONTINUED,
     /* VKD3D_SM4_DATA_UNUSED */     VKD3D_DATA_UNUSED,
 };
@@ -1430,7 +1430,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
     unsigned int i;
 
     /*
-     * d -> VKD3D_DATA_DOUBLE
+     * d -> VSIR_DATA_F64
      * f -> VSIR_DATA_F32
      * i -> VKD3D_DATA_INT
      * u -> VKD3D_DATA_UINT
@@ -1990,7 +1990,7 @@ static enum vsir_data_type map_data_type(char t)
     switch (t)
     {
         case 'd':
-            return VKD3D_DATA_DOUBLE;
+            return VSIR_DATA_F64;
         case 'f':
             return VSIR_DATA_F32;
         case 'i':
@@ -2512,7 +2512,7 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
             break;
     }
 
-    if (data_type == VKD3D_DATA_DOUBLE)
+    if (data_type == VSIR_DATA_F64)
         dst_param->write_mask = vsir_write_mask_64_from_32(dst_param->write_mask);
     /* Some scalar registers are declared with no write mask in shader bytecode. */
     if (!dst_param->write_mask && shader_sm4_is_scalar_register(&dst_param->reg))

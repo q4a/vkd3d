@@ -2503,7 +2503,7 @@ static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
             case 32:
                 return VSIR_DATA_F32;
             case 64:
-                return VKD3D_DATA_DOUBLE;
+                return VSIR_DATA_F64;
             default:
                 FIXME("Unhandled width %u.\n", type->u.width);
                 return VSIR_DATA_F32;
@@ -3266,7 +3266,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
                 icb->data[i] = operands[i];
             break;
 
-        case VKD3D_DATA_DOUBLE:
+        case VSIR_DATA_F64:
         case VKD3D_DATA_UINT64:
             data64 = (uint64_t *)icb->data;
             for (i = 0; i < count; ++i)
@@ -9043,13 +9043,13 @@ static const enum vsir_data_type data_type_table[] =
     [COMPONENT_TYPE_U64]         = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_F16]         = VSIR_DATA_F32,
     [COMPONENT_TYPE_F32]         = VSIR_DATA_F32,
-    [COMPONENT_TYPE_F64]         = VKD3D_DATA_DOUBLE,
+    [COMPONENT_TYPE_F64]         = VSIR_DATA_F64,
     [COMPONENT_TYPE_SNORMF16]    = VKD3D_DATA_SNORM,
     [COMPONENT_TYPE_UNORMF16]    = VKD3D_DATA_UNORM,
     [COMPONENT_TYPE_SNORMF32]    = VKD3D_DATA_SNORM,
     [COMPONENT_TYPE_UNORMF32]    = VKD3D_DATA_UNORM,
-    [COMPONENT_TYPE_SNORMF64]    = VKD3D_DATA_DOUBLE,
-    [COMPONENT_TYPE_UNORMF64]    = VKD3D_DATA_DOUBLE,
+    [COMPONENT_TYPE_SNORMF64]    = VSIR_DATA_F64,
+    [COMPONENT_TYPE_UNORMF64]    = VSIR_DATA_F64,
     [COMPONENT_TYPE_PACKEDS8X32] = VKD3D_DATA_UNUSED,
     [COMPONENT_TYPE_PACKEDU8X32] = VKD3D_DATA_UNUSED,
 };
