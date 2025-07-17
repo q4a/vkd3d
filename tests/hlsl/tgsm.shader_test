@@ -280,7 +280,7 @@ size (raw_buffer, 8)
 0xf000f 0xf000f 0xf000f 0xf000f
 0xf000f 0xf000f 0xf000f 0xf000f
 
-[compute shader todo]
+[compute shader]
 RWByteAddressBuffer u : register(u0);
 groupshared min16uint m;
 
@@ -305,7 +305,7 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
 }
 
 [test]
-todo(sm<6 | msl) dispatch 2 1 1
+todo(glsl | msl) dispatch 2 1 1
 probe uav 0 (0) u32(0x14321)
 probe uav 0 (1) u32(0x14321)
 probe uav 0 (2) u32(0x14321)

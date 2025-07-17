@@ -1610,6 +1610,38 @@ static bool lower_tgsm_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, s
 
     return true;
 }
+
+/* Lowers stores to TGSMs to resource stores. */
+static bool lower_tgsm_stores(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_store *store;
+    struct hlsl_ir_node *coords;
+    struct hlsl_deref res_deref;
+    struct hlsl_deref *deref;
+
+    if (instr->type != HLSL_IR_STORE)
+        return false;
+    store = hlsl_ir_store(instr);
+    deref = &store->lhs;
+
+    if (!deref->var->is_tgsm)
+        return false;
+
+    if (deref->path_len)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Store to indexed TGSM.");
+        return false;
+    }
+
+    hlsl_init_simple_deref_from_var(&res_deref, deref->var);
+    coords = hlsl_block_add_uint_constant(ctx, block, 0, &instr->loc);
+
+    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STORE, &res_deref,
+            coords, store->rhs.node, store->writemask, &instr->loc);
+
+    return true;
+}
+
 /* Allocate a unique, ordered index to each instruction, which will be used for
  * copy propagation and computing liveness ranges.
  * Index 0 means unused, so start at 1. */
@@ -3475,10 +3507,10 @@ static bool validate_dereferences(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
         {
             struct hlsl_ir_resource_store *store = hlsl_ir_resource_store(instr);
 
-            if (!store->resource.var->is_uniform)
+            if (!store->resource.var->is_uniform && !store->resource.var->is_tgsm)
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
-                        "Accessed resource must have a single uniform source.");
+                        "Accessed resource must have a single uniform or groupshared source.");
             }
             else if (validate_component_index_range_from_deref(ctx, &store->resource) == DEREF_VALIDATION_NOT_CONSTANT)
             {
@@ -11204,11 +11236,7 @@ static bool sm4_generate_vsir_instr_store(struct hlsl_ctx *ctx,
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_instruction *ins;
 
-    if (store->lhs.var->is_tgsm)
-    {
-        hlsl_fixme(ctx, &instr->loc, "Store to groupshared variable.");
-        return false;
-    }
+    VKD3D_ASSERT(!store->lhs.var->is_tgsm);
 
     if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VSIR_OP_MOV, 1, 1)))
         return false;
@@ -11289,8 +11317,8 @@ static bool sm4_generate_vsir_instr_resource_store(struct hlsl_ctx *ctx,
     struct hlsl_type *resource_type = hlsl_deref_get_type(ctx, &store->resource);
     struct hlsl_ir_node *coords = store->coords.node, *value = store->value.node;
     struct hlsl_ir_node *instr = &store->node;
+    bool tgsm = store->resource.var->is_tgsm;
     struct vkd3d_shader_instruction *ins;
-    unsigned int writemask;
 
     if (store->store_type != HLSL_RESOURCE_STORE)
     {
@@ -11317,9 +11345,9 @@ static bool sm4_generate_vsir_instr_resource_store(struct hlsl_ctx *ctx,
         return true;
     }
 
-    if (!store->resource.var->is_uniform)
+    if (!store->resource.var->is_uniform && !tgsm)
     {
-        hlsl_fixme(ctx, &store->node.loc, "Store to non-uniform resource variable.");
+        hlsl_fixme(ctx, &store->node.loc, "Store to non-uniform non-groupshared resource variable.");
         return false;
     }
 
@@ -11329,14 +11357,19 @@ static bool sm4_generate_vsir_instr_resource_store(struct hlsl_ctx *ctx,
         return false;
     }
 
-    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
+    if (tgsm && !hlsl_is_numeric_type(resource_type))
+    {
+        hlsl_fixme(ctx, &store->node.loc, "Store to structured TGSM.");
+        return false;
+    }
+
+    if (tgsm || resource_type->sampler_dim == HLSL_SAMPLER_DIM_RAW_BUFFER)
     {
         if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VSIR_OP_STORE_RAW, 1, 2)))
             return false;
 
-        writemask = vkd3d_write_mask_from_component_count(value->data_type->e.numeric.dimx);
-        if (!sm4_generate_vsir_init_dst_param_from_deref(ctx, program,
-                &ins->dst[0], &store->resource, &instr->loc, writemask))
+        if (!sm4_generate_vsir_init_dst_param_from_deref(ctx, program, &ins->dst[0],
+                &store->resource, &instr->loc, store->writemask))
             return false;
     }
     else
@@ -13955,6 +13988,7 @@ static void process_entry_function(struct hlsl_ctx *ctx, struct list *semantic_v
     lower_ir(ctx, lower_index_loads, body);
 
     lower_ir(ctx, lower_tgsm_loads, body);
+    lower_ir(ctx, lower_tgsm_stores, body);
 
     if (entry_func->return_var)
     {

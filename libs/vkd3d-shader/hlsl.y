@@ -2117,7 +2117,8 @@ static bool add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struc
         VKD3D_ASSERT(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
         VKD3D_ASSERT(coords->data_type->e.numeric.dimx == dim_count);
 
-        hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STORE, &resource_deref, coords, rhs, &lhs->loc);
+        hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STORE,
+                &resource_deref, coords, rhs, writemask, &lhs->loc);
         hlsl_cleanup_deref(&resource_deref);
     }
     else if (matrix_writemask)
@@ -6300,6 +6301,7 @@ static bool add_store_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block
     struct hlsl_ir_node *offset, *rhs;
     struct hlsl_deref resource_deref;
     unsigned int value_dim;
+    uint32_t writemask;
 
     if (params->args_count != 2)
     {
@@ -6321,11 +6323,12 @@ static bool add_store_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block
             hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
     rhs = add_implicit_conversion(ctx, block, params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, value_dim), loc);
+    writemask = vkd3d_write_mask_from_component_count(value_dim);
 
     if (!hlsl_init_deref_from_index_chain(ctx, &resource_deref, object))
         return false;
 
-    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STORE, &resource_deref, offset, rhs, loc);
+    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STORE, &resource_deref, offset, rhs, writemask, loc);
     hlsl_cleanup_deref(&resource_deref);
 
     return true;
@@ -6350,7 +6353,7 @@ static bool add_so_append_method_call(struct hlsl_ctx *ctx, struct hlsl_block *b
     if (!(rhs = add_implicit_conversion(ctx, block, params->args[0], object->data_type->e.so.type, loc)))
         return false;
 
-    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STREAM_APPEND, &so_deref, NULL, rhs, loc);
+    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STREAM_APPEND, &so_deref, NULL, rhs, 0, loc);
     hlsl_cleanup_deref(&so_deref);
 
     return true;
@@ -6371,7 +6374,7 @@ static bool add_so_restartstrip_method_call(struct hlsl_ctx *ctx, struct hlsl_bl
     if (!hlsl_init_deref_from_index_chain(ctx, &so_deref, object))
         return false;
 
-    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STREAM_RESTART, &so_deref, NULL, NULL, loc);
+    hlsl_block_add_resource_store(ctx, block, HLSL_RESOURCE_STREAM_RESTART, &so_deref, NULL, NULL, 0, loc);
     hlsl_cleanup_deref(&so_deref);
 
     return true;
