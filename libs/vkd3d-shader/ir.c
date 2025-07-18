@@ -9559,6 +9559,7 @@ static void vsir_validate_register(struct validation_context *ctx,
         [VKD3DSPR_GSINSTID]         = {true, 0, VSIR_DIMENSION_SCALAR},
         [VKD3DSPR_DEPTHOUTGE]       = {true, 0, VSIR_DIMENSION_SCALAR},
         [VKD3DSPR_DEPTHOUTLE]       = {true, 0, VSIR_DIMENSION_SCALAR},
+        [VKD3DSPR_OUTSTENCILREF]    = {true, 0, VSIR_DIMENSION_SCALAR},
     };
 
     const struct register_validation_data *validation_data;
@@ -9684,10 +9685,6 @@ static void vsir_validate_register(struct validation_context *ctx,
             break;
 
         case VKD3DSPR_TESSCOORD:
-            vsir_validate_register_without_indices(ctx, reg);
-            break;
-
-        case VKD3DSPR_OUTSTENCILREF:
             vsir_validate_register_without_indices(ctx, reg);
             break;
 
