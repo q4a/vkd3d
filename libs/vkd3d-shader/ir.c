@@ -9548,6 +9548,7 @@ static void vsir_validate_register(struct validation_context *ctx,
     register_validation_data[] =
     {
         [VKD3DSPR_DEPTHOUT]         = {true, 0, VSIR_DIMENSION_SCALAR},
+        [VKD3DSPR_PRIMID]           = {true, 0, VSIR_DIMENSION_SCALAR},
         [VKD3DSPR_OUTPOINTID]       = {true, 0, VSIR_DIMENSION_SCALAR},
         [VKD3DSPR_THREADID]         = {true, 0, VSIR_DIMENSION_VEC4},
         [VKD3DSPR_THREADGROUPID]    = {true, 0, VSIR_DIMENSION_VEC4},
@@ -9644,10 +9645,6 @@ static void vsir_validate_register(struct validation_context *ctx,
 
         case VKD3DSPR_CONSTBUFFER:
             vsir_validate_constbuffer_register(ctx, reg);
-            break;
-
-        case VKD3DSPR_PRIMID:
-            vsir_validate_register_without_indices(ctx, reg);
             break;
 
         case VKD3DSPR_NULL:
