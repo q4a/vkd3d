@@ -9534,6 +9534,18 @@ static void vsir_validate_src_param(struct validation_context *ctx,
 static void vsir_validate_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
+    static const struct register_validation_data
+    {
+        bool valid;
+        unsigned int idx_count;
+        enum vsir_dimension dimension;
+    }
+    register_validation_data[] =
+    {
+        [VKD3DSPR_LOCALTHREADINDEX] = {true, 0, VSIR_DIMENSION_VEC4},
+    };
+
+    const struct register_validation_data *validation_data;
     unsigned int i;
 
     if (reg->type >= VKD3DSPR_COUNT)
@@ -9683,10 +9695,6 @@ static void vsir_validate_register(struct validation_context *ctx,
             vsir_validate_register_without_indices(ctx, reg);
             break;
 
-        case VKD3DSPR_LOCALTHREADINDEX:
-            vsir_validate_register_without_indices(ctx, reg);
-            break;
-
         case VKD3DSPR_COVERAGE:
             vsir_validate_register_without_indices(ctx, reg);
             break;
@@ -9726,6 +9734,24 @@ static void vsir_validate_register(struct validation_context *ctx,
         default:
             break;
     }
+
+    if (reg->type >= ARRAY_SIZE(register_validation_data))
+        return;
+
+    validation_data = &register_validation_data[reg->type];
+
+    if (!validation_data->valid)
+        return;
+
+    if (reg->idx_count != validation_data->idx_count)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid index count %u for a register of type %#x, expected %u.",
+                reg->idx_count, reg->type, validation_data->idx_count);
+
+    if (reg->dimension != validation_data->dimension)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT,
+                "Invalid dimension %#x for a register of type %#x, expected %#x.",
+                reg->dimension, reg->type, validation_data->dimension);
 }
 
 static void vsir_validate_io_dst_param(struct validation_context *ctx,

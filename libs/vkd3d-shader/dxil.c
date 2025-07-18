@@ -5477,11 +5477,9 @@ static void sm6_parser_emit_dx_compute_builtin(struct sm6_parser *sm6, enum dx_i
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
     vsir_register_init(&src_param->reg, reg_type, VKD3D_DATA_UINT, 0);
+    src_param->reg.dimension = VSIR_DIMENSION_VEC4;
     if (component_count > 1)
-    {
-        src_param->reg.dimension = VSIR_DIMENSION_VEC4;
         component_idx = sm6_value_get_constant_uint(operands[0], sm6);
-    }
     src_param_init_scalar(src_param, component_idx);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
