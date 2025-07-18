@@ -5718,14 +5718,14 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
     {
         component_type = builtin->component_type;
         input_component_count = builtin->component_count;
-        component_idx = 0;
     }
     else
     {
         component_type = signature_element->component_type;
         input_component_count = vsir_write_mask_component_count(signature_element->mask);
-        component_idx = vsir_write_mask_get_component_idx(signature_element->mask);
     }
+
+    component_idx = vsir_write_mask_get_component_idx(write_mask);
 
     if (needs_private_io_variable(builtin))
     {
@@ -5734,7 +5734,6 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
     }
     else
     {
-        component_idx = vsir_write_mask_get_component_idx(write_mask);
         reg_write_mask = write_mask >> component_idx;
     }
 
@@ -5820,7 +5819,7 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
                 vkd3d_write_mask_from_component_count(input_component_count),
                 VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_SHADER_NO_SWIZZLE, signature_element->mask >> component_idx);
 
-        spirv_compiler_emit_store_reg(compiler, &dst_reg, signature_element->mask, val_id);
+        spirv_compiler_emit_store_reg(compiler, &dst_reg, signature_element->mask >> component_idx, val_id);
     }
 }
 
