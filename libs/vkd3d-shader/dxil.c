@@ -4104,6 +4104,7 @@ static enum vkd3d_shader_register_type register_type_from_dxil_semantic_kind(
         case VKD3D_SHADER_SV_SAMPLE_INDEX:
             return VKD3DSPR_NULL;
         case VKD3D_SHADER_SV_COVERAGE:
+            *dimension = is_input ? VSIR_DIMENSION_VEC4 : VSIR_DIMENSION_SCALAR;
             return is_input ? VKD3DSPR_COVERAGE : VKD3DSPR_SAMPLEMASK;
         case VKD3D_SHADER_SV_DEPTH:
             *dimension = VSIR_DIMENSION_SCALAR;
