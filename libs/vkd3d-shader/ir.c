@@ -9543,6 +9543,7 @@ static void vsir_validate_register(struct validation_context *ctx,
     register_validation_data[] =
     {
         [VKD3DSPR_DEPTHOUT]         = {true, 0, VSIR_DIMENSION_SCALAR},
+        [VKD3DSPR_LOCALTHREADID]    = {true, 0, VSIR_DIMENSION_VEC4},
         [VKD3DSPR_LOCALTHREADINDEX] = {true, 0, VSIR_DIMENSION_VEC4},
         [VKD3DSPR_COVERAGE]         = {true, 0, VSIR_DIMENSION_VEC4},
         [VKD3DSPR_DEPTHOUTGE]       = {true, 0, VSIR_DIMENSION_SCALAR},
@@ -9688,10 +9689,6 @@ static void vsir_validate_register(struct validation_context *ctx,
             break;
 
         case VKD3DSPR_THREADGROUPID:
-            vsir_validate_register_without_indices(ctx, reg);
-            break;
-
-        case VKD3DSPR_LOCALTHREADID:
             vsir_validate_register_without_indices(ctx, reg);
             break;
 
