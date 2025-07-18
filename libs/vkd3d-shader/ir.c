@@ -9543,6 +9543,7 @@ static void vsir_validate_register(struct validation_context *ctx,
     register_validation_data[] =
     {
         [VKD3DSPR_LOCALTHREADINDEX] = {true, 0, VSIR_DIMENSION_VEC4},
+        [VKD3DSPR_COVERAGE]         = {true, 0, VSIR_DIMENSION_VEC4},
     };
 
     const struct register_validation_data *validation_data;
@@ -9692,10 +9693,6 @@ static void vsir_validate_register(struct validation_context *ctx,
             break;
 
         case VKD3DSPR_LOCALTHREADID:
-            vsir_validate_register_without_indices(ctx, reg);
-            break;
-
-        case VKD3DSPR_COVERAGE:
             vsir_validate_register_without_indices(ctx, reg);
             break;
 
