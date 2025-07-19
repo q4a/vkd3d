@@ -38,6 +38,7 @@ struct teapot_fence
 struct teapot_cb_data
 {
     struct demo_matrix mvp_matrix;
+    struct demo_vec3 eye;
     float level;
     unsigned int wireframe, flat;
 };
@@ -521,6 +522,7 @@ static void teapot_update_mvp(struct teapot *teapot)
     demo_matrix_perspective_rh(&projection, 2.0f, 2.0f * teapot->height / teapot->width, 5.0f, 160.0f);
     demo_matrix_look_at_rh(&world, &eye, &ref, &up);
     demo_matrix_multiply(&teapot->cb_data->mvp_matrix, &world, &projection);
+    teapot->cb_data->eye = eye;
 }
 
 static void teapot_update_text(struct teapot *teapot, double fps)

@@ -21,6 +21,7 @@
 cbuffer teapot_cb : register(b0)
 {
     float4x4 mvp_matrix;
+    float3 eye;
     float level;
     uint wireframe, flat;
 };
@@ -185,21 +186,75 @@ float3 brdf_lambert(float3 diffuse)
     return diffuse / M_PI;
 }
 
+/* The Schlick Fresnel approximation:
+ *
+ *     R(θ) ≈ R₀ + (1 - R₀)(1 - c̅o̅s̅ θ)⁵
+ */
+float3 fresnel_schlick(float3 r0, float cos_theta)
+{
+    return lerp(r0, 1.0, pow(1.0 - cos_theta, 5.0));
+}
+
+float g1(float cos_theta, float alpha_sq)
+{
+    return cos_theta + sqrt(alpha_sq + (cos_theta - alpha_sq * cos_theta) * cos_theta);
+}
+
+/* Trowbridge-Reitz, "Average irregularity representation of a rough surface for ray reflection".
+ * Also known as "GGX".
+ *
+ *     G1(θ) = 2 / (1 + sqrt(α² + (1 - α²)c̅o̅s̅² θ))
+ *     G(θᵢ, θₒ) = G1(θᵢ) * G1(θₒ)
+ *
+ * This returns G / (4 c̅o̅s̅ θᵢ c̅o̅s̅ θₒ)
+ */
+float geometric_att_trowbridge_reitz(float cos_theta_i, float cos_theta_o, float alpha_sq)
+{
+    return 1.0 / (g1(cos_theta_i, alpha_sq) * g1(cos_theta_o, alpha_sq));
+}
+
+/* Trowbridge-Reitz, "Average irregularity representation of a rough surface for ray reflection".
+ * Also known as "GGX".
+ *
+ *     D(θ) = α² / π((cos² θ)(α² - 1) + 1)²
+ */
+float ndf_trowbridge_reitz(float cos_theta_h, float alpha_sq)
+{
+    float f = (cos_theta_h * alpha_sq - cos_theta_h) * cos_theta_h + 1.0;
+    return alpha_sq / (M_PI * f * f);
+}
+
 float4 ps_main(struct ps_in i) : SV_TARGET
 {
+    float3 barycentric, diffuse, diffuse_colour, radiance, specular, f, h, n, v;
+    float alpha, alpha_sq, cos_theta_h, cos_theta_i, cos_theta_o, d, g, wire;
     float3 light_dir = normalize(float3(5.0, 5.0, 10.0));
     float3 light_colour = float3(1.0, 0.95, 0.88);
     float3 light_irradiance = 5.0 * light_colour;
-    float3 barycentric, diffuse_colour, radiance;
     float3 base_colour = float3(0.8, 0.8, 0.8);
+    float3 f0 = float3(0.04, 0.04, 0.04);
     float3 ambient = 0.3 * light_colour;
-    float cos_theta_i, wire;
+    float roughness = 0.2;
     float metallic = 0.3;
 
-    diffuse_colour = base_colour * (1.0 - metallic);
-    cos_theta_i = saturate(dot(normalize(i.normal), light_dir));
-    /* Cook-Torrance. */
-    radiance = brdf_lambert(diffuse_colour) * light_irradiance * cos_theta_i;
+    n = normalize(i.normal);
+    v = normalize(eye - i.pos);
+    h = normalize(light_dir + v);
+    cos_theta_h = dot(n, h);
+    cos_theta_i = saturate(dot(n, light_dir));
+    cos_theta_o = saturate(dot(n, v));
+
+    diffuse_colour = base_colour * (float3(1.0, 1.0, 1.0) - f0) * (1.0 - metallic);
+    alpha = roughness * roughness;
+    alpha_sq = alpha * alpha;
+
+    /* Cook-Torrance. The division by (4 c̅o̅s̅ θᵢ c̅o̅s̅ θₒ) is folded into G. */
+    f = fresnel_schlick(lerp(f0, base_colour, metallic), dot(v, h));
+    g = geometric_att_trowbridge_reitz(cos_theta_i, cos_theta_o, alpha_sq);
+    d = ndf_trowbridge_reitz(cos_theta_h, alpha_sq);
+    diffuse = (1.0 - f) * brdf_lambert(diffuse_colour);
+    specular = f * g * d;
+    radiance = (diffuse + specular) * light_irradiance * cos_theta_i;
     radiance += ambient * base_colour;
 
     barycentric = float3(i.barycentric, 1.0 - (i.barycentric.x + i.barycentric.y));
