@@ -8725,12 +8725,16 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
     for (unsigned int i = 0; i < program->ssa_count; ++i)
     {
         const struct liveness_tracker_reg *liveness_reg = &tracker.ssa_regs[i];
+        const unsigned int prev_temp_count = program->temp_count;
         struct temp_allocator_reg *reg = &allocator.ssa_regs[i];
 
-        if (temp_allocator_allocate(&allocator, &tracker, reg, liveness_reg, program->temp_count))
+        if (temp_allocator_allocate(&allocator, &tracker, reg, liveness_reg, prev_temp_count))
+        {
             TRACE("Allocated r%u%s to sr%u (liveness %u-%u).\n",
                     reg->temp_id, debug_vsir_writemask(reg->allocated_mask), i,
                     liveness_reg->first_write, liveness_reg->last_access);
+            program->temp_count = max(program->temp_count, reg->temp_id + 1);
+        }
         ++allocator.allocated_ssa_count;
     }
 
@@ -8789,10 +8793,7 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
         for (unsigned int j = 0; j < ins->dst_count; ++j)
         {
             if (ins->dst[j].reg.type == VKD3DSPR_TEMP)
-            {
                 temp_count = max(temp_count, ins->dst[j].reg.idx[0].offset + 1);
-                program->temp_count = max(program->temp_count, temp_count);
-            }
         }
     }
 
