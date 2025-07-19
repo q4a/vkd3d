@@ -2147,6 +2147,9 @@ int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
     if ((result = vsir_allocate_temp_registers(program, message_context)))
         return result;
 
+    if ((result = vsir_update_dcl_temps(program, message_context)))
+        return result;
+
     d3dbc.program = program;
     d3dbc.message_context = message_context;
     switch (version->type)

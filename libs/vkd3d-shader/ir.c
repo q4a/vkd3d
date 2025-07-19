@@ -8705,7 +8705,6 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
     struct temp_allocator allocator = {0};
     struct temp_allocator_reg *regs;
     struct liveness_tracker tracker;
-    uint32_t temp_count = 0;
     enum vkd3d_result ret;
 
     if (!program->ssa_count)
@@ -8750,13 +8749,25 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
             temp_allocator_set_dst(&allocator, &ins->dst[j], ins);
     }
 
-    /* Rewrite dcl_temps to reflect the new temp count.
-     * Note that dcl_temps appears once per phase, and should reflect only the
-     * number of temps needed by that phase.
-     * Therefore we iterate backwards through the shader, finding the maximum
-     * register used by any instruction, update the dcl_temps at the beginning
-     * of each phase, and then reset the temp count back to 0 for the next
-     * phase (if any). */
+    program->ssa_count = 0;
+
+    vkd3d_free(regs);
+    liveness_tracker_cleanup(&tracker);
+    return allocator.result;
+}
+
+/* Rewrite dcl_temps to reflect the new temp count.
+ * Note that dcl_temps appears once per phase, and should reflect only the
+ * number of temps needed by that phase.
+ * Therefore we iterate backwards through the shader, finding the maximum
+ * register used by any instruction, update the dcl_temps at the beginning
+ * of each phase, and then reset the temp count back to 0 for the next
+ * phase (if any). */
+enum vkd3d_result vsir_update_dcl_temps(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    unsigned int temp_count = 0;
+
     for (int i = program->instructions.count - 1; i >= 0; --i)
     {
         struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
@@ -8767,6 +8778,7 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
             temp_count = 0;
             continue;
         }
+
         if (temp_count && program->shader_version.major >= 4
                 && (ins->opcode == VSIR_OP_HS_CONTROL_POINT_PHASE
                         || ins->opcode == VSIR_OP_HS_FORK_PHASE
@@ -8775,11 +8787,7 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
             /* The phase didn't have a dcl_temps instruction, but we added
              * temps here, so we need to insert one. */
             if (!shader_instruction_array_insert_at(&program->instructions, i + 1, 1))
-            {
-                vkd3d_free(regs);
-                liveness_tracker_cleanup(&tracker);
                 return VKD3D_ERROR_OUT_OF_MEMORY;
-            }
 
             ins = &program->instructions.elements[i + 1];
             vsir_instruction_init(ins, &program->instructions.elements[i].location, VSIR_OP_DCL_TEMPS);
@@ -8788,8 +8796,12 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
             continue;
         }
 
-        /* No need to check sources. If we've produced an unwritten source then
-         * that's a bug somewhere in this pass. */
+        for (unsigned int j = 0; j < ins->src_count; ++j)
+        {
+            if (ins->src[j].reg.type == VKD3DSPR_TEMP)
+                temp_count = max(temp_count, ins->src[j].reg.idx[0].offset + 1);
+        }
+
         for (unsigned int j = 0; j < ins->dst_count; ++j)
         {
             if (ins->dst[j].reg.type == VKD3DSPR_TEMP)
@@ -8802,22 +8814,14 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins;
 
         if (!shader_instruction_array_insert_at(&program->instructions, 0, 1))
-        {
-            vkd3d_free(regs);
-            liveness_tracker_cleanup(&tracker);
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        }
 
         ins = &program->instructions.elements[0];
         vsir_instruction_init(ins, &program->instructions.elements[1].location, VSIR_OP_DCL_TEMPS);
         ins->declaration.count = temp_count;
     }
 
-    program->ssa_count = 0;
-
-    vkd3d_free(regs);
-    liveness_tracker_cleanup(&tracker);
-    return allocator.result;
+    return VKD3D_OK;
 }
 
 struct validation_context
