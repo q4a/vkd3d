@@ -2896,7 +2896,6 @@ static void shader_sm4_validate_default_phase_index_ranges(struct vkd3d_shader_s
 int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program)
 {
-    struct vkd3d_shader_instruction_array *instructions;
     struct vkd3d_shader_sm4_parser sm4 = {0};
     struct dxbc_shader_desc dxbc_desc = {0};
     struct vkd3d_shader_instruction *ins;
@@ -2956,17 +2955,14 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    instructions = &program->instructions;
     while (sm4.ptr != sm4.end)
     {
-        if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+        if (!(ins = vsir_program_append(program)))
         {
-            ERR("Failed to allocate instructions.\n");
             vkd3d_shader_parser_error(&sm4.p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
             vsir_program_cleanup(program);
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
-        ins = &instructions->elements[instructions->count];
         shader_sm4_read_instruction(&sm4, ins);
 
         if (ins->opcode == VSIR_OP_INVALID)
@@ -2975,7 +2971,6 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
             vsir_program_cleanup(program);
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
-        ++instructions->count;
     }
     if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL
             && !sm4.has_control_point_phase && !sm4.p.failed)

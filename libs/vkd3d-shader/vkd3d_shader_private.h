@@ -1583,6 +1583,16 @@ bool vsir_instruction_init_with_params(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode opcode, unsigned int dst_count, unsigned int src_count);
 
+static inline struct vkd3d_shader_instruction *vsir_program_append(struct vsir_program *program)
+{
+    struct vkd3d_shader_instruction_array *array = &program->instructions;
+
+    if (!shader_instruction_array_insert_at(array, array->count, 1))
+        return NULL;
+
+    return &array->elements[array->count - 1];
+}
+
 static inline struct vkd3d_shader_dst_param *vsir_program_get_dst_params(
         struct vsir_program *program, unsigned int count)
 {
