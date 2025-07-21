@@ -7588,7 +7588,7 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
     const struct vkd3d_shader_src_param *src = instruction->src;
     uint32_t val_id;
 
-    VKD3D_ASSERT(src->reg.data_type == VKD3D_DATA_BOOL && dst->reg.data_type != VKD3D_DATA_BOOL);
+    VKD3D_ASSERT(src->reg.data_type == VSIR_DATA_BOOL && dst->reg.data_type != VSIR_DATA_BOOL);
 
     val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
     if (dst->reg.data_type == VSIR_DATA_F16 || dst->reg.data_type == VSIR_DATA_F32)
@@ -7639,9 +7639,9 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    if (src->reg.data_type == VKD3D_DATA_BOOL)
+    if (src->reg.data_type == VSIR_DATA_BOOL)
     {
-        if (dst->reg.data_type == VKD3D_DATA_BOOL)
+        if (dst->reg.data_type == VSIR_DATA_BOOL)
         {
             /* VSIR supports logic ops AND/OR/XOR on bool values. */
             op = spirv_compiler_map_logical_instruction(instruction);
@@ -7955,7 +7955,7 @@ static void spirv_compiler_emit_movc(struct spirv_compiler *compiler,
     component_count = vsir_write_mask_component_count(dst->write_mask);
     type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
 
-    if (src[0].reg.data_type != VKD3D_DATA_BOOL)
+    if (src[0].reg.data_type != VSIR_DATA_BOOL)
     {
         if (instruction->opcode == VSIR_OP_CMP)
             condition_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, SpvOpFOrdGreaterThanEqual,
@@ -8398,7 +8398,7 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
     result_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
             op, type_id, src0_id, src1_id);
 
-    if (dst->reg.data_type != VKD3D_DATA_BOOL)
+    if (dst->reg.data_type != VSIR_DATA_BOOL)
         result_id = spirv_compiler_emit_bool_to_int(compiler, component_count, result_id, true);
     spirv_compiler_emit_store_reg(compiler, &dst->reg, dst->write_mask, result_id);
 }
@@ -8579,7 +8579,7 @@ static void spirv_compiler_emit_discard(struct spirv_compiler *compiler,
      * a mismatch between the VSIR structure and the SPIR-V one, which would cause problems if
      * structurisation is necessary. Therefore we emit it as a function call. */
     condition_id = spirv_compiler_emit_load_src(compiler, src, VKD3DSP_WRITEMASK_0);
-    if (src->reg.data_type != VKD3D_DATA_BOOL)
+    if (src->reg.data_type != VSIR_DATA_BOOL)
         condition_id = spirv_compiler_emit_int_to_bool(compiler,
                 instruction->flags, src->reg.data_type, 1, condition_id);
     else if (instruction->flags & VKD3D_SHADER_CONDITIONAL_OP_Z)
@@ -8666,7 +8666,7 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
     }
 
     condition_id = spirv_compiler_emit_load_src(compiler, &src[0], VKD3DSP_WRITEMASK_0);
-    if (src[0].reg.data_type != VKD3D_DATA_BOOL)
+    if (src[0].reg.data_type != VSIR_DATA_BOOL)
         condition_id = spirv_compiler_emit_int_to_bool(compiler,
                 VKD3D_SHADER_CONDITIONAL_OP_NZ, src[0].reg.data_type, 1, condition_id);
     /* Emit the merge immediately before the branch instruction. */

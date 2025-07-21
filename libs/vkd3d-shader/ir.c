@@ -661,7 +661,7 @@ static void src_param_init_ssa_scalar(struct vkd3d_shader_src_param *src,
 
 static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    src_param_init_ssa_scalar(src, idx, VKD3D_DATA_BOOL);
+    src_param_init_ssa_scalar(src, idx, VSIR_DATA_BOOL);
 }
 
 static void src_param_init_ssa_float(struct vkd3d_shader_src_param *src, unsigned int idx)
@@ -676,7 +676,7 @@ static void src_param_init_ssa_float4(struct vkd3d_shader_src_param *src, unsign
 
 static void src_param_init_temp_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
+    vsir_src_param_init(src, VKD3DSPR_TEMP, VSIR_DATA_BOOL, 1);
     src->reg.idx[0].offset = idx;
 }
 
@@ -745,7 +745,7 @@ static void dst_param_init_ssa_scalar(struct vkd3d_shader_dst_param *dst,
 
 static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
-    dst_param_init_ssa_scalar(dst, idx, VKD3D_DATA_BOOL);
+    dst_param_init_ssa_scalar(dst, idx, VSIR_DATA_BOOL);
 }
 
 static void dst_param_init_ssa_float(struct vkd3d_shader_dst_param *dst, unsigned int idx)
@@ -760,7 +760,7 @@ static void dst_param_init_ssa_float4(struct vkd3d_shader_dst_param *dst, unsign
 
 static void dst_param_init_temp_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
 {
-    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VKD3D_DATA_BOOL, 1);
+    vsir_dst_param_init(dst, VKD3DSPR_TEMP, VSIR_DATA_BOOL, 1);
     dst->reg.idx[0].offset = idx;
 }
 
@@ -10685,7 +10685,7 @@ static void vsir_validate_logic_elementwise_operation(struct validation_context 
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_BOOL] = true,
+        [VSIR_DATA_BOOL] = true,
         [VSIR_DATA_I32] = true,
         [VSIR_DATA_U32] = true,
         [VSIR_DATA_U64] = true,
@@ -10705,7 +10705,7 @@ static void vsir_validate_comparison_operation(struct validation_context *ctx,
 
     dst_data_type = instruction->dst[0].reg.data_type;
 
-    if (dst_data_type != VSIR_DATA_U32 && dst_data_type != VKD3D_DATA_BOOL)
+    if (dst_data_type != VSIR_DATA_U32 && dst_data_type != VSIR_DATA_BOOL)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                 "Invalid data type %#x for result of comparison operation \"%s\" (%#x).",
                 dst_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
@@ -11358,7 +11358,7 @@ static void vsir_validate_itof(struct validation_context *ctx, const struct vkd3
 {
     static const bool src_types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_BOOL] = true,
+        [VSIR_DATA_BOOL] = true,
         [VSIR_DATA_I32] = true,
         [VSIR_DATA_U32] = true,
         [VSIR_DATA_U64] = true,
@@ -11377,7 +11377,7 @@ static void vsir_validate_itoi(struct validation_context *ctx, const struct vkd3
 {
     static const bool types[VSIR_DATA_TYPE_COUNT] =
     {
-        [VKD3D_DATA_BOOL] = true,
+        [VSIR_DATA_BOOL] = true,
         [VSIR_DATA_I32] = true,
         [VSIR_DATA_U32] = true,
         [VSIR_DATA_U64] = true,

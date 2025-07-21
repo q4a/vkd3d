@@ -710,7 +710,7 @@ enum vkd3d_shader_register_precision
 
 enum vsir_data_type
 {
-    VKD3D_DATA_BOOL,
+    VSIR_DATA_BOOL,
 
     VSIR_DATA_F16,
     VSIR_DATA_F32,
@@ -742,7 +742,7 @@ static inline bool data_type_is_integer(enum vsir_data_type data_type)
 
 static inline bool data_type_is_bool(enum vsir_data_type data_type)
 {
-    return data_type == VKD3D_DATA_BOOL;
+    return data_type == VSIR_DATA_BOOL;
 }
 
 static inline bool data_type_is_floating_point(enum vsir_data_type data_type)
@@ -1806,6 +1806,8 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
 {
     switch (data_type)
     {
+        case VSIR_DATA_BOOL:
+            return VKD3D_SHADER_COMPONENT_BOOL;
         case VSIR_DATA_F16: /* Minimum precision. TODO: native 16-bit */
         case VSIR_DATA_F32:
         case VSIR_DATA_SNORM:
@@ -1820,8 +1822,6 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
             return VKD3D_SHADER_COMPONENT_UINT;
         case VSIR_DATA_U64:
             return VKD3D_SHADER_COMPONENT_UINT64;
-        case VKD3D_DATA_BOOL:
-            return VKD3D_SHADER_COMPONENT_BOOL;
         default:
             FIXME("Unhandled data type %#x.\n", data_type);
             /* fall-through */

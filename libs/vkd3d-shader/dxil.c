@@ -2480,7 +2480,7 @@ static enum vsir_data_type vsir_data_type_from_dxil(const struct sm6_type *type)
         switch (type->u.width)
         {
             case 1:
-                return VKD3D_DATA_BOOL;
+                return VSIR_DATA_BOOL;
             case 8:
                 return VSIR_DATA_U8;
             case 16:
