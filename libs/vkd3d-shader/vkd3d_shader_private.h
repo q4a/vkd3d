@@ -710,7 +710,6 @@ enum vkd3d_shader_register_precision
 
 enum vsir_data_type
 {
-    VKD3D_DATA_OPAQUE,
     VKD3D_DATA_MIXED,
     VKD3D_DATA_CONTINUED,
     VKD3D_DATA_UNUSED,
@@ -729,6 +728,8 @@ enum vsir_data_type
 
     VSIR_DATA_SNORM,
     VSIR_DATA_UNORM,
+
+    VSIR_DATA_OPAQUE,
 
     VSIR_DATA_TYPE_COUNT,
 };

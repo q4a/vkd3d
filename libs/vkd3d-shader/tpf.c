@@ -979,8 +979,7 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
     unsigned int *io_masks;
     uint32_t write_mask;
 
-    shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_OPAQUE,
-            &index_range->dst);
+    shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VSIR_DATA_OPAQUE, &index_range->dst);
     index_range->register_count = *tokens;
 
     register_idx = index_range->dst.reg.idx[index_range->dst.reg.idx_count - 1].offset;
@@ -1228,7 +1227,7 @@ static void shader_sm5_read_fcall(struct vkd3d_shader_instruction *ins, uint32_t
         const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     ins->src[0].reg.u.fp_body_idx = *tokens++;
-    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_OPAQUE, &ins->src[0]);
+    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VSIR_DATA_OPAQUE, &ins->src[0]);
 }
 
 static void shader_sm5_read_dcl_function_body(struct vkd3d_shader_instruction *ins, uint32_t opcode,
@@ -1434,7 +1433,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
      * f -> VSIR_DATA_F32
      * i -> VSIR_DATA_I32
      * u -> VSIR_DATA_U32
-     * O -> VKD3D_DATA_OPAQUE
+     * O -> VSIR_DATA_OPAQUE
      * R -> VKD3D_DATA_RESOURCE
      * S -> VKD3D_DATA_SAMPLER
      * U -> VKD3D_DATA_UAV
@@ -1998,7 +1997,7 @@ static enum vsir_data_type map_data_type(char t)
         case 'u':
             return VSIR_DATA_U32;
         case 'O':
-            return VKD3D_DATA_OPAQUE;
+            return VSIR_DATA_OPAQUE;
         case '*':
             return VKD3D_DATA_UNUSED;
         default:
