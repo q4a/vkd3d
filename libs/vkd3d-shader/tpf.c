@@ -4334,20 +4334,23 @@ static void tpf_handle_instruction(struct tpf_compiler *tpf, const struct vkd3d_
     }
 }
 
-static void tpf_write_program(struct tpf_compiler *tpf, const struct vsir_program *program)
+static void tpf_write_program(struct tpf_compiler *tpf, struct vsir_program *program)
 {
-    unsigned int i;
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
+    struct vkd3d_shader_instruction *ins;
 
     if (tpf->program->shader_version.type == VKD3D_SHADER_TYPE_COMPUTE)
         tpf_dcl_thread_group(tpf, &tpf->program->thread_group_size);
 
-    for (i = 0; i < program->instructions.count; ++i)
-        tpf_handle_instruction(tpf, &program->instructions.elements[i]);
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
+    {
+        tpf_handle_instruction(tpf, ins);
+    }
 }
 
 static void tpf_write_shdr(struct tpf_compiler *tpf)
 {
-    const struct vsir_program *program = tpf->program;
+    struct vsir_program *program = tpf->program;
     const struct vkd3d_shader_version *version;
     struct vkd3d_bytecode_buffer buffer = {0};
     size_t token_count_position;
