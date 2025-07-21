@@ -2123,11 +2123,13 @@ static void d3dbc_write_semantic_dcls(struct d3dbc_compiler *d3dbc)
 
 static void d3dbc_write_program_instructions(struct d3dbc_compiler *d3dbc)
 {
-    struct vsir_program *program = d3dbc->program;
-    unsigned int i;
+    struct vsir_program_iterator it = vsir_program_iterator(&d3dbc->program->instructions);
+    struct vkd3d_shader_instruction *ins;
 
-    for (i = 0; i < program->instructions.count; ++i)
-        d3dbc_write_vsir_instruction(d3dbc, &program->instructions.elements[i]);
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
+    {
+        d3dbc_write_vsir_instruction(d3dbc, ins);
+    }
 }
 
 int d3dbc_compile(struct vsir_program *program, uint64_t config_flags,
