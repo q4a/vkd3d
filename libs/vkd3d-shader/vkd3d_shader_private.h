@@ -710,7 +710,6 @@ enum vkd3d_shader_register_precision
 
 enum vsir_data_type
 {
-    VKD3D_DATA_MIXED,
     VKD3D_DATA_CONTINUED,
     VKD3D_DATA_UNUSED,
     VKD3D_DATA_BOOL,
@@ -730,6 +729,7 @@ enum vsir_data_type
     VSIR_DATA_UNORM,
 
     VSIR_DATA_OPAQUE,
+    VSIR_DATA_MIXED,
 
     VSIR_DATA_TYPE_COUNT,
 };
@@ -1825,7 +1825,7 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
         default:
             FIXME("Unhandled data type %#x.\n", data_type);
             /* fall-through */
-        case VKD3D_DATA_MIXED:
+        case VSIR_DATA_MIXED:
             return VKD3D_SHADER_COMPONENT_UINT;
     }
 }

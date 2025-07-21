@@ -756,7 +756,7 @@ static const enum vsir_data_type data_type_table[] =
     /* VKD3D_SM4_DATA_INT */        VSIR_DATA_I32,
     /* VKD3D_SM4_DATA_UINT */       VSIR_DATA_U32,
     /* VKD3D_SM4_DATA_FLOAT */      VSIR_DATA_F32,
-    /* VKD3D_SM4_DATA_MIXED */      VKD3D_DATA_MIXED,
+    /* VKD3D_SM4_DATA_MIXED */      VSIR_DATA_MIXED,
     /* VKD3D_SM4_DATA_DOUBLE */     VSIR_DATA_F64,
     /* VKD3D_SM4_DATA_CONTINUED */  VKD3D_DATA_CONTINUED,
     /* VKD3D_SM4_DATA_UNUSED */     VKD3D_DATA_UNUSED,

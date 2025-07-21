@@ -8239,7 +8239,7 @@ static enum vsir_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, c
     if (type->class == HLSL_CLASS_ARRAY)
         return vsir_data_type_from_hlsl_type(ctx, type->e.array.type);
     if (type->class == HLSL_CLASS_STRUCT)
-        return VKD3D_DATA_MIXED;
+        return VSIR_DATA_MIXED;
     if (type->class <= HLSL_CLASS_LAST_NUMERIC)
     {
         switch (type->e.numeric.type)
