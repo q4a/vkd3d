@@ -11618,6 +11618,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_RCP] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_REP] =                              {0,   1, vsir_validate_rep},
     [VSIR_OP_RET] =                              {0,   0, vsir_validate_ret},
+    [VSIR_OP_ROUND_NE] =                         {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_SWITCH] =                           {0,   1, vsir_validate_switch},
     [VSIR_OP_SWITCH_MONOLITHIC] =                {0, ~0u, vsir_validate_switch_monolithic},
 };
