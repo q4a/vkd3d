@@ -1497,6 +1497,34 @@ static enum vkd3d_result vsir_program_lower_texldd(struct vsir_program *program,
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_texldl(struct vsir_program *program,
+        struct vkd3d_shader_instruction *texldl)
+{
+    unsigned int idx = texldl->src[1].reg.idx[0].offset;
+    enum vkd3d_shader_swizzle_component w;
+    struct vkd3d_shader_src_param *srcs;
+
+    VKD3D_ASSERT(texldl->src[1].reg.idx_count == 1);
+    VKD3D_ASSERT(!texldl->src[1].reg.idx[0].rel_addr);
+
+    if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 4)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    srcs[0] = texldl->src[0];
+    vsir_src_param_init_resource(&srcs[1], idx, idx);
+    vsir_src_param_init_sampler(&srcs[2], idx, idx);
+
+    texldl->opcode = VSIR_OP_SAMPLE_LOD;
+    texldl->src = srcs;
+    texldl->src_count = 4;
+
+    w = vsir_swizzle_get_component(srcs[0].swizzle, 3);
+    srcs[3] = texldl->src[0];
+    srcs[3].swizzle = vkd3d_shader_create_swizzle(w, w, w, w);
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_dcl_input(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, struct vsir_transformation_context *ctx)
 {
@@ -1668,6 +1696,11 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                     return ret;
                 break;
 
+            case VSIR_OP_TEXLDL:
+                if ((ret = vsir_program_lower_texldl(program, ins)) < 0)
+                    return ret;
+                break;
+
             case VSIR_OP_TEXBEM:
             case VSIR_OP_TEXBEML:
             case VSIR_OP_TEXCOORD:
@@ -1675,7 +1708,6 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VSIR_OP_TEXDEPTH:
             case VSIR_OP_TEXDP3:
             case VSIR_OP_TEXDP3TEX:
-            case VSIR_OP_TEXLDL:
             case VSIR_OP_TEXM3x2PAD:
             case VSIR_OP_TEXM3x2TEX:
             case VSIR_OP_TEXM3x3DIFF:
