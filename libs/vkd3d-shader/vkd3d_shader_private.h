@@ -1620,7 +1620,7 @@ void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_pr
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 
-void vsir_program_trace(const struct vsir_program *program);
+void vsir_program_trace(struct vsir_program *program);
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type);
 
@@ -1645,7 +1645,7 @@ enum vsir_asm_flags
     VSIR_ASM_FLAG_DUMP_DESCRIPTORS = 0x8,
 };
 
-enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
+enum vkd3d_result d3d_asm_compile(struct vsir_program *program,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, enum vsir_asm_flags flags);
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer);

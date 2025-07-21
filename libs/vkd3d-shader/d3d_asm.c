@@ -1951,8 +1951,7 @@ static void shader_print_descriptors(struct vkd3d_d3d_asm_compiler *compiler,
     }
 }
 
-enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
-        const struct vkd3d_shader_compile_info *compile_info,
+enum vkd3d_result d3d_asm_compile(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, enum vsir_asm_flags flags)
 {
     const struct vkd3d_shader_version *shader_version = &program->shader_version;
@@ -1961,8 +1960,10 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
     {
         .flags = flags,
     };
+    struct vkd3d_shader_instruction *ins;
     enum vkd3d_result result = VKD3D_OK;
     struct vkd3d_string_buffer *buffer;
+    struct vsir_program_iterator it;
     unsigned int indent, i, j;
     const char *indent_str;
 
@@ -2042,10 +2043,10 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
         vkd3d_string_buffer_printf(buffer, "%s.text%s\n", compiler.colours.opcode, compiler.colours.reset);
 
     indent = 0;
-    for (i = 0; i < program->instructions.count; ++i)
-    {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
+    it = vsir_program_iterator(&program->instructions);
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
+    {
         switch (ins->opcode)
         {
             case VSIR_OP_ELSE:
@@ -2236,7 +2237,7 @@ static void trace_io_declarations(const struct vsir_program *program)
     vkd3d_string_buffer_cleanup(&buffer);
 }
 
-void vsir_program_trace(const struct vsir_program *program)
+void vsir_program_trace(struct vsir_program *program)
 {
     const unsigned int flags = VSIR_ASM_FLAG_DUMP_TYPES | VSIR_ASM_FLAG_DUMP_ALL_INDICES
             | VSIR_ASM_FLAG_DUMP_SIGNATURES | VSIR_ASM_FLAG_DUMP_DESCRIPTORS;
