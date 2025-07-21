@@ -11611,6 +11611,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_NEO] =                              {1,   2, vsir_validate_float_comparison_operation},
     [VSIR_OP_NEU] =                              {1,   2, vsir_validate_float_comparison_operation},
     [VSIR_OP_NOP] =                              {0,   0, vsir_validate_nop},
+    [VSIR_OP_NOT] =                              {1,   1, vsir_validate_logic_elementwise_operation},
     [VSIR_OP_PHI] =                              {1, ~0u, vsir_validate_phi},
     [VSIR_OP_REP] =                              {0,   1, vsir_validate_rep},
     [VSIR_OP_RET] =                              {0,   0, vsir_validate_ret},
