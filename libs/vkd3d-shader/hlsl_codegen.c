@@ -12320,7 +12320,7 @@ static void sm4_generate_vsir_add_dcl_stream(struct hlsl_ctx *ctx,
         return;
     }
 
-    vsir_src_param_init(&ins->src[0], VKD3DSPR_STREAM, VKD3D_DATA_OPAQUE, 1);
+    vsir_src_param_init(&ins->src[0], VKD3DSPR_STREAM, VKD3D_DATA_UNUSED, 1);
     ins->src[0].reg.dimension = VSIR_DIMENSION_NONE;
     ins->src[0].reg.idx[0].offset = var->regs[HLSL_REGSET_STREAM_OUTPUTS].index;
 }

@@ -5301,8 +5301,7 @@ static void sm6_parser_emit_dx_stream(struct sm6_parser *sm6, enum dx_intrinsic_
                 "Output stream index %u is invalid.", i);
     }
 
-    /* VKD3D_DATA_UNUSED would be more reasonable, but TPF uses data type 0 here. */
-    register_init_with_id(&src_param->reg, VKD3DSPR_STREAM, 0, i);
+    register_init_with_id(&src_param->reg, VKD3DSPR_STREAM, VKD3D_DATA_UNUSED, i);
     src_param_init(src_param);
 
     if (op == DX_EMIT_THEN_CUT_STREAM)
