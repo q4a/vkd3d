@@ -982,6 +982,7 @@ struct vkd3d_spirv_builder
     SpvExecutionModel execution_model;
 
     uint32_t current_id;
+    uint32_t source_name_id;
     uint32_t main_function_id;
     struct rb_tree declarations;
     uint32_t type_sampler_id;
@@ -1568,10 +1569,15 @@ static uint32_t vkd3d_spirv_build_op_string(struct vkd3d_spirv_builder *builder,
 static void vkd3d_spirv_build_op_source(struct vkd3d_spirv_builder *builder, const char *source_name)
 {
     struct vkd3d_spirv_stream *stream = &builder->debug_stream;
-    uint32_t source_id;
 
-    source_id = vkd3d_spirv_build_op_string(builder, source_name ? source_name : "<anonymous>");
-    vkd3d_spirv_build_op3(stream, SpvOpSource, 0, 0, source_id);
+    builder->source_name_id = vkd3d_spirv_build_op_string(builder, source_name ? source_name : "<anonymous>");
+    vkd3d_spirv_build_op3(stream, SpvOpSource, 0, 0, builder->source_name_id);
+}
+
+static void vkd3d_spirv_build_op_line(struct vkd3d_spirv_builder *builder, const struct vkd3d_shader_location *location)
+{
+    vkd3d_spirv_build_op3(&builder->function_stream, SpvOpLine,
+            builder->source_name_id, location->line, location->column);
 }
 
 static void vkd3d_spirv_build_op_member_name(struct vkd3d_spirv_builder *builder,
@@ -10548,6 +10554,17 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
     int ret = VKD3D_OK;
 
     compiler->location = instruction->location;
+    /* radeonsi from Mesa 20.3.5 seems to get confused by OpLine instructions
+     * before OpFunction, seemingly causing it to fail to find the entry
+     * point. As far as I can tell that's not prohibited, and the validation
+     * layers don't seem to mind either, but perhaps it's best avoided.
+     * Notably, radv from the same Mesa version doesn't mind either.
+     *
+     * This is an issue for hull shaders in particular, because we don't go
+     * through vkd3d_spirv_builder_begin_main_function() before getting here
+     * in that case. */
+    if (!compiler->strip_debug && compiler->spirv_builder.function_stream.word_count)
+        vkd3d_spirv_build_op_line(&compiler->spirv_builder, &instruction->location);
 
     switch (instruction->opcode)
     {
