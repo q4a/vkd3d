@@ -2028,8 +2028,8 @@ static void msl_generate_entrypoint(struct msl_generator *gen)
 
 static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader_code *out)
 {
-    const struct vkd3d_shader_instruction_array *instructions = &gen->program->instructions;
-    unsigned int i;
+    struct vkd3d_shader_instruction *ins;
+    struct vsir_program_iterator it;
 
     MESSAGE("Generating a MSL shader. This is unsupported; you get to keep all the pieces if it breaks.\n");
 
@@ -2095,9 +2095,10 @@ static int msl_generator_generate(struct msl_generator *gen, struct vkd3d_shader
         vkd3d_string_buffer_printf(gen->buffer, "vkd3d_vec4 r[%u];\n\n", gen->program->temp_count);
     }
 
-    for (i = 0; i < instructions->count; ++i)
+    it = vsir_program_iterator(&gen->program->instructions);
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        msl_handle_instruction(gen, &instructions->elements[i]);
+        msl_handle_instruction(gen, ins);
     }
 
     --gen->indent;
