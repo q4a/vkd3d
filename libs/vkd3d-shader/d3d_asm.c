@@ -388,7 +388,6 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
 {
     static const char *const data_type_names[] =
     {
-        [VKD3D_DATA_SNORM    ] = "snorm",
         [VKD3D_DATA_OPAQUE   ] = "opaque",
         [VKD3D_DATA_MIXED    ] = "mixed",
         [VKD3D_DATA_CONTINUED] = "<continued>",
@@ -402,6 +401,7 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
         [VSIR_DATA_U16      ] = "uint16",
         [VSIR_DATA_U32      ] = "uint",
         [VSIR_DATA_U64      ] = "uint64",
+        [VSIR_DATA_SNORM    ] = "snorm",
         [VSIR_DATA_UNORM    ] = "unorm",
     };
 
