@@ -1526,8 +1526,6 @@ static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_t
 {
     switch (data_type)
     {
-        case VKD3D_DATA_CONTINUED:
-            return VKD3D_SHADER_RESOURCE_DATA_CONTINUED;
         case VKD3D_DATA_UNUSED:
             return VKD3D_SHADER_RESOURCE_DATA_NONE;
         case VSIR_DATA_F32:
@@ -1544,6 +1542,8 @@ static enum vkd3d_shader_resource_data_type vkd3d_resource_data_type_from_data_t
             return VKD3D_SHADER_RESOURCE_DATA_UNORM;
         case VSIR_DATA_MIXED:
             return VKD3D_SHADER_RESOURCE_DATA_MIXED;
+        case VSIR_DATA_CONTINUED:
+            return VKD3D_SHADER_RESOURCE_DATA_CONTINUED;
         default:
             ERR("Invalid resource data type %#x.\n", data_type);
             return VKD3D_SHADER_RESOURCE_DATA_FLOAT;
