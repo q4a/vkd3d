@@ -1472,7 +1472,6 @@ static uint32_t get_external_constant_count(struct vkd3d_shader_sm1_parser *sm1,
 int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program)
 {
-    struct vkd3d_shader_instruction_array *instructions;
     struct vkd3d_shader_sm1_parser sm1 = {0};
     struct vkd3d_shader_instruction *ins;
     unsigned int i;
@@ -1484,17 +1483,14 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
         return ret;
     }
 
-    instructions = &program->instructions;
     while (!shader_sm1_is_end(&sm1))
     {
-        if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+        if (!(ins = vsir_program_append(program)))
         {
-            ERR("Failed to allocate instructions.\n");
             vkd3d_shader_parser_error(&sm1.p, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY, "Out of memory.");
             vsir_program_cleanup(program);
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
-        ins = &instructions->elements[instructions->count];
         shader_sm1_read_instruction(&sm1, ins);
 
         if (ins->opcode == VSIR_OP_INVALID)
@@ -1503,7 +1499,6 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
             vsir_program_cleanup(program);
             return VKD3D_ERROR_INVALID_SHADER;
         }
-        ++instructions->count;
     }
 
     for (i = 0; i < ARRAY_SIZE(program->flat_constant_count); ++i)
