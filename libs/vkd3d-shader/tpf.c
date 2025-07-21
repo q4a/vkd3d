@@ -759,7 +759,7 @@ static const enum vsir_data_type data_type_table[] =
     /* VKD3D_SM4_DATA_MIXED */      VSIR_DATA_MIXED,
     /* VKD3D_SM4_DATA_DOUBLE */     VSIR_DATA_F64,
     /* VKD3D_SM4_DATA_CONTINUED */  VSIR_DATA_CONTINUED,
-    /* VKD3D_SM4_DATA_UNUSED */     VKD3D_DATA_UNUSED,
+    /* VKD3D_SM4_DATA_UNUSED */     VSIR_DATA_UNUSED,
 };
 
 static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *sm4)
@@ -895,7 +895,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins, u
                 >> VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
     }
 
-    reg_data_type = VKD3D_DATA_UNUSED;
+    reg_data_type = VSIR_DATA_UNUSED;
     shader_sm4_read_dst_param(priv, &tokens, end, reg_data_type, &semantic->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &semantic->resource.reg.reg, &semantic->resource.range);
 
@@ -957,7 +957,7 @@ static void shader_sm4_read_dcl_sampler(struct vkd3d_shader_instruction *ins, ui
     ins->flags = (opcode_token & VKD3D_SM4_SAMPLER_MODE_MASK) >> VKD3D_SM4_SAMPLER_MODE_SHIFT;
     if (ins->flags & ~VKD3D_SM4_SAMPLER_COMPARISON)
         FIXME("Unhandled sampler mode %#x.\n", ins->flags);
-    shader_sm4_read_src_param(priv, &tokens, end, VKD3D_DATA_UNUSED, &ins->declaration.sampler.src);
+    shader_sm4_read_src_param(priv, &tokens, end, VSIR_DATA_UNUSED, &ins->declaration.sampler.src);
     shader_sm4_set_descriptor_register_range(priv, &ins->declaration.sampler.src.reg, &ins->declaration.sampler.range);
     shader_sm4_read_register_space(priv, &tokens, end, &ins->declaration.sampler.range.space);
 }
@@ -1314,7 +1314,7 @@ static void shader_sm5_read_dcl_uav_raw(struct vkd3d_shader_instruction *ins, ui
     struct vkd3d_shader_raw_resource *resource = &ins->declaration.raw_resource;
     const uint32_t *end = &tokens[token_count];
 
-    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UNUSED, &resource->resource.reg);
+    shader_sm4_read_dst_param(priv, &tokens, end, VSIR_DATA_UNUSED, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     ins->flags = (opcode_token & VKD3D_SM5_UAV_FLAGS_MASK) >> VKD3D_SM5_UAV_FLAGS_SHIFT;
     shader_sm4_read_register_space(priv, &tokens, end, &resource->resource.range.space);
@@ -1326,7 +1326,7 @@ static void shader_sm5_read_dcl_uav_structured(struct vkd3d_shader_instruction *
     struct vkd3d_shader_structured_resource *resource = &ins->declaration.structured_resource;
     const uint32_t *end = &tokens[token_count];
 
-    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UNUSED, &resource->resource.reg);
+    shader_sm4_read_dst_param(priv, &tokens, end, VSIR_DATA_UNUSED, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     ins->flags = (opcode_token & VKD3D_SM5_UAV_FLAGS_MASK) >> VKD3D_SM5_UAV_FLAGS_SHIFT;
     resource->byte_stride = *tokens++;
@@ -1363,7 +1363,7 @@ static void shader_sm5_read_dcl_resource_structured(struct vkd3d_shader_instruct
     struct vkd3d_shader_structured_resource *resource = &ins->declaration.structured_resource;
     const uint32_t *end = &tokens[token_count];
 
-    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UNUSED, &resource->resource.reg);
+    shader_sm4_read_dst_param(priv, &tokens, end, VSIR_DATA_UNUSED, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     resource->byte_stride = *tokens++;
     if (resource->byte_stride % 4)
@@ -1377,7 +1377,7 @@ static void shader_sm5_read_dcl_resource_raw(struct vkd3d_shader_instruction *in
     struct vkd3d_shader_raw_resource *resource = &ins->declaration.raw_resource;
     const uint32_t *end = &tokens[token_count];
 
-    shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UNUSED, &resource->resource.reg);
+    shader_sm4_read_dst_param(priv, &tokens, end, VSIR_DATA_UNUSED, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     shader_sm4_read_register_space(priv, &tokens, end, &resource->resource.range.space);
 }
@@ -1999,7 +1999,7 @@ static enum vsir_data_type map_data_type(char t)
         case 'O':
             return VSIR_DATA_OPAQUE;
         case '*':
-            return VKD3D_DATA_UNUSED;
+            return VSIR_DATA_UNUSED;
         default:
             ERR("Invalid data type '%c'.\n", t);
             return VSIR_DATA_F32;

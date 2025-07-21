@@ -8259,7 +8259,7 @@ static enum vsir_data_type vsir_data_type_from_hlsl_type(struct hlsl_ctx *ctx, c
         }
     }
 
-    return VKD3D_DATA_UNUSED;
+    return VSIR_DATA_UNUSED;
 }
 
 static enum vsir_data_type vsir_data_type_from_hlsl_instruction(struct hlsl_ctx *ctx,
@@ -8788,7 +8788,7 @@ static void sm4_generate_vsir_rasterizer_sample_count(struct hlsl_ctx *ctx,
     vsir_dst_from_hlsl_node(&ins->dst[0], ctx, instr);
 
     src_param = &ins->src[0];
-    vsir_src_param_init(src_param, VKD3DSPR_RASTERIZER, VKD3D_DATA_UNUSED, 0);
+    vsir_src_param_init(src_param, VKD3DSPR_RASTERIZER, VSIR_DATA_UNUSED, 0);
     src_param->reg.dimension = VSIR_DIMENSION_VEC4;
     src_param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
 }
@@ -12134,7 +12134,7 @@ static void sm4_generate_vsir_add_dcl_sampler(struct hlsl_ctx *ctx,
             ins->flags |= VKD3DSI_SAMPLER_COMPARISON_MODE;
 
         src_param = &ins->declaration.sampler.src;
-        vsir_src_param_init(src_param, VKD3DSPR_SAMPLER, VKD3D_DATA_UNUSED, 0);
+        vsir_src_param_init(src_param, VKD3DSPR_SAMPLER, VSIR_DATA_UNUSED, 0);
 
         ins->declaration.sampler.range.first = array_first;
         ins->declaration.sampler.range.last = array_last;
@@ -12273,7 +12273,7 @@ static void sm4_generate_vsir_add_dcl_texture(struct hlsl_ctx *ctx,
         else
             vsir_resource = &ins->declaration.semantic.resource;
 
-        vsir_dst_param_init(&vsir_resource->reg, uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VKD3D_DATA_UNUSED, 0);
+        vsir_dst_param_init(&vsir_resource->reg, uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VSIR_DATA_UNUSED, 0);
 
         if (uav && component_type->e.resource.rasteriser_ordered)
             ins->flags = VKD3DSUF_RASTERISER_ORDERED_VIEW;
@@ -12331,7 +12331,7 @@ static void sm4_generate_vsir_add_dcl_stream(struct hlsl_ctx *ctx,
         return;
     }
 
-    vsir_src_param_init(&ins->src[0], VKD3DSPR_STREAM, VKD3D_DATA_UNUSED, 1);
+    vsir_src_param_init(&ins->src[0], VKD3DSPR_STREAM, VSIR_DATA_UNUSED, 1);
     ins->src[0].reg.dimension = VSIR_DIMENSION_NONE;
     ins->src[0].reg.idx[0].offset = var->regs[HLSL_REGSET_STREAM_OUTPUTS].index;
 }

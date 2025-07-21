@@ -604,7 +604,7 @@ static void vsir_src_param_init_io(struct vkd3d_shader_src_param *src,
 
 void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
 {
-    vsir_src_param_init(param, VKD3DSPR_LABEL, VKD3D_DATA_UNUSED, 1);
+    vsir_src_param_init(param, VKD3DSPR_LABEL, VSIR_DATA_UNUSED, 1);
     param->reg.dimension = VSIR_DIMENSION_NONE;
     param->reg.idx[0].offset = label_id;
 }
@@ -625,7 +625,7 @@ static void src_param_init_parameter_vec4(struct vkd3d_shader_src_param *src, ui
 
 static void vsir_src_param_init_resource(struct vkd3d_shader_src_param *src, unsigned int id, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_RESOURCE, VKD3D_DATA_UNUSED, 2);
+    vsir_src_param_init(src, VKD3DSPR_RESOURCE, VSIR_DATA_UNUSED, 2);
     src->reg.idx[0].offset = id;
     src->reg.idx[1].offset = idx;
     src->reg.dimension = VSIR_DIMENSION_VEC4;
@@ -634,7 +634,7 @@ static void vsir_src_param_init_resource(struct vkd3d_shader_src_param *src, uns
 
 static void vsir_src_param_init_sampler(struct vkd3d_shader_src_param *src, unsigned int id, unsigned int idx)
 {
-    vsir_src_param_init(src, VKD3DSPR_SAMPLER, VKD3D_DATA_UNUSED, 2);
+    vsir_src_param_init(src, VKD3DSPR_SAMPLER, VSIR_DATA_UNUSED, 2);
     src->reg.idx[0].offset = id;
     src->reg.idx[1].offset = idx;
     src->reg.dimension = VSIR_DIMENSION_NONE;
@@ -719,7 +719,7 @@ static void vsir_dst_param_init_io(struct vkd3d_shader_dst_param *dst, enum vkd3
 
 void vsir_dst_param_init_null(struct vkd3d_shader_dst_param *dst)
 {
-    vsir_dst_param_init(dst, VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+    vsir_dst_param_init(dst, VKD3DSPR_NULL, VSIR_DATA_UNUSED, 0);
     dst->reg.dimension = VSIR_DIMENSION_NONE;
     dst->write_mask = 0;
 }
@@ -9353,7 +9353,7 @@ static void vsir_validate_label_register(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
                 "Invalid precision %#x for a LABEL register.", reg->precision);
 
-    if (reg->data_type != VKD3D_DATA_UNUSED)
+    if (reg->data_type != VSIR_DATA_UNUSED)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                 "Invalid data type %#x for a LABEL register.", reg->data_type);
 
@@ -9432,7 +9432,7 @@ static void vsir_validate_sampler_register(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
                 "Invalid precision %#x for a SAMPLER register.", reg->precision);
 
-    if (reg->data_type != VKD3D_DATA_UNUSED)
+    if (reg->data_type != VSIR_DATA_UNUSED)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                 "Invalid data type %#x for a SAMPLER register.", reg->data_type);
 
@@ -9458,7 +9458,7 @@ static void vsir_validate_resource_register(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION,
                 "Invalid precision %#x for a RESOURCE register.", reg->precision);
 
-    if (reg->data_type != VKD3D_DATA_UNUSED)
+    if (reg->data_type != VSIR_DATA_UNUSED)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                 "Invalid data type %#x for a RESOURCE register.", reg->data_type);
 
@@ -9484,7 +9484,7 @@ static void vsir_validate_uav_register(struct validation_context *ctx,
                 "Invalid precision %#x for a UAV register.",
                 reg->precision);
 
-    if (reg->data_type != VKD3D_DATA_UNUSED)
+    if (reg->data_type != VSIR_DATA_UNUSED)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                 "Invalid data type %#x for a UAV register.",
                 reg->data_type);
@@ -10516,7 +10516,7 @@ static void vsir_validate_descriptors(struct validation_context *ctx)
         if (descriptor->resource_data_type >= VSIR_DATA_TYPE_COUNT)
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                     "Descriptor %u has invalid resource data type %#x.", i, descriptor->resource_data_type);
-        else if ((descriptor->resource_data_type == VKD3D_DATA_UNUSED)
+        else if ((descriptor->resource_data_type == VSIR_DATA_UNUSED)
                 != (descriptor->type == VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER))
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
                     "Descriptor %u has invalid resource data type %#x for descriptor type %#x.",

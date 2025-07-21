@@ -388,7 +388,6 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
 {
     static const char *const data_type_names[] =
     {
-        [VKD3D_DATA_UNUSED   ] = "<unused>",
         [VKD3D_DATA_BOOL     ] = "bool",
         [VSIR_DATA_F16      ] = "half",
         [VSIR_DATA_F32      ] = "float",
@@ -403,6 +402,7 @@ static void shader_print_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum
         [VSIR_DATA_OPAQUE   ] = "opaque",
         [VSIR_DATA_MIXED    ] = "mixed",
         [VSIR_DATA_CONTINUED] = "<continued>",
+        [VSIR_DATA_UNUSED   ] = "<unused>",
     };
 
     if (type < ARRAY_SIZE(data_type_names))
@@ -957,7 +957,7 @@ static void shader_print_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
         return;
     }
 
-    if (reg->data_type == VKD3D_DATA_UNUSED)
+    if (reg->data_type == VSIR_DATA_UNUSED)
         return;
 
     if (reg->dimension < ARRAY_SIZE(dimensions))
