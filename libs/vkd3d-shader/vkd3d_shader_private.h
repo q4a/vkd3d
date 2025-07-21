@@ -710,7 +710,6 @@ enum vkd3d_shader_register_precision
 
 enum vsir_data_type
 {
-    VKD3D_DATA_UNORM,
     VKD3D_DATA_SNORM,
     VKD3D_DATA_OPAQUE,
     VKD3D_DATA_MIXED,
@@ -728,6 +727,8 @@ enum vsir_data_type
     VSIR_DATA_U16,
     VSIR_DATA_U32,
     VSIR_DATA_U64,
+
+    VSIR_DATA_UNORM,
 
     VSIR_DATA_TYPE_COUNT,
 };
@@ -1806,7 +1807,7 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
     {
         case VSIR_DATA_F16: /* Minimum precision. TODO: native 16-bit */
         case VSIR_DATA_F32:
-        case VKD3D_DATA_UNORM:
+        case VSIR_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             return VKD3D_SHADER_COMPONENT_FLOAT;
         case VSIR_DATA_F64:

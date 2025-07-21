@@ -138,7 +138,7 @@ static void msl_print_resource_datatype(struct msl_generator *gen,
     switch (data_type)
     {
         case VSIR_DATA_F32:
-        case VKD3D_DATA_UNORM:
+        case VSIR_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             vkd3d_string_buffer_printf(buffer, "float");
             break;
@@ -527,7 +527,7 @@ static void msl_print_bitcast(struct vkd3d_string_buffer *dst, struct msl_genera
 {
     bool write_cast = false;
 
-    if (dst_data_type == VKD3D_DATA_UNORM || dst_data_type == VKD3D_DATA_SNORM)
+    if (dst_data_type == VSIR_DATA_UNORM || dst_data_type == VKD3D_DATA_SNORM)
         dst_data_type = VSIR_DATA_F32;
 
     switch (src_data_type)
@@ -1320,7 +1320,7 @@ static void msl_store_uav_typed(struct msl_generator *gen, const struct vkd3d_sh
                         "Internal compiler error: Unhandled data type %#x.", data_type);
                 /* fall through */
             case VSIR_DATA_F32:
-            case VKD3D_DATA_UNORM:
+            case VSIR_DATA_UNORM:
             case VKD3D_DATA_SNORM:
                 vkd3d_string_buffer_printf(image_data, "float4(");
                 break;

@@ -330,9 +330,9 @@ static void glsl_src_cleanup(struct glsl_src *src, struct vkd3d_string_buffer_ca
 static void shader_glsl_print_bitcast(struct vkd3d_string_buffer *dst, struct vkd3d_glsl_generator *gen,
         const char *src, enum vsir_data_type dst_data_type, enum vsir_data_type src_data_type, unsigned int size)
 {
-    if (dst_data_type == VKD3D_DATA_UNORM || dst_data_type == VKD3D_DATA_SNORM)
+    if (dst_data_type == VSIR_DATA_UNORM || dst_data_type == VKD3D_DATA_SNORM)
         dst_data_type = VSIR_DATA_F32;
-    if (src_data_type == VKD3D_DATA_UNORM || src_data_type == VKD3D_DATA_SNORM)
+    if (src_data_type == VSIR_DATA_UNORM || src_data_type == VKD3D_DATA_SNORM)
         src_data_type = VSIR_DATA_F32;
 
     if (dst_data_type == src_data_type)
@@ -1175,7 +1175,7 @@ static void shader_glsl_store_uav_typed(struct vkd3d_glsl_generator *gen, const 
                         "Internal compiler error: Unhandled data type %#x.", data_type);
                 /* fall through */
             case VSIR_DATA_F32:
-            case VKD3D_DATA_UNORM:
+            case VSIR_DATA_UNORM:
             case VKD3D_DATA_SNORM:
                 vkd3d_string_buffer_printf(image_data, "vec4(");
                 break;
@@ -1780,7 +1780,7 @@ static void shader_glsl_generate_uav_declaration(struct vkd3d_glsl_generator *ge
                     uav->resource_data_type, uav->register_id);
             /* fall through */
         case VSIR_DATA_F32:
-        case VKD3D_DATA_UNORM:
+        case VSIR_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             image_type_prefix = "";
             read_format = "r32f";
@@ -1996,7 +1996,7 @@ static void shader_glsl_generate_sampler_declaration(struct vkd3d_glsl_generator
     switch (srv->resource_data_type)
     {
         case VSIR_DATA_F32:
-        case VKD3D_DATA_UNORM:
+        case VSIR_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             sampler_type_prefix = "";
             break;

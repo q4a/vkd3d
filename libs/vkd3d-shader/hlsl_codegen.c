@@ -12190,7 +12190,7 @@ static enum vsir_data_type sm4_generate_vsir_get_format_type(const struct hlsl_t
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_HALF:
             if (format->modifiers & HLSL_MODIFIER_UNORM)
-                return VKD3D_DATA_UNORM;
+                return VSIR_DATA_UNORM;
             if (format->modifiers & HLSL_MODIFIER_SNORM)
                 return VKD3D_DATA_SNORM;
             return VSIR_DATA_F32;

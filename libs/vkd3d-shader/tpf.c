@@ -751,7 +751,7 @@ static const enum vkd3d_shader_resource_type resource_type_table[] =
 static const enum vsir_data_type data_type_table[] =
 {
     /* 0 */                         VSIR_DATA_F32,
-    /* VKD3D_SM4_DATA_UNORM */      VKD3D_DATA_UNORM,
+    /* VKD3D_SM4_DATA_UNORM */      VSIR_DATA_UNORM,
     /* VKD3D_SM4_DATA_SNORM */      VKD3D_DATA_SNORM,
     /* VKD3D_SM4_DATA_INT */        VSIR_DATA_I32,
     /* VKD3D_SM4_DATA_UINT */       VSIR_DATA_U32,
