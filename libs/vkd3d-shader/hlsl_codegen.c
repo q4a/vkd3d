@@ -9403,6 +9403,10 @@ static void sm1_generate_vsir_instr_resource_load(struct hlsl_ctx *ctx,
             flags |= VKD3DSI_TEXLD_PROJECT;
             break;
 
+        case HLSL_RESOURCE_SAMPLE_LOD:
+            opcode = VSIR_OP_TEXLDL;
+            break;
+
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
             opcode = VSIR_OP_TEXLD;
             flags |= VKD3DSI_TEXLD_BIAS;

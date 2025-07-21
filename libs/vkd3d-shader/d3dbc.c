@@ -2018,6 +2018,7 @@ static void d3dbc_write_vsir_instruction(struct d3dbc_compiler *d3dbc, const str
         case VSIR_OP_SINCOS:
         case VSIR_OP_SLT:
         case VSIR_OP_TEXLD:
+        case VSIR_OP_TEXLDL:
         case VSIR_OP_TEXLDD:
             d3dbc_write_instruction(d3dbc, ins);
             break;
