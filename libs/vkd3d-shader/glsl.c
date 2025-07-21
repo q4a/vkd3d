@@ -2325,9 +2325,9 @@ static void shader_glsl_generate_declarations(struct vkd3d_glsl_generator *gen)
 
 static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *gen, struct vkd3d_shader_code *out)
 {
-    const struct vkd3d_shader_instruction_array *instructions = &gen->program->instructions;
     struct vkd3d_string_buffer *buffer = gen->buffer;
-    unsigned int i;
+    struct vkd3d_shader_instruction *ins;
+    struct vsir_program_iterator it;
     void *code;
 
     MESSAGE("Generating a GLSL shader. This is unsupported; you get to keep all the pieces if it breaks.\n");
@@ -2342,9 +2342,11 @@ static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *gen, struc
 
     ++gen->indent;
     shader_glsl_shader_prologue(gen);
-    for (i = 0; i < instructions->count; ++i)
+
+    it = vsir_program_iterator(&gen->program->instructions);
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        vkd3d_glsl_handle_instruction(gen, &instructions->elements[i]);
+        vkd3d_glsl_handle_instruction(gen, ins);
     }
 
     vkd3d_string_buffer_printf(buffer, "}\n");
