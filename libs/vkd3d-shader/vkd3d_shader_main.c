@@ -87,7 +87,7 @@ void vkd3d_string_buffer_truncate(struct vkd3d_string_buffer *buffer, size_t siz
 
 static bool vkd3d_string_buffer_resize(struct vkd3d_string_buffer *buffer, int rc)
 {
-    unsigned int new_buffer_size = rc >= 0 ? buffer->content_size + rc + 1 : buffer->buffer_size * 2;
+    size_t new_buffer_size = rc >= 0 ? buffer->content_size + rc + 1 : buffer->buffer_size * 2;
 
     if (!vkd3d_array_reserve((void **)&buffer->buffer, &buffer->buffer_size, new_buffer_size, 1))
     {
@@ -100,7 +100,7 @@ static bool vkd3d_string_buffer_resize(struct vkd3d_string_buffer *buffer, int r
 
 int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args)
 {
-    unsigned int rem;
+    size_t rem;
     va_list a;
     int rc;
 
@@ -135,7 +135,7 @@ int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer, const char *f
 
 int vkd3d_string_buffer_print_f32(struct vkd3d_string_buffer *buffer, float f)
 {
-    unsigned int idx = buffer->content_size + 1;
+    size_t idx = buffer->content_size + 1;
     int ret;
 
     if (!(ret = vkd3d_string_buffer_printf(buffer, "%.8e", f)) && isfinite(f))
@@ -150,7 +150,7 @@ int vkd3d_string_buffer_print_f32(struct vkd3d_string_buffer *buffer, float f)
 
 int vkd3d_string_buffer_print_f64(struct vkd3d_string_buffer *buffer, double d)
 {
-    unsigned int idx = buffer->content_size + 1;
+    size_t idx = buffer->content_size + 1;
     int ret;
 
     if (!(ret = vkd3d_string_buffer_printf(buffer, "%.16e", d)) && isfinite(d))
