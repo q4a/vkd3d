@@ -10020,6 +10020,10 @@ static void spirv_compiler_emit_sample_info(struct spirv_compiler *compiler,
     uint32_t type_id, val_id;
     unsigned int i;
 
+    if (instruction->flags & ~VKD3DSI_SAMPLE_INFO_UINT)
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Unhandled sample info flags %#x.\n", instruction->flags & ~VKD3DSI_SAMPLE_INFO_UINT);
+
     val_id = spirv_compiler_emit_query_sample_count(compiler, src);
 
     constituents[0] = val_id;
@@ -10030,15 +10034,9 @@ static void spirv_compiler_emit_sample_info(struct spirv_compiler *compiler,
 
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE);
     if (instruction->flags == VKD3DSI_SAMPLE_INFO_UINT)
-    {
         val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
-    }
     else
-    {
-        if (instruction->flags)
-            FIXME("Unhandled flags %#x.\n", instruction->flags);
         val_id = vkd3d_spirv_build_op_convert_utof(builder, type_id, val_id);
-    }
 
     val_id = spirv_compiler_emit_swizzle(compiler, val_id, VKD3DSP_WRITEMASK_ALL,
             VKD3D_SHADER_COMPONENT_FLOAT, src->swizzle, dst->write_mask);
