@@ -5016,9 +5016,12 @@ int hlsl_compile_shader(const struct vkd3d_shader_compile_info *compile_info,
 {
     enum vkd3d_shader_target_type target_type = compile_info->target_type;
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
+    uint64_t config_flags = vkd3d_shader_init_config_flags();
     struct hlsl_ir_function_decl *decl, *entry_func = NULL;
+    struct vkd3d_shader_code reflection_data = {0};
     const struct hlsl_profile_info *profile;
     struct hlsl_ir_function *func;
+    struct vsir_program program;
     const char *entry_point;
     struct hlsl_ctx ctx;
     int ret;
@@ -5118,43 +5121,15 @@ int hlsl_compile_shader(const struct vkd3d_shader_compile_info *compile_info,
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    if (target_type == VKD3D_SHADER_TARGET_SPIRV_BINARY
-            || target_type == VKD3D_SHADER_TARGET_SPIRV_TEXT
-            || target_type == VKD3D_SHADER_TARGET_GLSL
-            || target_type == VKD3D_SHADER_TARGET_D3D_ASM)
+    if ((ret = hlsl_emit_vsir(&ctx, compile_info, entry_func, &program, &reflection_data)) >= 0)
     {
-        uint64_t config_flags = vkd3d_shader_init_config_flags();
-        struct vkd3d_shader_compile_info info = *compile_info;
-        struct vsir_program program;
-
-        if (profile->major_version < 4)
-        {
-            if ((ret = hlsl_emit_bytecode(&ctx, entry_func, VKD3D_SHADER_TARGET_D3D_BYTECODE, &info.source)) < 0)
-                goto done;
-            info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
-            ret = d3dbc_parse(&info, config_flags, message_context, &program);
-        }
-        else
-        {
-            if ((ret = hlsl_emit_bytecode(&ctx, entry_func, VKD3D_SHADER_TARGET_DXBC_TPF, &info.source)) < 0)
-                goto done;
-            info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
-            ret = tpf_parse(&info, config_flags, message_context, &program);
-        }
-        if (ret >= 0)
-        {
-            ret = vsir_program_compile(&program, config_flags, &info, out, message_context);
-            vsir_program_cleanup(&program);
-        }
-        vkd3d_shader_free_shader_code(&info.source);
+        vsir_program_trace(&program);
+        ret = vsir_program_compile(&program, &reflection_data, config_flags, compile_info, out, message_context);
+        vkd3d_shader_free_shader_code(&reflection_data);
+        vsir_program_cleanup(&program);
     }
-    else
-    {
-        ret = hlsl_emit_bytecode(&ctx, entry_func, target_type, out);
-    }
-
-done:
     hlsl_ctx_cleanup(&ctx);
+
     return ret;
 }
 

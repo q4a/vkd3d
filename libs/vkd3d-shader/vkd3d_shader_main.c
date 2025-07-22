@@ -1733,9 +1733,9 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     return ret;
 }
 
-int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
-        struct vkd3d_shader_message_context *message_context)
+int vsir_program_compile(struct vsir_program *program, const struct vkd3d_shader_code *reflection_data,
+        uint64_t config_flags, const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_combined_resource_sampler_info combined_sampler_info;
     struct vkd3d_shader_compile_info scan_info;
@@ -1747,6 +1747,18 @@ int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
             ret = d3d_asm_compile(program, compile_info, out, VSIR_ASM_FLAG_NONE);
+            break;
+
+        case VKD3D_SHADER_TARGET_D3D_BYTECODE:
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, true)) < 0)
+                return ret;
+            ret = d3dbc_compile(program, config_flags, compile_info, reflection_data, out, message_context);
+            break;
+
+        case VKD3D_SHADER_TARGET_DXBC_TPF:
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, true)) < 0)
+                return ret;
+            ret = tpf_compile(program, config_flags, reflection_data, out, message_context);
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
@@ -1843,7 +1855,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
 
         if (!(ret = vsir_parse(compile_info, config_flags, &message_context, &program)))
         {
-            ret = vsir_program_compile(&program, config_flags, compile_info, out, &message_context);
+            ret = vsir_program_compile(&program, NULL, config_flags, compile_info, out, &message_context);
             vsir_program_cleanup(&program);
         }
     }

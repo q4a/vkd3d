@@ -278,11 +278,12 @@ struct hlsl_struct_field
     size_t name_bytecode_offset;
 };
 
-/* Information of the register(s) allocated for an instruction node or variable.
- * These values are initialized at the end of hlsl_emit_bytecode(), after the compilation passes,
- *   just before writing the bytecode.
- * The type of register (register class) is implied from its use, so it is not stored in this
- *   struct. */
+/* Information about the register(s) allocated for an instruction node or
+ * variable. These values are initialised at the end of hlsl_emit_vsir(),
+ * after the compilation passes, as vsir starts being generated from HLSL IR.
+ *
+ * The type of register (register class) is implied by its usage, so it is not
+ * stored in this structure. */
 struct hlsl_reg
 {
     /* Register number of the first register allocated. */
@@ -1625,9 +1626,10 @@ struct hlsl_state_block_entry *clone_stateblock_entry(struct hlsl_ctx *ctx,
 
 void hlsl_lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_block *body);
 void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body);
-int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
-        enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out);
 int hlsl_emit_effect_binary(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out);
+int hlsl_emit_vsir(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info *compile_info,
+        struct hlsl_ir_function_decl *entry_func, struct vsir_program *program,
+        struct vkd3d_shader_code *reflection_data);
 
 bool hlsl_init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_var *var, unsigned int path_len);
 bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_node *chain);
