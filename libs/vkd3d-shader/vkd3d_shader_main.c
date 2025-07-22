@@ -1598,12 +1598,13 @@ void vkd3d_shader_free_scan_descriptor_info1(struct vkd3d_shader_scan_descriptor
 static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, bool add_descriptor_info)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct vkd3d_shader_scan_combined_resource_sampler_info *combined_sampler_info;
     struct vkd3d_shader_scan_hull_shader_tessellation_info *tessellation_info;
     struct vkd3d_shader_scan_descriptor_info *descriptor_info;
     struct vkd3d_shader_scan_signature_info *signature_info;
-    struct vkd3d_shader_instruction *instruction;
     struct vkd3d_shader_scan_context context;
+    struct vkd3d_shader_instruction *ins;
     int ret = VKD3D_OK;
     unsigned int i;
 
@@ -1631,10 +1632,9 @@ static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_sh
     if (TRACE_ON())
         vsir_program_trace(program);
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        instruction = &program->instructions.elements[i];
-        if ((ret = vkd3d_shader_scan_instruction(&context, instruction)) < 0)
+        if ((ret = vkd3d_shader_scan_instruction(&context, ins)) < 0)
             break;
     }
 
