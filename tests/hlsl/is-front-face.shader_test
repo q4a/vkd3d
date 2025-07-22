@@ -8,29 +8,49 @@ shader model >= 4.0
 -2.0 -2.0
  2.0 -2.0
 -2.0  2.0
+
+ 2.0 -2.0
+-2.0  2.0
  2.0  2.0
 
 [vertex shader]
-void main(inout float4 pos : sv_position)
+void main(out uint a : A, inout float4 pos : sv_position)
 {
+    a = 2;
 }
 
 [pixel shader]
-float4 main(bool face : sv_isfrontface) : sv_target
+float4 main(uint a : A, bool face : sv_isfrontface) : sv_target
 {
-    return face ? float4(1.0f, 2.0f, 1.0f, 2.0f) : float4(0.0f, 1.0f, 0.0f, 1.0f);
+    return float4(a, face, 0, 0);
 }
 
 [test]
-draw triangle strip 4
-probe (0, 0, 640, 480) rgba (0.0, 1.0, 0.0, 1.0)
+draw triangle list 6
+probe (160, 240) f32(2.0, 0.0, 0.0, 0.0)
+probe (480, 240) f32(2.0, 1.0, 0.0, 0.0)
 
-[vb 0]
--2.0 -2.0
--2.0  2.0
- 2.0 -2.0
- 2.0  2.0
+% As above, but compiled with native d3dcompiler_43.
+% Versions 43 and earlier will pack together "a" with "face".
+
+[require]
+shader model >= 4.0
+shader model < 4.1
+
+[pixel shader dxbc-tpf-hex]
+44584243 27142e5c db948785 3bc0e84e 973472c5 01000000 40010000 03000000
+2c000000 80000000 b4000000 4953474e 4c000000 02000000 08000000 38000000
+00000000 00000000 01000000 00000000 01010000 3a000000 00000000 09000000
+01000000 00000000 02020000 41007376 5f697366 726f6e74 66616365 00ababab
+4f53474e 2c000000 01000000 08000000 20000000 00000000 00000000 03000000
+00000000 0f000000 73765f74 61726765 7400abab 53484452 84000000 40000000
+21000000 62080003 12101000 00000000 63080004 22101000 00000000 09000000
+65000003 f2201000 00000000 56000005 12201000 00000000 0a101000 00000000
+01000007 22201000 00000000 1a101000 00000000 01400000 0000803f 36000008
+c2201000 00000000 02400000 00000000 00000000 00000000 00000000 3e000001
 
 [test]
-draw triangle strip 4
-probe (0, 0, 640, 480) rgba (1.0, 2.0, 1.0, 2.0)
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(msl) draw triangle list 6
+probe (160, 240) f32(2.0, 0.0, 0.0, 0.0)
+todo(glsl) probe (480, 240) f32(2.0, 1.0, 0.0, 0.0)
