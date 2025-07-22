@@ -1810,7 +1810,10 @@ static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
 
     preprocessed_info = *compile_info;
     preprocessed_info.source = preprocessed;
-    ret = hlsl_compile_shader(&preprocessed_info, message_context, out);
+    if (compile_info->target_type == VKD3D_SHADER_TARGET_FX)
+        ret = hlsl_compile_effect(&preprocessed_info, message_context, out);
+    else
+        ret = hlsl_compile_shader(&preprocessed_info, message_context, out);
 
     vkd3d_shader_free_shader_code(&preprocessed);
     return ret;

@@ -1806,6 +1806,8 @@ void vkd3d_compute_md5(const void *dxbc, size_t size, uint32_t checksum[4], enum
 int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
+int hlsl_compile_effect(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_code *out);
 int hlsl_compile_shader(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_code *out);
 
