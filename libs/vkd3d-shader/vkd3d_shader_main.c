@@ -2234,7 +2234,7 @@ void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator,
     return params;
 }
 
-bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve)
+bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instructions, size_t reserve)
 {
     memset(instructions, 0, sizeof(*instructions));
     /* Size the parameter initial allocations so they are large enough for most shaders. The
@@ -2245,7 +2245,7 @@ bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instru
     return shader_instruction_array_reserve(instructions, reserve);
 }
 
-bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve)
+bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *instructions, size_t reserve)
 {
     if (!vkd3d_array_reserve((void **)&instructions->elements, &instructions->capacity, reserve,
             sizeof(*instructions->elements)))
@@ -2257,7 +2257,7 @@ bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *ins
 }
 
 bool shader_instruction_array_insert_at(struct vkd3d_shader_instruction_array *instructions,
-        unsigned int idx, unsigned int count)
+        size_t idx, size_t count)
 {
     VKD3D_ASSERT(idx <= instructions->count);
 
@@ -2347,7 +2347,7 @@ static struct vkd3d_shader_src_param *shader_instruction_array_clone_src_params(
 /* NOTE: Immediate constant buffers are not cloned, so the source must not be destroyed while the
  * destination is in use. This seems like a reasonable requirement given how this is currently used. */
 bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_array *instructions,
-        unsigned int dst, unsigned int src)
+        size_t dst, size_t src)
 {
     struct vkd3d_shader_instruction *ins = &instructions->elements[dst];
 
