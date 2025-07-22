@@ -1281,8 +1281,8 @@ struct vkd3d_shader_instruction
     struct vkd3d_shader_location location;
     enum vkd3d_shader_opcode opcode;
     uint32_t flags;
-    unsigned int dst_count;
-    unsigned int src_count;
+    size_t dst_count;
+    size_t src_count;
     struct vkd3d_shader_dst_param *dst;
     struct vkd3d_shader_src_param *src;
     struct vkd3d_shader_texel_offset texel_offset;
@@ -1377,22 +1377,22 @@ struct vkd3d_shader_param_allocator
 {
     struct vkd3d_shader_param_node *head;
     struct vkd3d_shader_param_node *current;
-    unsigned int count;
-    unsigned int stride;
-    unsigned int index;
+    size_t count;
+    size_t stride;
+    size_t index;
 };
 
-void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator, unsigned int count);
+void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator, size_t count);
 
 static inline struct vkd3d_shader_src_param *shader_src_param_allocator_get(
-        struct vkd3d_shader_param_allocator *allocator, unsigned int count)
+        struct vkd3d_shader_param_allocator *allocator, size_t count)
 {
     VKD3D_ASSERT(allocator->stride == sizeof(struct vkd3d_shader_src_param));
     return shader_param_allocator_get(allocator, count);
 }
 
 static inline struct vkd3d_shader_dst_param *shader_dst_param_allocator_get(
-        struct vkd3d_shader_param_allocator *allocator, unsigned int count)
+        struct vkd3d_shader_param_allocator *allocator, size_t count)
 {
     VKD3D_ASSERT(allocator->stride == sizeof(struct vkd3d_shader_dst_param));
     return shader_param_allocator_get(allocator, count);

@@ -2187,7 +2187,7 @@ static struct vkd3d_shader_param_node *shader_param_allocator_node_create(
 }
 
 static void shader_param_allocator_init(struct vkd3d_shader_param_allocator *allocator,
-        unsigned int count, unsigned int stride)
+        size_t count, size_t stride)
 {
     allocator->count = max(count, MAX_REG_OUTPUT);
     allocator->stride = stride;
@@ -2208,7 +2208,7 @@ static void shader_param_allocator_destroy(struct vkd3d_shader_param_allocator *
     }
 }
 
-void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator, unsigned int count)
+void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator, size_t count)
 {
     void *params;
 
@@ -2285,7 +2285,7 @@ bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *ins
 
 static struct vkd3d_shader_src_param *shader_instruction_array_clone_src_params(
         struct vkd3d_shader_instruction_array *instructions, const struct vkd3d_shader_src_param *params,
-        unsigned int count);
+        size_t count);
 
 static bool shader_register_clone_relative_addresses(struct vkd3d_shader_register *reg,
         struct vkd3d_shader_instruction_array *instructions)
@@ -2306,10 +2306,10 @@ static bool shader_register_clone_relative_addresses(struct vkd3d_shader_registe
 
 static struct vkd3d_shader_dst_param *shader_instruction_array_clone_dst_params(
         struct vkd3d_shader_instruction_array *instructions, const struct vkd3d_shader_dst_param *params,
-        unsigned int count)
+        size_t count)
 {
     struct vkd3d_shader_dst_param *dst_params;
-    unsigned int i;
+    size_t i;
 
     if (!(dst_params = shader_dst_param_allocator_get(&instructions->dst_params, count)))
         return NULL;
@@ -2326,10 +2326,10 @@ static struct vkd3d_shader_dst_param *shader_instruction_array_clone_dst_params(
 
 static struct vkd3d_shader_src_param *shader_instruction_array_clone_src_params(
         struct vkd3d_shader_instruction_array *instructions, const struct vkd3d_shader_src_param *params,
-        unsigned int count)
+        size_t count)
 {
     struct vkd3d_shader_src_param *src_params;
-    unsigned int i;
+    size_t i;
 
     if (!(src_params = shader_src_param_allocator_get(&instructions->src_params, count)))
         return NULL;

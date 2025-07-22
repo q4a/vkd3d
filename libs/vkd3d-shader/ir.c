@@ -1180,7 +1180,7 @@ static enum vkd3d_result vsir_program_lower_udiv(struct vsir_program *program,
     {
         vkd3d_shader_error(ctx->message_context, &udiv->location,
                 VKD3D_SHADER_ERROR_VSIR_INVALID_DEST_COUNT,
-                "Internal compiler error: invalid destination count %u for UDIV.",
+                "Internal compiler error: invalid destination count %zu for UDIV.",
                 udiv->dst_count);
         return VKD3D_ERROR;
     }
@@ -1321,7 +1321,7 @@ static enum vkd3d_result vsir_program_lower_sm4_sincos(struct vsir_program *prog
     {
         vkd3d_shader_error(ctx->message_context, &sincos->location,
                 VKD3D_SHADER_ERROR_VSIR_INVALID_DEST_COUNT,
-                "Internal compiler error: invalid destination count %u for SINCOS.",
+                "Internal compiler error: invalid destination count %zu for SINCOS.",
                 sincos->dst_count);
         return VKD3D_ERROR;
     }
@@ -10020,7 +10020,7 @@ static void vsir_validate_dst_count(struct validation_context *ctx,
 {
     if (instruction->dst_count != count)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DEST_COUNT,
-                "Invalid destination parameter count %u for instruction \"%s\" (%#x); expected %u.",
+                "Invalid destination parameter count %zu for instruction \"%s\" (%#x); expected %u.",
                 instruction->dst_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
                 instruction->opcode, count);
 }
@@ -10030,7 +10030,7 @@ static void vsir_validate_src_count(struct validation_context *ctx,
 {
     if (instruction->src_count != count)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source parameter count %u for instruction \"%s\" (%#x); expected %u.",
+                "Invalid source parameter count %zu for instruction \"%s\" (%#x); expected %u.",
                 instruction->src_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
                 instruction->opcode, count);
 }
@@ -10041,7 +10041,7 @@ static bool vsir_validate_src_min_count(struct validation_context *ctx,
     if (instruction->src_count < count)
     {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source parameter count %u for instruction \"%s\" (%#x); expected at least %u.",
+                "Invalid source parameter count %zu for instruction \"%s\" (%#x); expected at least %u.",
                 instruction->src_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
                 instruction->opcode, count);
         return false;
@@ -10056,7 +10056,7 @@ static bool vsir_validate_src_max_count(struct validation_context *ctx,
     if (instruction->src_count > count)
     {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source parameter count %u for instruction \"%s\" (%#x); expected at most %u.",
+                "Invalid source parameter count %zu for instruction \"%s\" (%#x); expected at most %u.",
                 instruction->src_count, vsir_opcode_get_name(instruction->opcode, "<unknown>"),
                 instruction->opcode, count);
         return false;
@@ -11421,7 +11421,7 @@ static void vsir_validate_phi(struct validation_context *ctx, const struct vkd3d
 
     if (instruction->src_count % 2 != 0)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source count %u for a PHI instruction, it must be an even number.",
+                "Invalid source count %zu for a PHI instruction, it must be an even number.",
                 instruction->src_count);
     incoming_count = instruction->src_count / 2;
 
@@ -11503,7 +11503,7 @@ static void vsir_validate_switch_monolithic(struct validation_context *ctx,
 
     if (instruction->src_count % 2 != 1)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
-                "Invalid source count %u for a monolithic SWITCH instruction, it must be an odd number.",
+                "Invalid source count %zu for a monolithic SWITCH instruction, it must be an odd number.",
                 instruction->src_count);
 
     if (!vsir_register_is_label(&instruction->src[1].reg))

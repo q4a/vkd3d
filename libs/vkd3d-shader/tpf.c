@@ -4087,14 +4087,14 @@ static void tpf_simple_instruction(struct tpf_compiler *tpf, const struct vkd3d_
 
     if (ins->dst_count != dst_count)
     {
-        ERR("Invalid destination count %u for vsir instruction %#x (expected %u).\n",
+        ERR("Invalid destination count %zu for vsir instruction %#x (expected %u).\n",
                 ins->dst_count, ins->opcode, dst_count);
         tpf->result = VKD3D_ERROR_INVALID_SHADER;
         return;
     }
     if (ins->src_count != src_count)
     {
-        ERR("Invalid source count %u for vsir instruction %#x (expected %u).\n",
+        ERR("Invalid source count %zu for vsir instruction %#x (expected %u).\n",
                 ins->src_count, ins->opcode, src_count);
         tpf->result = VKD3D_ERROR_INVALID_SHADER;
         return;
