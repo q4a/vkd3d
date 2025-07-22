@@ -10015,6 +10015,7 @@ static uint32_t spirv_compiler_emit_query_sample_count(struct spirv_compiler *co
 static void spirv_compiler_emit_sample_info(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
+    enum vkd3d_shader_component_type component_type = VKD3D_SHADER_COMPONENT_UINT;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
@@ -10034,14 +10035,14 @@ static void spirv_compiler_emit_sample_info(struct spirv_compiler *compiler,
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, VKD3D_VEC4_SIZE);
     val_id = vkd3d_spirv_build_op_composite_construct(builder, type_id, constituents, VKD3D_VEC4_SIZE);
 
-    type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE);
-    if (instruction->flags == VKD3DSI_SAMPLE_INFO_UINT)
-        val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
-    else
+    if (!(instruction->flags & VKD3DSI_SAMPLE_INFO_UINT))
+    {
+        component_type = VKD3D_SHADER_COMPONENT_FLOAT;
+        type_id = vkd3d_spirv_get_type_id(builder, component_type, VKD3D_VEC4_SIZE);
         val_id = vkd3d_spirv_build_op_convert_utof(builder, type_id, val_id);
-
+    }
     val_id = spirv_compiler_emit_swizzle(compiler, val_id, VKD3DSP_WRITEMASK_ALL,
-            VKD3D_SHADER_COMPONENT_FLOAT, src->swizzle, dst->write_mask);
+            component_type, src->swizzle, dst->write_mask);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }

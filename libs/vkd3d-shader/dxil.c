@@ -6009,7 +6009,7 @@ static void sm6_parser_emit_dx_get_sample_count(struct sm6_parser *sm6, enum dx_
     src_param_init(src_param);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
-    ins->dst->reg.data_type = VSIR_DATA_F32;
+    ins->dst->reg.data_type = VSIR_DATA_U32;
 }
 
 static void sm6_parser_emit_dx_get_sample_pos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
