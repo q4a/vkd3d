@@ -792,6 +792,10 @@ void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vk
     memset(ins, 0, sizeof(*ins));
     ins->location = *location;
     ins->opcode = opcode;
+    ins->resource_data_type[0] = VSIR_DATA_F32;
+    ins->resource_data_type[1] = VSIR_DATA_F32;
+    ins->resource_data_type[2] = VSIR_DATA_F32;
+    ins->resource_data_type[3] = VSIR_DATA_F32;
 }
 
 bool vsir_instruction_init_with_params(struct vsir_program *program,
