@@ -1785,6 +1785,7 @@ static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
         const struct shader_dump_data *dump_data, struct vkd3d_shader_code *out,
         struct vkd3d_shader_message_context *message_context)
 {
+    struct vkd3d_shader_compile_info preprocessed_info;
     struct vkd3d_shader_code preprocessed;
     int ret;
 
@@ -1793,7 +1794,9 @@ static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
 
     vkd3d_shader_dump_shader(dump_data, preprocessed.code, preprocessed.size, SHADER_DUMP_TYPE_PREPROC);
 
-    ret = hlsl_compile_shader(&preprocessed, compile_info, out, message_context);
+    preprocessed_info = *compile_info;
+    preprocessed_info.source = preprocessed;
+    ret = hlsl_compile_shader(&preprocessed_info, message_context, out);
 
     vkd3d_shader_free_shader_code(&preprocessed);
     return ret;
