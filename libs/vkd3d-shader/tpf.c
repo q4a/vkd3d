@@ -2742,7 +2742,8 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
         }
     }
 
-    if (ins->opcode == VSIR_OP_SAMPLE_INFO && ins->flags & VKD3DSI_SAMPLE_INFO_UINT)
+    if ((ins->opcode == VSIR_OP_SAMPLE_INFO && ins->flags & VKD3DSI_SAMPLE_INFO_UINT)
+            || (ins->opcode == VSIR_OP_RESINFO && ins->flags & VKD3DSI_RESINFO_UINT))
         ins->dst[0].reg.data_type = VSIR_DATA_U32;
 
     return;
