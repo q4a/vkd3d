@@ -1746,6 +1746,8 @@ int vsir_program_compile(struct vsir_program *program, const struct vkd3d_shader
     switch (compile_info->target_type)
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, true)) < 0)
+                return ret;
             ret = d3d_asm_compile(program, compile_info, out, VSIR_ASM_FLAG_NONE);
             break;
 
