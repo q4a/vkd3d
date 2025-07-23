@@ -1434,9 +1434,7 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
      * i -> VSIR_DATA_I32
      * u -> VSIR_DATA_U32
      * O -> VSIR_DATA_OPAQUE
-     * R -> VKD3D_DATA_RESOURCE
-     * S -> VKD3D_DATA_SAMPLER
-     * U -> VKD3D_DATA_UAV
+     * * -> VSIR_DATA_UNUSED
      */
     static const struct vkd3d_sm4_opcode_info opcode_table[] =
     {
