@@ -10800,6 +10800,38 @@ static void vsir_validate_cast_operation(struct validation_context *ctx,
                 dst_data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
 }
 
+static void vsir_validate_shift_operation(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    enum vsir_data_type data_type;
+
+    static const bool types[] =
+    {
+        [VSIR_DATA_I32] = true,
+        [VSIR_DATA_U32] = true,
+        [VSIR_DATA_U64] = true,
+    };
+
+    data_type = instruction->dst[0].reg.data_type;
+    if ((size_t)data_type >= ARRAY_SIZE(types) || !types[data_type])
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid destination data type %#x for shift operation \"%s\" (%#x).",
+                data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+
+    if (instruction->src[0].reg.data_type != data_type)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Data type %#x for source operand 0 doesn't match destination data type %#x "
+                "for shift operation \"%s\" (%#x).",
+                instruction->src[0].reg.data_type, data_type,
+                vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+
+    data_type = instruction->src[1].reg.data_type;
+    if ((size_t)data_type >= ARRAY_SIZE(types) || !types[data_type])
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+                "Invalid source operand 1 data type %#x for shift operation \"%s\" (%#x).",
+                data_type, vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode);
+}
+
 static void vsir_validate_branch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     size_t i;
@@ -11629,8 +11661,8 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_INEG] =                             {1,   1, vsir_validate_integer_elementwise_operation},
     [VSIR_OP_IREM] =                             {1,   2, vsir_validate_integer_elementwise_operation},
     [VSIR_OP_ISFINITE] =                         {1,   1, vsir_validate_float_comparison_operation},
-    [VSIR_OP_ISHL] =                             {1,   2, vsir_validate_integer_elementwise_operation},
-    [VSIR_OP_ISHR] =                             {1,   2, vsir_validate_integer_elementwise_operation},
+    [VSIR_OP_ISHL] =                             {1,   2, vsir_validate_shift_operation},
+    [VSIR_OP_ISHR] =                             {1,   2, vsir_validate_shift_operation},
     [VSIR_OP_ISINF] =                            {1,   1, vsir_validate_float_comparison_operation},
     [VSIR_OP_ISNAN] =                            {1,   1, vsir_validate_float_comparison_operation},
     [VSIR_OP_ITOF] =                             {1,   1, vsir_validate_itof},
