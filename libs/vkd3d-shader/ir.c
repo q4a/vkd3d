@@ -11518,6 +11518,35 @@ static void vsir_validate_ret(struct validation_context *ctx, const struct vkd3d
     ctx->inside_block = false;
 }
 
+static void vsir_validate_throw_invalid_dst_type_error_with_flags(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    enum vsir_data_type dst_data_type = instruction->dst[0].reg.data_type;
+
+    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE,
+            "Invalid destination data type %#x for operation \"%s\" (%#x) with flags %#x.", dst_data_type,
+            vsir_opcode_get_name(instruction->opcode, "<unknown>"), instruction->opcode, instruction->flags);
+}
+
+static void vsir_validate_sample_info(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    enum vsir_data_type dst_data_type = instruction->dst[0].reg.data_type;
+
+    switch (dst_data_type)
+    {
+        case VSIR_DATA_F32:
+        case VSIR_DATA_U32:
+            if (!!(instruction->flags & VKD3DSI_SAMPLE_INFO_UINT) != (dst_data_type == VSIR_DATA_U32))
+                vsir_validate_throw_invalid_dst_type_error_with_flags(ctx, instruction);
+            break;
+
+        default:
+            vsir_validate_throw_invalid_dst_type_error_with_flags(ctx, instruction);
+            break;
+    }
+}
+
 static void vsir_validate_switch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
@@ -11688,6 +11717,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_RET] =                              {0,   0, vsir_validate_ret},
     [VSIR_OP_ROUND_NE] =                         {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_ROUND_NI] =                         {1,   1, vsir_validate_float_elementwise_operation},
+    [VSIR_OP_SAMPLE_INFO] =                      {1,   1, vsir_validate_sample_info},
     [VSIR_OP_SWITCH] =                           {0,   1, vsir_validate_switch},
     [VSIR_OP_SWITCH_MONOLITHIC] =                {0, ~0u, vsir_validate_switch_monolithic},
 };
