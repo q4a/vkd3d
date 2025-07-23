@@ -11547,6 +11547,25 @@ static void vsir_validate_sample_info(struct validation_context *ctx,
     }
 }
 
+static void vsir_validate_resinfo(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    enum vsir_data_type dst_data_type = instruction->dst[0].reg.data_type;
+
+    switch (dst_data_type)
+    {
+        case VSIR_DATA_F32:
+        case VSIR_DATA_U32:
+            if (!!(instruction->flags & VKD3DSI_RESINFO_UINT) != (dst_data_type == VSIR_DATA_U32))
+                vsir_validate_throw_invalid_dst_type_error_with_flags(ctx, instruction);
+            break;
+
+        default:
+            vsir_validate_throw_invalid_dst_type_error_with_flags(ctx, instruction);
+            break;
+    }
+}
+
 static void vsir_validate_switch(struct validation_context *ctx, const struct vkd3d_shader_instruction *instruction)
 {
     vsir_validate_cf_type(ctx, instruction, VSIR_CF_STRUCTURED);
@@ -11714,6 +11733,7 @@ static const struct vsir_validator_instruction_desc vsir_validator_instructions[
     [VSIR_OP_PHI] =                              {1, ~0u, vsir_validate_phi},
     [VSIR_OP_RCP] =                              {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_REP] =                              {0,   1, vsir_validate_rep},
+    [VSIR_OP_RESINFO] =                          {1,   2, vsir_validate_resinfo},
     [VSIR_OP_RET] =                              {0,   0, vsir_validate_ret},
     [VSIR_OP_ROUND_NE] =                         {1,   1, vsir_validate_float_elementwise_operation},
     [VSIR_OP_ROUND_NI] =                         {1,   1, vsir_validate_float_elementwise_operation},
