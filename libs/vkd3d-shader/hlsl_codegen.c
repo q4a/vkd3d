@@ -9619,8 +9619,6 @@ static void sm1_generate_vsir(struct hlsl_ctx *ctx, const struct vkd3d_shader_co
     if (ctx->result)
         return;
 
-    generate_vsir_signature(ctx, program, func, semantic_vars);
-
     hlsl_block_init(&block);
     sm1_generate_vsir_constant_defs(ctx, program, &block);
     sm1_generate_vsir_sampler_dcls(ctx, program, &block);
@@ -12342,10 +12340,6 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx,
     unsigned int extern_resources_count;
     const struct hlsl_buffer *cbuffer;
 
-    generate_vsir_signature(ctx, program, func, semantic_vars);
-    if (version->type == VKD3D_SHADER_TYPE_HULL)
-        generate_vsir_signature(ctx, program, ctx->patch_constant_func, patch_semantic_vars);
-
     if (version->type == VKD3D_SHADER_TYPE_COMPUTE)
     {
         program->thread_group_size.x = ctx->thread_count[0];
@@ -13971,6 +13965,10 @@ int hlsl_emit_vsir(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info 
         ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
         return ctx->result;
     }
+
+    generate_vsir_signature(ctx, program, entry_func, &semantic_vars);
+    if (version.type == VKD3D_SHADER_TYPE_HULL)
+        generate_vsir_signature(ctx, program, ctx->patch_constant_func, &patch_semantic_vars);
 
     if (version.major < 4)
         sm1_generate_ctab(ctx, reflection_data);
