@@ -20,6 +20,8 @@
 
 #include "hlsl.h"
 
+#define TAG_FX20 0x46580200
+
 static inline size_t put_u32_unaligned(struct vkd3d_bytecode_buffer *buffer, uint32_t value)
 {
     return bytecode_put_bytes_unaligned(buffer, &value, sizeof(value));
@@ -4333,6 +4335,32 @@ static void fx_parse_fx_2_array_selector(struct fx_parser *parser)
     }
 }
 
+static void fx_2_parse_code_blob(struct fx_parser *parser, const uint32_t *blob, uint32_t size)
+{
+    uint32_t tag;
+
+    if (size < sizeof(tag))
+        return;
+
+    tag = *blob;
+
+    if (tag == TAG_FX20)
+    {
+        fx_2_parse_fxlvm_expression(parser, blob, size);
+        return;
+    }
+
+    tag >>= 16;
+    if (tag == 0xfffe || tag == 0xffff)
+    {
+        fx_parse_shader_blob(parser, VKD3D_SHADER_SOURCE_D3D_BYTECODE, blob, size);
+        vkd3d_string_buffer_printf(&parser->buffer, "\n");
+        return;
+    }
+
+    fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA, "Unrecognized code blob type, tag 0x%08x.", *blob);
+}
+
 static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
 {
     struct
@@ -4374,7 +4402,7 @@ static void fx_parse_fx_2_complex_state(struct fx_parser *parser)
         size = fx_parser_read_u32(parser);
         data = fx_parser_get_ptr(parser, size);
         vkd3d_string_buffer_printf(&parser->buffer, "blob size %u\n", size);
-        fx_2_parse_fxlvm_expression(parser, data, size);
+        fx_2_parse_code_blob(parser, data, size);
         fx_parser_skip(parser, align(size, 4));
     }
     else
