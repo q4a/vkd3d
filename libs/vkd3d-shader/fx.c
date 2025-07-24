@@ -5192,6 +5192,12 @@ static void fx_2_parse_fxlvm_expression(struct fx_parser *parser, const uint32_t
     code.ptr = find_d3dbc_section(blob, count, TAG_FXLC, &count);
     code.end = code.ptr + count;
 
+    if (!code.ptr)
+    {
+        fx_parser_error(parser, VKD3D_SHADER_ERROR_FX_INVALID_DATA, "Failed to locate expression code section.");
+        return;
+    }
+
     fx_parse_fxlvm_expression(parser, &code);
 }
 
