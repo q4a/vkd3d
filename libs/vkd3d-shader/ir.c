@@ -444,7 +444,14 @@ bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_c
     program->shader_version = *version;
     program->cf_type = cf_type;
     program->normalisation_level = normalisation_level;
-    return shader_instruction_array_init(&program->instructions, reserve);
+    if (!shader_instruction_array_init(&program->instructions, reserve))
+    {
+        if (program->free_parameters)
+            vkd3d_free((void *)program->parameters);
+        return false;
+    }
+
+    return true;
 }
 
 void vsir_program_cleanup(struct vsir_program *program)
