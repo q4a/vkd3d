@@ -9938,9 +9938,9 @@ static void spirv_compiler_emit_resinfo(struct spirv_compiler *compiler,
     struct vkd3d_shader_image image;
     bool supports_mipmaps;
 
-    if (instruction->flags & ~VKD3DSI_RESINFO_UINT)
-        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
-                "Unhandled resinfo flags %#x.\n", instruction->flags & ~VKD3DSI_RESINFO_UINT);
+    if (instruction->flags & ~(VKD3DSI_RESINFO_UINT | VKD3DSI_PRECISE_XYZW))
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED, "Unhandled resinfo flags %#x.\n",
+                instruction->flags & ~(VKD3DSI_RESINFO_UINT | VKD3DSI_PRECISE_XYZW));
 
     vkd3d_spirv_enable_capability(builder, SpvCapabilityImageQuery);
 
@@ -9978,6 +9978,8 @@ static void spirv_compiler_emit_resinfo(struct spirv_compiler *compiler,
         component_type = VKD3D_SHADER_COMPONENT_FLOAT;
         type_id = vkd3d_spirv_get_type_id(builder, component_type, VKD3D_VEC4_SIZE);
         val_id = vkd3d_spirv_build_op_convert_utof(builder, type_id, val_id);
+        if (instruction->flags & VKD3DSI_PRECISE_XYZW)
+            vkd3d_spirv_build_op_decorate(builder, val_id, SpvDecorationNoContraction, NULL, 0);
     }
     val_id = spirv_compiler_emit_swizzle(compiler, val_id, VKD3DSP_WRITEMASK_ALL,
             component_type, src[1].swizzle, dst->write_mask);
