@@ -39235,6 +39235,39 @@ static void test_multi_fence_event(void)
     ok(!refcount, "ID3D12Device has %u references left.\n", refcount);
 }
 
+static void test_enumerate_meta_commands(void)
+{
+    ID3D12Device5 *device5;
+    unsigned int refcount;
+    ID3D12Device *device;
+    UINT count;
+    HRESULT hr;
+
+    if (!(device = create_device()))
+    {
+        skip("Failed to create device.\n");
+        return;
+    }
+
+    if (FAILED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device5, (void **)&device5)))
+    {
+        skip("ID3D12Device5 not available; skipping tests.\n");
+        ID3D12Device_Release(device);
+        return;
+    }
+
+    hr = ID3D12Device5_EnumerateMetaCommands(device5, NULL, NULL);
+    ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+
+    count = 0;
+    hr = ID3D12Device5_EnumerateMetaCommands(device5, &count, NULL);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    ID3D12Device5_Release(device5);
+    refcount = ID3D12Device_Release(device);
+    ok(!refcount, "ID3D12Device has %u references left.\n", refcount);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -39421,4 +39454,5 @@ START_TEST(d3d12)
     run_test(test_unused_interpolated_input);
     run_test(test_shader_cache);
     run_test(test_multi_fence_event);
+    run_test(test_enumerate_meta_commands);
 }
