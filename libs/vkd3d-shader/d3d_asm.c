@@ -156,6 +156,8 @@ static void shader_dump_atomic_op_flags(struct vkd3d_d3d_asm_compiler *compiler,
         atomic_flags &= ~VKD3DARF_VOLATILE;
     }
 
+    atomic_flags &= ~VKD3DSI_PRECISE_XYZW;
+
     if (atomic_flags)
         vkd3d_string_buffer_printf(&compiler->buffer, "_unknown_flags(%#x)", atomic_flags);
 }
@@ -182,6 +184,8 @@ static void shader_dump_sync_flags(struct vkd3d_d3d_asm_compiler *compiler, uint
         vkd3d_string_buffer_printf(&compiler->buffer, "_t");
         sync_flags &= ~VKD3DSSF_THREAD_GROUP;
     }
+
+    sync_flags &= ~VKD3DSI_PRECISE_XYZW;
 
     if (sync_flags)
         vkd3d_string_buffer_printf(&compiler->buffer, "_unknown_flags(%#x)", sync_flags);
@@ -1332,7 +1336,7 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
             break;
 
         case VSIR_OP_RESINFO:
-            switch (ins->flags)
+            switch (ins->flags & ~VKD3DSI_PRECISE_XYZW)
             {
                 case VKD3DSI_NONE:
                     break;
@@ -1349,7 +1353,7 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
             break;
 
         case VSIR_OP_SAMPLE_INFO:
-            switch (ins->flags)
+            switch (ins->flags & ~VKD3DSI_PRECISE_XYZW)
             {
                 case VKD3DSI_NONE:
                     break;
@@ -1405,9 +1409,9 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
         case VSIR_OP_USHR:
             if (ins->flags & VKD3DSI_SHIFT_UNMASKED)
                 vkd3d_string_buffer_printf(buffer, "_unmasked");
-            /* fall through */
+            break;
+
         default:
-            shader_dump_precise_flags(compiler, ins->flags);
             break;
     }
 }
@@ -1665,8 +1669,13 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_dump_instruction_flags(compiler, ins);
 
             if (ins->resource_type != VKD3D_SHADER_RESOURCE_NONE)
+                vkd3d_string_buffer_printf(buffer, "_indexable");
+
+            shader_dump_precise_flags(compiler, ins->flags);
+
+            if (ins->resource_type != VKD3D_SHADER_RESOURCE_NONE)
             {
-                vkd3d_string_buffer_printf(buffer, "_indexable(");
+                vkd3d_string_buffer_printf(buffer, "(");
                 if (ins->raw)
                     vkd3d_string_buffer_printf(buffer, "raw_");
                 if (ins->structured)
