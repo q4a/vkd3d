@@ -60,9 +60,53 @@ float4 main(struct ps_data ps_input) : SV_Target
 }
 
 [test]
+clear rtv 0 0.0 0.0 0.0 0.0
 todo(glsl) draw point list 1
 bug(mvk) probe rtv 0 (320, 190) rgba(0.0, 0.0, 0.0, 0.0)
 bug(mvk) probe rtv 0 (255, 240) rgba(0.0, 0.0, 0.0, 0.0)
 bug(mvk) probe rtv 0 (320, 240) rgba(0.0, 1.0, 1.0, 1.0)
 bug(mvk) probe rtv 0 (385, 240) rgba(0.0, 0.0, 0.0, 0.0)
 bug(mvk) probe rtv 0 (320, 290) rgba(0.0, 0.0, 0.0, 0.0)
+
+[require]
+shader model >= 5.0
+geometry-shader
+
+[geometry shader]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+    float4 color : COLOR;
+};
+
+    [maxvertexcount(4)][instance(5)]
+void main(point struct gs_data vin[1], inout TriangleStream<gs_data> vout,
+        uint inst_id : SV_GSInstanceID)
+{
+    float offset = 0.2 * vin[0].pos.w;
+    gs_data v;
+
+    if (inst_id != 3)
+        return;
+
+    v.color = vin[0].color;
+
+    v.pos = float4(vin[0].pos.x - offset, vin[0].pos.y - offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+    v.pos = float4(vin[0].pos.x - offset, vin[0].pos.y + offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+    v.pos = float4(vin[0].pos.x + offset, vin[0].pos.y - offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+    v.pos = float4(vin[0].pos.x + offset, vin[0].pos.y + offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+}
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+todo(glsl | sm>=6) draw point list 1
+probe rtv 0 (320, 190) f32(0.0, 0.0, 0.0, 0.0)
+probe rtv 0 (255, 240) f32(0.0, 0.0, 0.0, 0.0)
+% Broken on WARP with SM < 6
+if(!warp | sm>=6) todo probe rtv 0 (320, 240) f32(0.0, 1.0, 1.0, 1.0)
+probe rtv 0 (385, 240) f32(0.0, 0.0, 0.0, 0.0)
+probe rtv 0 (320, 290) f32(0.0, 0.0, 0.0, 0.0)

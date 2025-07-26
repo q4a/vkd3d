@@ -160,6 +160,7 @@ static bool check_qualifier_args_conjunction(struct shader_runner *runner,
         "mvk",
         "opengl",
         "vulkan",
+        "warp",
     };
     bool holds = true;
 

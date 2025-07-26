@@ -325,6 +325,10 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
         runner->caps.format_caps[formats[i]] = get_format_support(runner->device, formats[i]);
     }
 
+    runner->caps.tag_count = 0;
+    if (test_options.use_warp_device)
+        runner->caps.tags[runner->caps.tag_count++] = "warp";
+
     rt_width = RENDER_TARGET_WIDTH;
     rt_height = RENDER_TARGET_HEIGHT;
     SetRect(&rect, 0, 0, rt_width, rt_height);

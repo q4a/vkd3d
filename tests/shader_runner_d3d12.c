@@ -1119,6 +1119,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
             runner->caps.tags[runner->caps.tag_count++] = "llvmpipe";
         if (is_mesa_device_lt(device, 23, 3, 0))
             runner->caps.tags[runner->caps.tag_count++] = "mesa<23.3";
+        if (test_options.use_warp_device)
+            runner->caps.tags[runner->caps.tag_count++] = "warp";
     }
 
     for (unsigned int i = 0; i < ARRAY_SIZE(formats); ++i)
