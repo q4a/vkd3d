@@ -7549,6 +7549,8 @@ static void parse_entry_function_attributes(struct hlsl_ctx *ctx, struct hlsl_ir
             entry_func->early_depth_test = true;
         else if (!strcmp(attr->name, "maxvertexcount") && profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
             parse_maxvertexcount_attribute(ctx, attr);
+        else if (!strcmp(attr->name, "instance") && profile->type == VKD3D_SHADER_TYPE_GEOMETRY)
+            hlsl_fixme(ctx, &entry_func->attrs[i]->loc, "Geometry shader instance count");
         else
             hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
                     "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);

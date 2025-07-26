@@ -72,7 +72,7 @@ bug(mvk) probe rtv 0 (320, 290) rgba(0.0, 0.0, 0.0, 0.0)
 shader model >= 5.0
 geometry-shader
 
-[geometry shader]
+[geometry shader todo]
 struct gs_data
 {
     float4 pos : SV_POSITION;
@@ -103,10 +103,10 @@ void main(point struct gs_data vin[1], inout TriangleStream<gs_data> vout,
 
 [test]
 clear rtv 0 0.0 0.0 0.0 0.0
-todo(glsl | sm>=6) draw point list 1
+todo draw point list 1
 probe rtv 0 (320, 190) f32(0.0, 0.0, 0.0, 0.0)
 probe rtv 0 (255, 240) f32(0.0, 0.0, 0.0, 0.0)
 % Broken on WARP with SM < 6
-if(!warp | sm>=6) todo probe rtv 0 (320, 240) f32(0.0, 1.0, 1.0, 1.0)
+if(!warp | sm>=6) probe rtv 0 (320, 240) f32(0.0, 1.0, 1.0, 1.0)
 probe rtv 0 (385, 240) f32(0.0, 0.0, 0.0, 0.0)
 probe rtv 0 (320, 290) f32(0.0, 0.0, 0.0, 0.0)
