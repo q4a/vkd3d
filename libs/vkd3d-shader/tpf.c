@@ -2237,7 +2237,6 @@ bool shader_sm4_is_scalar_register(const struct vkd3d_shader_register *reg)
         case VKD3DSPR_DEPTHOUT:
         case VKD3DSPR_DEPTHOUTGE:
         case VKD3DSPR_DEPTHOUTLE:
-        case VKD3DSPR_GSINSTID:
         case VKD3DSPR_OUTPOINTID:
         case VKD3DSPR_PRIMID:
         case VKD3DSPR_SAMPLEMASK:
