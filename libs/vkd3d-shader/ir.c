@@ -903,14 +903,13 @@ static bool get_opcode_from_rel_op(enum vkd3d_shader_rel_op rel_op,
 static enum vkd3d_result vsir_program_normalize_addr(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct vkd3d_shader_instruction *ins, *ins2;
     unsigned int tmp_idx = ~0u;
-    unsigned int i, k, r;
+    unsigned int k, r;
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        ins = &program->instructions.elements[i];
-
         if (ins->opcode == VSIR_OP_MOV && ins->dst[0].reg.type == VKD3DSPR_ADDR)
         {
             if (tmp_idx == ~0u)
@@ -926,16 +925,16 @@ static enum vkd3d_result vsir_program_normalize_addr(struct vsir_program *progra
             if (tmp_idx == ~0u)
                 tmp_idx = program->temp_count++;
 
-            if (!shader_instruction_array_insert_at(&program->instructions, i + 1, 1))
+            if (!vsir_program_iterator_insert_after(&it, 1))
                 return VKD3D_ERROR_OUT_OF_MEMORY;
-            ins = &program->instructions.elements[i];
-            ins2 = &program->instructions.elements[i + 1];
+            ins = vsir_program_iterator_current(&it);
 
             ins->opcode = VSIR_OP_ROUND_NE;
             vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VSIR_DATA_F32, 1);
             ins->dst[0].reg.idx[0].offset = tmp_idx;
             ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
 
+            ins2 = vsir_program_iterator_next(&it);
             if (!vsir_instruction_init_with_params(program, ins2, &ins->location, VSIR_OP_FTOU, 1, 1))
                 return VKD3D_ERROR_OUT_OF_MEMORY;
 
