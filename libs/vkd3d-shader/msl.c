@@ -948,10 +948,10 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     const struct vkd3d_shader_descriptor_info1 *descriptor;
     const struct vkd3d_shader_descriptor_binding *binding;
     enum vkd3d_shader_resource_type resource_type;
+    uint32_t coord_mask, write_mask_size;
     struct vkd3d_string_buffer *read;
     enum vsir_data_type data_type;
     unsigned int srv_binding;
-    uint32_t coord_mask;
     struct msl_dst dst;
 
     if (vkd3d_shader_instruction_has_texel_offset(ins))
@@ -1011,7 +1011,12 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
     msl_dst_init(&dst, gen, ins, &ins->dst[0]);
     read = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    vkd3d_string_buffer_printf(read, "as_type<uint4>(");
+    vkd3d_string_buffer_printf(read, "as_type<");
+    msl_print_resource_datatype(gen, read, ins->dst[0].reg.data_type);
+    write_mask_size = vkd3d_popcount(ins->dst[0].write_mask);
+    if (write_mask_size != 1)
+        vkd3d_string_buffer_printf(read, "%u", write_mask_size);
+    vkd3d_string_buffer_printf(read, ">(");
     msl_print_srv_name(read, gen, srv_binding, resource_type_info, data_type, false);
     vkd3d_string_buffer_printf(read, ".read(");
     msl_print_src_with_type(read, gen, &ins->src[0], coord_mask, VSIR_DATA_U32);
@@ -1028,8 +1033,9 @@ static void msl_ld(struct msl_generator *gen, const struct vkd3d_shader_instruct
         else
             msl_print_src_with_type(read, gen, &ins->src[2], VKD3DSP_WRITEMASK_0, VSIR_DATA_U32);
     }
-    vkd3d_string_buffer_printf(read, "))");
+    vkd3d_string_buffer_printf(read, ")");
     msl_print_swizzle(read, ins->src[1].swizzle, ins->dst[0].write_mask);
+    vkd3d_string_buffer_printf(read, ")");
 
     msl_print_assignment(gen, &dst, "%s", read->buffer);
 
@@ -1048,10 +1054,10 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     const struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_resource_type resource_type;
     unsigned int srv_binding, sampler_binding;
+    uint32_t coord_mask, write_mask_size;
     struct vkd3d_string_buffer *sample;
     enum vsir_data_type data_type;
     unsigned int component_idx;
-    uint32_t coord_mask;
     struct msl_dst dst;
 
     bias = ins->opcode == VSIR_OP_SAMPLE_B;
@@ -1170,8 +1176,12 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
     msl_dst_init(&dst, gen, ins, &ins->dst[0]);
     sample = vkd3d_string_buffer_get(&gen->string_buffers);
 
-    if (ins->dst[0].reg.data_type == VSIR_DATA_U32)
-        vkd3d_string_buffer_printf(sample, "as_type<uint4>(");
+    vkd3d_string_buffer_printf(sample, "as_type<");
+    msl_print_resource_datatype(gen, sample, ins->dst[0].reg.data_type);
+    write_mask_size = vkd3d_popcount(ins->dst[0].write_mask);
+    if (write_mask_size != 1)
+        vkd3d_string_buffer_printf(sample, "%u", write_mask_size);
+    vkd3d_string_buffer_printf(sample, ">(");
     msl_print_srv_name(sample, gen, srv_binding, resource_type_info, data_type, compare);
     if (gather && compare)
         vkd3d_string_buffer_printf(sample, ".gather_compare(");
@@ -1240,10 +1250,9 @@ static void msl_sample(struct msl_generator *gen, const struct vkd3d_shader_inst
         vkd3d_string_buffer_printf(sample, ", component::%c", "xyzw"[component_idx]);
     }
     vkd3d_string_buffer_printf(sample, ")");
-    if (ins->dst[0].reg.data_type == VSIR_DATA_U32)
-        vkd3d_string_buffer_printf(sample, ")");
     if (!compare || gather)
         msl_print_swizzle(sample, resource->swizzle, ins->dst[0].write_mask);
+    vkd3d_string_buffer_printf(sample, ")");
 
     msl_print_assignment(gen, &dst, "%s", sample->buffer);
 
