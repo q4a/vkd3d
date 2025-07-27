@@ -12064,8 +12064,11 @@ enum vkd3d_result vsir_program_transform(struct vsir_program *program, uint64_t 
         vsir_transform(&ctx, vsir_program_materialise_phi_ssas_to_temps);
         vsir_transform(&ctx, vsir_program_lower_switch_to_selection_ladder);
         vsir_transform(&ctx, vsir_program_structurize);
-        vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
-        vsir_transform(&ctx, vsir_program_materialize_undominated_ssas_to_temps);
+        if (compile_info->target_type != VKD3D_SHADER_TARGET_MSL)
+        {
+            vsir_transform(&ctx, vsir_program_flatten_control_flow_constructs);
+            vsir_transform(&ctx, vsir_program_materialize_undominated_ssas_to_temps);
+        }
     }
     else
     {
