@@ -6291,6 +6291,10 @@ static void sm6_parser_emit_dx_texture_gather(struct sm6_parser *sm6, enum dx_in
         return;
     }
 
+    /* DXIL doesn't know about signedness, but vsir expects the offset to be signed. */
+    if (extended_offset)
+        offset.data_type = VSIR_DATA_I32;
+
     ins = state->ins;
     if (op == DX_TEXTURE_GATHER)
     {
