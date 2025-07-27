@@ -18,6 +18,8 @@
 
 #include "vkd3d_shader_private.h"
 
+#define MAX_IO_REG_COUNT 32
+
 enum msl_data_type
 {
     MSL_DATA_FLOAT,
@@ -1614,6 +1616,7 @@ static void msl_generate_input_struct_declarations(struct msl_generator *gen)
     const struct shader_signature *signature = &gen->program->input_signature;
     enum vkd3d_shader_type type = gen->program->shader_version.type;
     struct vkd3d_string_buffer *buffer = gen->buffer;
+    bool locations[MAX_IO_REG_COUNT] = {0};
     const struct signature_element *e;
     unsigned int i;
 
@@ -1625,6 +1628,18 @@ static void msl_generate_input_struct_declarations(struct msl_generator *gen)
 
         if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
             continue;
+
+        if (e->target_location >= ARRAY_SIZE(locations))
+        {
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled input target location %u.", e->target_location);
+            continue;
+        }
+
+        if (locations[e->target_location])
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled duplicate input target location %u.", e->target_location);
+        locations[e->target_location] = true;
 
         switch (e->sysval_semantic)
         {
@@ -1777,6 +1792,7 @@ static void msl_generate_output_struct_declarations(struct msl_generator *gen)
     const struct shader_signature *signature = &gen->program->output_signature;
     enum vkd3d_shader_type type = gen->program->shader_version.type;
     struct vkd3d_string_buffer *buffer = gen->buffer;
+    bool locations[MAX_IO_REG_COUNT] = {0};
     const struct signature_element *e;
     unsigned int i;
 
@@ -1789,6 +1805,18 @@ static void msl_generate_output_struct_declarations(struct msl_generator *gen)
         if (e->target_location == SIGNATURE_TARGET_LOCATION_UNUSED
                 || e->sysval_semantic == VKD3D_SHADER_SV_DEPTH)
             continue;
+
+        if (e->target_location >= ARRAY_SIZE(locations))
+        {
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled input target location %u.", e->target_location);
+            continue;
+        }
+
+        if (locations[e->target_location])
+            msl_compiler_error(gen, VKD3D_SHADER_ERROR_MSL_INTERNAL,
+                    "Internal compiler error: Unhandled duplicate input target location %u.", e->target_location);
+        locations[e->target_location] = true;
 
         if (e->min_precision != VKD3D_SHADER_MINIMUM_PRECISION_NONE)
         {
@@ -1995,8 +2023,8 @@ static void msl_generate_entrypoint(struct msl_generator *gen)
     vkd3d_string_buffer_printf(gen->buffer, "vkd3d_%s_in input [[stage_in]])\n{\n", gen->prefix);
 
     /* TODO: declare #maximum_register + 1 */
-    vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_in[%u];\n", gen->prefix, 32);
-    vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_out[%u];\n", gen->prefix, 32);
+    vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_in[%u];\n", gen->prefix, MAX_IO_REG_COUNT);
+    vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_vec4 %s_out[%u];\n", gen->prefix, MAX_IO_REG_COUNT);
     vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_%s_out output;\n", gen->prefix);
     if (bitmap_is_set(gen->program->io_dcls, VKD3DSPR_SAMPLEMASK))
         vkd3d_string_buffer_printf(gen->buffer, "    vkd3d_scalar o_mask;\n");
