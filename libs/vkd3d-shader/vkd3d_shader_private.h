@@ -1453,6 +1453,13 @@ static inline struct vkd3d_shader_instruction *vsir_program_iterator_head(
     return vsir_program_iterator_current(iterator);
 }
 
+static inline struct vkd3d_shader_instruction *vsir_program_iterator_tail(struct vsir_program_iterator *iterator)
+{
+    iterator->idx = iterator->array->count - 1;
+
+    return vsir_program_iterator_current(iterator);
+}
+
 static inline struct vkd3d_shader_instruction *vsir_program_iterator_next(
         struct vsir_program_iterator *iterator)
 {

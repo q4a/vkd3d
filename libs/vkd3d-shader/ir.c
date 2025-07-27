@@ -1740,14 +1740,21 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
 static enum vkd3d_result vsir_program_ensure_ret(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     static const struct vkd3d_shader_location no_loc;
-    if (program->instructions.count
-            && program->instructions.elements[program->instructions.count - 1].opcode == VSIR_OP_RET)
+    struct vkd3d_shader_instruction *ins;
+
+    ins = vsir_program_iterator_tail(&it);
+
+    if (ins && ins->opcode == VSIR_OP_RET)
         return VKD3D_OK;
 
-    if (!shader_instruction_array_insert_at(&program->instructions, program->instructions.count, 1))
+    if (!vsir_program_iterator_insert_after(&it, 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    vsir_instruction_init(&program->instructions.elements[program->instructions.count - 1], &no_loc, VSIR_OP_RET);
+
+    ins = vsir_program_iterator_next(&it);
+    vsir_instruction_init(ins, &no_loc, VSIR_OP_RET);
+
     return VKD3D_OK;
 }
 
