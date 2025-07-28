@@ -2257,8 +2257,8 @@ bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instru
     /* Size the parameter initial allocations so they are large enough for most shaders. The
      * code path for chained allocations will be tested if a few shaders need to use it. */
     shader_param_allocator_init(&instructions->dst_params, reserve - reserve / 8u,
-            sizeof(*instructions->elements->dst));
-    shader_param_allocator_init(&instructions->src_params, reserve * 2u, sizeof(*instructions->elements->src));
+            sizeof(struct vkd3d_shader_dst_param));
+    shader_param_allocator_init(&instructions->src_params, reserve * 2u, sizeof(struct vkd3d_shader_src_param));
     return shader_instruction_array_reserve(instructions, reserve);
 }
 
