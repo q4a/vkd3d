@@ -10022,9 +10022,9 @@ static void spirv_compiler_emit_sample_info(struct spirv_compiler *compiler,
     uint32_t type_id, val_id;
     unsigned int i;
 
-    if (instruction->flags & ~VKD3DSI_SAMPLE_INFO_UINT)
-        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
-                "Unhandled sample info flags %#x.\n", instruction->flags & ~VKD3DSI_SAMPLE_INFO_UINT);
+    if (instruction->flags & ~(VKD3DSI_SAMPLE_INFO_UINT | VKD3DSI_PRECISE_XYZW))
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED, "Unhandled sample info flags %#x.\n",
+                instruction->flags & ~(VKD3DSI_SAMPLE_INFO_UINT | VKD3DSI_PRECISE_XYZW));
 
     val_id = spirv_compiler_emit_query_sample_count(compiler, src);
 
@@ -10039,6 +10039,8 @@ static void spirv_compiler_emit_sample_info(struct spirv_compiler *compiler,
         component_type = VKD3D_SHADER_COMPONENT_FLOAT;
         type_id = vkd3d_spirv_get_type_id(builder, component_type, VKD3D_VEC4_SIZE);
         val_id = vkd3d_spirv_build_op_convert_utof(builder, type_id, val_id);
+        if (instruction->flags & VKD3DSI_PRECISE_XYZW)
+            vkd3d_spirv_build_op_decorate(builder, val_id, SpvDecorationNoContraction, NULL, 0);
     }
     val_id = spirv_compiler_emit_swizzle(compiler, val_id, VKD3DSP_WRITEMASK_ALL,
             component_type, src->swizzle, dst->write_mask);
