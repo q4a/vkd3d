@@ -3971,9 +3971,9 @@ VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_sta
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .pNext = NULL,
         .flags = 0,
-        .viewportCount = 1,
+        .viewportCount = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE,
         .pViewports = NULL,
-        .scissorCount = 1,
+        .scissorCount = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE,
         .pScissors = NULL,
     };
     static const VkDynamicState dynamic_states[] =
