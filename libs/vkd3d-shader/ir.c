@@ -8751,6 +8751,7 @@ static void temp_allocator_set_dst(struct temp_allocator *allocator,
 enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context)
 {
+    const unsigned int prev_temp_count = program->temp_count;
     struct temp_allocator allocator = {0};
     struct temp_allocator_reg *regs;
     struct liveness_tracker tracker;
@@ -8773,7 +8774,6 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
     for (unsigned int i = 0; i < program->ssa_count; ++i)
     {
         const struct liveness_tracker_reg *liveness_reg = &tracker.ssa_regs[i];
-        const unsigned int prev_temp_count = program->temp_count;
         struct temp_allocator_reg *reg = &allocator.ssa_regs[i];
 
         if (temp_allocator_allocate(&allocator, &tracker, reg, liveness_reg, prev_temp_count))
