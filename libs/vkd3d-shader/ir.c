@@ -1752,14 +1752,11 @@ static enum vkd3d_result vsir_program_ensure_ret(struct vsir_program *program,
     struct vkd3d_shader_instruction *ins;
 
     ins = vsir_program_iterator_tail(&it);
-
     if (ins && ins->opcode == VSIR_OP_RET)
         return VKD3D_OK;
 
-    if (!vsir_program_iterator_insert_after(&it, 1))
+    if (!(ins = vsir_program_append(program)))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-
-    ins = vsir_program_iterator_next(&it);
     vsir_instruction_init(ins, &no_loc, VSIR_OP_RET);
 
     return VKD3D_OK;
