@@ -1814,6 +1814,7 @@ static enum vkd3d_result vsir_program_add_diffuse_output(struct vsir_program *pr
 static enum vkd3d_result vsir_program_ensure_diffuse(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     static const struct vkd3d_shader_location no_loc;
     struct vkd3d_shader_instruction *ins;
     unsigned int i;
@@ -1825,17 +1826,16 @@ static enum vkd3d_result vsir_program_ensure_diffuse(struct vsir_program *progra
     /* Write the instruction after all LABEL, DCL, and NOP instructions.
      * We need to skip NOP instructions because they might result from removed
      * DCLs, and there could still be DCLs after NOPs. */
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        ins = &program->instructions.elements[i];
-
         if (!vsir_instruction_is_dcl(ins) && ins->opcode != VSIR_OP_LABEL && ins->opcode != VSIR_OP_NOP)
             break;
     }
 
-    if (!shader_instruction_array_insert_at(&program->instructions, i, 1))
+    vsir_program_iterator_prev(&it);
+    if (!vsir_program_iterator_insert_after(&it, 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    ins = &program->instructions.elements[i];
+    ins = vsir_program_iterator_next(&it);
 
     vsir_instruction_init_with_params(program, ins, &no_loc, VSIR_OP_MOV, 1, 1);
     vsir_dst_param_init(&ins->dst[0], VKD3DSPR_ATTROUT, VSIR_DATA_F32, 1);

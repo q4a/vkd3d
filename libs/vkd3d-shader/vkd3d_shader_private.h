@@ -1463,8 +1463,17 @@ static inline struct vkd3d_shader_instruction *vsir_program_iterator_tail(struct
 static inline struct vkd3d_shader_instruction *vsir_program_iterator_next(
         struct vsir_program_iterator *iterator)
 {
-    if (iterator->idx < iterator->array->count)
+    if (iterator->idx < iterator->array->count || iterator->idx == SIZE_MAX)
         ++iterator->idx;
+
+    return vsir_program_iterator_current(iterator);
+}
+
+static inline struct vkd3d_shader_instruction *vsir_program_iterator_prev(
+        struct vsir_program_iterator *iterator)
+{
+    if (iterator->idx != SIZE_MAX)
+        --iterator->idx;
 
     return vsir_program_iterator_current(iterator);
 }
