@@ -8427,26 +8427,25 @@ static enum vkd3d_shader_register_type sm4_get_semantic_register_type(enum vkd3d
     return VKD3DSPR_INPUT;
 }
 
-static struct vkd3d_shader_instruction *generate_vsir_add_program_instruction(
-        struct hlsl_ctx *ctx, struct vsir_program *program,
-        const struct vkd3d_shader_location *loc, enum vkd3d_shader_opcode opcode,
-        unsigned int dst_count, unsigned int src_count)
+static struct vkd3d_shader_instruction *generate_vsir_add_program_instruction(struct hlsl_ctx *ctx,
+        struct vsir_program *program, const struct vkd3d_shader_location *loc,
+        enum vkd3d_shader_opcode opcode, unsigned int dst_count, unsigned int src_count)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     struct vkd3d_shader_instruction *ins;
 
-    if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+    if (!(ins = vsir_program_append(program)))
     {
         ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
         return NULL;
     }
-    ins = &instructions->elements[instructions->count];
+
     if (!vsir_instruction_init_with_params(program, ins, loc, opcode, dst_count, src_count))
     {
+        vsir_instruction_init(ins, loc, VSIR_OP_NOP);
         ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
         return NULL;
     }
-    ++instructions->count;
+
     return ins;
 }
 
