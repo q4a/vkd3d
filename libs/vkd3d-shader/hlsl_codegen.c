@@ -8325,7 +8325,6 @@ static void sm1_generate_vsir_constant_defs(struct hlsl_ctx *ctx, struct vsir_pr
 static void sm1_generate_vsir_sampler_dcls(struct hlsl_ctx *ctx,
         struct vsir_program *program, struct hlsl_block *block)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     enum vkd3d_shader_resource_type resource_type;
     struct vkd3d_shader_register_range *range;
     struct vkd3d_shader_dst_param *dst_param;
@@ -8372,20 +8371,13 @@ static void sm1_generate_vsir_sampler_dcls(struct hlsl_ctx *ctx,
                         break;
                 }
 
-                if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+                if (!(ins = vsir_program_append(program)))
                 {
                     ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
                     return;
                 }
 
-                ins = &instructions->elements[instructions->count];
-                if (!vsir_instruction_init_with_params(program, ins, &var->loc, VSIR_OP_DCL, 0, 0))
-                {
-                    ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
-                    return;
-                }
-                ++instructions->count;
-
+                vsir_instruction_init(ins, &var->loc, VSIR_OP_DCL);
                 semantic = &ins->declaration.semantic;
                 semantic->resource_type = resource_type;
 
