@@ -8282,7 +8282,6 @@ static uint32_t generate_vsir_get_src_swizzle(uint32_t src_writemask, uint32_t d
 static void sm1_generate_vsir_constant_defs(struct hlsl_ctx *ctx, struct vsir_program *program,
         struct hlsl_block *block)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_instruction *ins;
@@ -8292,19 +8291,17 @@ static void sm1_generate_vsir_constant_defs(struct hlsl_ctx *ctx, struct vsir_pr
     {
         const struct hlsl_constant_register *constant_reg = &ctx->constant_defs.regs[i];
 
-        if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+        if (!(ins = vsir_program_append(program)))
         {
             ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
             return;
         }
-
-        ins = &instructions->elements[instructions->count];
         if (!vsir_instruction_init_with_params(program, ins, &constant_reg->loc, VSIR_OP_DEF, 1, 1))
         {
+            vsir_instruction_init(ins, &constant_reg->loc, VSIR_OP_NOP);
             ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
             return;
         }
-        ++instructions->count;
 
         dst_param = &ins->dst[0];
         vsir_register_init(&dst_param->reg, VKD3DSPR_CONST, VSIR_DATA_F32, 1);
