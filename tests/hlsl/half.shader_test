@@ -27,12 +27,12 @@ shader model < 3.0
 [pixel shader d3dbc-hex]
 % The same as above, but in bytecode format so we test the partial precision
 % destination modifier.
-0002ffff                                                % ps_2_0
-51000005 01000fa0 0000003f 00000000 00000000 00000000   % def c1, 0.5, 0, 0, 0
-01000002 00000f80 0000e4a0                              % mov r0, c0
-02000003 00002f80 0000e480 010000a0                     % add_pp r0, r0, c1.x
-01000002 00082f80 0000e480                              % mov_pp oC0, r0
-ffff0000                                                % end
+ffff0200                                                % ps_2_0
+05000051 a00f0001 3f000000 00000000 00000000 00000000   % def c1, 0.5, 0, 0, 0
+02000001 800f0000 a0e40000                              % mov r0, c0
+03000002 802f0000 80e40000 a0000001                     % add_pp r0, r0, c1.x
+02000001 802f0800 80e40000                              % mov_pp oC0, r0
+0000ffff                                                % end
 
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0

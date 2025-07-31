@@ -1726,9 +1726,8 @@ static HRESULT dxc_compiler_compile_shader(void *dxc_compiler, const char *profi
 
 static ID3D10Blob *parse_hex(const char *source)
 {
-    size_t len = strlen(source), i, pos = 0;
-    unsigned char *ptr, value = 0;
-    bool even = false;
+    size_t len = strlen(source), i, pos = 0, nibble = 0;
+    uint32_t *ptr, value = 0;
     ID3D10Blob *blob;
 
     ptr = malloc(len / 2);
@@ -1737,40 +1736,49 @@ static ID3D10Blob *parse_hex(const char *source)
     {
         char c = source[i];
 
+        if (nibble == 8)
+        {
+            ptr[pos++] = value;
+            nibble = 0;
+            value = 0;
+        }
+
         if (isspace(c))
+        {
+            if (nibble && nibble != 8)
+                fatal_error("Malformed hex literal.\n");
             continue;
+        }
 
         if (c == '%')
         {
+            if (nibble && nibble != 8)
+                fatal_error("Malformed hex literal.\n");
             while (source[i] != '\n')
                 ++i;
             continue;
         }
 
+        value <<= 4;
         if ('0' <= c && c <= '9')
-            value = 16 * value + (c - '0');
+            value |= (c - '0');
         else if ('a' <= c && c <= 'f')
-            value = 16 * value + (c - 'a' + 10);
+            value |= (c - 'a' + 10);
         else if ('A' <= c && c <= 'F')
-            value = 16 * value + (c - 'A' + 10);
+            value |= (c - 'A' + 10);
         else
             fatal_error("Invalid hex character '%c'\n", c);
-
-        if (even)
-        {
-            ptr[pos++] = value;
-            value = 0;
-        }
-
-        even = !even;
+        ++nibble;
     }
 
-    if (even)
-        fatal_error("Odd number of hex characters.\n");
+    if (nibble == 8)
+        ptr[pos++] = value;
+    else if (nibble)
+        fatal_error("Malformed hex literal.\n");
 
-    D3DCreateBlob(pos, &blob);
+    D3DCreateBlob(pos * sizeof(value), &blob);
     if (pos)
-        memcpy(ID3D10Blob_GetBufferPointer(blob), ptr, pos);
+        memcpy(ID3D10Blob_GetBufferPointer(blob), ptr, pos * sizeof(value));
     free(ptr);
 
     return blob;
