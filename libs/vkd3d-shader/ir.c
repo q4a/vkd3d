@@ -1936,6 +1936,7 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
         struct vsir_transformation_context *ctx)
 {
     const struct vkd3d_shader_location location = {.source_name = ctx->compile_info->source_name};
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     const struct vkd3d_shader_compile_info *compile_info = ctx->compile_info;
     bool allows_subset_masks = target_allows_subset_masks(compile_info);
@@ -1945,6 +1946,7 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
     struct signature_element *new_elements, *e;
     unsigned int uninit_varying_count = 0;
     unsigned int subset_varying_count = 0;
+    struct vkd3d_shader_instruction *ins;
     unsigned int new_register_count = 0;
     unsigned int i;
 
@@ -2044,18 +2046,18 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
     }
 
     /* Write each uninitialized varying before each ret. */
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
         struct vkd3d_shader_location loc;
 
         if (ins->opcode != VSIR_OP_RET)
             continue;
 
         loc = ins->location;
-        if (!shader_instruction_array_insert_at(&program->instructions, i, uninit_varying_count))
+        vsir_program_iterator_prev(&it);
+        if (!vsir_program_iterator_insert_after(&it, uninit_varying_count))
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        ins = &program->instructions.elements[i];
+        ins = vsir_program_iterator_next(&it);
 
         for (unsigned int j = signature->element_count - uninit_varying_count; j < signature->element_count; ++j)
         {
@@ -2065,10 +2067,8 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
             dst_param_init_output(&ins->dst[0], VSIR_DATA_F32, e->register_index, e->mask);
             vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VSIR_DATA_F32, 0);
             ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
-            ++ins;
+            ins = vsir_program_iterator_next(&it);
         }
-
-        i += uninit_varying_count;
     }
 
     /* Vulkan (without KHR_maintenance4) disallows any mismatching masks,
@@ -2079,10 +2079,8 @@ static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program
     if (!subset_varying_count || allows_subset_masks)
         return VKD3D_OK;
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-
         for (unsigned int j = 0; j < ins->dst_count; ++j)
             remove_unread_output_components(signature, ins, &ins->dst[j]);
     }
