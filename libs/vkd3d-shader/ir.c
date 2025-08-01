@@ -2434,11 +2434,11 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
         struct vsir_program *program, struct vsir_transformation_context *ctx)
 {
-    struct vkd3d_shader_instruction_array *instructions;
     struct control_point_normaliser normaliser;
     unsigned int input_control_point_count;
     struct vkd3d_shader_location location;
     struct vkd3d_shader_instruction *ins;
+    struct vsir_program_iterator it;
     enum vkd3d_result ret;
     unsigned int i, j;
 
@@ -2456,13 +2456,11 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
     normaliser.instructions = program->instructions;
-    instructions = &normaliser.instructions;
+    it = vsir_program_iterator(&normaliser.instructions);
     normaliser.phase = VSIR_OP_INVALID;
 
-    for (i = 0; i < normaliser.instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        ins = &instructions->elements[i];
-
         switch (ins->opcode)
         {
             case VSIR_OP_HS_CONTROL_POINT_PHASE:
@@ -2482,10 +2480,8 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
     normaliser.phase = VSIR_OP_INVALID;
     input_control_point_count = 1;
 
-    for (i = 0; i < instructions->count; ++i)
+    for (ins = vsir_program_iterator_head(&it), i = 0; ins; ins = vsir_program_iterator_next(&it), ++i)
     {
-        ins = &instructions->elements[i];
-
         switch (ins->opcode)
         {
             case VSIR_OP_DCL_INPUT_CONTROL_POINT_COUNT:
