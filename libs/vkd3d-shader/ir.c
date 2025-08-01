@@ -2119,10 +2119,9 @@ struct shader_phase_location_array
     unsigned int count;
 };
 
-static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normaliser,
-        unsigned int index, struct shader_phase_location_array *locations)
+static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normaliser, unsigned int index,
+        struct vkd3d_shader_instruction *ins, struct shader_phase_location_array *locations)
 {
-    struct vkd3d_shader_instruction *ins = &normaliser->program->instructions.elements[index];
     struct shader_phase_location *loc;
     bool b;
 
@@ -2287,15 +2286,19 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
 static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct shader_phase_location_array locations;
     struct hull_flattener flattener = {program};
+    struct vkd3d_shader_instruction *ins;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
 
     flattener.phase = VSIR_OP_INVALID;
-    for (i = 0, locations.count = 0; i < instructions->count; ++i)
-        flattener_eliminate_phase_related_dcls(&flattener, i, &locations);
+    locations.count = 0;
+    for (ins = vsir_program_iterator_head(&it), i = 0; ins; ins = vsir_program_iterator_next(&it), ++i)
+    {
+        flattener_eliminate_phase_related_dcls(&flattener, i, ins, &locations);
+    }
     bitmap_clear(program->io_dcls, VKD3DSPR_FORKINSTID);
     bitmap_clear(program->io_dcls, VKD3DSPR_JOININSTID);
 
@@ -2313,10 +2316,9 @@ static enum vkd3d_result vsir_program_flatten_hull_shader_phases(struct vsir_pro
 
     if (flattener.phase != VSIR_OP_INVALID)
     {
-        if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
+        if (!(ins = vsir_program_append(program)))
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        vsir_instruction_init(&instructions->elements[instructions->count++],
-                &flattener.last_ret_location, VSIR_OP_RET);
+        vsir_instruction_init(ins, &flattener.last_ret_location, VSIR_OP_RET);
     }
 
     return result;
