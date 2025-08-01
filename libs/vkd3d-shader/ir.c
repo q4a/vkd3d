@@ -3143,8 +3143,8 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
 {
     struct io_normaliser normaliser = {ctx->message_context, VKD3D_OK, program->instructions};
     struct vkd3d_shader_instruction *ins;
+    struct vsir_program_iterator it;
     enum vkd3d_result ret;
-    unsigned int i;
 
     VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_HULL_CONTROL_POINT_IO);
 
@@ -3155,10 +3155,9 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
     normaliser.output_signature = &program->output_signature;
     normaliser.patch_constant_signature = &program->patch_constant_signature;
 
-    for (i = 0; i < program->instructions.count; ++i)
+    it = vsir_program_iterator(&program->instructions);
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        ins = &program->instructions.elements[i];
-
         switch (ins->opcode)
         {
             case VSIR_OP_DCL_OUTPUT_CONTROL_POINT_COUNT:
@@ -3190,8 +3189,11 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
     }
 
     normaliser.phase = VSIR_OP_INVALID;
-    for (i = 0; i < normaliser.instructions.count; ++i)
-        shader_instruction_normalise_io_params(&normaliser.instructions.elements[i], &normaliser);
+    it = vsir_program_iterator(&normaliser.instructions);
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
+    {
+        shader_instruction_normalise_io_params(ins, &normaliser);
+    }
 
     program->instructions = normaliser.instructions;
     program->use_vocp = normaliser.use_vocp;
