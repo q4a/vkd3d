@@ -6171,7 +6171,7 @@ static bool track_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         {
             struct hlsl_ir_load *load = hlsl_ir_load(instr);
 
-            if (!load->src.var->is_uniform)
+            if (!load->src.var->is_uniform && !load->src.var->is_tgsm)
                 return false;
 
             /* These will are handled by validate_static_object_references(). */
@@ -6695,7 +6695,7 @@ static uint32_t allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_block 
     {
         LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
         {
-            if (!(var->is_input_semantic || var->is_output_semantic || var->is_uniform))
+            if (!(var->is_input_semantic || var->is_output_semantic || var->is_uniform || var->is_tgsm))
                 memset(var->regs, 0, sizeof(var->regs));
         }
     }
@@ -7340,6 +7340,27 @@ static void allocate_stream_outputs(struct hlsl_ctx *ctx)
         var->regs[HLSL_REGSET_STREAM_OUTPUTS].index = index;
         var->regs[HLSL_REGSET_STREAM_OUTPUTS].id = index;
         var->regs[HLSL_REGSET_STREAM_OUTPUTS].allocated = true;
+
+        ++index;
+    }
+}
+
+static void allocate_tgsms(struct hlsl_ctx *ctx)
+{
+    struct hlsl_ir_var *var;
+    struct hlsl_reg *reg;
+    uint32_t index = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->is_tgsm || !var->bind_count[HLSL_REGSET_NUMERIC])
+            continue;
+
+        reg = &var->regs[HLSL_REGSET_NUMERIC];
+        reg->space = 0;
+        reg->index = index;
+        reg->id = index;
+        reg->allocated = true;
 
         ++index;
     }
@@ -11142,6 +11163,12 @@ static bool sm4_generate_vsir_instr_store(struct hlsl_ctx *ctx,
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_instruction *ins;
 
+    if (store->lhs.var->is_tgsm)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Store to groupshared variable.");
+        return false;
+    }
+
     if (!(ins = generate_vsir_add_program_instruction(ctx, program, &instr->loc, VSIR_OP_MOV, 1, 1)))
         return false;
 
@@ -11175,6 +11202,12 @@ static bool sm4_generate_vsir_instr_load(struct hlsl_ctx *ctx, struct vsir_progr
     struct hlsl_ir_node *instr = &load->node;
     struct vkd3d_shader_instruction *ins;
     struct hlsl_constant_value value;
+
+    if (load->src.var->is_tgsm)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Load from groupshared variable.");
+        return false;
+    }
 
     VKD3D_ASSERT(hlsl_is_numeric_type(type));
     if (type->e.numeric.type == HLSL_TYPE_BOOL && var_is_user_input(version, load->src.var))
@@ -12003,7 +12036,7 @@ static void sm4_generate_vsir_add_function(struct hlsl_ctx *ctx, struct list *se
     {
         LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
         {
-            if (var->is_uniform || var->is_input_semantic || var->is_output_semantic)
+            if (var->is_uniform || var->is_tgsm || var->is_input_semantic || var->is_output_semantic)
                 continue;
             if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
                 continue;
@@ -12572,6 +12605,7 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx,
     struct extern_resource *extern_resources;
     unsigned int extern_resources_count;
     const struct hlsl_buffer *cbuffer;
+    const struct hlsl_ir_var *var;
 
     if (version->type == VKD3D_SHADER_TYPE_COMPUTE)
     {
@@ -12622,10 +12656,14 @@ static void sm4_generate_vsir(struct hlsl_ctx *ctx,
     }
     sm4_free_extern_resources(extern_resources, extern_resources_count);
 
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_tgsm && var->regs[HLSL_REGSET_NUMERIC].allocated)
+            hlsl_fixme(ctx, &var->loc, "Groupshared variable.");
+    }
+
     if (version->type == VKD3D_SHADER_TYPE_GEOMETRY && version->major >= 5)
     {
-        const struct hlsl_ir_var *var;
-
         LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
         {
             if (var->bind_count[HLSL_REGSET_STREAM_OUTPUTS])
@@ -14151,7 +14189,14 @@ int hlsl_emit_vsir(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
         if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
+        {
             prepend_uniform_copy(ctx, &global_uniform_block, var);
+        }
+        else if (var->storage_modifiers & HLSL_STORAGE_GROUPSHARED)
+        {
+            var->is_tgsm = 1;
+            list_add_tail(&ctx->extern_vars, &var->extern_entry);
+        }
     }
 
     process_entry_function(ctx, &semantic_vars, &body, &global_uniform_block, entry_func);
@@ -14180,6 +14225,7 @@ int hlsl_emit_vsir(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info 
         allocate_objects(ctx, &semantic_vars, HLSL_REGSET_TEXTURES);
         allocate_objects(ctx, &semantic_vars, HLSL_REGSET_UAVS);
         allocate_objects(ctx, &semantic_vars, HLSL_REGSET_SAMPLERS);
+        allocate_tgsms(ctx);
     }
 
     if (TRACE_ON())

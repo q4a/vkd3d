@@ -2566,13 +2566,10 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
                     "Ignoring the 'groupshared' modifier in a non-compute shader.");
         }
 
-        if (modifiers & HLSL_STORAGE_GROUPSHARED)
-            hlsl_fixme(ctx, &var->loc, "Group shared variables.");
-
         /* Mark it as uniform. We need to do this here since synthetic
             * variables also get put in the global scope, but shouldn't be
             * considered uniforms, and we have no way of telling otherwise. */
-        if (!(modifiers & HLSL_STORAGE_STATIC))
+        if (!(modifiers & (HLSL_STORAGE_STATIC | HLSL_STORAGE_GROUPSHARED)))
             var->storage_modifiers |= HLSL_STORAGE_UNIFORM;
 
         if (stream_output)
