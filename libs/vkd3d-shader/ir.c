@@ -3282,13 +3282,13 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
 static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct flat_constants_normaliser normaliser = {0};
-    unsigned int i, j;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int i;
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-
         if (ins->opcode == VSIR_OP_DEF || ins->opcode == VSIR_OP_DEFI || ins->opcode == VSIR_OP_DEFB)
         {
             struct flat_constant_def *def;
@@ -3303,15 +3303,19 @@ static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_progr
             def = &normaliser.defs[normaliser.def_count++];
 
             get_flat_constant_register_type(&ins->dst[0].reg, &def->set, &def->index, NULL);
-            for (j = 0; j < 4; ++j)
-                def->value[j] = ins->src[0].reg.u.immconst_u32[j];
+            for (i = 0; i < 4; ++i)
+            {
+                def->value[i] = ins->src[0].reg.u.immconst_u32[i];
+            }
 
             vkd3d_shader_instruction_make_nop(ins);
         }
         else
         {
-            for (j = 0; j < ins->src_count; ++j)
-                shader_register_normalise_flat_constants(&ins->src[j], &normaliser);
+            for (i = 0; i < ins->src_count; ++i)
+            {
+                shader_register_normalise_flat_constants(&ins->src[i], &normaliser);
+            }
         }
     }
 
