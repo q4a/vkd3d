@@ -3321,13 +3321,13 @@ static enum vkd3d_result vsir_program_normalise_flat_constants(struct vsir_progr
 static enum vkd3d_result vsir_program_remove_dead_code(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    size_t i, depth = 0;
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
+    struct vkd3d_shader_instruction *ins;
     bool dead = false;
+    size_t depth = 0;
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-
         switch (ins->opcode)
         {
             case VSIR_OP_IF:
