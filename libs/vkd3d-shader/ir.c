@@ -3700,10 +3700,11 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_instruction_array *instructions;
+    const struct vkd3d_shader_instruction *instruction;
     struct vsir_program *program = flattener->program;
     bool is_hull_shader, after_declarations_section;
     struct vkd3d_shader_instruction *dst_ins;
-    size_t i;
+    struct vsir_program_iterator it;
 
     instructions = &program->instructions;
     is_hull_shader = program->shader_version.type == VKD3D_SHADER_TYPE_HULL;
@@ -3712,10 +3713,10 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
     if (!cf_flattener_require_space(flattener, instructions->count + 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    for (i = 0; i < instructions->count; ++i)
+    it = vsir_program_iterator(instructions);
+    for (instruction = vsir_program_iterator_head(&it); instruction; instruction = vsir_program_iterator_next(&it))
     {
         unsigned int loop_header_block_id, loop_body_block_id, continue_block_id, merge_block_id, true_block_id;
-        const struct vkd3d_shader_instruction *instruction = &instructions->elements[i];
         const struct vkd3d_shader_src_param *src = instruction->src;
         struct cf_flattener_info *cf_info;
 
