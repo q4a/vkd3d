@@ -2525,7 +2525,6 @@ struct io_normaliser
 {
     struct vkd3d_shader_message_context *message_context;
     enum vkd3d_result result;
-    struct vkd3d_shader_instruction_array instructions;
     enum vkd3d_shader_type shader_type;
     uint8_t major;
     struct shader_signature *input_signature;
@@ -3141,9 +3140,9 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
 static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    struct io_normaliser normaliser = {ctx->message_context, VKD3D_OK, program->instructions};
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
+    struct io_normaliser normaliser = {ctx->message_context, VKD3D_OK};
     struct vkd3d_shader_instruction *ins;
-    struct vsir_program_iterator it;
     enum vkd3d_result ret;
 
     VKD3D_ASSERT(program->normalisation_level == VSIR_NORMALISED_HULL_CONTROL_POINT_IO);
@@ -3155,7 +3154,6 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
     normaliser.output_signature = &program->output_signature;
     normaliser.patch_constant_signature = &program->patch_constant_signature;
 
-    it = vsir_program_iterator(&program->instructions);
     for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
         switch (ins->opcode)
@@ -3183,19 +3181,14 @@ static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program
                     normaliser.output_range_map, false)) < 0
             || (ret = shader_signature_merge(&normaliser, &program->patch_constant_signature,
                     normaliser.pc_range_map, true)) < 0)
-    {
-        program->instructions = normaliser.instructions;
         return ret;
-    }
 
     normaliser.phase = VSIR_OP_INVALID;
-    it = vsir_program_iterator(&normaliser.instructions);
     for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
         shader_instruction_normalise_io_params(ins, &normaliser);
     }
 
-    program->instructions = normaliser.instructions;
     program->use_vocp = normaliser.use_vocp;
     program->normalisation_level = VSIR_NORMALISED_SM6;
     return normaliser.result;
