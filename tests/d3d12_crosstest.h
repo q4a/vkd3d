@@ -558,6 +558,11 @@ static inline bool is_depth_clip_enable_supported(ID3D12Device *device)
     return true;
 }
 
+static inline bool is_geometry_shader_supported(ID3D12Device *device)
+{
+    return true;
+}
+
 #else
 
 #define VKD3D_AGILITY_SDK_EXPORTS
@@ -939,6 +944,15 @@ static inline bool is_depth_clip_enable_supported(ID3D12Device *device)
 {
     VkPhysicalDevice vk_physical_device = vkd3d_get_vk_physical_device(device);
     return check_device_extension(vk_physical_device, VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME);
+}
+
+static inline bool is_geometry_shader_supported(ID3D12Device *device)
+{
+    VkPhysicalDeviceFeatures features;
+
+    vkGetPhysicalDeviceFeatures(vkd3d_get_vk_physical_device(device), &features);
+
+    return features.geometryShader;
 }
 #endif
 
