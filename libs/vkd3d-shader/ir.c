@@ -4317,10 +4317,12 @@ static void ssas_to_temps_block_info_cleanup(struct ssas_to_temps_block_info *bl
 static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
-    size_t ins_capacity = 0, ins_count = 0, phi_count, incoming_count, i;
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
+    size_t ins_capacity = 0, ins_count = 0, phi_count, incoming_count;
     struct ssas_to_temps_block_info *info, *block_info = NULL;
     struct vkd3d_shader_instruction *instructions = NULL;
     struct ssas_to_temps_alloc alloc = {0};
+    struct vkd3d_shader_instruction *ins;
     unsigned int current_label = 0;
 
     VKD3D_ASSERT(program->cf_type == VSIR_CF_BLOCKS);
@@ -4334,9 +4336,10 @@ static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_
     if (!ssas_to_temps_alloc_init(&alloc, program->ssa_count, program->temp_count))
         goto fail;
 
-    for (i = 0, phi_count = 0, incoming_count = 0; i < program->instructions.count; ++i)
+    phi_count = 0;
+    incoming_count = 0;
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
         unsigned int j, temp_idx;
 
         /* Only phi src/dst SSA values need be converted here. Structurisation may
@@ -4379,9 +4382,9 @@ static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_
     if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count + incoming_count - phi_count))
         goto fail;
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *mov_ins, *ins = &program->instructions.elements[i];
+        struct vkd3d_shader_instruction *mov_ins;
         size_t j;
 
         for (j = 0; j < ins->dst_count; ++j)
