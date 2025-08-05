@@ -1775,7 +1775,9 @@ static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_sh
 int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char **messages)
 {
     struct vkd3d_shader_message_context message_context;
+    struct vkd3d_shader_code reflection_data = {0};
     struct shader_dump_data dump_data;
+    struct vsir_program program;
     int ret;
 
     TRACE("compile_info %p, messages %p.\n", compile_info, messages);
@@ -1793,24 +1795,12 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     fill_shader_dump_data(compile_info, &dump_data);
     vkd3d_shader_dump_shader(&dump_data, compile_info->source.code, compile_info->source.size, SHADER_DUMP_TYPE_SOURCE);
 
-    if (compile_info->source_type == VKD3D_SHADER_SOURCE_HLSL)
+    if (!(ret = vsir_parse(compile_info, vkd3d_shader_init_config_flags(),
+            &dump_data, &message_context, &program, &reflection_data)))
     {
-        FIXME("HLSL support not implemented.\n");
-        ret = VKD3D_ERROR_NOT_IMPLEMENTED;
-    }
-    else
-    {
-        uint64_t config_flags = vkd3d_shader_init_config_flags();
-        struct vkd3d_shader_code reflection_data = {0};
-        struct vsir_program program;
-
-        if (!(ret = vsir_parse(compile_info, config_flags, &dump_data,
-                &message_context, &program, &reflection_data)))
-        {
-            ret = vsir_program_scan(&program, compile_info, &message_context, false);
-            vkd3d_shader_free_shader_code(&reflection_data);
-            vsir_program_cleanup(&program);
-        }
+        ret = vsir_program_scan(&program, compile_info, &message_context, false);
+        vkd3d_shader_free_shader_code(&reflection_data);
+        vsir_program_cleanup(&program);
     }
 
     vkd3d_shader_message_context_trace_messages(&message_context);
