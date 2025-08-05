@@ -14276,9 +14276,7 @@ int hlsl_emit_vsir(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info 
     struct hlsl_block global_uniform_block, body, patch_body;
     uint32_t config_flags = vkd3d_shader_init_config_flags();
     const struct hlsl_profile_info *profile = ctx->profile;
-    enum vsir_normalisation_level normalisation_level;
     struct list semantic_vars, patch_semantic_vars;
-    struct vkd3d_shader_version version = {0};
     struct hlsl_ir_var *var;
 
     parse_entry_function_attributes(ctx, entry_func);
@@ -14355,43 +14353,24 @@ int hlsl_emit_vsir(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info 
     if (ctx->result)
         return ctx->result;
 
-    version.major = ctx->profile->major_version;
-    version.minor = ctx->profile->minor_version;
-    version.type = ctx->profile->type;
-    normalisation_level = VSIR_NORMALISED_SM4;
-    if (version.major < 4 && (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM
-            || compile_info->target_type == VKD3D_SHADER_TARGET_D3D_BYTECODE))
-        normalisation_level = VSIR_NORMALISED_SM1;
-    if (!vsir_program_init(program, compile_info, &version, 0, VSIR_CF_STRUCTURED, normalisation_level))
-    {
-        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
-        return ctx->result;
-    }
-
     generate_vsir_signature(ctx, program, entry_func, &semantic_vars);
-    if (version.type == VKD3D_SHADER_TYPE_HULL)
+    if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
         generate_vsir_signature(ctx, program, ctx->patch_constant_func, &patch_semantic_vars);
 
-    if (version.major < 4)
+    if (program->shader_version.major < 4)
         sm1_generate_ctab(ctx, reflection_data);
     else
         sm4_generate_rdef(ctx, reflection_data);
     if (ctx->result)
-    {
-        vsir_program_cleanup(program);
         return ctx->result;
-    }
 
-    if (version.major < 4)
+    if (program->shader_version.major < 4)
         sm1_generate_vsir(ctx, compile_info, entry_func, &semantic_vars, &body, config_flags, program);
     else
         sm4_generate_vsir(ctx, compile_info, entry_func, &semantic_vars, &body,
                 &patch_semantic_vars, &patch_body, config_flags, program);
     if (ctx->result)
-    {
         vkd3d_shader_free_shader_code(reflection_data);
-        vsir_program_cleanup(program);
-    }
 
     return ctx->result;
 }

@@ -5049,24 +5049,11 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
 }
 
 static int hlsl_ctx_parse(struct hlsl_ctx *ctx, struct vkd3d_shader_source_list *source_list,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
+        const struct vkd3d_shader_compile_info *compile_info, const struct hlsl_profile_info *profile,
+        struct vkd3d_shader_message_context *message_context)
 {
     enum vkd3d_shader_target_type target_type = compile_info->target_type;
-    const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
-    const struct hlsl_profile_info *profile;
     int ret;
-
-    if (!(hlsl_source_info = vkd3d_find_struct(compile_info->next, HLSL_SOURCE_INFO)))
-    {
-        ERR("No HLSL source info given.\n");
-        return VKD3D_ERROR_INVALID_ARGUMENT;
-    }
-
-    if (!(profile = hlsl_get_target_info(hlsl_source_info->profile)))
-    {
-        FIXME("Unknown compilation target %s.\n", debugstr_a(hlsl_source_info->profile));
-        return VKD3D_ERROR_NOT_IMPLEMENTED;
-    }
 
     if (target_type != VKD3D_SHADER_TARGET_FX && profile->type == VKD3D_SHADER_TYPE_EFFECT)
     {
@@ -5122,12 +5109,27 @@ static int hlsl_ctx_parse(struct hlsl_ctx *ctx, struct vkd3d_shader_source_list 
 int hlsl_compile_effect(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_code *out)
 {
+    const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
     struct vkd3d_shader_source_list source_list;
+    const struct hlsl_profile_info *profile;
     struct hlsl_ctx ctx;
     int ret;
 
+    if (!(hlsl_source_info = vkd3d_find_struct(compile_info->next, HLSL_SOURCE_INFO)))
+    {
+        WARN("No HLSL source info given.\n");
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!(profile = hlsl_get_target_info(hlsl_source_info->profile)))
+    {
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INVALID_PROFILE,
+                "Unknown target profile '%s'.", hlsl_source_info->profile);
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+
     vkd3d_shader_source_list_init(&source_list);
-    if ((ret = hlsl_ctx_parse(&ctx, &source_list, compile_info, message_context)) < 0)
+    if ((ret = hlsl_ctx_parse(&ctx, &source_list, compile_info, profile, message_context)) < 0)
     {
         vkd3d_shader_source_list_cleanup(&source_list);
         return ret;
@@ -5146,22 +5148,51 @@ int hlsl_compile_shader(const struct vkd3d_shader_compile_info *compile_info,
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
     uint64_t config_flags = vkd3d_shader_init_config_flags();
     struct hlsl_ir_function_decl *decl, *entry_func = NULL;
+    enum vsir_normalisation_level normalisation_level;
     struct vkd3d_shader_code reflection_data = {0};
     struct vkd3d_shader_source_list source_list;
+    const struct hlsl_profile_info *profile;
+    struct vkd3d_shader_version version;
     struct hlsl_ir_function *func;
     struct vsir_program program;
     const char *entry_point;
     struct hlsl_ctx ctx;
     int ret;
 
+    if (!(hlsl_source_info = vkd3d_find_struct(compile_info->next, HLSL_SOURCE_INFO)))
+    {
+        WARN("No HLSL source info given.\n");
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!(profile = hlsl_get_target_info(hlsl_source_info->profile)))
+    {
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INVALID_PROFILE,
+                "Unknown target profile '%s'.", hlsl_source_info->profile);
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+
+    version = (struct vkd3d_shader_version)
+    {
+        .type = profile->type,
+        .major = profile->major_version,
+        .minor = profile->minor_version,
+    };
+    normalisation_level = VSIR_NORMALISED_SM4;
+    if (version.major < 4 && (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM
+            || compile_info->target_type == VKD3D_SHADER_TARGET_D3D_BYTECODE))
+        normalisation_level = VSIR_NORMALISED_SM1;
+    if (!vsir_program_init(&program, compile_info, &version, 0, VSIR_CF_STRUCTURED, normalisation_level))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
     vkd3d_shader_source_list_init(&source_list);
-    if ((ret = hlsl_ctx_parse(&ctx, &source_list, compile_info, message_context)) < 0)
+    if ((ret = hlsl_ctx_parse(&ctx, &source_list, compile_info, profile, message_context)) < 0)
     {
         vkd3d_shader_source_list_cleanup(&source_list);
+        vsir_program_cleanup(&program);
         return ret;
     }
 
-    hlsl_source_info = vkd3d_find_struct(compile_info->next, HLSL_SOURCE_INFO);
     entry_point = hlsl_source_info->entry_point ? hlsl_source_info->entry_point : "main";
     if ((func = hlsl_get_function(&ctx, entry_point)))
     {
@@ -5187,6 +5218,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_compile_info *compile_info,
                 "Entry point \"%s\" is not defined.", entry_point);
         hlsl_ctx_cleanup(&ctx);
         vkd3d_shader_source_list_cleanup(&source_list);
+        vsir_program_cleanup(&program);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
@@ -5195,10 +5227,10 @@ int hlsl_compile_shader(const struct vkd3d_shader_compile_info *compile_info,
         vsir_program_trace(&program);
         ret = vsir_program_compile(&program, &reflection_data, config_flags, compile_info, out, message_context);
         vkd3d_shader_free_shader_code(&reflection_data);
-        vsir_program_cleanup(&program);
     }
     hlsl_ctx_cleanup(&ctx);
     vkd3d_shader_source_list_cleanup(&source_list);
+    vsir_program_cleanup(&program);
 
     return ret;
 }
