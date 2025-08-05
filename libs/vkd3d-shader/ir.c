@@ -451,6 +451,8 @@ bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_c
         return false;
     }
 
+    vkd3d_shader_source_list_init(&program->source_files);
+
     return true;
 }
 
@@ -463,6 +465,7 @@ void vsir_program_cleanup(struct vsir_program *program)
     for (i = 0; i < program->block_name_count; ++i)
         vkd3d_free((void *)program->block_names[i]);
     vkd3d_free(program->block_names);
+    vkd3d_shader_source_list_cleanup(&program->source_files);
     shader_instruction_array_destroy(&program->instructions);
     shader_signature_cleanup(&program->input_signature);
     shader_signature_cleanup(&program->output_signature);

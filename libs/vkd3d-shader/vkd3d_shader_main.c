@@ -800,12 +800,28 @@ static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_
 }
 
 static enum vkd3d_result vsir_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
-        struct vkd3d_shader_message_context *message_context, struct vsir_program *program)
+        const struct shader_dump_data *dump_data, struct vkd3d_shader_message_context *message_context,
+        struct vsir_program *program, struct vkd3d_shader_code *reflection_data)
 {
+    struct vkd3d_shader_compile_info preprocessed_info;
+    struct vkd3d_shader_code preprocessed;
     enum vkd3d_result ret;
 
     switch (compile_info->source_type)
     {
+        case VKD3D_SHADER_SOURCE_HLSL:
+            if ((ret = preproc_lexer_parse(compile_info, &preprocessed, message_context)) >= 0)
+            {
+                vkd3d_shader_dump_shader(dump_data, preprocessed.code, preprocessed.size, SHADER_DUMP_TYPE_PREPROC);
+
+                preprocessed_info = *compile_info;
+                preprocessed_info.source = preprocessed;
+                ret = hlsl_parse(&preprocessed_info, message_context, program, reflection_data);
+
+                vkd3d_shader_free_shader_code(&preprocessed);
+            }
+            break;
+
         case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
             ret = d3dbc_parse(compile_info, config_flags, message_context, program);
             break;
@@ -836,14 +852,18 @@ static enum vkd3d_result vsir_parse(const struct vkd3d_shader_compile_info *comp
 
         if (TRACE_ON())
             vsir_program_trace(program);
-
-        vsir_program_cleanup(program);
-        return ret;
+        goto fail;
     }
 
     if (compile_info->target_type != VKD3D_SHADER_TARGET_NONE
             && (ret = vsir_program_transform_early(program, config_flags, compile_info, message_context)) < 0)
-        vsir_program_cleanup(program);
+        goto fail;
+
+    return ret;
+
+fail:
+    vkd3d_shader_free_shader_code(reflection_data);
+    vsir_program_cleanup(program);
 
     return ret;
 }
@@ -1781,11 +1801,14 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     else
     {
         uint64_t config_flags = vkd3d_shader_init_config_flags();
+        struct vkd3d_shader_code reflection_data = {0};
         struct vsir_program program;
 
-        if (!(ret = vsir_parse(compile_info, config_flags, &message_context, &program)))
+        if (!(ret = vsir_parse(compile_info, config_flags, &dump_data,
+                &message_context, &program, &reflection_data)))
         {
             ret = vsir_program_scan(&program, compile_info, &message_context, false);
+            vkd3d_shader_free_shader_code(&reflection_data);
             vsir_program_cleanup(&program);
         }
     }
@@ -1797,7 +1820,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     return ret;
 }
 
-int vsir_program_compile(struct vsir_program *program, const struct vkd3d_shader_code *reflection_data,
+static int vsir_program_compile(struct vsir_program *program, const struct vkd3d_shader_code *reflection_data,
         uint64_t config_flags, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
@@ -1859,7 +1882,7 @@ int vsir_program_compile(struct vsir_program *program, const struct vkd3d_shader
     return ret;
 }
 
-static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
+static int fx_compile(const struct vkd3d_shader_compile_info *compile_info,
         const struct shader_dump_data *dump_data, struct vkd3d_shader_code *out,
         struct vkd3d_shader_message_context *message_context)
 {
@@ -1874,10 +1897,7 @@ static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
 
     preprocessed_info = *compile_info;
     preprocessed_info.source = preprocessed;
-    if (compile_info->target_type == VKD3D_SHADER_TARGET_FX)
-        ret = hlsl_compile_effect(&preprocessed_info, message_context, out);
-    else
-        ret = hlsl_compile_shader(&preprocessed_info, message_context, out);
+    ret = hlsl_compile_effect(&preprocessed_info, message_context, out);
 
     vkd3d_shader_free_shader_code(&preprocessed);
     return ret;
@@ -1905,9 +1925,10 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     fill_shader_dump_data(compile_info, &dump_data);
     vkd3d_shader_dump_shader(&dump_data, compile_info->source.code, compile_info->source.size, SHADER_DUMP_TYPE_SOURCE);
 
-    if (compile_info->source_type == VKD3D_SHADER_SOURCE_HLSL)
+    if (compile_info->source_type == VKD3D_SHADER_SOURCE_HLSL
+            && compile_info->target_type == VKD3D_SHADER_TARGET_FX)
     {
-        ret = compile_hlsl(compile_info, &dump_data, out, &message_context);
+        ret = fx_compile(compile_info, &dump_data, out, &message_context);
     }
     else if (compile_info->source_type == VKD3D_SHADER_SOURCE_FX)
     {
@@ -1920,11 +1941,14 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     else
     {
         uint64_t config_flags = vkd3d_shader_init_config_flags();
+        struct vkd3d_shader_code reflection_data = {0};
         struct vsir_program program;
 
-        if (!(ret = vsir_parse(compile_info, config_flags, &message_context, &program)))
+        if (!(ret = vsir_parse(compile_info, config_flags, &dump_data,
+                &message_context, &program, &reflection_data)))
         {
-            ret = vsir_program_compile(&program, NULL, config_flags, compile_info, out, &message_context);
+            ret = vsir_program_compile(&program, &reflection_data, config_flags, compile_info, out, &message_context);
+            vkd3d_shader_free_shader_code(&reflection_data);
             vsir_program_cleanup(&program);
         }
     }

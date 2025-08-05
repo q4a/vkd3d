@@ -1582,6 +1582,7 @@ struct vsir_program
 
     struct vsir_features features;
 
+    struct vkd3d_shader_source_list source_files;
     const char **block_names;
     size_t block_name_count;
 };
@@ -1591,9 +1592,6 @@ enum vkd3d_result vsir_allocate_temp_registers(struct vsir_program *program,
 enum vkd3d_result vsir_update_dcl_temps(struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context);
 void vsir_program_cleanup(struct vsir_program *program);
-int vsir_program_compile(struct vsir_program *program, const struct vkd3d_shader_code *reflection_data,
-        uint64_t config_flags, const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 const struct vkd3d_shader_parameter1 *vsir_program_get_parameter(
         const struct vsir_program *program, enum vkd3d_shader_parameter_name name);
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
@@ -1829,8 +1827,9 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
 
 int hlsl_compile_effect(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_code *out);
-int hlsl_compile_shader(const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_code *out);
+int hlsl_parse(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context,
+        struct vsir_program *program, struct vkd3d_shader_code *reflection_data);
 
 static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_type( enum vsir_data_type data_type)
 {
