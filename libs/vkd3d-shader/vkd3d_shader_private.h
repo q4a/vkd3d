@@ -937,6 +937,16 @@ enum vkd3d_shader_type
 
 struct vkd3d_shader_message_context;
 
+struct vkd3d_shader_source_list
+{
+    const char **sources;
+    size_t capacity, count;
+};
+
+bool vkd3d_shader_source_list_append(struct vkd3d_shader_source_list *l, const char *source);
+void vkd3d_shader_source_list_cleanup(struct vkd3d_shader_source_list *l);
+void vkd3d_shader_source_list_init(struct vkd3d_shader_source_list *l);
+
 struct vkd3d_shader_version
 {
     enum vkd3d_shader_type type;

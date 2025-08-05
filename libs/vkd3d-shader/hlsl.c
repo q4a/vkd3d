@@ -4908,15 +4908,15 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
 
     ctx->message_context = message_context;
 
-    if (!(ctx->source_files = hlsl_alloc(ctx, sizeof(*ctx->source_files))))
-        return false;
-    if (!(ctx->source_files[0] = hlsl_strdup(ctx, compile_info->source_name ? compile_info->source_name : "<anonymous>")))
+    vkd3d_shader_source_list_init(&ctx->source_files);
+    if (!vkd3d_shader_source_list_append(&ctx->source_files,
+            compile_info->source_name ? compile_info->source_name : "<anonymous>"))
     {
-        vkd3d_free(ctx->source_files);
+        vkd3d_shader_source_list_cleanup(&ctx->source_files);
         return false;
     }
-    ctx->source_files_count = 1;
-    ctx->location.source_name = ctx->source_files[0];
+
+    ctx->location.source_name = ctx->source_files.sources[0];
     ctx->location.line = ctx->location.column = 1;
     vkd3d_string_buffer_cache_init(&ctx->string_buffers);
 
@@ -4924,8 +4924,8 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
 
     if (!(ctx->dummy_scope = hlsl_new_scope(ctx, NULL)))
     {
-        vkd3d_free((void *)ctx->source_files[0]);
-        vkd3d_free(ctx->source_files);
+        vkd3d_string_buffer_cache_cleanup(&ctx->string_buffers);
+        vkd3d_shader_source_list_cleanup(&ctx->source_files);
         return false;
     }
     hlsl_push_scope(ctx);
@@ -5010,10 +5010,8 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
     struct hlsl_type *type, *next_type;
     unsigned int i;
 
-    for (i = 0; i < ctx->source_files_count; ++i)
-        vkd3d_free((void *)ctx->source_files[i]);
-    vkd3d_free(ctx->source_files);
     vkd3d_string_buffer_cache_cleanup(&ctx->string_buffers);
+    vkd3d_shader_source_list_cleanup(&ctx->source_files);
 
     rb_destroy(&ctx->functions, free_function_rb, NULL);
 

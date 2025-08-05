@@ -57,6 +57,39 @@ uint32_t vkd3d_parse_integer(const char *s)
     return ret;
 }
 
+bool vkd3d_shader_source_list_append(struct vkd3d_shader_source_list *l, const char *source)
+{
+    char *s;
+
+    if (!(s = vkd3d_strdup(source)))
+        return false;
+
+    if (!vkd3d_array_reserve((void **)&l->sources, &l->capacity, l->count + 1, sizeof(*l->sources)))
+    {
+        vkd3d_free(s);
+        return false;
+    }
+    l->sources[l->count++] = s;
+
+    return true;
+}
+
+void vkd3d_shader_source_list_cleanup(struct vkd3d_shader_source_list *l)
+{
+    size_t i;
+
+    for (i = 0; i < l->count; ++i)
+    {
+        vkd3d_free((void *)l->sources[i]);
+    }
+    vkd3d_free(l->sources);
+}
+
+void vkd3d_shader_source_list_init(struct vkd3d_shader_source_list *l)
+{
+    memset(l, 0, sizeof(*l));
+}
+
 void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer)
 {
     buffer->buffer_size = 16;

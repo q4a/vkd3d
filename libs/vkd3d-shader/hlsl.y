@@ -7190,23 +7190,19 @@ declaration_statement_list:
 preproc_directive:
       PRE_LINE STRING
         {
-            const char **new_array = NULL;
-
-            ctx->location.line = $1;
             if (strcmp($2, ctx->location.source_name))
-                new_array = hlsl_realloc(ctx, ctx->source_files,
-                        sizeof(*ctx->source_files) * (ctx->source_files_count + 1));
-
-            if (new_array)
             {
-                ctx->source_files = new_array;
-                ctx->source_files[ctx->source_files_count++] = $2;
-                ctx->location.source_name = $2;
+                if (!vkd3d_shader_source_list_append(&ctx->source_files, $2))
+                {
+                    ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+                else
+                {
+                    ctx->location.line = $1;
+                    ctx->location.source_name = ctx->source_files.sources[ctx->source_files.count - 1];
+                }
             }
-            else
-            {
-                vkd3d_free($2);
-            }
+            vkd3d_free($2);
         }
 
 struct_declaration_without_vars:
