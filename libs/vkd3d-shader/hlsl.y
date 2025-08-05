@@ -7192,14 +7192,14 @@ preproc_directive:
         {
             if (strcmp($2, ctx->location.source_name))
             {
-                if (!vkd3d_shader_source_list_append(&ctx->source_files, $2))
+                if (!vkd3d_shader_source_list_append(ctx->source_files, $2))
                 {
                     ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
                 }
                 else
                 {
                     ctx->location.line = $1;
-                    ctx->location.source_name = ctx->source_files.sources[ctx->source_files.count - 1];
+                    ctx->location.source_name = ctx->source_files->sources[ctx->source_files->count - 1];
                 }
             }
             vkd3d_free($2);

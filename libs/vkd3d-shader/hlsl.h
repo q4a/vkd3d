@@ -1093,7 +1093,7 @@ struct hlsl_ctx
 {
     const struct hlsl_profile_info *profile;
 
-    struct vkd3d_shader_source_list source_files;
+    struct vkd3d_shader_source_list *source_files;
     /* Current location being read in the HLSL source, updated while parsing. */
     struct vkd3d_shader_location location;
     /* Stores the logging messages and logging configuration. */
