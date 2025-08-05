@@ -1387,6 +1387,23 @@ static enum vkd3d_result vsir_program_lower_sm4_sincos(struct vsir_program *prog
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_texcrd(struct vsir_program *program,
+        struct vkd3d_shader_instruction *ins, struct vkd3d_shader_message_context *message_context)
+{
+    /* texcrd DST, t# -> mov DST, t# */
+
+    if (ins->src[0].modifiers)
+    {
+        vkd3d_shader_error(message_context, &ins->location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                "Aborting due to not yet implemented feature: texcrd source modifier.");
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+
+    ins->opcode = VSIR_OP_MOV;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_texld_sm1(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, struct vkd3d_shader_message_context *message_context)
 {
@@ -1649,6 +1666,10 @@ static enum vkd3d_result vsir_program_lower_d3dbc_instructions(struct vsir_progr
 
         switch (ins->opcode)
         {
+            case VSIR_OP_TEXCRD:
+                ret = vsir_program_lower_texcrd(program, ins, message_context);
+                break;
+
             case VSIR_OP_TEXLD:
                 if (program->shader_version.major == 1)
                     ret = vsir_program_lower_texld_sm1(program, ins, message_context);
@@ -1766,7 +1787,6 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VSIR_OP_TEXBEM:
             case VSIR_OP_TEXBEML:
             case VSIR_OP_TEXCOORD:
-            case VSIR_OP_TEXCRD:
             case VSIR_OP_TEXDEPTH:
             case VSIR_OP_TEXDP3:
             case VSIR_OP_TEXDP3TEX:
