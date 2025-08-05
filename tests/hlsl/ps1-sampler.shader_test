@@ -1,0 +1,30 @@
+[require]
+shader model < 3.0
+
+[sampler 0]
+filter point point point
+address wrap wrap wrap
+
+[srv 0]
+size (2d, 2, 2)
+1.0 0.0 0.0 0.0     1.0 1.0 0.0 0.0
+1.0 0.0 1.0 0.0     1.0 1.0 1.0 0.0
+
+[vertex shader]
+void main(inout float4 pos : position, out float4 tex : texcoord)
+{
+    tex = pos + 0.75;
+}
+
+[pixel shader d3dbc-hex]
+% TODO: Convert to assembly or HLSL.
+ffff0104                                                % ps_1_4
+00000042 800f0000 b0e40000                              % texld r0, t0
+0000ffff                                                % end
+
+[test]
+draw quad
+probe (320, 240) f32(1, 1, 1, 0)
+probe (480, 240) f32(1, 0, 1, 0)
+probe (320, 360) f32(1, 1, 0, 0)
+probe (480, 360) f32(1, 0, 0, 0)

@@ -1387,6 +1387,36 @@ static enum vkd3d_result vsir_program_lower_sm4_sincos(struct vsir_program *prog
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_texld_sm1(struct vsir_program *program,
+        struct vkd3d_shader_instruction *ins, struct vkd3d_shader_message_context *message_context)
+{
+    unsigned int idx = ins->src[0].reg.idx[0].offset;
+    struct vkd3d_shader_src_param *srcs;
+
+    /* texld DST, t# -> sample DST, t#, resource#, sampler# */
+
+    if (ins->src[0].modifiers)
+    {
+        vkd3d_shader_error(message_context, &ins->location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                "Aborting due to not yet implemented feature: texld source modifier.");
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
+    }
+
+    if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 3)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    /* Note we run before I/O normalization. */
+    srcs[0] = ins->src[0];
+    vsir_src_param_init_resource(&srcs[1], idx, idx);
+    vsir_src_param_init_sampler(&srcs[2], idx, idx);
+
+    ins->opcode = VSIR_OP_SAMPLE;
+    ins->src = srcs;
+    ins->src_count = 3;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_texldp(struct vsir_program *program,
         struct vsir_program_iterator *it, unsigned int *tmp_idx)
 {
@@ -1620,7 +1650,9 @@ static enum vkd3d_result vsir_program_lower_d3dbc_instructions(struct vsir_progr
         switch (ins->opcode)
         {
             case VSIR_OP_TEXLD:
-                if (ins->flags == VKD3DSI_TEXLD_PROJECT)
+                if (program->shader_version.major == 1)
+                    ret = vsir_program_lower_texld_sm1(program, ins, message_context);
+                else if (ins->flags == VKD3DSI_TEXLD_PROJECT)
                     ret = vsir_program_lower_texldp(program, &it, &tmp_idx);
                 else
                     ret = vsir_program_lower_texld(program, ins, message_context);
