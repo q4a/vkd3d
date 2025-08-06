@@ -7528,12 +7528,13 @@ static bool replace_texcoord_with_point_coord(struct vsir_program *program,
 static enum vkd3d_result vsir_program_insert_point_coord(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions), it2;
     const struct vkd3d_shader_parameter1 *sprite_parameter = NULL;
     static const struct vkd3d_shader_location no_loc;
     struct vkd3d_shader_instruction *ins;
     bool used_texcoord = false;
     unsigned int coord_temp;
-    size_t i, insert_pos;
+    size_t i;
 
     if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
         return VKD3D_OK;
@@ -7574,21 +7575,16 @@ static enum vkd3d_result vsir_program_insert_point_coord(struct vsir_program *pr
     /* Construct the new temp after all LABEL, DCL, and NOP instructions.
      * We need to skip NOP instructions because they might result from removed
      * DCLs, and there could still be DCLs after NOPs. */
-    for (i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        ins = &program->instructions.elements[i];
-
         if (!vsir_instruction_is_dcl(ins) && ins->opcode != VSIR_OP_LABEL && ins->opcode != VSIR_OP_NOP)
             break;
     }
 
-    insert_pos = i;
-
+    it2 = it;
     /* Replace each texcoord read with a read from the point coord. */
-    for (; i < program->instructions.count; ++i)
+    for (; ins; ins = vsir_program_iterator_next(&it2))
     {
-        ins = &program->instructions.elements[i];
-
         if (vsir_instruction_is_dcl(ins))
             continue;
 
@@ -7617,9 +7613,10 @@ static enum vkd3d_result vsir_program_insert_point_coord(struct vsir_program *pr
 
     if (used_texcoord)
     {
-        if (!shader_instruction_array_insert_at(&program->instructions, insert_pos, 2))
+        vsir_program_iterator_prev(&it);
+        if (!vsir_program_iterator_insert_after(&it, 2))
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        ins = &program->instructions.elements[insert_pos];
+        ins = vsir_program_iterator_next(&it);
 
         vsir_instruction_init_with_params(program, ins, &no_loc, VSIR_OP_MOV, 1, 1);
         dst_param_init_temp_float4(&ins->dst[0], coord_temp);
@@ -7627,14 +7624,14 @@ static enum vkd3d_result vsir_program_insert_point_coord(struct vsir_program *pr
         vsir_src_param_init(&ins->src[0], VKD3DSPR_POINT_COORD, VSIR_DATA_F32, 0);
         ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
         ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
-        ++ins;
+        ins = vsir_program_iterator_next(&it);
 
         vsir_instruction_init_with_params(program, ins, &no_loc, VSIR_OP_MOV, 1, 1);
         dst_param_init_temp_float4(&ins->dst[0], coord_temp);
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_2 | VKD3DSP_WRITEMASK_3;
         vsir_src_param_init(&ins->src[0], VKD3DSPR_IMMCONST, VSIR_DATA_F32, 0);
         ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
-        ++ins;
+        vsir_program_iterator_next(&it);
 
         program->has_point_coord = true;
     }
