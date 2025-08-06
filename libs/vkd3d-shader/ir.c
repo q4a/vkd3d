@@ -7355,7 +7355,9 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
         struct vsir_transformation_context *ctx)
 {
     const struct vkd3d_shader_parameter1 *min_parameter = NULL, *max_parameter = NULL;
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     static const struct vkd3d_shader_location no_loc;
+    struct vkd3d_shader_instruction *ins;
 
     if (!program->has_point_size)
         return VKD3D_OK;
@@ -7392,9 +7394,8 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
 
     /* Replace writes to the point size by inserting a clamp before each write. */
 
-    for (size_t i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
         const struct vkd3d_shader_location *loc;
         unsigned int ssa_value;
         bool clamp = false;
@@ -7418,11 +7419,11 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
         if (!clamp)
             continue;
 
-        if (!shader_instruction_array_insert_at(&program->instructions, i + 1, !!min_parameter + !!max_parameter))
+        if (!vsir_program_iterator_insert_after(&it, !!min_parameter + !!max_parameter))
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        ins = &program->instructions.elements[i + 1];
 
-        loc = &program->instructions.elements[i].location;
+        loc = &vsir_program_iterator_current(&it)->location;
+        ins = vsir_program_iterator_next(&it);
 
         if (min_parameter)
         {
@@ -7439,8 +7440,7 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
                 vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VSIR_DATA_F32, 1);
                 ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
             }
-            ++ins;
-            ++i;
+            ins = vsir_program_iterator_next(&it);
         }
 
         if (max_parameter)
@@ -7450,8 +7450,7 @@ static enum vkd3d_result vsir_program_insert_point_size_clamp(struct vsir_progra
             src_param_init_parameter(&ins->src[1], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE_MAX, VSIR_DATA_F32);
             vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VSIR_DATA_F32, 1);
             ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
-
-            ++i;
+            ins = vsir_program_iterator_next(&it);
         }
     }
 
