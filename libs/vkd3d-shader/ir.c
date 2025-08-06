@@ -7283,32 +7283,32 @@ static bool is_pre_rasterization_shader(enum vkd3d_shader_type type)
 }
 
 static enum vkd3d_result insert_point_size_before_ret(struct vsir_program *program,
-        const struct vkd3d_shader_instruction *ret, size_t *ret_pos)
+        struct vsir_program_iterator *it)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    const struct vkd3d_shader_location loc = ret->location;
-    size_t pos = ret - instructions->elements;
+    const struct vkd3d_shader_location loc = vsir_program_iterator_current(it)->location;
     struct vkd3d_shader_instruction *ins;
 
-    if (!shader_instruction_array_insert_at(&program->instructions, pos, 1))
+    vsir_program_iterator_prev(it);
+    if (!vsir_program_iterator_insert_after(it, 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    ret = NULL;
-    ins = &program->instructions.elements[pos];
+    ins = vsir_program_iterator_next(it);
 
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
     vsir_dst_param_init(&ins->dst[0], VKD3DSPR_RASTOUT, VSIR_DATA_F32, 1);
     ins->dst[0].reg.idx[0].offset = VSIR_RASTOUT_POINT_SIZE;
     src_param_init_parameter(&ins->src[0], VKD3D_SHADER_PARAMETER_NAME_POINT_SIZE, VSIR_DATA_F32);
+    ins = vsir_program_iterator_next(it);
 
-    *ret_pos = pos + 1;
     return VKD3D_OK;
 }
 
 static enum vkd3d_result vsir_program_insert_point_size(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     const struct vkd3d_shader_parameter1 *size_parameter = NULL;
     static const struct vkd3d_shader_location no_loc;
+    struct vkd3d_shader_instruction *ins;
 
     if (program->has_point_size)
         return VKD3D_OK;
@@ -7337,18 +7337,14 @@ static enum vkd3d_result vsir_program_insert_point_size(struct vsir_program *pro
     program->has_point_size = true;
 
     /* Append a point size write before each ret. */
-    for (size_t i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-
         if (ins->opcode == VSIR_OP_RET)
         {
-            size_t new_pos;
             int ret;
 
-            if ((ret = insert_point_size_before_ret(program, ins, &new_pos)) < 0)
+            if ((ret = insert_point_size_before_ret(program, &it)) < 0)
                 return ret;
-            i = new_pos;
         }
     }
 
