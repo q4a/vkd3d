@@ -1605,6 +1605,39 @@ static enum vkd3d_result vsir_program_lower_dcl_output(struct vsir_program *prog
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_lower_d3dbc_instructions(struct vsir_program *program,
+        struct vsir_transformation_context *ctx)
+{
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
+    struct vkd3d_shader_message_context *message_context = ctx->message_context;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int tmp_idx = ~0u;
+
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
+    {
+        enum vkd3d_result ret;
+
+        switch (ins->opcode)
+        {
+            case VSIR_OP_TEXLD:
+                if (ins->flags == VKD3DSI_TEXLD_PROJECT)
+                    ret = vsir_program_lower_texldp(program, &it, &tmp_idx);
+                else
+                    ret = vsir_program_lower_texld(program, ins, message_context);
+                break;
+
+            default:
+                ret = VKD3D_OK;
+                break;
+        }
+
+        if (ret < 0)
+            return ret;
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
@@ -1684,19 +1717,6 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
                 else
                 {
                     if ((ret = vsir_program_lower_sm4_sincos(program, &it, ctx)) < 0)
-                        return ret;
-                }
-                break;
-
-            case VSIR_OP_TEXLD:
-                if (ins->flags == VKD3DSI_TEXLD_PROJECT)
-                {
-                    if ((ret = vsir_program_lower_texldp(program, &it, &tmp_idx)) < 0)
-                        return ret;
-                }
-                else
-                {
-                    if ((ret = vsir_program_lower_texld(program, ins, message_context)) < 0)
                         return ret;
                 }
                 break;
@@ -12040,6 +12060,26 @@ enum vkd3d_result vsir_program_transform_early(struct vsir_program *program, uin
 
     /* For vsir_program_insert_vertex_fog(). */
     vsir_transform(&ctx, vsir_program_add_fog_output);
+
+    return ctx.result;
+}
+
+enum vkd3d_result vsir_program_lower_d3dbc(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
+{
+    struct vsir_transformation_context ctx =
+    {
+        .result = VKD3D_OK,
+        .program = program,
+        .config_flags = config_flags,
+        .compile_info = compile_info,
+        .message_context = message_context,
+    };
+
+    vsir_transform(&ctx, vsir_program_lower_d3dbc_instructions);
+
+    if (TRACE_ON())
+        vsir_program_trace(program);
 
     return ctx.result;
 }

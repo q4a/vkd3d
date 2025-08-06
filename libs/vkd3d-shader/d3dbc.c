@@ -1513,7 +1513,10 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
         return ret;
     }
 
-    return VKD3D_OK;
+    if (program->normalisation_level >= VSIR_NORMALISED_SM4)
+        ret = vsir_program_lower_d3dbc(program, config_flags, compile_info, message_context);
+
+    return ret;
 }
 
 bool sm1_register_from_semantic_name(const struct vkd3d_shader_version *version, const char *semantic_name,

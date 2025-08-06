@@ -1470,13 +1470,6 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             if (context->cf_info_count)
                 context->cf_info[context->cf_info_count - 1].inside_block = false;
             break;
-        case VSIR_OP_TEXLD:
-            if (context->version->major == 1)
-                sampler_reg = &instruction->dst[0].reg;
-            else
-                sampler_reg = &instruction->src[1].reg;
-            vkd3d_shader_scan_combined_sampler_usage(context, sampler_reg, sampler_reg);
-            break;
         case VSIR_OP_TEX:
         case VSIR_OP_TEXBEM:
         case VSIR_OP_TEXBEML:
