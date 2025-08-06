@@ -6933,14 +6933,12 @@ static enum vkd3d_result vsir_program_apply_flat_interpolation(struct vsir_progr
 }
 
 static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *program,
-        const struct vkd3d_shader_instruction *ret, enum vkd3d_shader_comparison_func compare_func,
+        struct vsir_program_iterator *it, enum vkd3d_shader_comparison_func compare_func,
         const struct vkd3d_shader_parameter1 *ref, uint32_t colour_signature_idx,
-        uint32_t colour_temp, size_t *ret_pos, struct vkd3d_shader_message_context *message_context)
+        uint32_t colour_temp, struct vkd3d_shader_message_context *message_context)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    const struct vkd3d_shader_location loc = ret->location;
+    struct vkd3d_shader_location loc = vsir_program_iterator_current(it)->location;
     static const struct vkd3d_shader_location no_loc;
-    size_t pos = ret - instructions->elements;
     struct vkd3d_shader_instruction *ins;
 
     static const struct
@@ -6961,23 +6959,23 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
 
     if (compare_func == VKD3D_SHADER_COMPARISON_FUNC_NEVER)
     {
-        if (!shader_instruction_array_insert_at(&program->instructions, pos, 1))
+        vsir_program_iterator_prev(it);
+        if (!vsir_program_iterator_insert_after(it, 1))
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        ret = NULL;
-        ins = &program->instructions.elements[pos];
+        ins = vsir_program_iterator_next(it);
 
         vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_DISCARD, 0, 1);
         ins->flags = VKD3D_SHADER_CONDITIONAL_OP_Z;
         src_param_init_const_uint(&ins->src[0], 0);
+        vsir_program_iterator_next(it);
 
-        *ret_pos = pos + 1;
         return VKD3D_OK;
     }
 
-    if (!shader_instruction_array_insert_at(&program->instructions, pos, 3))
+    vsir_program_iterator_prev(it);
+    if (!vsir_program_iterator_insert_after(it, 3))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    ret = NULL;
-    ins = &program->instructions.elements[pos];
+    ins = vsir_program_iterator_next(it);
 
     switch (ref->data_type)
     {
@@ -7009,14 +7007,14 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
     ins->src[opcodes[compare_func].swap ? 1 : 0].reg.dimension = VSIR_DIMENSION_VEC4;
     ins->src[opcodes[compare_func].swap ? 1 : 0].swizzle = VKD3D_SHADER_SWIZZLE(W, W, W, W);
 
-    ++ins;
+    ins = vsir_program_iterator_next(it);
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_DISCARD, 0, 1);
     ins->flags = VKD3D_SHADER_CONDITIONAL_OP_Z;
     src_param_init_ssa_bool(&ins->src[0], program->ssa_count);
 
     ++program->ssa_count;
 
-    ++ins;
+    ins = vsir_program_iterator_next(it);
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
     vsir_dst_param_init(&ins->dst[0], VKD3DSPR_OUTPUT, VSIR_DATA_F32, 1);
     ins->dst[0].reg.idx[0].offset = colour_signature_idx;
@@ -7026,20 +7024,21 @@ static enum vkd3d_result insert_alpha_test_before_ret(struct vsir_program *progr
     ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
     ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
 
-    *ret_pos = pos + 3;
+    vsir_program_iterator_next(it);
+
     return VKD3D_OK;
 }
 
 static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct vkd3d_shader_message_context *message_context = ctx->message_context;
     const struct vkd3d_shader_parameter1 *func = NULL, *ref = NULL;
     uint32_t colour_signature_idx, colour_temp = ~0u;
     static const struct vkd3d_shader_location no_loc;
     enum vkd3d_shader_comparison_func compare_func;
     struct vkd3d_shader_instruction *ins;
-    size_t new_pos;
     int ret;
 
     if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
@@ -7076,19 +7075,16 @@ static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *pro
     if (compare_func != VKD3D_SHADER_COMPARISON_FUNC_NEVER)
         colour_temp = program->temp_count++;
 
-    for (size_t i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        ins = &program->instructions.elements[i];
-
         if (vsir_instruction_is_dcl(ins))
             continue;
 
         if (ins->opcode == VSIR_OP_RET)
         {
-            if ((ret = insert_alpha_test_before_ret(program, ins, compare_func,
-                    ref, colour_signature_idx, colour_temp, &new_pos, message_context)) < 0)
+            if ((ret = insert_alpha_test_before_ret(program, &it, compare_func,
+                    ref, colour_signature_idx, colour_temp, message_context)) < 0)
                 return ret;
-            i = new_pos;
             continue;
         }
 
