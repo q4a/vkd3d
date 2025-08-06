@@ -1233,6 +1233,40 @@ static void vkd3d_shader_scan_combined_sampler_usage(struct vkd3d_shader_scan_co
     s->sampler_index = sampler_idx;
 }
 
+static void vkd3d_shader_scan_sample_instruction(struct vkd3d_shader_scan_context *context,
+        const struct vkd3d_shader_register *resource, const struct vkd3d_shader_register *sampler)
+{
+    unsigned int resource_idx = resource->idx[0].offset;
+    unsigned int sampler_idx = sampler->idx[0].offset;
+
+    vkd3d_shader_scan_combined_sampler_usage(context, resource, sampler);
+
+    if (!context->scan_descriptor_info)
+        return;
+
+    /* Sample instructions lowered from 1.x texture instructions have no
+     * DCL, so we need to add the resource if it didn't already exist.
+     * Such descriptors have a fixed count, type, etc. */
+
+    if (!vkd3d_shader_find_descriptor(context->scan_descriptor_info,
+            VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, resource_idx))
+    {
+        struct vkd3d_shader_register_range range = {.first = resource_idx, .last = resource_idx};
+
+        vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, resource,
+                &range, VKD3D_SHADER_RESOURCE_TEXTURE_2D, VSIR_DATA_F32);
+    }
+
+    if (!vkd3d_shader_find_descriptor(context->scan_descriptor_info,
+            VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, sampler_idx))
+    {
+        struct vkd3d_shader_register_range range = {.first = sampler_idx, .last = sampler_idx};
+
+        vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, resource,
+                &range, VKD3D_SHADER_RESOURCE_NONE, VSIR_DATA_UNUSED);
+    }
+}
+
 static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_resource *resource, enum vkd3d_shader_resource_type resource_type,
         enum vsir_data_type resource_data_type, unsigned int sample_count,
@@ -1459,13 +1493,15 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             break;
         case VSIR_OP_GATHER4:
         case VSIR_OP_GATHER4_C:
-        case VSIR_OP_SAMPLE:
         case VSIR_OP_SAMPLE_B:
         case VSIR_OP_SAMPLE_C:
         case VSIR_OP_SAMPLE_C_LZ:
         case VSIR_OP_SAMPLE_GRAD:
         case VSIR_OP_SAMPLE_LOD:
             vkd3d_shader_scan_combined_sampler_usage(context, &instruction->src[1].reg, &instruction->src[2].reg);
+            break;
+        case VSIR_OP_SAMPLE:
+            vkd3d_shader_scan_sample_instruction(context, &instruction->src[1].reg, &instruction->src[2].reg);
             break;
         case VSIR_OP_GATHER4_PO:
         case VSIR_OP_GATHER4_PO_C:
