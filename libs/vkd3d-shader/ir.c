@@ -7110,19 +7110,17 @@ static enum vkd3d_result vsir_program_insert_alpha_test(struct vsir_program *pro
 }
 
 static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *program,
-        const struct vkd3d_shader_instruction *ret, uint32_t mask, uint32_t position_signature_idx,
-        uint32_t position_temp, uint32_t low_signature_idx, uint32_t high_signature_idx, size_t *ret_pos)
+        struct vsir_program_iterator *it, uint32_t mask, uint32_t position_signature_idx,
+        uint32_t position_temp, uint32_t low_signature_idx, uint32_t high_signature_idx)
 {
-    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
-    const struct vkd3d_shader_location loc = ret->location;
-    size_t pos = ret - instructions->elements;
+    const struct vkd3d_shader_location loc = vsir_program_iterator_current(it)->location;
     struct vkd3d_shader_instruction *ins;
     unsigned int output_idx = 0;
 
-    if (!shader_instruction_array_insert_at(&program->instructions, pos, vkd3d_popcount(mask) + 1))
+    vsir_program_iterator_prev(it);
+    if (!vsir_program_iterator_insert_after(it, vkd3d_popcount(mask) + 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    ret = NULL;
-    ins = &program->instructions.elements[pos];
+    ins = vsir_program_iterator_next(it);
 
     for (unsigned int i = 0; i < 8; ++i)
     {
@@ -7144,7 +7142,7 @@ static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *prog
         ins->dst[0].write_mask = (1u << (output_idx % 4));
         ++output_idx;
 
-        ++ins;
+        ins = vsir_program_iterator_next(it);
     }
 
     vsir_instruction_init_with_params(program, ins, &loc, VSIR_OP_MOV, 1, 1);
@@ -7155,14 +7153,15 @@ static enum vkd3d_result insert_clip_planes_before_ret(struct vsir_program *prog
     src_param_init_temp_float(&ins->src[0], position_temp);
     ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
     ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
+    ins = vsir_program_iterator_next(it);
 
-    *ret_pos = pos + vkd3d_popcount(mask) + 1;
     return VKD3D_OK;
 }
 
 static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *program,
         struct vsir_transformation_context *ctx)
 {
+    struct vsir_program_iterator it = vsir_program_iterator(&program->instructions);
     struct shader_signature *signature = &program->output_signature;
     unsigned int low_signature_idx = ~0u, high_signature_idx = ~0u;
     const struct vkd3d_shader_parameter1 *mask_parameter = NULL;
@@ -7171,7 +7170,6 @@ static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *pr
     struct signature_element *clip_element;
     struct vkd3d_shader_instruction *ins;
     unsigned int plane_count;
-    size_t new_pos;
     int ret;
 
     if (program->shader_version.type != VKD3D_SHADER_TYPE_VERTEX)
@@ -7247,19 +7245,16 @@ static enum vkd3d_result vsir_program_insert_clip_planes(struct vsir_program *pr
 
     position_temp = program->temp_count++;
 
-    for (size_t i = 0; i < program->instructions.count; ++i)
+    for (ins = vsir_program_iterator_head(&it); ins; ins = vsir_program_iterator_next(&it))
     {
-        ins = &program->instructions.elements[i];
-
         if (vsir_instruction_is_dcl(ins))
             continue;
 
         if (ins->opcode == VSIR_OP_RET)
         {
-            if ((ret = insert_clip_planes_before_ret(program, ins, mask, position_signature_idx,
-                    position_temp, low_signature_idx, high_signature_idx, &new_pos)) < 0)
+            if ((ret = insert_clip_planes_before_ret(program, &it, mask, position_signature_idx,
+                    position_temp, low_signature_idx, high_signature_idx)) < 0)
                 return ret;
-            i = new_pos;
             continue;
         }
 
