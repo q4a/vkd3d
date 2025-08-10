@@ -5676,6 +5676,48 @@ static unsigned int shader_signature_next_location(const struct shader_signature
     return max_row;
 }
 
+static const struct vkd3d_symbol *spirv_compiler_emit_io_register(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_dst_param *dst)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_register *reg = &dst->reg;
+    const struct vkd3d_spirv_builtin *builtin;
+    struct vkd3d_symbol reg_symbol;
+    SpvStorageClass storage_class;
+    uint32_t write_mask, id;
+    struct rb_entry *entry;
+
+    VKD3D_ASSERT(!reg->idx_count || !reg->idx[0].rel_addr);
+    VKD3D_ASSERT(reg->idx_count < 2);
+
+    if (reg->type == VKD3DSPR_RASTOUT && reg->idx[0].offset == VSIR_RASTOUT_POINT_SIZE)
+    {
+        builtin = &vkd3d_output_point_size_builtin;
+        storage_class = SpvStorageClassOutput;
+    }
+    else if (!(builtin = get_spirv_builtin_for_register(reg->type, &storage_class)))
+    {
+        FIXME("Unhandled register %#x.\n", reg->type);
+        return NULL;
+    }
+
+    /* vPrim may be declared in multiple hull shader phases. */
+    vkd3d_symbol_make_register(&reg_symbol, reg);
+    if ((entry = rb_get(&compiler->symbol_table, &reg_symbol)))
+        return RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
+
+    id = spirv_compiler_emit_builtin_variable(compiler, builtin, storage_class, 0);
+    spirv_compiler_emit_register_execution_mode(compiler, reg->type);
+    spirv_compiler_emit_register_debug_name(builder, id, reg);
+
+    write_mask = vkd3d_write_mask_from_component_count(builtin->component_count);
+    vkd3d_symbol_set_register_info(&reg_symbol, id,
+            storage_class, builtin->component_type, write_mask);
+    reg_symbol.info.reg.is_aggregate = builtin->spirv_array_size;
+
+    return spirv_compiler_put_symbol(compiler, &reg_symbol);
+}
+
 static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
         enum vkd3d_shader_register_type reg_type, unsigned int element_idx)
 {
@@ -5684,6 +5726,7 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
     const struct signature_element *signature_element;
     const struct shader_signature *shader_signature;
     enum vkd3d_shader_component_type component_type;
+    enum vkd3d_shader_register_type sysval_reg_type;
     const struct vkd3d_spirv_builtin *builtin;
     enum vkd3d_shader_sysval_semantic sysval;
     uint32_t write_mask, reg_write_mask;
@@ -5707,6 +5750,22 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
 
     if (!signature_element->used_mask)
         return;
+
+    sysval_reg_type = vsir_register_type_from_sysval_input(signature_element->sysval_semantic);
+    if (sysval_reg_type != VKD3DSPR_INPUT)
+    {
+        struct vkd3d_shader_dst_param dst;
+        const struct vkd3d_symbol *symbol;
+
+        vsir_dst_param_init(&dst, sysval_reg_type, VSIR_DATA_F32, 0);
+        symbol = spirv_compiler_emit_io_register(compiler, &dst);
+
+        vkd3d_symbol_make_io(&reg_symbol, reg_type, element_idx);
+        reg_symbol.id = symbol->id;
+        reg_symbol.info.reg = symbol->info.reg;
+        spirv_compiler_put_symbol(compiler, &reg_symbol);
+        return;
+    }
 
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
 
@@ -5827,47 +5886,6 @@ static void spirv_compiler_emit_input(struct spirv_compiler *compiler,
 
         spirv_compiler_emit_store_reg(compiler, &dst_reg, signature_element->mask >> component_idx, val_id);
     }
-}
-
-static void spirv_compiler_emit_io_register(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_dst_param *dst)
-{
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_register *reg = &dst->reg;
-    const struct vkd3d_spirv_builtin *builtin;
-    struct vkd3d_symbol reg_symbol;
-    SpvStorageClass storage_class;
-    uint32_t write_mask, id;
-    struct rb_entry *entry;
-
-    VKD3D_ASSERT(!reg->idx_count || !reg->idx[0].rel_addr);
-    VKD3D_ASSERT(reg->idx_count < 2);
-
-    if (reg->type == VKD3DSPR_RASTOUT && reg->idx[0].offset == VSIR_RASTOUT_POINT_SIZE)
-    {
-        builtin = &vkd3d_output_point_size_builtin;
-        storage_class = SpvStorageClassOutput;
-    }
-    else if (!(builtin = get_spirv_builtin_for_register(reg->type, &storage_class)))
-    {
-        FIXME("Unhandled register %#x.\n", reg->type);
-        return;
-    }
-
-    /* vPrim may be declared in multiple hull shader phases. */
-    vkd3d_symbol_make_register(&reg_symbol, reg);
-    if ((entry = rb_get(&compiler->symbol_table, &reg_symbol)))
-        return;
-
-    id = spirv_compiler_emit_builtin_variable(compiler, builtin, storage_class, 0);
-
-    write_mask = vkd3d_write_mask_from_component_count(builtin->component_count);
-    vkd3d_symbol_set_register_info(&reg_symbol, id,
-            storage_class, builtin->component_type, write_mask);
-    reg_symbol.info.reg.is_aggregate = builtin->spirv_array_size;
-    spirv_compiler_put_symbol(compiler, &reg_symbol);
-    spirv_compiler_emit_register_execution_mode(compiler, reg->type);
-    spirv_compiler_emit_register_debug_name(builder, id, reg);
 }
 
 static unsigned int get_shader_output_swizzle(const struct spirv_compiler *compiler,

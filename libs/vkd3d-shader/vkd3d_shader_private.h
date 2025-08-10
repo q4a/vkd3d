@@ -1023,6 +1023,20 @@ static inline bool vsir_register_is_descriptor(const struct vkd3d_shader_registe
     }
 }
 
+static inline enum vkd3d_shader_register_type vsir_register_type_from_sysval_input(
+        enum vkd3d_shader_sysval_semantic sysval)
+{
+    switch (sysval)
+    {
+        case VKD3D_SHADER_SV_PRIMITIVE_ID:
+            return VKD3DSPR_PRIMID;
+        case VKD3D_SHADER_SV_COVERAGE:
+            return VKD3DSPR_COVERAGE;
+        default:
+            return VKD3DSPR_INPUT;
+    }
+}
+
 struct vkd3d_shader_dst_param
 {
     struct vkd3d_shader_register reg;
