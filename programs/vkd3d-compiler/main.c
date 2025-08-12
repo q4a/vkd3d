@@ -891,7 +891,7 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!options.target_type && !options.preprocess_only)
+    if (!options.target_type)
         options.target_type = get_target_type_info(options.source_type->default_target_type);
 
     if (!options.preprocess_only && !validate_target_type(options.source_type->type, options.target_type->type))
