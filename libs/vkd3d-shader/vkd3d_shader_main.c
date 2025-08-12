@@ -1816,6 +1816,7 @@ static int vsir_program_compile(struct vsir_program *program, const struct vkd3d
 {
     struct vkd3d_shader_scan_combined_resource_sampler_info combined_sampler_info;
     struct vkd3d_shader_compile_info scan_info;
+    enum vsir_asm_flags asm_flags;
     int ret;
 
     scan_info = *compile_info;
@@ -1825,7 +1826,11 @@ static int vsir_program_compile(struct vsir_program *program, const struct vkd3d
         case VKD3D_SHADER_TARGET_D3D_ASM:
             if ((ret = vsir_program_scan(program, &scan_info, message_context, true)) < 0)
                 return ret;
-            ret = d3d_asm_compile(program, compile_info, out, VSIR_ASM_FLAG_NONE);
+            asm_flags = VSIR_ASM_FLAG_NONE;
+            if (program->shader_version.major < 6 && compile_info->source_type != VKD3D_SHADER_SOURCE_DXBC_TPF
+                    && compile_info->source_type != VKD3D_SHADER_SOURCE_D3D_BYTECODE)
+                asm_flags |= VSIR_ASM_FLAG_ALLOCATE_TEMPS;
+            ret = d3d_asm_compile(program, compile_info, out, asm_flags, message_context);
             break;
 
         case VKD3D_SHADER_TARGET_D3D_BYTECODE:

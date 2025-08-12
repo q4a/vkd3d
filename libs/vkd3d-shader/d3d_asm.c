@@ -1961,7 +1961,7 @@ static void shader_print_descriptors(struct vkd3d_d3d_asm_compiler *compiler,
 }
 
 enum vkd3d_result d3d_asm_compile(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out, enum vsir_asm_flags flags)
+        struct vkd3d_shader_code *out, enum vsir_asm_flags flags, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_version *shader_version = &program->shader_version;
     enum vkd3d_shader_compile_option_formatting_flags formatting;
@@ -2028,6 +2028,14 @@ enum vkd3d_result d3d_asm_compile(struct vsir_program *program, const struct vkd
      * even have an explicit concept of signature. */
     if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES && shader_version->major >= 4)
         compiler.flags |= VSIR_ASM_FLAG_DUMP_SIGNATURES;
+
+    if (compiler.flags & VSIR_ASM_FLAG_ALLOCATE_TEMPS)
+    {
+        if ((result = vsir_allocate_temp_registers(program, message_context)) < 0)
+            return result;
+        if ((result = vsir_update_dcl_temps(program, message_context)))
+            return result;
+    }
 
     buffer = &compiler.buffer;
     vkd3d_string_buffer_init(buffer);
@@ -2250,16 +2258,21 @@ void vsir_program_trace(struct vsir_program *program)
 {
     const unsigned int flags = VSIR_ASM_FLAG_DUMP_TYPES | VSIR_ASM_FLAG_DUMP_ALL_INDICES
             | VSIR_ASM_FLAG_DUMP_SIGNATURES | VSIR_ASM_FLAG_DUMP_DESCRIPTORS;
+    struct vkd3d_shader_message_context message_context;
     struct vkd3d_shader_code code;
     const char *p, *q, *end;
+
+    vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_NONE);
 
     trace_signature(&program->input_signature, "Input");
     trace_signature(&program->output_signature, "Output");
     trace_signature(&program->patch_constant_signature, "Patch-constant");
     trace_io_declarations(program);
 
-    if (d3d_asm_compile(program, NULL, &code, flags) != VKD3D_OK)
+    if (d3d_asm_compile(program, NULL, &code, flags, &message_context) != VKD3D_OK)
         return;
+
+    vkd3d_shader_message_context_cleanup(&message_context);
 
     end = (const char *)code.code + code.size;
     for (p = code.code; p < end; p = q)
