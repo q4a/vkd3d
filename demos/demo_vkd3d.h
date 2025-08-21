@@ -28,7 +28,7 @@
 #ifdef HAVE_XCB
 # define VK_USE_PLATFORM_XCB_KHR
 #endif
-#define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_16
+#define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_17
 #include <vkd3d.h>
 #include <vkd3d_utils.h>
 #ifdef HAVE_XCB

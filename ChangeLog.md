@@ -1,3 +1,83 @@
+# What's new in vkd3d 1.17 (21 August 2025)
+
+### libvkd3d
+
+  - The EnumerateMetaCommands() method of the ID3D12Device5 interface is
+    implemented.
+
+### libvkd3d-shader
+
+  - Several new features and improvements for the HLSL source type:
+    - Initial thread group shared memory support.
+    - Improved support for geometry shaders: shader model 5 multiple output
+      streams, as well as SV_IsFrontFace, SV_RenderTargetArrayIndex, and
+      SV_ViewportArrayIndex outputs.
+    - Structure variable input/output semantics are propagated to the
+      constituent structure fields.
+    - Shader entry point return values are allocated before any other outputs
+      in the output signature. This matches d3dcompiler/fxc more closely.
+    - Hull shader control point pass-through.
+    - Reflection information can be retrieved using vkd3d_shader_scan().
+    - Improved preprocessor handling of comments inside include directives, as
+      well as inclusion of empty files.
+    - Memory barrier intrinsics are supported in shader model 4 target
+      profiles. Previous these were only supported in shader model 5 target
+      profiles.
+    - Parser support for the noise() intrinsic. Although the intrinsic itself
+      isn't implemented, parser support for the intrinsic is required to allow
+      compilation of any other shaders in the same source file to succeed as
+      well.
+    - Parser support for StructuredBuffer resources.
+
+  - Various new features and improvements for the effects (FX) source type:
+    - Shader blob assignments and FXLVM value expressions in ‘fx_2_0’ effects.
+    - Nameless structure types.
+    - Explicit constant buffer bind points and constant packing offsets.
+    - The ‘d3ds_noiseswiz’, ‘ge’, ‘lt’, and ‘noise’ FXLVM operations.
+
+  - The experimental Metal Shading Language (MSL) target supports the
+    following features:
+    - Texture sampling and gather operations.
+    - Loops and switches.
+    - Screen-space partial derivatives.
+    - Various integer arithmetic and comparison operations.
+    - Indirect addressing of constant buffers.
+    - Indexable temporary registers.
+    - Fragment shader output sample coverage masks.
+    - SV_Position and SV_SampleIndex fragment shader inputs.
+    - SV_VertexID inputs.
+
+  - When the experimental MSL target is enabled, the ‘dxbc-dxil’ source type
+    can be used in combination with the ‘msl’ target type to convert DXIL
+    shaders to MSL.
+
+  - The new ‘tx’ source type can be used in combination with the ‘d3d-asm’
+    target type to disassemble D3DX ‘tx_1_0’ texture shaders.
+
+  - The FX target takes alignment and padding into account in ‘fx_4_0’ buffer
+    size calculations.
+
+  - The SPIR-V target is capable of outputting OpSource and OpLine debug
+    information.
+
+  - The core grammar for the experimental SPIR-V disassembler has been updated
+    to the ‘vulkan-sdk-1.4.313.0’ release.
+
+  - New interfaces:
+    - The VKD3D_SHADER_SOURCE_TX source type specifies D3DX ‘tx_1_0’ texture
+      shaders.
+
+### vkd3d-compiler
+
+  - The new ‘tx’ source type specifies D3DX ‘tx_1_0’ texture shaders.
+
+### demos
+
+  - The new vkd3d-teapot demo uses tessellation shaders to render a version of
+    Martin Newell's famous teapot. It should be noted that current versions of
+    MoltenVK unfortunately do not support all features required to execute
+    this demo correctly.
+
 # What's new in vkd3d 1.16 (20 May 2025)
 
 ### libvkd3d
