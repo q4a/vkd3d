@@ -97,7 +97,11 @@ typedef INT64 LONG64;
 typedef long LONG_PTR;
 typedef unsigned long ULONG_PTR;
 
+#ifdef _WIN32
 typedef ULONG_PTR SIZE_T;
+#else
+typedef size_t SIZE_T;
+#endif
 
 # ifdef VKD3D_WIN32_WCHAR
 typedef unsigned short WCHAR;
