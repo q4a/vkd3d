@@ -80,7 +80,11 @@ typedef float FLOAT;
 typedef LONG BOOL;
 
 /* Assuming LP64 model */
+#ifdef _WIN32
 typedef char INT8;
+#else
+typedef int8_t INT8;
+#endif
 typedef unsigned char UINT8;
 typedef short INT16;
 typedef unsigned short UINT16;
