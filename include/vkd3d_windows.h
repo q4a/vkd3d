@@ -115,6 +115,8 @@ typedef wchar_t WCHAR;
 typedef void *HANDLE;
 
 /* GUID */
+#ifndef GUID_DEFINED
+#define GUID_DEFINED
 # ifdef __WIDL__
 typedef struct
 {
@@ -132,6 +134,7 @@ typedef struct _GUID
     unsigned char Data4[8];
 } GUID;
 # endif
+#endif /* GUID_DEFINED */
 
 typedef GUID IID;
 typedef GUID CLSID;
@@ -176,7 +179,9 @@ extern "C++"
         } \
     }
 
+# ifndef __uuidof
 # define __uuidof(type) __vkd3d_uuidof<typeof(type)>()
+# endif /* __uuidof */
 #else
 # define __CRT_UUID_DECL(type, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)
 #endif /* defined(__cplusplus) && !defined(_MSC_VER) */
