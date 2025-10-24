@@ -20,255 +20,388 @@
 #define __VKD3D_WINDOWS_H
 #ifndef _INC_WINDOWS
 
-/* Nameless unions */
-#ifndef __C89_NAMELESS
-# ifdef NONAMELESSUNION
-#  define __C89_NAMELESS
-#  define __C89_NAMELESSUNIONNAME u
-# else
-#  define __C89_NAMELESS
-#  define __C89_NAMELESSUNIONNAME
-# endif /* NONAMELESSUNION */
-#endif  /* __C89_NAMELESS */
+#ifdef __cplusplus
+#include <cstdint>
+#include <cstring>
+#else
+#include <stdint.h>
+#include <string.h>
+#include <wchar.h>
+#endif // __cplusplus
 
-#if !defined(_WIN32) || defined(__WIDL__)
+// GCC complains about the COM interfaces
+// not having virtual destructors
 
-# if !defined(__WIDL__)
-#  if !defined(VKD3D_WIN32_WCHAR)
-#   include <wchar.h>
-#  endif
-#  include <stdint.h>
-# endif
+// and class conversion for C...DESC helper types
+#if defined(__GNUC__) && defined(__cplusplus)
+#pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
+#pragma GCC diagnostic ignored "-Wclass-conversion"
+#endif // __GNUC__ && __cplusplus
 
-# ifdef __GNUC__
-#  define DECLSPEC_ALIGN(x) __attribute__((aligned(x)))
-# endif
+typedef int32_t INT;
+typedef uint32_t UINT;
 
-/* HRESULT */
-typedef int HRESULT;
-# define SUCCEEDED(hr) ((HRESULT)(hr) >= 0)
-# define FAILED(hr)    ((HRESULT)(hr) < 0)
+typedef int32_t LONG;
+typedef uint32_t ULONG;
+typedef int32_t *LPLONG;
 
-# define _HRESULT_TYPEDEF_(x) ((HRESULT)x)
+typedef int32_t HRESULT;
 
-# define S_OK    _HRESULT_TYPEDEF_(0)
-# define S_FALSE _HRESULT_TYPEDEF_(1)
-
-# define E_NOTIMPL     _HRESULT_TYPEDEF_(0x80004001)
-# define E_NOINTERFACE _HRESULT_TYPEDEF_(0x80004002)
-# define E_POINTER     _HRESULT_TYPEDEF_(0x80004003)
-# define E_ABORT       _HRESULT_TYPEDEF_(0x80004004)
-# define E_FAIL        _HRESULT_TYPEDEF_(0x80004005)
-# define E_OUTOFMEMORY _HRESULT_TYPEDEF_(0x8007000E)
-# define E_INVALIDARG  _HRESULT_TYPEDEF_(0x80070057)
-
-# define DXGI_ERROR_NOT_FOUND _HRESULT_TYPEDEF_(0x887a0002)
-# define DXGI_ERROR_MORE_DATA _HRESULT_TYPEDEF_(0x887a0003)
-# define DXGI_ERROR_UNSUPPORTED _HRESULT_TYPEDEF_(0x887a0004)
-# define DXGI_ERROR_ALREADY_EXISTS _HRESULT_TYPEDEF_(0x887a0036)
-
-# define D3DERR_INVALIDCALL _HRESULT_TYPEDEF_(0x8876086c)
-
-/* Basic types */
-typedef unsigned char BYTE;
-typedef unsigned int DWORD;
-typedef int INT;
-typedef unsigned int UINT;
-typedef int LONG;
-typedef unsigned int ULONG;
-typedef float FLOAT;
-typedef LONG BOOL;
-
-/* Assuming LP64 model */
-typedef char INT8;
-typedef unsigned char UINT8;
-typedef short INT16;
-typedef unsigned short UINT16;
-typedef int INT32;
-typedef unsigned int UINT32;
-# if defined(__WIDL__)
-typedef __int64 INT64;
-typedef unsigned __int64 UINT64;
-# else
-typedef int64_t DECLSPEC_ALIGN(8) INT64;
-typedef uint64_t DECLSPEC_ALIGN(8) UINT64;
-# endif
-typedef INT64 LONG64;
-typedef long LONG_PTR;
-typedef unsigned long ULONG_PTR;
-
-typedef ULONG_PTR SIZE_T;
-
-# ifdef VKD3D_WIN32_WCHAR
-typedef unsigned short WCHAR;
-# else
 typedef wchar_t WCHAR;
-# endif /* VKD3D_WIN32_WCHAR */
-typedef void *HANDLE;
+typedef WCHAR *NWPSTR, *LPWSTR, *PWSTR;
+typedef unsigned char UCHAR, *PUCHAR;
 
-/* GUID */
-# ifdef __WIDL__
-typedef struct
-{
-    unsigned long Data1;
-    unsigned short Data2;
-    unsigned short Data3;
-    unsigned char Data4[8];
-} GUID;
-# else
-typedef struct _GUID
-{
-    unsigned int Data1;
-    unsigned short Data2;
-    unsigned short Data3;
-    unsigned char Data4[8];
-} GUID;
-# endif
+typedef char CHAR;
+typedef const CHAR *LPCSTR, *PCSTR;
 
-typedef GUID IID;
-typedef GUID CLSID;
+typedef INT BOOL;
+typedef BOOL WINBOOL;
+
+typedef uint16_t UINT16;
+typedef uint32_t UINT32;
+typedef uint64_t UINT64;
+typedef void VOID;
+typedef void* PVOID;
+typedef void* LPVOID;
+typedef const void* LPCVOID;
+
+typedef size_t SIZE_T;
+
+typedef int8_t INT8;
+typedef uint8_t UINT8;
+typedef uint8_t BYTE;
+
+typedef int16_t SHORT;
+typedef uint16_t USHORT;
+
+typedef int64_t LONGLONG;
+typedef int64_t INT64;
+
+typedef uint64_t ULONGLONG;
+typedef uint64_t UINT64;
+
+typedef intptr_t LONG_PTR;
+typedef uintptr_t ULONG_PTR;
+
+typedef float FLOAT;
+
+#ifndef GUID_DEFINED
+#define GUID_DEFINED
+typedef struct GUID {
+  uint32_t Data1;
+  uint16_t Data2;
+  uint16_t Data3;
+  uint8_t  Data4[8];
+} GUID;
+#endif // GUID_DEFINED
+
 typedef GUID UUID;
-
-# ifdef INITGUID
-#  ifndef __cplusplus
-#   define DEFINE_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
-        const GUID name DECLSPEC_HIDDEN; \
-        const GUID name = \
-    { l, w1, w2, { b1, b2, b3, b4, b5, b6, b7, b8 }}
-#  else
-#   define DEFINE_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
-        EXTERN_C const GUID name DECLSPEC_HIDDEN; \
-        EXTERN_C const GUID name = \
-    { l, w1, w2, { b1, b2, b3, b4, b5, b6, b7, b8 }}
-#  endif
-# else
-#  define DEFINE_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
-        EXTERN_C const GUID name DECLSPEC_HIDDEN;
-# endif /* INITGUID */
-
-/* __uuidof emulation */
-#if defined(__cplusplus) && !defined(_MSC_VER)
-
-extern "C++"
-{
-    template<typename T> const GUID &__vkd3d_uuidof();
-}
-
-# define __CRT_UUID_DECL(type, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
-    extern "C++" \
-    { \
-        template<> inline const GUID &__vkd3d_uuidof<type>() \
-        { \
-            static const IID __uuid_inst = {l, w1, w2, {b1, b2, b3, b4, b5, b6, b7, b8}}; \
-            return __uuid_inst; \
-        } \
-        template<> inline const GUID &__vkd3d_uuidof<type *>() \
-        { \
-            return __vkd3d_uuidof<type>(); \
-        } \
-    }
-
-# define __uuidof(type) __vkd3d_uuidof<typeof(type)>()
+typedef GUID IID;
+#ifdef __cplusplus
+#define REFIID const IID&
+#define REFGUID const GUID&
+#define REFCLSID const GUID&
 #else
-# define __CRT_UUID_DECL(type, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)
-#endif /* defined(__cplusplus) && !defined(_MSC_VER) */
+#define REFIID const IID*
+#define REFGUID const GUID*
+#define REFCLSID const GUID* const
+#endif // __cplusplus
 
-typedef struct SECURITY_ATTRIBUTES SECURITY_ATTRIBUTES;
-#endif  /* !defined(_WIN32) || defined(__WIDL__) */
+#ifdef __cplusplus
 
+template <typename T>
+constexpr GUID __uuidof_helper();
 
-#ifndef _WIN32
-# include <stddef.h>
-# include <stdlib.h>
-# include <string.h>
+#define __uuidof(T) __uuidof_helper<T>()
+#define __uuidof_var(T) __uuidof_helper<decltype(T)>()
 
-# define COM_NO_WINDOWS_H
+inline bool operator==(const GUID& a, const GUID& b) { return std::memcmp(&a, &b, sizeof(GUID)) == 0; }
+inline bool operator!=(const GUID& a, const GUID& b) { return std::memcmp(&a, &b, sizeof(GUID)) != 0; }
 
-# define FORCEINLINE inline
+#endif // __cplusplus
 
-# define CONTAINING_RECORD(address, type, field) \
-        ((type *)((char *)(address) - offsetof(type, field)))
+typedef uint32_t DWORD;
+typedef uint16_t WORD;
+typedef DWORD *LPDWORD;
 
-# ifdef __x86_64__
-#  define __stdcall __attribute__((ms_abi))
-# else
-#  if (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2)) || defined(__APPLE__)
-#   define __stdcall __attribute__((__stdcall__)) __attribute__((__force_align_arg_pointer__))
-#  else
-#   define __stdcall __attribute__((__stdcall__))
-#  endif
-# endif
+typedef void* HANDLE;
+typedef HANDLE HMONITOR;
+typedef HANDLE HDC;
+typedef HANDLE HMODULE;
+typedef HANDLE HINSTANCE;
+typedef HANDLE HWND;
+typedef HANDLE HKEY;
+typedef HANDLE *LPHANDLE;
+typedef DWORD COLORREF;
 
-# define WINAPI __stdcall
-# define STDMETHODCALLTYPE __stdcall
-
-# ifdef __GNUC__
-#  define DECLSPEC_SELECTANY __attribute__((weak))
-# endif
-
-/* Macros for COM interfaces */
-# define interface struct
-# define BEGIN_INTERFACE
-# define END_INTERFACE
-# define MIDL_INTERFACE(x) struct
-
-# ifdef __cplusplus
-#  define EXTERN_C extern "C"
-# else
-#  define EXTERN_C extern
-# endif
-
-# define CONST_VTBL const
-
-# define TRUE 1
-# define FALSE 0
-
-# if defined(__cplusplus) && !defined(CINTERFACE)
-#  define REFIID const IID &
-#  define REFGUID const GUID &
-#  define REFCLSID const CLSID &
-# else
-#  define REFIID const IID * const
-#  define REFGUID const GUID * const
-#  define REFCLSID const CLSID * const
-# endif
-
-#if defined(__cplusplus) && !defined(CINTERFACE)
-# define IsEqualGUID(guid1, guid2) (!memcmp(&(guid1), &(guid2), sizeof(GUID)))
+#if INTPTR_MAX == INT64_MAX
+typedef int64_t  INT_PTR;
+typedef uint64_t UINT_PTR;
 #else
-# define IsEqualGUID(guid1, guid2) (!memcmp(guid1, guid2, sizeof(GUID)))
+typedef int32_t  INT_PTR;
+typedef uint32_t UINT_PTR;
 #endif
+typedef INT_PTR*  PINT_PTR;
+typedef UINT_PTR* PUINT_PTR;
 
-#elif !defined(__WIDL__)
+#ifdef STRICT
+#define DECLARE_HANDLE(a) typedef struct a##__ { int unused; } *a
+#else /*STRICT*/
+#define DECLARE_HANDLE(a) typedef HANDLE a
+#endif /*STRICT*/
 
-# include <windows.h>
+typedef char* LPSTR;
+typedef wchar_t* LPWSTR;
+typedef const char* LPCSTR;
+typedef const wchar_t* LPCWSTR;
 
-#endif  /* _WIN32 */
+typedef struct LUID {
+  DWORD LowPart;
+  LONG  HighPart;
+} LUID;
 
+typedef struct POINT {
+  LONG x;
+  LONG y;
+} POINT;
 
-/* Define DECLSPEC_HIDDEN */
-#ifndef DECLSPEC_HIDDEN
-# if defined(__MINGW32__)
-#  define DECLSPEC_HIDDEN
-# elif defined(__GNUC__)
-#  define DECLSPEC_HIDDEN __attribute__((visibility("hidden")))
-# else
-#  define DECLSPEC_HIDDEN
-# endif
-#endif  /* DECLSPEC_HIDDEN */
+typedef POINT* LPPOINT;
 
-/* Define min() & max() macros */
-#ifndef NOMINMAX
-# ifndef min
-#  define min(a, b) (((a) <= (b)) ? (a) : (b))
-# endif
+typedef struct RECT {
+  LONG left;
+  LONG top;
+  LONG right;
+  LONG bottom;
+} RECT,*PRECT,*NPRECT,*LPRECT;
 
-# ifndef max
-#  define max(a, b) (((a) >= (b)) ? (a) : (b))
-# endif
-#endif /* NOMINMAX */
+typedef struct SIZE {
+  LONG cx;
+  LONG cy;
+} SIZE,*PSIZE,*LPSIZE;
+
+typedef union {
+  struct {
+    DWORD LowPart;
+    LONG HighPart;
+  };
+
+  struct {
+    DWORD LowPart;
+    LONG HighPart;
+  } u;
+
+  LONGLONG QuadPart;
+} LARGE_INTEGER;
+
+typedef struct MEMORYSTATUS {
+  DWORD  dwLength;
+  SIZE_T dwTotalPhys;
+} MEMORYSTATUS;
+
+typedef struct SECURITY_ATTRIBUTES {
+  DWORD nLength;
+  void* lpSecurityDescriptor;
+  BOOL  bInheritHandle;
+} SECURITY_ATTRIBUTES;
+
+typedef struct PALETTEENTRY {
+  BYTE peRed;
+  BYTE peGreen;
+  BYTE peBlue;
+  BYTE peFlags;
+} PALETTEENTRY, *PPALETTEENTRY, *LPPALETTEENTRY;
+
+typedef struct RGNDATAHEADER {
+  DWORD dwSize;
+  DWORD iType;
+  DWORD nCount;
+  DWORD nRgnSize;
+  RECT  rcBound;
+} RGNDATAHEADER;
+
+typedef struct RGNDATA {
+  RGNDATAHEADER rdh;
+  char          Buffer[1];
+} RGNDATA,*PRGNDATA,*NPRGNDATA,*LPRGNDATA;
+
+// Ignore these.
+#define STDMETHODCALLTYPE
+#define __stdcall
+
+#define CONST const
+#define CONST_VTBL const
+
+#define TRUE 1
+#define FALSE 0
+
+#define WAIT_TIMEOUT    0x00000102
+#define WAIT_FAILED	    0xffffffff
+#define WAIT_OBJECT_0		0
+#define WAIT_ABANDONED  0x00000080
+
+#define interface struct
+#define MIDL_INTERFACE(x) struct
+
+#ifdef __cplusplus
+
+#define DEFINE_GUID(iid, a, b, c, d, e, f, g, h, i, j, k) \
+  constexpr GUID iid = {a,b,c,{d,e,f,g,h,i,j,k}};
+
+#define DECLARE_UUIDOF_HELPER(type, a, b, c, d, e, f, g, h, i, j, k) \
+  extern "C++" { template <> constexpr GUID __uuidof_helper<type>() { return GUID{a,b,c,{d,e,f,g,h,i,j,k}}; } } \
+  extern "C++" { template <> constexpr GUID __uuidof_helper<type*>() { return __uuidof_helper<type>(); } } \
+  extern "C++" { template <> constexpr GUID __uuidof_helper<const type*>() { return __uuidof_helper<type>(); } } \
+  extern "C++" { template <> constexpr GUID __uuidof_helper<type&>() { return __uuidof_helper<type>(); } } \
+  extern "C++" { template <> constexpr GUID __uuidof_helper<const type&>() { return __uuidof_helper<type>(); } }
+
+#else
+#define DEFINE_GUID(iid, a, b, c, d, e, f, g, h, i, j, k) \
+  static const GUID iid = {a,b,c,{d,e,f,g,h,i,j,k}};
+#define DECLARE_UUIDOF_HELPER(type, a, b, c, d, e, f, g, h, i, j, k)
+#endif // __cplusplus
+
+#define __CRT_UUID_DECL(type, a, b, c, d, e, f, g, h, i, j, k) DECLARE_UUIDOF_HELPER(type, a, b, c, d, e, f, g, h, i, j, k)
+
+#define S_OK     0
+#define S_FALSE  1
+
+#define E_INVALIDARG  ((HRESULT)0x80070057)
+#define E_FAIL        ((HRESULT)0x80004005)
+#define E_NOINTERFACE ((HRESULT)0x80004002)
+#define E_NOTIMPL     ((HRESULT)0x80004001)
+#define E_OUTOFMEMORY ((HRESULT)0x8007000E)
+#define E_POINTER     ((HRESULT)0x80004003)
+
+#define DXGI_STATUS_OCCLUDED                     ((HRESULT)0x087a0001)
+#define DXGI_STATUS_CLIPPED                      ((HRESULT)0x087a0002)
+#define DXGI_STATUS_NO_REDIRECTION               ((HRESULT)0x087a0004)
+#define DXGI_STATUS_NO_DESKTOP_ACCESS            ((HRESULT)0x087a0005)
+#define DXGI_STATUS_GRAPHICS_VIDPN_SOURCE_IN_USE ((HRESULT)0x087a0006)
+#define DXGI_STATUS_MODE_CHANGED                 ((HRESULT)0x087a0007)
+#define DXGI_STATUS_MODE_CHANGE_IN_PROGRESS      ((HRESULT)0x087a0008)
+#define DXGI_STATUS_UNOCCLUDED                   ((HRESULT)0x087a0009)
+#define DXGI_STATUS_DDA_WAS_STILL_DRAWING        ((HRESULT)0x087a000a)
+#define DXGI_STATUS_PRESENT_REQUIRED             ((HRESULT)0x087a002f)
+
+#define DXGI_ERROR_INVALID_CALL                  ((HRESULT)0x887A0001)
+#define DXGI_ERROR_NOT_FOUND                     ((HRESULT)0x887A0002)
+#define DXGI_ERROR_MORE_DATA                     ((HRESULT)0x887A0003)
+#define DXGI_ERROR_UNSUPPORTED                   ((HRESULT)0x887A0004)
+#define DXGI_ERROR_DEVICE_REMOVED                ((HRESULT)0x887A0005)
+#define DXGI_ERROR_DEVICE_HUNG                   ((HRESULT)0x887A0006)
+#define DXGI_ERROR_DEVICE_RESET                  ((HRESULT)0x887A0007)
+#define DXGI_ERROR_WAS_STILL_DRAWING             ((HRESULT)0x887A000A)
+#define DXGI_ERROR_FRAME_STATISTICS_DISJOINT     ((HRESULT)0x887A000B)
+#define DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE  ((HRESULT)0x887A000C)
+#define DXGI_ERROR_DRIVER_INTERNAL_ERROR         ((HRESULT)0x887A0020)
+#define DXGI_ERROR_NONEXCLUSIVE                  ((HRESULT)0x887A0021)
+#define DXGI_ERROR_NOT_CURRENTLY_AVAILABLE       ((HRESULT)0x887A0022)
+#define DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED    ((HRESULT)0x887A0023)
+#define DXGI_ERROR_REMOTE_OUTOFMEMORY            ((HRESULT)0x887A0024)
+#define DXGI_ERROR_ACCESS_LOST                   ((HRESULT)0x887A0026)
+#define DXGI_ERROR_WAIT_TIMEOUT                  ((HRESULT)0x887A0027)
+#define DXGI_ERROR_SESSION_DISCONNECTED          ((HRESULT)0x887A0028)
+#define DXGI_ERROR_RESTRICT_TO_OUTPUT_STALE      ((HRESULT)0x887A0029)
+#define DXGI_ERROR_CANNOT_PROTECT_CONTENT        ((HRESULT)0x887A002A)
+#define DXGI_ERROR_ACCESS_DENIED                 ((HRESULT)0x887A002B)
+#define DXGI_ERROR_NAME_ALREADY_EXISTS           ((HRESULT)0x887A002C)
+#define DXGI_ERROR_SDK_COMPONENT_MISSING         ((HRESULT)0x887A002D)
+
+#define D3D11_ERROR_DEFERRED_CONTEXT_MAP_WITHOUT_INITIAL_DISCARD ((HRESULT)0x887C0004)
+
+#define WINAPI
+#define WINUSERAPI
+
+#define RGB(r,g,b)          ((COLORREF)(((BYTE)(r)|((WORD)((BYTE)(g))<<8))|(((DWORD)(BYTE)(b))<<16)))
+
+#define MAKE_HRESULT(sev,fac,code) \
+    ((HRESULT) (((unsigned long)(sev)<<31) | ((unsigned long)(fac)<<16) | ((unsigned long)(code))) )
+
+#ifdef __cplusplus
+#define STDMETHOD(name) virtual HRESULT name
+#define STDMETHOD_(type, name) virtual type name
+#else
+#define STDMETHOD(name) HRESULT (STDMETHODCALLTYPE *name)
+#define STDMETHOD_(type, name) type (STDMETHODCALLTYPE *name)
+#endif // __cplusplus
+
+#define THIS_
+#define THIS
+
+#define __C89_NAMELESSSTRUCTNAME
+#define __C89_NAMELESSUNIONNAME
+#define __C89_NAMELESSUNIONNAME1
+#define __C89_NAMELESSUNIONNAME2
+#define __C89_NAMELESSUNIONNAME3
+#define __C89_NAMELESSUNIONNAME4
+#define __C89_NAMELESSUNIONNAME5
+#define __C89_NAMELESSUNIONNAME6
+#define __C89_NAMELESSUNIONNAME7
+#define __C89_NAMELESSUNIONNAME8
+#define __C89_NAMELESS
+#define DUMMYUNIONNAME
+#define DUMMYSTRUCTNAME
+#define DUMMYUNIONNAME1
+#define DUMMYUNIONNAME2
+#define DUMMYUNIONNAME3
+#define DUMMYUNIONNAME4
+#define DUMMYUNIONNAME5
+#define DUMMYUNIONNAME6
+#define DUMMYUNIONNAME7
+#define DUMMYUNIONNAME8
+#define DUMMYUNIONNAME9
+
+#ifdef __cplusplus
+#define DECLARE_INTERFACE(x)     struct x
+#define DECLARE_INTERFACE_(x, y) struct x : public y
+#else
+#ifdef CONST_VTABLE
+#define DECLARE_INTERFACE(x) \
+    typedef interface x { \
+        const struct x##Vtbl *lpVtbl; \
+    } x; \
+    typedef const struct x##Vtbl x##Vtbl; \
+    const struct x##Vtbl
+#else
+#define DECLARE_INTERFACE(x) \
+    typedef interface x { \
+        struct x##Vtbl *lpVtbl; \
+    } x; \
+    typedef struct x##Vtbl x##Vtbl; \
+    struct x##Vtbl
+#endif // CONST_VTABLE
+#define DECLARE_INTERFACE_(x, y) DECLARE_INTERFACE(x)
+#endif // __cplusplus
+
+#define BEGIN_INTERFACE
+#define END_INTERFACE
+
+#ifdef __cplusplus
+#define PURE = 0
+#else
+#define PURE
+#endif // __cplusplus
+
+#define DECLSPEC_SELECTANY
+
+#define __MSABI_LONG(x) x
+
+#define ENUM_CURRENT_SETTINGS ((DWORD)-1)
+#define ENUM_REGISTRY_SETTINGS ((DWORD)-2)
+
+#define INVALID_HANDLE_VALUE ((HANDLE)-1)
+
+#define DUPLICATE_CLOSE_SOURCE ((DWORD)0x1)
+#define DUPLICATE_SAME_ACCESS ((DWORD)0x2)
+
+#define FAILED(hr) ((HRESULT)(hr) < 0)
+#define SUCCEEDED(hr) ((HRESULT)(hr) >= 0)
+
+#define RtlZeroMemory(Destination,Length) memset((Destination),0,(Length))
+#define ZeroMemory RtlZeroMemory
 
 #ifndef DEFINE_ENUM_FLAG_OPERATORS
+
 #ifdef __cplusplus
 # define DEFINE_ENUM_FLAG_OPERATORS(type) \
 extern "C++" \
