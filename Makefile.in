@@ -3177,9 +3177,12 @@ libs/vkd3d-shader/hlsl.tab.c libs/vkd3d-shader/hlsl.tab.h &: libs/vkd3d-shader/h
 ${objc_headers}: %.h: demos/make_objc %.json
 	@$(MKDIR_P) $(@D)
 	$(VKD3D_V_PERL)$(VKD3D_PERL) $^ > $@.tmp && mv $@.tmp $@
-$(widl_headers): %.h: %.idl
-@HAVE_WIDL_TRUE@	$(VKD3D_V_WIDL)$(WIDL) -I$(srcdir)/include -h -o $@ $<
-@HAVE_WIDL_FALSE@	@echo "widl is required to generate $@"
+#$(widl_headers): %.h: %.idl
+#if HAVE_WIDL
+#	$(VKD3D_V_WIDL)$(WIDL) -I$(srcdir)/include -h -o $@ $<
+#else
+#	@echo "widl is required to generate $@"
+#endif
 
 libvkd3d-utils.pc: $(srcdir)/libs/vkd3d-utils/libvkd3d-utils.pc.in Makefile
 	$(AM_V_GEN)$(SED) -e 's![@]prefix[@]!$(prefix)!g' \

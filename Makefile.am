@@ -600,12 +600,12 @@ EXTRA_DIST += \
 	$(widl_headers:.h=.idl) \
 	$(objc_headers:.h=.json) \
 	include/private/spirv.core.grammar.json
-$(widl_headers): %.h: %.idl
-if HAVE_WIDL
-	$(VKD3D_V_WIDL)$(WIDL) -I$(srcdir)/include -h -o $@ $<
-else
-	@echo "widl is required to generate $@"
-endif
+#$(widl_headers): %.h: %.idl
+#if HAVE_WIDL
+#	$(VKD3D_V_WIDL)$(WIDL) -I$(srcdir)/include -h -o $@ $<
+#else
+#	@echo "widl is required to generate $@"
+#endif
 
 libvkd3d-utils.pc: $(srcdir)/libs/vkd3d-utils/libvkd3d-utils.pc.in Makefile
 	$(AM_V_GEN)$(SED) -e 's![@]prefix[@]!$(prefix)!g' \
