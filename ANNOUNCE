@@ -1,0 +1,682 @@
+The vkd3d team is proud to announce that release 1.17 of vkd3d, the Direct3D
+to Vulkan translation library, is now available.
+
+This release contains improvements that are listed in the release notes below.
+The main highlights are:
+
+  - Initial HLSL support for thread group shared memory.
+  - Several features have been implemented for the experimental Metal Shading
+    Language target.
+  - Miscellaneous bug fixes.
+
+The source is available from the following location:
+
+  <https://dl.winehq.org/vkd3d/source/vkd3d-1.17.tar.xz>
+
+The current source can also be pulled directly from the git repository:
+
+  <https://gitlab.winehq.org/wine/vkd3d.git>
+
+Vkd3d is available thanks to the work of multiple people. See the file AUTHORS
+for the complete list.
+
+# What's new in vkd3d 1.17
+
+### libvkd3d
+
+  - The EnumerateMetaCommands() method of the ID3D12Device5 interface is
+    implemented.
+
+### libvkd3d-shader
+
+  - Several new features and improvements for the HLSL source type:
+    - Initial thread group shared memory support.
+    - Improved support for geometry shaders: shader model 5 multiple output
+      streams, as well as SV_IsFrontFace, SV_RenderTargetArrayIndex, and
+      SV_ViewportArrayIndex outputs.
+    - Structure variable input/output semantics are propagated to the
+      constituent structure fields.
+    - Shader entry point return values are allocated before any other outputs
+      in the output signature. This matches d3dcompiler/fxc more closely.
+    - Hull shader control point pass-through.
+    - Reflection information can be retrieved using vkd3d_shader_scan().
+    - Improved preprocessor handling of comments inside include directives, as
+      well as inclusion of empty files.
+    - Memory barrier intrinsics are supported in shader model 4 target
+      profiles. Previous these were only supported in shader model 5 target
+      profiles.
+    - Parser support for the noise() intrinsic. Although the intrinsic itself
+      isn't implemented, parser support for the intrinsic is required to allow
+      compilation of any other shaders in the same source file to succeed as
+      well.
+    - Parser support for StructuredBuffer resources.
+
+  - Various new features and improvements for the effects (FX) source type:
+    - Shader blob assignments and FXLVM value expressions in ‘fx_2_0’ effects.
+    - Nameless structure types.
+    - Explicit constant buffer bind points and constant packing offsets.
+    - The ‘d3ds_noiseswiz’, ‘ge’, ‘lt’, and ‘noise’ FXLVM operations.
+
+  - The experimental Metal Shading Language (MSL) target supports the
+    following features:
+    - Texture sampling and gather operations.
+    - Loops and switches.
+    - Screen-space partial derivatives.
+    - Various integer arithmetic and comparison operations.
+    - Indirect addressing of constant buffers.
+    - Indexable temporary registers.
+    - Fragment shader output sample coverage masks.
+    - SV_Position and SV_SampleIndex fragment shader inputs.
+    - SV_VertexID inputs.
+
+  - When the experimental MSL target is enabled, the ‘dxbc-dxil’ source type
+    can be used in combination with the ‘msl’ target type to convert DXIL
+    shaders to MSL.
+
+  - The new ‘tx’ source type can be used in combination with the ‘d3d-asm’
+    target type to disassemble D3DX ‘tx_1_0’ texture shaders.
+
+  - The FX target takes alignment and padding into account in ‘fx_4_0’ buffer
+    size calculations.
+
+  - The SPIR-V target is capable of outputting OpSource and OpLine debug
+    information.
+
+  - The core grammar for the experimental SPIR-V disassembler has been updated
+    to the ‘vulkan-sdk-1.4.313.0’ release.
+
+  - New interfaces:
+    - The VKD3D_SHADER_SOURCE_TX source type specifies D3DX ‘tx_1_0’ texture
+      shaders.
+
+### vkd3d-compiler
+
+  - The new ‘tx’ source type specifies D3DX ‘tx_1_0’ texture shaders.
+
+### demos
+
+  - The new vkd3d-teapot demo uses tessellation shaders to render a version of
+    Martin Newell's famous teapot. It should be noted that current versions of
+    MoltenVK unfortunately do not support all features required to execute
+    this demo correctly.
+
+### Changes since vkd3d 1.16:
+```
+Anna (navi) Figueiredo Gomes (5):
+      vkd3d-shader/hlsl: Clone the entry point body and redirect processing to the clone.
+      vkd3d-shader/hlsl: Reset "extern_vars" before processing "entry_func" in hlsl_emit_bytecode().
+      vkd3d-shader/hlsl: Add temporary variables to "dummy_scope" in prepend_uniform_copy().
+      vkd3d-shader/hlsl: Don't create a temporary copy for a uniform if one already exists.
+      vkd3d-shader/hlsl: Move hlsl_ir_function_decl->extern_vars to a local variable.
+
+Brendan Shanks (2):
+      include: Add additional generated files to .gitignore.
+      tests: Add dxcompiler.h to .gitignore.
+
+Conor McCarthy (9):
+      vkd3d-shader/dxil: Validate the function return type after calling the handler.
+      vkd3d-shader/dxil: Check the destination value is invalid after calling a void function handler.
+      vkd3d-shader/dxil: Add a null check for the type when validating non-void operands.
+      vkd3d-shader/ir: Allow constant buffer loads to have a minimum precision.
+      vkd3d-shader/dxil: Convert constant buffer minimum-precision source registers.
+      tests: Replace test_ps_viewport_index() with a shader runner test.
+      vkd3d-shader/dxil: Handle SV_ViewportArrayIndex.
+      tests/hlsl: Add a test for SV_PrimitiveId inputs and outputs.
+      vkd3d-shader/dxil: Handle SV_PrimitiveId outputs.
+
+Elizabeth Figura (31):
+      vkd3d-shader/ir: Use add_signature_element() to add clip planes.
+      vkd3d-shader/ir: Split TEXCOORD into two separate vsir opcodes.
+      vkd3d-shader/ir: Split TEX into two separate vsir opcodes.
+      vkd3d-shader: Use the correct union members for raw and structured resources.
+      vkd3d-shader/preproc: Parse comments in #include and #line directives.
+      vkd3d-shader/preproc: Swap to the INITIAL state after ending a buffer.
+      vkd3d-shader/preproc: Store EOF state per buffer.
+      vkd3d-shader/hlsl: Add a register type field to struct hlsl_reg.
+      vkd3d-shader/ir: Introduce a stub SSA to temp allocation pass.
+      vkd3d-shader/ir: Track liveness in the SSA allocator.
+      vkd3d-shader/ir: Allocate SSA registers to temps.
+      vkd3d-shader/hlsl: Output SSA registers where possible.
+      vkd3d-shader/d3d-asm: Handle INT_MIN in shader_print_int_literal().
+      vkd3d-shader/hlsl: Convert descriptor registers to pre-5.1 form in the TPF writer.
+      vkd3d-shader/hlsl: Output sm1 semantics with unique register_index values.
+      vkd3d-shader/hlsl: Set the data type in sm4_generate_vsir_reg_from_deref().
+      vkd3d-shader/hlsl: Set the destination data type to UINT in sm4_generate_vsir_cast_from_bool().
+      vkd3d-shader/ir: Allow bitwise operations on VKD3D_DATA_INT.
+      tests/shader_runner: Add support for 3D resources.
+      tests/hlsl: Add tests for 3D textures.
+      tests/shader_runner: Add support for cube resources.
+      tests/hlsl: Add tests for cube textures.
+      vkd3d-shader/spirv: Do not use OpCopyMemory for partial writemasks in spirv_compiler_emit_mov().
+      vkd3d-shader/spirv: Use left-shifted writemasks for private variables for inputs.
+      vkd3d-shader/ir: Record the previous temp count before allocating any SSA values.
+      tests/hlsl: Add a regression test for packed SV_IsFrontFace.
+      vkd3d-shader: Add descriptors from SAMPLE instructions if necessary.
+      vkd3d-shader/d3dbc: Move TEXLD lowering to d3dbc_parse().
+      vkd3d-shader/d3dbc: Normalize ps 1.x output.
+      vkd3d-shader/d3dbc: Lower 1.4 TEXLD.
+      vkd3d-shader/d3dbc: Lower TEXCRD.
+
+Evan Tang (4):
+      vkd3d: Replace the resource count field of struct d3d12_heap with an internal refcount.
+      vkd3d: Mask colour writes on graphics pipelines without fragment shaders.
+      tests/d3d12: Add a colour attachment to test_draw_depth_no_ps().
+      vkd3d: Get rid of the default fragment shader from d3d12_pipeline_state_init_graphics().
+
+Francisco Casas (38):
+      tests/d3d12: Avoid out-of-bounds access when evaluating ok() args (ubsan).
+      tests/shader_runner_d3d12: Handle the "bug" qualifier on state creation failure.
+      tests/hlsl: Test the allocation order of return semantics.
+      vkd3d-shader/hlsl: Allocate return variables before other outputs.
+      tests/hlsl: Fix up point-sprite.shader_test.
+      vkd3d-shader/hlsl: Update the enum hlsl_sampler_dim comment.
+      vkd3d-shader/ir: Avoid a compiler warning in vsir_block_list_init().
+      tests/hlsl: Add semantic cascading tests.
+      vkd3d-shader/hlsl: Use the index in the hlsl_semantic when appending output copies.
+      vkd3d-shader/hlsl: Use the index in the hlsl_semantic when prepending input copies.
+      vkd3d-shader/hlsl: Don't pass the semantic index in add_semantic_var().
+      vkd3d-shader/hlsl: Make output semantics on structs cascade down onto the fields.
+      vkd3d-shader/hlsl: Make input semantics on structs cascade down onto the fields.
+      tests/hlsl: Add additional semantic cascading tests.
+      tests: Test semantic cascading signatures.
+      vkd3d-shader/hlsl: Dump processed function bodies.
+      vkd3d-shader/ir: Validate flags in SAMPLE_INFO operations.
+      vkd3d-shader/ir: Validate flags in RESINFO operations.
+      vkd3d-shader/dxil: Use iterators in sm6_parser_globals_init().
+      vkd3d-shader/hlsl: Use vsir_program_append() in sm1_generate_vsir_constant_defs().
+      vkd3d-shader/hlsl: Use vsir_program_append() in sm1_generate_vsir_sampler_dcls().
+      vkd3d-shader/hlsl: Use vsir_program_append() in generate_vsir_add_program_instruction().
+      vkd3d-shader/ir: Use iterators in vsir_program_ensure_diffuse().
+      vkd3d-shader/ir: Use iterators in vsir_program_remap_output_signature().
+      vkd3d-shader/ir: Use iterators in instruction_array_normalise_hull_shader_control_point_io().
+      vkd3d-shader/ir: Use iterators in vsir_program_normalise_flat_constants().
+      vkd3d-shader/ir: Use iterators in vsir_program_normalise_io_registers().
+      vkd3d-shader/ir: Remove the io_normaliser.instructions field.
+      vkd3d-shader/ir: Use iterators in vsir_program_remove_dead_code().
+      vkd3d-shader/ir: Use iterators in cf_flattener_iterate_instruction_array().
+      vkd3d-shader/ir: Use iterators in vsir_program_flatten_hull_shader_phases().
+      vkd3d-shader/ir: Use iterators in vsir_program_materialise_phi_ssas_to_temps().
+      vkd3d-shader/ir: Use iterators in vsir_program_insert_alpha_test().
+      vkd3d-shader/ir: Use iterators in vsir_program_insert_clip_planes().
+      vkd3d-shader/ir: Use iterators in vsir_program_insert_point_size().
+      vkd3d-shader/ir: Use iterators in vsir_program_insert_point_size_clamp().
+      vkd3d-shader/ir: Use iterators in vsir_program_insert_point_coord().
+      vkd3d-compiler: Set a default target type even when preprocessing.
+
+Giovanni Mascellani (251):
+      vkd3d-shader/dxil: Pass a reference to the SM6 parser to src_params_init_from_operands().
+      vkd3d-shader/dxil: Pass a reference to the SM6 parser to src_param_init_from_value().
+      vkd3d-shader/dxil: Pass a reference to the SM6 parser to sm6_register_from_value().
+      vkd3d-shader/dxil: Reimplement aggregate indexing using specialized value types.
+      tests/hlsl: Test minimum precision stride in constant buffers.
+      tests/hlsl: Test minimum precision 16-bit unsigned integers.
+      tests/hlsl: Test minimum precision 16-bit signed integers.
+      tests/hlsl: Remove some tests from minimum-precision.shader_test.
+      tests/hlsl: Test casting doubles to minimum precision integers.
+      tests/hlsl: Test casting minimum precision integers to doubles.
+      tests/hlsl: Test casting 16-bit integers to doubles.
+      tests/hlsl: Test native 16-bit floating point numbers.
+      tests/hlsl: Test minimum precision floating point numbers.
+      tests/hlsl: Test minimum precision stride for signed integers too.
+      tests/hlsl: Test minimum precision stride for floating point numbers too.
+      tests/hlsl: Do not test for overflowing 16-bit texture sampling.
+      tests/hlsl: Mark a test in object-references.shader_test as todo on MoltenVK with DXIL.
+      tests/hlsl: Mark some tests in clip-cull-distance.shader_test as buggy on MoltenVK with d3d12.
+      tests/hlsl: Mark a test in gather-offset.shader_test as buggy on MoltenVK with d3d12.
+      tests/hlsl: Mark some tests in wave-ops-uint.shader_test as buggy on MoltenVK.
+      tests/hlsl: Mark some tests in wave-ops-int.shader_test as buggy on MoltenVK.
+      tests/hlsl: Mark some tests in uav-atomics.shader_test as working on MoltenVK.
+      ci: Really use DXC 1.8.2502 for macOS.
+      vkd3d-shader/dxil: Do not touch the parser current value in instruction_dst_param_init_temp_vector().
+      vkd3d-shader/dxil: Generate CONSTANT values in sm6_parser_constants_init() for integer values.
+      vkd3d-shader/dxil: Generate CONSTANT values in sm6_parser_constants_init() for floating-point values.
+      vkd3d-shader/dxil: Generate specialized values in sm6_parser_constants_init() for casts.
+      vkd3d-shader/dxil: Generate CONSTANT values in sm6_parser_constants_init() for null scalars.
+      vkd3d-shader/dxil: Remove bitcast helpers.
+      tests/hlsl: Test sampling with minimum precision floating-point numbers.
+      tests/hlsl: Test the interstage interface for minimum precision types.
+      tests/hlsl: Use the appropriate RTV format in shader-interstage-interface.shader_test.
+      tests/hlsl: Add a test reading from a minimum precision signed integer array.
+      tests/hlsl: Add some more minimum precision floating-point tests.
+      tests/hlsl: Add a test reading from a minimum precision floating-point array.
+      tests/hlsl: Mark a test in sm6-uav-rwtexture.shader_test as todo on MoltenVK.
+      tests/hlsl: Mark a test in register-reservation-resources.shader_test as todo on MoltenVK with DXIL.
+      tests/hlsl: Mark a test in entry-point-semantics.shader_test as buggy on MoltenVK with DXIL.
+      tests/hlsl: Mark some tests in geometry.shader_test as buggy on MoltenVK.
+      tests/hlsl: Mark some tests in wave-ops-float.shader_test as buggy on MoltenVK.
+      vkd3d-shader/glsl: Accept and ignore the REFACTORING_ALLOWED global flag.
+      vkd3d-shader/msl: Accept and ignore the REFACTORING_ALLOWED global flag.
+      vkd3d-shader/glsl: Ignore the PARTIALPRECISION destination modifier.
+      vkd3d-shader/msl: Ignore the PARTIALPRECISION destination modifier.
+      tests: Add a test for the ABSNEG source modifier.
+      vkd3d-shader/glsl: Support the ABSNEG source modifier.
+      vkd3d-shader/msl: Support the ABSNEG source modifier.
+      vkd3d-shader/dxil: Do not use field "reg" in of sm6_value when writing bitcasts.
+      vkd3d-shader/dxil: Validate that floating-point truncation casts decrease bit width.
+      vkd3d-shader/dxil: Validate that integer extension casts increase bit width.
+      vkd3d-shader/dxil: Validate that floating-point extension casts increase bit width.
+      vkd3d-shader/dxil: Handle 16-bit values uniformly in sm6_map_cast_op().
+      tests: Mark some tests in arithmetic-int-uniform.shader_test as buggy on MoltenVK < 1.2.11.
+      tests: Mark some tests in calculate-lod.shader_test as buggy on MoltenVK < 1.2.11.
+      ci: Enable testing with DXC again on macOS.
+      tests/hlsl: Test minimum precision IDXTEMP registers.
+      vkd3d-shader/hlsl: Reject programs with group shared variables.
+      tests/hlsl: Test some quirks of TGSMs with SM < 5.0.
+      tests/hlsl: Test TGSMs with minimum precision unsigned integers.
+      vkd3d-shader/dxil: Generate specialized values in sm6_parser_emit_cast() for trivial casts.
+      vkd3d-shader/dxil: Represent non uniformness in the SM6 value.
+      vkd3d-shader/dxil: Store a SM6 value in sm6_phi.
+      vkd3d-shader/dxil: Do not set the value type in sm6_parser_declare_global().
+      vkd3d-shader/dxil: Do not set the value type in sm6_parser_function_init().
+      tests: Skip test_graphics_compute_queue_synchronization() on paravirtualized MoltenVK.
+      tests: Add a test about discontiguous input swizzles in bytecode format.
+      tests: Fix the shader model requirements for a ps_5_0 shader.
+      vkd3d-shader/dxil: Rewrite sm6_value_is_constant() in terms of the value type.
+      vkd3d-shader/dxil: Rewrite sm6_value_is_undef() in terms of the value type.
+      vkd3d-shader/dxil: Rewrite sm6_value_is_ssa() in terms of the value type.
+      vkd3d-shader/dxil: Rewrite sm6_value_get_constant_uint() in terms of the SM6 value.
+      vkd3d-shader/dxil: Rewrite sm6_value_get_constant_uint64() in terms of the SM6 value.
+      vkd3d-shader/dxil: Rewrite sm6_value_is_constant_zero() in terms of the SM6 value.
+      vkd3d-shader/dxil: Rewrite sm6_parser_init_ssa_value() in terms of the SM6 value.
+      vkd3d-shader/dxil: Introduce sm6_value_get_constant_float().
+      vkd3d-shader/dxil: Remove field "reg" from struct sm6_value.
+      vkd3d-shader/dxil: Emit 16-bit CONSTANT values as minimum precision registers.
+      vkd3d-shader/dxil: Emit 16-bit arrays as minimum precision types.
+      vkd3d-shader/dxil: Emit 16-bit IDXTEMP values as minimum precision registers.
+      vkd3d-shader/dxil: Emit 16-bit SSA values as minimum precision registers.
+      vkd3d-shader/dxil: Emit 16-bit ICB values as minimum precision registers.
+      vkd3d-shader/ir: Rename VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER to VKD3D_SHADER_ERROR_VSIR_INVALID_OPCODE.
+      vkd3d-shader/dxil: Allow constant zero values to be floating point.
+      vkd3d-shader/dxil: Emit 16-bit raw TGSMs as minimum precision.
+      vkd3d-shader/dxil: Emit 16-bit structured TGSMs as minimum precision.
+      vkd3d-shader/dxil: Emit 16-bit GROUPSHAREDMEM values as minimum precision registers.
+      vkd3d-shader/dxil: Emit 16-bit UNDEFINED and INVALID values as minimum precision registers.
+      vkd3d-shader/ir: Validate ABS instructions.
+      vkd3d-shader/ir: Validate ACOS instructions.
+      vkd3d-shader/ir: Validate ADD instructions.
+      vkd3d-shader/ir: Validate AND instructions.
+      vkd3d-shader/ir: Validate ASIN instructions.
+      vkd3d-shader/ir: Validate ATAN instructions.
+      tests: Add a test for the partial precision destination modifier.
+      vkd3d-shader/ir: Validate data types for NEG source modifiers.
+      vkd3d-shader/ir: Validate data types for BIAS source modifiers.
+      vkd3d-shader/ir: Validate data types for BIASNEG source modifiers.
+      vkd3d-shader/ir: Validate data types for SIGN source modifiers.
+      vkd3d-shader/ir: Validate data types for SIGNNEG source modifiers.
+      vkd3d-shader/ir: Introduce opcode COS.
+      vkd3d-shader/ir: Introduce opcode SIN.
+      vkd3d-shader/ir: Lower d3dbc SINCOS to the new COS and SIN instructions.
+      vkd3d-shader/ir: Lower tpf SINCOS to the new COS and SIN instructions.
+      vkd3d-shader/ir: Validate DADD instructions.
+      vkd3d-shader/ir: Validate DDIV instructions.
+      vkd3d-shader/ir: Validate DFMA instructions.
+      vkd3d-shader/ir: Validate DGEO instructions.
+      vkd3d-shader/ir: Validate DIV instructions.
+      vkd3d-shader/ir: Validate DLT instructions.
+      vkd3d-shader/ir: Validate DMAX instructions.
+      vkd3d-shader/ir: Validate DMIN instructions.
+      vkd3d-shader/ir: Validate DMOV instructions.
+      vkd3d-shader/ir: Validate DMUL instructions.
+      vkd3d-shader/ir: Validate data types for COMP source modifiers.
+      vkd3d-shader/ir: Validate data types for X2 source modifiers.
+      vkd3d-shader/ir: Validate data types for X2NEG source modifiers.
+      vkd3d-shader/ir: Validate data types for DZ source modifiers.
+      vkd3d-shader/ir: Validate data types for DW source modifiers.
+      vkd3d-shader/ir: Introduce VKD3DSIH_IMUL_LOW.
+      vkd3d-shader/ir: Lower IMUL and UMUL to IMUL_LOW.
+      vkd3d-shader/ir: Validate data types for ABS source modifiers.
+      vkd3d-shader/ir: Validate data types for ABSNEG source modifiers.
+      vkd3d-shader/ir: Validate data types for NOT source modifiers.
+      vkd3d-shader/ir: Validate data types for SATURATE destination modifiers.
+      vkd3d-shader/ir: Validate data types for destination shifts.
+      vkd3d-shader/ir: Validate DNE instructions.
+      vkd3d-shader/ir: Validate DRCP instructions.
+      vkd3d-shader/ir: Validate DSX instructions.
+      vkd3d-shader/ir: Validate DSX_COARSE instructions.
+      vkd3d-shader/ir: Validate DSX_FINE instructions.
+      vkd3d-shader/ir: Validate DSY instructions.
+      vkd3d-shader/ir: Validate DSY_COARSE instructions.
+      vkd3d-shader/ir: Validate DSY_FINE instructions.
+      vkd3d-shader/ir: Do not crash when registers cannot be resolved to signature elements.
+      vkd3d-shader/ir: Introduce VSIR_OP_IREM.
+      vkd3d-shader/ir: Repurpose IDIV to compute plain signed division.
+      vkd3d-shader/ir: Introduce VSIR_OP_UDIV_SIMPLE.
+      vkd3d-shader/ir: Introduce VSIR_OP_UREM.
+      vkd3d-shader/ir: Lower UDIV to UDIV_SIMPLE and UREM.
+      vkd3d-shader/ir: Validate EQO instructions.
+      vkd3d-shader/ir: Validate DEQO instructions.
+      vkd3d-shader/ir: Validate EQU instructions.
+      vkd3d-shader/ir: Validate EXP instructions.
+      vkd3d-shader/ir: Validate FRC instructions.
+      vkd3d-shader/ir: Validate FREM instructions.
+      vkd3d-shader/ir: Validate GEO instructions.
+      vkd3d-shader/ir: Validate GEU instructions.
+      vkd3d-shader/ir: Test the data type when validating comparison operations.
+      tests/hlsl: Test int64 comparisons.
+      tests/hlsl: Test uint64 comparisons.
+      vkd3d-shader/ir: Validate HCOS instructions.
+      vkd3d-shader/ir: Validate HSIN instructions.
+      vkd3d-shader/ir: Validate HTAN instructions.
+      vkd3d-shader/ir: Validate IADD instructions.
+      vkd3d-shader/ir: Validate IEQ instructions.
+      vkd3d-shader/ir: Validate IGE instructions.
+      vkd3d-shader/ir: Validate ILT instructions.
+      vkd3d-shader/ir: Collect the hull shader phase flattener code together.
+      vkd3d-shader/ir: Handle SSA registers when flattening hull shader phases.
+      vkd3d-shader/ir: Do not make a local copy of the instructions array in vsir_program_flatten_hull_shader_phases().
+      vkd3d: Move vkd3d_vk_descriptor_set_index_from_vk_descriptor_type() to resource.c.
+      vkd3d/resource: Write null descriptors with their correct type when using mutable descriptor types.
+      vkd3d-shader/ir: Validate descriptor flags in vsir programs.
+      vkd3d-shader/ir: Validate UAV flags in vsir programs.
+      vkd3d-shader/ir: Validate IMAD operations.
+      vkd3d-shader/ir: Validate IMAX operations.
+      vkd3d-shader/ir: Validate IMIN operations.
+      vkd3d-shader/ir: Validate INE operations.
+      vkd3d-shader/ir: Validate INEG operations.
+      vkd3d-shader/ir: Validate IREM operations.
+      vkd3d-shader/ir: Validate ISHL operations.
+      vkd3d-shader/ir: Validate ISHR operations.
+      vkd3d-shader/ir: Introduce an abstraction to iterate through vsir instructions.
+      vkd3d-shader/ir: Use the iterator in vsir_program_lower_ifc().
+      vkd3d-shader/ir: Use the iterator in vsir_program_lower_texkill().
+      vkd3d-shader/ir: Use the iterator in vsir_program_lower_precise_mad().
+      vkd3d-shader/ir: Sort vsir_validator_instructions[] alphabetically.
+      vkd3d-shader/ir: Validate ISFINITE operations.
+      vkd3d-shader/ir: Validate ISINF operations.
+      vkd3d-shader/ir: Validate ISNAN operations.
+      vkd3d-shader/ir: Validate ITOF operations.
+      vkd3d-shader/ir: Validate ITOI operations.
+      vkd3d-shader/ir: Validate FTOI operations.
+      vkd3d-shader/ir: Validate FTOU operations.
+      vkd3d-shader/ir: Set dimension to VEC4 when converting SSAs to TEMPs.
+      vkd3d-shader/ir: Do not print a message for registers that are not being allocated.
+      vkd3d-shader/ir: Use the iterator in vsir_program_lower_udiv().
+      vkd3d-shader/ir: Use the iterator in vsir_program_lower_sm1_sincos().
+      vkd3d-shader/ir: Use the iterator in vsir_program_lower_sm4_sincos().
+      vkd3d-shader/ir: Use the iterator in vsir_program_lower_texldp().
+      vkd3d-shader/ir: Validate LOG operations.
+      vkd3d-shader/ir: Validate LTO operations.
+      vkd3d-shader/ir: Validate LTU operations.
+      vkd3d-shader/ir: Validate MAD operations.
+      vkd3d-shader/ir: Validate MAX operations.
+      vkd3d-shader/ir: Validate MIN operations.
+      vkd3d-shader/ir: Validate MUL operations.
+      vkd3d-shader/ir: Check that LOCALTHREADINDEX registers have dimension VEC4.
+      vkd3d-shader/ir: Check that COVERAGE registers have dimension VEC4.
+      vkd3d-shader/ir: Check that DEPTHOUT registers have dimension SCALAR.
+      vkd3d-shader/ir: Check that DEPTHOUTGE registers have dimension SCALAR.
+      vkd3d-shader/ir: Check that DEPTHOUTLE registers have dimension SCALAR.
+      vkd3d-shader/ir: Check that LOCALTHREADID registers have dimension VEC4.
+      vkd3d-shader/ir: Check that THREADGROUPID registers have dimension VEC4.
+      vkd3d-shader/ir: Update the program TEMP count when allocating TEMP registers.
+      vkd3d-shader/ir: Split updating DCL_TEMPS instructions to a dedicated pass.
+      vkd3d-shader/ir: Check that THREADID registers have dimension VEC4.
+      vkd3d-shader/ir: Check that SAMPLEMASK registers have dimension SCALAR.
+      vkd3d-shader/ir: Check that GSINSTID registers have dimension SCALAR.
+      vkd3d-shader/ir: Check that OUTPOINTID registers have dimension SCALAR.
+      vkd3d-shader/ir: Check that PRIMID registers have dimension SCALAR.
+      vkd3d-shader/ir: Check that OUTSTENCILREF registers have dimension SCALAR.
+      vkd3d-shader/ir: Introduce vsir_program_append().
+      vkd3d-shader/tpf: Use iterators in tpf_write_program().
+      vkd3d-shader/spirv: Use iterators in spirv_compiler_generate_spirv().
+      vkd3d-shader/msl: Use iterators in msl_generator_generate().
+      vkd3d-shader/glsl: Use iterators in vkd3d_glsl_generator_generate().
+      vkd3d-shader/d3d-asm: Use iterators in d3d_asm_compile().
+      vkd3d-shader/d3dbc: Use vsir_program_append() in d3dbc_parse().
+      vkd3d-shader/d3dbc: Use iterators in d3dbc_write_program_instructions().
+      vkd3d-shader/ir: Validate NEO operations.
+      vkd3d-shader/ir: Validate NEU operations.
+      vkd3d-shader/ir: Validate NOT operations.
+      vkd3d-shader/ir: Validate OR operations.
+      vkd3d-shader/ir: Validate ORD instructions.
+      vkd3d-shader/ir: Validate RCP instructions.
+      vkd3d-shader/ir: Validate ROUND_NE instructions.
+      vkd3d-shader/ir: Validate ROUND_NI instructions.
+      vkd3d-shader/ir: Use size_t in the parameter allocator.
+      vkd3d-shader/ir: Use size_t in the instruction array.
+      vkd3d-shader: Use size_t in the string buffer.
+      vkd3d-shader/msl: Ignore the interpolation mode for output variables.
+      vkd3d-shader/msl: Emit indexable temps with the appropriate component count.
+      vkd3d-shader/msl: Use the union type for SAMPLEMASK registers.
+      vkd3d-shader/msl: Reject shaders with duplicate I/O target locations.
+      vkd3d-shader/msl: Convert the results of load and sample operations to the destination data type.
+      vkd3d-shader/dxil: Emit gather offsets as signed.
+      vkd3d-shader/d3d-asm: Emit precise flags for a number of opcodes.
+      vkd3d-shader/spirv: Support precise flags on RESINFO instructions.
+      vkd3d-shader/spirv: Support precise flags on SAMPLE_INFO instructions.
+      tests/hlsl: Test SV_GSInstanceID.
+      vkd3d-shader/ir: Check that GSINSTID registers have dimension VEC4.
+      vkd3d-shader/hlsl: Reject geometry shaders with instance count.
+      vkd3d-shader: Use iterators in vsir_program_scan().
+      vkd3d-shader/ir: Use iterators in vsir_program_normalize_addr().
+      vkd3d-shader/ir: Use iterators in vsir_program_ensure_ret().
+      vkd3d-shader: Use the structure names when creating the parameter allocators.
+      vkd3d-shader: Enable converting DXIL to MSL.
+      vkd3d-shader/msl: Allocate SSA registers to temporaries.
+      tests/shader_runner_metal: Allow checking shader model 5.1 too.
+      tests/shader_runner_metal: Run the Metal shader runner with DXIL shaders.
+
+Henri Verbeet (148):
+      vkd3d-shader: Also output vkd3d_shader_verror() messages using WARN.
+      vkd3d-shader: Also output vkd3d_shader_vwarning() messages using WARN.
+      vkd3d-shader: Also output vkd3d_shader_vnote() messages using WARN.
+      vkd3d-shader: Remove some newlines from vkd3d-shader error messages.
+      tests/shader_runner_metal: Try harder to find a suitable device.
+      tests/shader_runner_d3d11: Direct3D 11 supports geometry shaders.
+      tests/hlsl: Require the "geometry-shader" cap for the relevant clip/cull-distance tests.
+      tests/hlsl: Get rid of a MSL todo in geometry.shader_test.
+      tests/hlsl: Slightly adjust the bias values in the sample-bias tests.
+      vkd3d-shader: Move vkd3d_siv_from_sysval_indexed() to hlsl_codegen.c.
+      vkd3d-shader/msl: Make the generated main function static.
+      tests/shader_runner: Introduce a "tessellation-shader" cap.
+      vkd3d-shader/msl: Ensure we have a non-NULL "resource_type_info" pointer in msl_ld().
+      vkd3d-shader/msl: Reject cube and multi-sample texel fetches in msl_ld().
+      vkd3d-shader/msl: Get rid of the "lod" field of struct msl_resource_type_info.
+      vkd3d-shader/msl: Slightly improve the error messages for unspecified descriptor bindings.
+      vkd3d-shader/msl: Continue when the SRV descriptor binding isn't specified in msl_ld().
+      vkd3d-shader/msl: Implement support for indirect constant buffer addressing.
+      vkd3d-shader/msl: Handle SV_POSITION inputs.
+      vkd3d-shader/msl: Handle SV_VERTEX_ID inputs.
+      vkd3d-shader/msl: Simplify SV_DEPTH handling.
+      tests/shader_runner_metal: Implement multi-sample readback.
+      tests/shader_runner_metal: Set the pipeline sample count in metal_runner_draw().
+      vkd3d-shader/msl: Handle SV_SAMPLE_INDEX inputs.
+      vkd3d-shader/msl: Implement support for VKD3DSPR_IDXTEMP registers.
+      vkd3d-shader/msl: Implement support for VKD3DSPR_SAMPLEMASK registers.
+      vkd3d-shader/msl: Implement VKD3DSIH_EQO.
+      vkd3d-shader/msl: Implement VKD3DSIH_IADD.
+      vkd3d-shader/msl: Implement VKD3DSIH_IGE.
+      vkd3d-shader/ir: Introduce vsir_opcode_get_name().
+      vkd3d-shader/d3dbc: Use vsir_opcode_get_name() in shader_sm1_get_opcode_info_from_vsir_instruction().
+      vkd3d-shader/d3dbc: Use vsir_opcode_get_name() in d3dbc_write_vsir_instruction().
+      vkd3d-shader/glsl: Use vsir_opcode_get_name() in shader_glsl_unhandled().
+      vkd3d-shader/ir: Use vsir_opcode_get_name() in vsir_program_lower_instructions().
+      vkd3d-shader/msl: Implement VKD3DSIH_ILT.
+      vkd3d-shader/msl: Implement VKD3DSIH_IMUL.
+      vkd3d-shader/msl: Implement loops.
+      vkd3d-shader/msl: Implement switches.
+      vkd3d-shader/msl: Implement VKD3DSIH_DISCARD.
+      tests/shader_runner: Rename the "ri64" probe format to "i64".
+      tests/shader_runner: Introduce the "u64" probe format.
+      tests/shader_runner: Introduce the "f64" probe format.
+      tests/shader_runner: Introduce the "i32" probe format.
+      tests/shader_runner: Introduce the "u32" probe format.
+      tests/shader_runner: Introduce the "f32" probe format.
+      demos: Allow Vulkan to determine the swapchain image count.
+      vkd3d-shader/msl: Implement VKD3DSIH_INEG.
+      vkd3d-shader/msl: Implement VKD3DSIH_ULT.
+      vkd3d-shader/msl: Implement VKD3DSIH_XOR.
+      tests/shader_runner_metal: Implement resource copies.
+      vkd3d-shader/msl: Implement VKD3DSIH_LD2DMS.
+      vkd3d-shader/ir: Use vsir_opcode_get_name() in the validator.
+      vkd3d-shader/msl: Use vsir_opcode_get_name() in msl_unhandled().
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_handle_instruction().
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_emit_atomic_instruction().
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_emit_sample().
+      demos: Print the GPU and platform we're running on.
+      demos: Map the Win32 A-Z keys to a-z.
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_emit_deriv_instruction().
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_emit_comparison_instruction().
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_emit_bitfield_instruction().
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_emit_ext_glsl_instruction().
+      vkd3d-shader/spirv: Use vsir_opcode_get_name() in spirv_compiler_emit_alu_instruction().
+      demos: Introduce a helper function to create a projection matrix.
+      vkd3d-shader/spirv: Emit an OpSource instruction with the source name.
+      vkd3d: Use the DXBC checksum to construct a shader source name.
+      demos/teapot: Add a tessellation demo.
+      vkd3d-shader/msl: Implement VKD3DSIH_SAMPLE.
+      vkd3d-shader/msl: Implement VKD3DSIH_SAMPLE_B.
+      vkd3d-shader/msl: Implement VKD3DSIH_SAMPLE_C.
+      vkd3d-shader/msl: Implement VKD3DSIH_SAMPLE_C_LZ
+      vkd3d-shader/msl: Implement VKD3DSIH_SAMPLE_GRAD.
+      vkd3d-shader/spirv: Do not require VKD3D_SHADER_BINDING_FLAG_IMAGE for sampler descriptors.
+      vkd3d-shader/d3dbc: Use TAG_CTAB in d3dbc_compile().
+      demos/teapot: Add on-screen help.
+      vkd3d-shader/msl: Implement VKD3DSIH_SAMPLE_LOD.
+      vkd3d-shader/msl: Implement VKD3DSIH_GATHER4.
+      vkd3d-shader/msl: Implement VKD3DSIH_GATHER4_C.
+      vkd3d-shader/msl: Implement VKD3DSIH_GATHER4_PO.
+      vkd3d-shader/msl: Implement support for static texel offsets in msl_sample().
+      vkd3d-shader/ir: Rename the VKD3DSIH_* enum elements to VSIR_OP_*.
+      vkd3d-shader/msl: Implement VSIR_OP_CONTINUE.
+      vkd3d-shader/msl: Implement VSIR_OP_DSX and VSIR_OP_DSY.
+      vkd3d-shader/msl: Implement VSIR_OP_DSX_COARSE and VSIR_OP_DSY_COARSE.
+      vkd3d-shader/msl: Implement VSIR_OP_DSX_FINE and VSIR_OP_DSY_FINE.
+      vkd3d-shader/msl: Implement VSIR_OP_IMAX.
+      vkd3d-shader/ir: Create SSA values with the corresponding dimension in vsir_program_lower_sm4_sincos().
+      vkd3d-shader/ir: Create SSA values with the corresponding dimension in vsir_program_lower_udiv().
+      demos/teapot: Add an fps counter.
+      vkd3d-shader/msl: Implement VSIR_OP_UMAX and VSIR_OP_UMIN.
+      tests/shader_runner_metal: Implement buffer textures.
+      vkd3d-shader/msl: Implement VSIR_OP_STORE_UAV_TYPED.
+      vkd3d-shader/msl: Implement VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL.
+      tests/shader_runner_gl: Implement geometry shaders.
+      demos/teapot: Add diffuse lighting.
+      demos/teapot: Add a flat shading toggle.
+      vkd3d-shader/ir: Rename enum vkd3d_data_type to vsir_data_type.
+      vkd3d-shader/ir: Rename VKD3D_DATA_HALF to VSIR_DATA_F16.
+      vkd3d-shader/ir: Rename VKD3D_DATA_FLOAT to VSIR_DATA_F32.
+      vkd3d-shader/ir: Rename VKD3D_DATA_DOUBLE to VSIR_DATA_F64.
+      demos/teapot: Animate the camera.
+      vkd3d-shader/ir: Rename VKD3D_DATA_INT to VSIR_DATA_I32.
+      vkd3d-shader/ir: Rename VKD3D_DATA_UINT8 to VSIR_DATA_U8.
+      vkd3d-shader/ir: Rename VKD3D_DATA_UINT16 to VSIR_DATA_U16.
+      vkd3d-shader/ir: Rename VKD3D_DATA_UINT to VSIR_DATA_U32.
+      vkd3d-shader/ir: Rename VKD3D_DATA_UINT64 to VSIR_DATA_U64.
+      vkd3d-shader/ir: Consistently use VKD3D_DATA_UNUSED for STREAM registers.
+      vkd3d-shader/ir: Rename VKD3D_DATA_UNORM to VSIR_DATA_UNORM.
+      vkd3d-shader/ir: Rename VKD3D_DATA_SNORM to VSIR_DATA_SNORM.
+      vkd3d-shader/ir: Rename VKD3D_DATA_OPAQUE to VSIR_DATA_OPAQUE.
+      vkd3d-shader/ir: Rename VKD3D_DATA_MIXED to VSIR_DATA_MIXED.
+      vkd3d-shader/ir: Rename VKD3D_DATA_CONTINUED to VSIR_DATA_CONTINUED.
+      vkd3d-shader/ir: Rename VKD3D_DATA_UNUSED to VSIR_DATA_UNUSED.
+      vkd3d-shader/ir: Rename VKD3D_DATA_BOOL to VSIR_DATA_BOOL.
+      vkd3d-shader/ir: Explicitly initialise the "resource_data_type" field in vsir_instruction_init().
+      vkd3d-shader/spirv: Use spirv_compiler_error() to report unhandled sample_info flags.
+      vkd3d-shader/spirv: Use spirv_compiler_error() to report unhandled resinfo flags.
+      vkd3d-shader/ir: Consistently use VSIR_DATA_U32 for sample_info_uint destination operands.
+      vkd3d-shader/ir: Consistently use VSIR_DATA_U32 for resinfo_uint destination operands.
+      vkd3d-shader/hlsl: Get rid of the "hlsl" argument to hlsl_compile_shader().
+      vkd3d-shader/tpf: Update the comment describing the data type mapping in init_sm4_lookup_tables().
+      vkd3d-shader/ir: Allow source operands of shift operations to have different data types.
+      vkd3d-shader/hlsl: Emit vsir from hlsl_emit_bytecode().
+      vkd3d-shader: Call vsir_program_scan() for d3d-asm targets in vsir_program_compile().
+      vkd3d-shader/spirv: Emit OpLine instructions.
+      demos/teapot: Add specular lighting.
+      vkd3d-shader/hlsl: Introduce hlsl_compile_effect().
+      vkd3d-shader/hlsl: Initialise the vsir program in hlsl_emit_vsir().
+      vkd3d-shader/hlsl: Generate vsir signatures in hlsl_emit_vsir().
+      vkd3d-shader/spirv: Update the SPIR-V grammar JSON to the vulkan-sdk-1.4.313.0 release.
+      vkd3d-shader/ir: Free program parameters on failure in vsir_program_init() if needed.
+      include: Remove some redudant TAG_* definintions from vkd3d_shader_util.h.
+      vkd3d: Set the maximum viewport count in d3d12_pipeline_state_get_or_create_pipeline().
+      vkd3d-shader/ir: Use vsir_program_append() in vsir_program_ensure_ret().
+      tests/shader_runner: Parse hex blobs as a list of 32-bit integers.
+      tests: Strip reflection data from dxbc-tpf-hex shaders.
+      tests/d3d12: Check whether the d3d12 device supports geometry shaders.
+      tests/shader_runner_d3d12: Check whether the d3d12 device supports geometry shaders.
+      vkd3d-shader: Cleanup the vsir program on vsir_program_transform_early() failure in vsir_parse().
+      vkd3d-shader: Introduce struct vkd3d_shader_source_list.
+      vkd3d-shader/hlsl: Pass a vkd3d_shader_source_list pointer to hlsl_ctx_init().
+      vkd3d-shader/hlsl: Initialise the vsir program in hlsl_compile_shader().
+      vkd3d-shader/hlsl: Return a vsir program from hlsl_compile_shader().
+      vkd3d-shader/hlsl: Support HLSL sources in vkd3d_shader_scan().
+      vkd3d-shader/spirv: Avoid emitting duplicate built-in inputs in spirv_compiler_emit_input().
+      vkd3d-shader/d3d-asm: Resolve SSA values when outputting SM<6 assembly.
+      vkd3d-shader/glsl: Resolve SSA values.
+      vkd3d-shader: Document that vkd3d_shader_scan() supports HLSL sources.
+
+Nikolay Sivov (45):
+      vkd3d-shader/fx: Handle nameless structure types.
+      vkd3d-shader/fx: Use the correct value range for bool initializers.
+      vkd3d-shader/fx: Use the correct field indices when writing structure default values.
+      vkd3d-shader/fx: Fix the total buffer size calculation in write_fx_4_buffer().
+      vkd3d-shader/fx: Fix writing fx_2_0 structure parameters.
+      vkd3d-shader/fx: Use variable unpacked size when setting buffer sizes.
+      vkd3d-shader/fx: Print explicit buffer bind points in fx -> d3d-asm output.
+      vkd3d-shader/fx: Print packoffset() modifiers in fx -> d3d-asm output.
+      vkd3d-shader/fx: Fix some typos in fx_2_0 state names.
+      vkd3d-shader/fx: Use correct array sizes for the fx_2_0 states.
+      vkd3d-shader/fx: Fix reading the assignment value base type when parsing fx_2_0.
+      vkd3d-shader/fx: Fix a crash in fx -> d3d-asm when named values are not defined.
+      vkd3d-shader/fx: Handle bool types when parsing fx_2_0 assignment values.
+      vkd3d-shader/fx: Add a few missing fxlc opcode names.
+      vkd3d-shader/fx: Do not print padding bytes of fx_2_0 strings.
+      vkd3d-shader/fx: Use a separate table for sampler states in fx_2_0.
+      vkd3d-shader/fx: Give fxlvm-specific constants a version-neutral name.
+      vkd3d-shader/fx: Use a version-neutral name for the opcode table.
+      vkd3d-shader/fx: Read instruction arguments in full before printing them.
+      vkd3d-shader/fx: Use more generic names for the literal constant array.
+      vkd3d-shader/fx: Add a helper to print literals.
+      vkd3d-shader/fx: Rename the constant argument helper to be version-neutral.
+      vkd3d-shader/fx: Parse array selector expressions for fx_2_0.
+      vkd3d-shader/fx: Remove the unused fx_4_fxlc_argument type.
+      vkd3d-shader/fx: Explicitly check all known state assignment types for fx_2_0.
+      vkd3d-shader/fx: Output value expressions for fx_2_0.
+      vkd3d-shader/fx: Output indirect register access in arguments.
+      vkd3d-shader/fx: Add the "noise" opcode name.
+      vkd3d-shader/fx: Add support for tx -> text output.
+      vkd3d-shader/d3dbc: Use the actual instruction length in d3dbc_write_instruction().
+      vkd3d-shader/hlsl: Add a stub for the noise() intrinsic.
+      vkd3d-shader/fx: Use a version-independent structure for states.
+      vkd3d-shader/fx: Use the same state data helpers for both fx_2_0 and fx_4+.
+      vkd3d-shader/fx: Move state decomposition to the fx_4_0-specific writing path.
+      vkd3d-shader/fx: Move entry count updates out of the state block writing helper.
+      vkd3d-shader/fx: Add a format-specific callback to write state assignments.
+      vkd3d-shader/fx: Fix the order of the "MaterialDiffuse" and "MaterialAmbient" state entries.
+      vkd3d-shader/fx: Improve register naming in the disassembly output.
+      vkd3d-shader/fx: Use the correct value range for bools in fx_4_0 state values.
+      vkd3d-shader/fx: Explicitly handle bool state values when parsing.
+      vkd3d-shader/ir: Handle TEXLDL instructions in vsir_program_lower_instructions().
+      vkd3d-shader/hlsl: Handle HLSL_RESOURCE_SAMPLE_LOD in sm1_generate_vsir_instr_resource_load().
+      vkd3d-shader/fx: Handle regular shader blobs when parsing the state data.
+      vkd3d-shader/fx: Do not attempt to parse expressions without code section.
+      vkd3d: Return success from d3d12_device_EnumerateMetaCommands().
+
+Shaun Ren (19):
+      vkd3d-shader/tpf: Read the DCL_OUTPUT_SGV instruction.
+      vkd3d-shader/hlsl: Implement output semantics for geometry shaders.
+      tests: Test signature reflection for geometry shader outputs.
+      vkd3d-shader/hlsl: Fix the register string for patch arrays in debug_register().
+      vkd3d-shader/hlsl: Support void pass-through hull shader control point functions.
+      vkd3d-shader/hlsl: Emit dcl_stream instructions for SM5 geometry shaders.
+      vkd3d-shader/hlsl: Generate vsir instructions for indexed output streams in geometry shaders.
+      vkd3d-shader/hlsl: Store stream index in struct hlsl_semantic.
+      vkd3d-shader/hlsl: Don't optimize semantic register allocations in SM1.
+      vkd3d-shader/hlsl: Remove a leftover TODO message.
+      vkd3d-shader/hlsl: Only dump store writemasks for single register types.
+      vkd3d-shader/hlsl: Handle nodes with NULL data types in hlsl_replace_node().
+      vkd3d-shader/hlsl: Allow memory barriers in SM4+ target profiles.
+      vkd3d-shader/hlsl: Ignore the 'groupshared' modifier for non-compute shaders.
+      vkd3d-shader/hlsl: Allocate groupshared registers.
+      vkd3d-shader/hlsl: Emit dcl_tgsm_raw instructions for raw groupshared variables.
+      vkd3d-shader/hlsl: Support loads from groupshared variables.
+      vkd3d-shader/hlsl: Support stores to raw groupshared variables.
+      vkd3d-shader/hlsl: Support interlocked operations on non-indexed groupshared variables.
+
+Victor Chiletto (4):
+      tests/hlsl: Add a few extra structured buffer matrix load + swizzle tests.
+      vkd3d-shader/hlsl: Parse SRV structured buffers.
+      vkd3d-shader/hlsl: Transform hlsl_ir_index into structured buffers into field specific hlsl_ir_resource_loads.
+      vkd3d-shader/hlsl: Split matrix copies from resource loads.
+```
