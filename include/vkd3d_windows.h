@@ -20,6 +20,21 @@
 #define __VKD3D_WINDOWS_H
 #ifndef _INC_WINDOWS
 
+/* Nameless unions */
+#ifndef __C89_NAMELESS
+# ifdef NONAMELESSUNION
+#  define __C89_NAMELESS
+#  define __C89_NAMELESSUNIONNAME u
+# else
+#  define __C89_NAMELESS
+#  define __C89_NAMELESSUNIONNAME
+# endif /* NONAMELESSUNION */
+#endif  /* __C89_NAMELESS */
+
+#ifdef __GNUC__
+# define DECLSPEC_ALIGN(x) __attribute__((aligned(x)))
+#endif
+
 #ifdef __cplusplus
 #include <cstdint>
 #include <cstring>
@@ -107,6 +122,12 @@ typedef GUID IID;
 #define REFCLSID const GUID* const
 #endif // __cplusplus
 
+#if defined(__cplusplus) && !defined(CINTERFACE)
+# define IsEqualGUID(guid1, guid2) (!memcmp(&(guid1), &(guid2), sizeof(GUID)))
+#else
+# define IsEqualGUID(guid1, guid2) (!memcmp(guid1, guid2, sizeof(GUID)))
+#endif
+
 #ifdef __cplusplus
 
 template <typename T>
@@ -155,24 +176,12 @@ typedef wchar_t* LPWSTR;
 typedef const char* LPCSTR;
 typedef const wchar_t* LPCWSTR;
 
-typedef struct LUID {
-  DWORD LowPart;
-  LONG  HighPart;
-} LUID;
-
 typedef struct POINT {
   LONG x;
   LONG y;
 } POINT;
 
 typedef POINT* LPPOINT;
-
-typedef struct RECT {
-  LONG left;
-  LONG top;
-  LONG right;
-  LONG bottom;
-} RECT,*PRECT,*NPRECT,*LPRECT;
 
 typedef struct SIZE {
   LONG cx;
@@ -210,19 +219,6 @@ typedef struct PALETTEENTRY {
   BYTE peBlue;
   BYTE peFlags;
 } PALETTEENTRY, *PPALETTEENTRY, *LPPALETTEENTRY;
-
-typedef struct RGNDATAHEADER {
-  DWORD dwSize;
-  DWORD iType;
-  DWORD nCount;
-  DWORD nRgnSize;
-  RECT  rcBound;
-} RGNDATAHEADER;
-
-typedef struct RGNDATA {
-  RGNDATAHEADER rdh;
-  char          Buffer[1];
-} RGNDATA,*PRGNDATA,*NPRGNDATA,*LPRGNDATA;
 
 // Ignore these.
 #define STDMETHODCALLTYPE
@@ -271,6 +267,10 @@ typedef struct RGNDATA {
 #define E_NOTIMPL     ((HRESULT)0x80004001)
 #define E_OUTOFMEMORY ((HRESULT)0x8007000E)
 #define E_POINTER     ((HRESULT)0x80004003)
+#define E_ABORT       ((HRESULT)0x80004004)
+#define E_FAIL        ((HRESULT)0x80004005)
+#define E_OUTOFMEMORY ((HRESULT)0x8007000E)
+#define E_INVALIDARG  ((HRESULT)0x80070057)
 
 #define DXGI_STATUS_OCCLUDED                     ((HRESULT)0x087a0001)
 #define DXGI_STATUS_CLIPPED                      ((HRESULT)0x087a0002)
@@ -306,8 +306,16 @@ typedef struct RGNDATA {
 #define DXGI_ERROR_ACCESS_DENIED                 ((HRESULT)0x887A002B)
 #define DXGI_ERROR_NAME_ALREADY_EXISTS           ((HRESULT)0x887A002C)
 #define DXGI_ERROR_SDK_COMPONENT_MISSING         ((HRESULT)0x887A002D)
+#define DXGI_ERROR_ALREADY_EXISTS                ((HRESULT)0x887A0036)
 
 #define D3D11_ERROR_DEFERRED_CONTEXT_MAP_WITHOUT_INITIAL_DISCARD ((HRESULT)0x887C0004)
+
+#include <stdlib.h>
+
+#define COM_NO_WINDOWS_H
+
+#define CONTAINING_RECORD(address, type, field) \
+        ((type *)((char *)(address) - offsetof(type, field)))
 
 #define WINAPI
 #define WINUSERAPI
@@ -328,17 +336,6 @@ typedef struct RGNDATA {
 #define THIS_
 #define THIS
 
-#define __C89_NAMELESSSTRUCTNAME
-#define __C89_NAMELESSUNIONNAME
-#define __C89_NAMELESSUNIONNAME1
-#define __C89_NAMELESSUNIONNAME2
-#define __C89_NAMELESSUNIONNAME3
-#define __C89_NAMELESSUNIONNAME4
-#define __C89_NAMELESSUNIONNAME5
-#define __C89_NAMELESSUNIONNAME6
-#define __C89_NAMELESSUNIONNAME7
-#define __C89_NAMELESSUNIONNAME8
-#define __C89_NAMELESS
 #define DUMMYUNIONNAME
 #define DUMMYSTRUCTNAME
 #define DUMMYUNIONNAME1
@@ -397,8 +394,21 @@ typedef struct RGNDATA {
 #define FAILED(hr) ((HRESULT)(hr) < 0)
 #define SUCCEEDED(hr) ((HRESULT)(hr) >= 0)
 
+#define _HRESULT_TYPEDEF_(x) ((HRESULT)x)
+
 #define RtlZeroMemory(Destination,Length) memset((Destination),0,(Length))
 #define ZeroMemory RtlZeroMemory
+
+/* Define min() & max() macros */
+#ifndef NOMINMAX
+# ifndef min
+#  define min(a, b) (((a) <= (b)) ? (a) : (b))
+# endif
+
+# ifndef max
+#  define max(a, b) (((a) >= (b)) ? (a) : (b))
+# endif
+#endif /* NOMINMAX */
 
 #ifndef DEFINE_ENUM_FLAG_OPERATORS
 
