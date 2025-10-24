@@ -176,12 +176,24 @@ typedef wchar_t* LPWSTR;
 typedef const char* LPCSTR;
 typedef const wchar_t* LPCWSTR;
 
+typedef struct LUID {
+  DWORD LowPart;
+  LONG  HighPart;
+} LUID;
+
 typedef struct POINT {
   LONG x;
   LONG y;
 } POINT;
 
 typedef POINT* LPPOINT;
+
+typedef struct RECT {
+  LONG left;
+  LONG top;
+  LONG right;
+  LONG bottom;
+} RECT,*PRECT,*NPRECT,*LPRECT;
 
 typedef struct SIZE {
   LONG cx;
@@ -219,6 +231,19 @@ typedef struct PALETTEENTRY {
   BYTE peBlue;
   BYTE peFlags;
 } PALETTEENTRY, *PPALETTEENTRY, *LPPALETTEENTRY;
+
+typedef struct RGNDATAHEADER {
+  DWORD dwSize;
+  DWORD iType;
+  DWORD nCount;
+  DWORD nRgnSize;
+  RECT  rcBound;
+} RGNDATAHEADER;
+
+typedef struct RGNDATA {
+  RGNDATAHEADER rdh;
+  char          Buffer[1];
+} RGNDATA,*PRGNDATA,*NPRGNDATA,*LPRGNDATA;
 
 // Ignore these.
 #define STDMETHODCALLTYPE
