@@ -69,7 +69,7 @@ typedef void (*PFN_vkd3d_log)(const char *format, va_list args);
 # define VKD3D_IMPORT __declspec(dllimport)
 # define VKD3D_EXPORT __declspec(dllexport)
 #elif defined(__GNUC__)
-# define VKD3D_IMPORT
+# define VKD3D_IMPORT __attribute__((visibility("default")))
 # define VKD3D_EXPORT __attribute__((visibility("default")))
 #else
 # define VKD3D_IMPORT
