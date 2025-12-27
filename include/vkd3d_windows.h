@@ -1,4 +1,21 @@
-#pragma once
+#ifndef __VKD3D_WINDOWS_H
+#define __VKD3D_WINDOWS_H
+#ifndef _INC_WINDOWS
+
+/* Nameless unions */
+#ifndef __C89_NAMELESS
+# ifdef NONAMELESSUNION
+#  define __C89_NAMELESS
+#  define __C89_NAMELESSUNIONNAME u
+# else
+#  define __C89_NAMELESS
+#  define __C89_NAMELESSUNIONNAME
+# endif /* NONAMELESSUNION */
+#endif  /* __C89_NAMELESS */
+
+#ifdef __GNUC__
+# define DECLSPEC_ALIGN(x) __attribute__((aligned(x)))
+#endif
 
 #ifdef __cplusplus
 #include <cstdint>
@@ -308,17 +325,6 @@ typedef struct RGNDATA {
 #define THIS_
 #define THIS
 
-#define __C89_NAMELESSSTRUCTNAME
-#define __C89_NAMELESSUNIONNAME
-#define __C89_NAMELESSUNIONNAME1
-#define __C89_NAMELESSUNIONNAME2
-#define __C89_NAMELESSUNIONNAME3
-#define __C89_NAMELESSUNIONNAME4
-#define __C89_NAMELESSUNIONNAME5
-#define __C89_NAMELESSUNIONNAME6
-#define __C89_NAMELESSUNIONNAME7
-#define __C89_NAMELESSUNIONNAME8
-#define __C89_NAMELESS
 #define DUMMYUNIONNAME
 #define DUMMYSTRUCTNAME
 #define DUMMYUNIONNAME1
@@ -398,3 +404,34 @@ extern "C++" \
 # define DEFINE_ENUM_FLAG_OPERATORS(type)
 #endif
 #endif /* DEFINE_ENUM_FLAG_OPERATORS */
+
+#if defined(__cplusplus) && !defined(CINTERFACE)
+# define IsEqualGUID(guid1, guid2) (!memcmp(&(guid1), &(guid2), sizeof(GUID)))
+#else
+# define IsEqualGUID(guid1, guid2) (!memcmp(guid1, guid2, sizeof(GUID)))
+#endif
+
+#include <stdlib.h>
+
+#define COM_NO_WINDOWS_H
+
+#define CONTAINING_RECORD(address, type, field) \
+        ((type *)((char *)(address) - offsetof(type, field)))
+
+/* Define min() & max() macros */
+#ifndef NOMINMAX
+# ifndef min
+#  define min(a, b) (((a) <= (b)) ? (a) : (b))
+# endif
+
+# ifndef max
+#  define max(a, b) (((a) >= (b)) ? (a) : (b))
+# endif
+#endif /* NOMINMAX */
+
+#define _HRESULT_TYPEDEF_(x) ((HRESULT)x)
+#define E_ABORT                   ((HRESULT)0x80004004)
+#define DXGI_ERROR_ALREADY_EXISTS ((HRESULT)0x887A0036)
+
+#endif  /* _INC_WINDOWS */
+#endif  /* __VKD3D_WINDOWS_H */
