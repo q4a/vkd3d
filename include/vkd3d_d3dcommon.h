@@ -70,16 +70,6 @@ typedef CLSID *REFCLSID;
 #if !defined(_WIN32)
 typedef void *HWND;
 typedef void *HMODULE;
-typedef struct LUID {
-    DWORD LowPart;
-    LONG HighPart;
-} LUID;
-typedef struct _RECT {
-    LONG left;
-    LONG top;
-    LONG right;
-    LONG bottom;
-} RECT;
 #endif
 /*****************************************************************************
  * IUnknown interface
